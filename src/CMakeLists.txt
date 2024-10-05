@@ -1,6 +1,6 @@
 
-option(DROSS_BUILD_SHARED_LIBS "build dross as a shared library" ON)
-if (DROSS_BUILD_SHARED_LIBS)
+option(BUILD_SHARED_LIBS "build dross as a shared library" ON)
+if (BUILD_SHARED_LIBS)
     add_library(${PROJECT_NAME} SHARED)
 else()
     add_library(${PROJECT_NAME} STATIC)
@@ -35,7 +35,8 @@ target_link_directories(${PROJECT_NAME}
     PRIVATE "$ENV{HOMEBREW_PREFIX}/lib" "$ENV{HOMEBREW_PREFIX}/opt/gcc/lib/gcc/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/lib"
 )
 
-set(PUBLIC_HEADERS
+set(DROSS_HEADERS
+    ${PROJECT_SOURCE_DIR}/include/dross/dross.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/array.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/data.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/dictionary.h
@@ -48,11 +49,11 @@ set(PUBLIC_HEADERS
 set_target_properties(${PROJECT_NAME} PROPERTIES
     VERSION ${PROJECT_VERSION}
     LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
-    PUBLIC_HEADER "${PUBLIC_HEADERS}"
+    PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/include/dross/dross.h"
     POSITION_INDEPENDENT_CODE ON
 )
 
-foreach(header ${PUBLIC_HEADERS})
+foreach(header ${DROSS_HEADERS})
     file(RELATIVE_PATH relative_path "${PROJECT_SOURCE_DIR}/include/dross" ${header})
     get_filename_component(header_directory, ${relative_path} DIRECTORY)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -63,3 +64,10 @@ foreach(header ${PUBLIC_HEADERS})
     )
 endforeach()
 
+include(GNUInstallDirs)
+install(TARGETS dross
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dross
+)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/dross DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

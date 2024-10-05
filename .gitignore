@@ -31,5 +31,6 @@
 *.out
 *.app
 
-#
+# Language server files
+.cache/
 compile_commands.json

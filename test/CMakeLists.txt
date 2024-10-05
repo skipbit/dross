@@ -39,3 +39,4 @@ target_link_libraries(${TEST_NAME}
 )
 
 gtest_discover_tests(${TEST_NAME})
+add_dependencies(${TEST_NAME} dross)
