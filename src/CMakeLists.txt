@@ -28,7 +28,7 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE "$ENV{HOMEBREW_PREFIX}/include" "$ENV{HOMEBREW_PREFIX}/opt/gcc/include/c++/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/include"
 )
 target_include_directories(${PROJECT_NAME}
-    PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_link_directories(${PROJECT_NAME}
@@ -48,21 +48,9 @@ set(DROSS_HEADERS
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     VERSION ${PROJECT_VERSION}
-    LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
     PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/include/dross/dross.h"
     POSITION_INDEPENDENT_CODE ON
 )
-
-foreach(header ${DROSS_HEADERS})
-    file(RELATIVE_PATH relative_path "${PROJECT_SOURCE_DIR}/include/dross" ${header})
-    get_filename_component(header_directory, ${relative_path} DIRECTORY)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/include/${header_directory}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${header} ${PROJECT_BINARY_DIR}/include/dross/${relative_path}
-        COMMENT "Copying ${header} to ${PROJECT_BINARY_DIR}/include/dross/${relative_path}"
-        DEPENDS ${PROJECT_SOURCE_DIR}/include/dross/${relative_path}
-    )
-endforeach()
 
 include(GNUInstallDirs)
 install(TARGETS dross

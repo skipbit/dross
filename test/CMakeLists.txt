@@ -6,7 +6,7 @@ find_package(GTest REQUIRED)
 
 set(TEST_NAME ${PROJECT_NAME}_test)
 
-add_executable(${TEST_NAME} ${TEST_SOURCES})
+add_executable(${TEST_NAME})
 
 target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_array.cpp
@@ -27,7 +27,7 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE "$ENV{HOMEBREW_PREFIX}/include" "$ENV{HOMEBREW_PREFIX}/opt/gcc/include/c++/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/include"
 )
 target_include_directories(${TEST_NAME}
-    PRIVATE ${dross_BINARY_DIR}/include
+    PRIVATE ${PROJECT_SOURCE_DIR}/include
 )
 target_link_directories(${TEST_NAME}
     PRIVATE "$ENV{HOMEBREW_PREFIX}/lib" "$ENV{HOMEBREW_PREFIX}/opt/gcc/lib/gcc/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/lib" ${dross_BINARY_DIR}/lib
@@ -39,4 +39,3 @@ target_link_libraries(${TEST_NAME}
 )
 
 gtest_discover_tests(${TEST_NAME})
-add_dependencies(${TEST_NAME} dross)
