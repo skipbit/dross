@@ -9,7 +9,7 @@ xdg::xdg(const std::string& name)
 {
 }
 
-std::optional<path> xdg::config_home() const
+std::optional<std::string> xdg::config_home() const
 {
     const auto directory = environment::value("XDG_CONFIG_HOME")
         .or_else([]() {
@@ -24,7 +24,7 @@ std::optional<path> xdg::config_home() const
     return directory;
 }
 
-std::optional<path> xdg::data_home() const
+std::optional<std::string> xdg::data_home() const
 {
     const auto directory = environment::value("XDG_DATA_HOME")
         .or_else([]() {
@@ -39,7 +39,7 @@ std::optional<path> xdg::data_home() const
     return directory;
 }
 
-std::optional<path> xdg::cache_home() const
+std::optional<std::string> xdg::cache_home() const
 {
     const auto directory = environment::value("XDG_CACHE_HOME")
         .or_else([]() {
@@ -54,7 +54,7 @@ std::optional<path> xdg::cache_home() const
     return directory;
 }
 
-std::optional<path> xdg::state_home() const
+std::optional<std::string> xdg::state_home() const
 {
     const auto directory = environment::value("XDG_STATE_HOME")
         .or_else([]() {
