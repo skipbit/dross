@@ -9,6 +9,7 @@ class path {
 public:
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::string&);
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path&);
+    static std::optional<path> home();
     static std::string separator();
 
     path();

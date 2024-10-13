@@ -1,6 +1,10 @@
 #include "dross/platform/path.h"
 #include "dross/platform/environment.h"
 
+#include <optional>
+#include <pwd.h>
+#include <unistd.h>
+
 namespace dross {
 
 std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::string& absolute_path)
@@ -20,6 +24,24 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::fi
     }
 
     return path{absolute_path};
+}
+
+std::optional<path> path::home()
+{
+    const auto h = environment::value("HOME")
+        .and_then([](const std::string& home) {
+            return std::make_optional(path(home));
+        })
+        .or_else([]() {
+            struct passwd* pw = getpwuid(getuid());
+            if (pw && pw->pw_dir) {
+                const std::string p = pw->pw_dir;
+                return std::make_optional(path{p});
+            }
+            return std::optional<path>(std::nullopt);
+        });
+
+    return h;
 }
 
 std::string path::separator()
@@ -66,8 +88,8 @@ std::string path::string() const
 std::expected<path, std::filesystem::filesystem_error> path::expand() const
 {
     if (_path.string().substr(0, 1) == "~") {
-        const auto expanded = environment::value("HOME").and_then([&](const std::string& env) {
-            return std::make_optional(path{env}.append(_path.string().replace(0, 1, "")).string());
+        const auto expanded = path::home().and_then([&](const path& p) {
+            return std::make_optional(p.append(_path.string().replace(0, 1, "")).string());
         });
         if (expanded) {
             return path { std::filesystem::canonical(std::filesystem::path{expanded.value()}) };
