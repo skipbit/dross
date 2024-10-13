@@ -7,6 +7,8 @@ else()
 endif()
 
 target_sources(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/environment.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/path.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/array.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/data.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/dictionary.cpp
@@ -37,6 +39,8 @@ target_link_directories(${PROJECT_NAME}
 
 set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/dross.h
+    ${PROJECT_SOURCE_DIR}/include/dross/platform/environment.h
+    ${PROJECT_SOURCE_DIR}/include/dross/platform/path.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/array.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/data.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/dictionary.h
