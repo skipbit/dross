@@ -35,18 +35,6 @@ template <typename T> concept container_type = requires(T a) {
  * @brief Concatenate containers.
  *
  * @tparam T The container type.
- * @param a The container to concatenate.
- * @return T The concatenated container.
- */
-template <container_type T>
-T concat(const T& a) {
-    return a;
-}
-
-/**
- * @brief Concatenate containers.
- *
- * @tparam T The container type.
  * @tparam Ts The container types.
  * @param a The container to concatenate.
  * @param b The container to concatenate.
@@ -54,8 +42,8 @@ T concat(const T& a) {
  */
 template<container_type T, typename... Ts>
 T concat(const T& a, const Ts&... b) {
-    T c = concat(b...);
-    c.insert(c.end(), a.begin(), a.end());
+    T c = a;
+    (c.insert(c.end(), b.begin(), b.end()), ...);
     return c;
 }
 
