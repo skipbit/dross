@@ -16,7 +16,16 @@ namespace dross {
  * @param delimiter The delimiter to split on.
  * @return std::vector<std::string> A vector of tokens.
  */
-std::vector<std::string> split(const std::string& s, const char& d);
+std::vector<std::string> split(const std::string& s, const std::string& d);
+
+/**
+ * @brief Join tokens into a string.
+ *
+ * @param c The tokens to join.
+ * @param delimiter The delimiter to join with.
+ * @return std::string The joined string.
+ */
+std::string join(const std::vector<std::string>& c, const std::string& d);
 
 /**
  * @brief Concatenate containers.

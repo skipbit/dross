@@ -7,11 +7,18 @@
 TEST(string_split_test, colon_delimited)
 {
     const auto s = "foo:bar:baz";
-    const auto v = dross::split(s, ':');
+    const auto v = dross::split(s, ":");
     ASSERT_EQ(v.size(), 3);
     EXPECT_EQ(v[0], "foo");
     EXPECT_EQ(v[1], "bar");
     EXPECT_EQ(v[2], "baz");
+}
+
+TEST(vector_join_test, comma_delimited)
+{
+    const std::vector<std::string> v = { "foo", "bar", "baz" };
+    const auto s = dross::join(v, ",");
+    EXPECT_EQ(s, "foo,bar,baz");
 }
 
 TEST(concat_test, two_number_vector_concat)
