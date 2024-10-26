@@ -26,6 +26,8 @@ public:
     value& value_at(const size_t) const;
 
     void append(const value&);
+    void append(iterator, iterator);
+    void append(const_iterator, const_iterator);
     void remove(const value&);
 
     iterator begin();
@@ -56,6 +58,7 @@ public:
     using reference = value&;
     using iterator_category = std::forward_iterator_tag;
 
+    iterator(const iterator&);
     ~iterator();
 
     iterator& operator++();
@@ -80,6 +83,7 @@ public:
     using reference = const value&;
     using iterator_category = std::forward_iterator_tag;
 
+    const_iterator(const const_iterator&);
     ~const_iterator();
 
     const_iterator& operator++();

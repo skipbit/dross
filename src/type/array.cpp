@@ -62,6 +62,20 @@ void array::append(const value& v)
     _store->contents.push_back(v);
 }
 
+void array::append(iterator first, iterator last)
+{
+    std::for_each(first, last, [this](const value& v) {
+        append(v);
+    });
+}
+
+void array::append(const_iterator first, const_iterator last)
+{
+    std::for_each(first, last, [this](const value& v) {
+        append(v);
+    });
+}
+
 void array::remove(const value& v)
 {
     std::erase(_store->contents, v);
@@ -135,6 +149,11 @@ array::iterator::iterator(const std::any& a)
 {
 }
 
+array::iterator::iterator(const iterator& i)
+    : _impl(std::make_unique<impl>(*(i._impl)))
+{
+}
+
 array::iterator::~iterator() = default;
 
 array::iterator& array::iterator::operator++()
@@ -167,6 +186,11 @@ public:
 
 array::const_iterator::const_iterator(const std::any& a)
     : _impl(std::make_unique<impl>(std::any_cast<std::vector<value>::const_iterator>(a)))
+{
+}
+
+array::const_iterator::const_iterator(const const_iterator& i)
+    : _impl(std::make_unique<impl>(*(i._impl)))
 {
 }
 
