@@ -14,6 +14,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_number.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_string.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_value.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/test_type.cpp
 )
 
 target_compile_options(${TEST_NAME}
@@ -31,7 +32,7 @@ target_include_directories(${TEST_NAME}
     PRIVATE ${PROJECT_SOURCE_DIR}/include
 )
 target_link_directories(${TEST_NAME}
-    PRIVATE "$ENV{HOMEBREW_PREFIX}/lib" "$ENV{HOMEBREW_PREFIX}/opt/gcc/lib/gcc/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/lib" ${dross_BINARY_DIR}/lib
+    PRIVATE "$ENV{HOMEBREW_PREFIX}/lib" "$ENV{HOMEBREW_PREFIX}/opt/gcc/lib/gcc/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/lib" ${dross_BINARY_DIR}/src
 )
 target_link_libraries(${TEST_NAME}
     dross
