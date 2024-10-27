@@ -69,6 +69,11 @@ path::path(const path& p)
 {
 }
 
+bool path::exists() const
+{
+    return std::filesystem::exists(_path);
+}
+
 path path::append(const std::string& component) const
 {
     std::filesystem::path p(_path);
@@ -113,6 +118,16 @@ std::expected<path, std::filesystem::filesystem_error> path::resolve() const
     } catch (const std::filesystem::filesystem_error& e) {
         return std::unexpected(e);
     }
+}
+
+path::operator std::string() const
+{
+    return _path.string();
+}
+
+path::operator std::filesystem::path() const
+{
+    return _path;
 }
 
 }

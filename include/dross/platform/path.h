@@ -2,6 +2,7 @@
 
 #include <expected>
 #include <filesystem>
+#include <string>
 
 namespace dross {
 
@@ -17,11 +18,15 @@ public:
     path(const std::filesystem::path&);
     path(const path&);
 
+    bool exists() const;
     path append(const std::string&) const;
     std::string string() const;
 
     std::expected<path, std::filesystem::filesystem_error> expand() const;
     std::expected<path, std::filesystem::filesystem_error> resolve() const;
+
+    operator std::string() const;
+    operator std::filesystem::path() const;
 private:
     std::filesystem::path _path;
 };
