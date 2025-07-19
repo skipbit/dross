@@ -1,8 +1,17 @@
 
 enable_testing()
 
-list(APPEND CMAKE_PREFIX_PATH "$ENV{HOMEBREW_PREFIX}/opt/googletest")
-find_package(GTest REQUIRED)
+# Use FetchContent to get GoogleTest if not found in system
+find_package(GTest QUIET)
+if(NOT GTest_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.15.2
+    )
+    FetchContent_MakeAvailable(googletest)
+endif()
 
 set(TEST_NAME ${PROJECT_NAME}_test)
 
@@ -24,15 +33,8 @@ target_compile_options(${TEST_NAME}
 )
 target_compile_features(${TEST_NAME} PUBLIC cxx_std_23)
 
-target_include_directories(${PROJECT_NAME}
-    SYSTEM BEFORE
-    PRIVATE "$ENV{HOMEBREW_PREFIX}/include" "$ENV{HOMEBREW_PREFIX}/opt/gcc/include/c++/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/include"
-)
 target_include_directories(${TEST_NAME}
     PRIVATE ${PROJECT_SOURCE_DIR}/include
-)
-target_link_directories(${TEST_NAME}
-    PRIVATE "$ENV{HOMEBREW_PREFIX}/lib" "$ENV{HOMEBREW_PREFIX}/opt/gcc/lib/gcc/13" "$ENV{HOMEBREW_PREFIX}/opt/glibc/lib" ${dross_BINARY_DIR}/src
 )
 target_link_libraries(${TEST_NAME}
     dross

@@ -3,6 +3,7 @@
 #include "dross/type.h"
 
 #include <list>
+#include <deque>
 
 TEST(string_split_test, colon_delimited)
 {

@@ -1,8 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 namespace dross {
+
+class value;
 
 class dictionary final {
 public:
