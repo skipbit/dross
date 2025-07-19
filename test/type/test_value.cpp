@@ -322,10 +322,14 @@ TEST(value_test, reassignment_type_changes)
 TEST(value_test, self_assignment)
 {
     dross::value v = 42;
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-assign-overloaded"
+#endif
     v = v;  // self assignment
+#ifdef __clang__
 #pragma clang diagnostic pop
+#endif
     EXPECT_EQ(v, 42);
     EXPECT_TRUE(v.is<dross::number>());
 }
