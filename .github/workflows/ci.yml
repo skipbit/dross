@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-ubuntu-gcc:
+    name: Ubuntu GCC Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+        gcc_version: [13, 14]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install GCC ${{ matrix.gcc_version }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc_version }} 100
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc_version }} 100
+    
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=gcc-${{ matrix.gcc_version }} \
+          -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc_version }}
+    
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
+    
+    - name: Test
+      run: |
+        cd build
+        ctest --output-on-failure -C ${{ matrix.build_type }}
+
+  build-ubuntu-clang:
+    name: Ubuntu Clang Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+        clang_version: [16, 17, 18]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Clang ${{ matrix.clang_version }}
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{ matrix.clang_version }}
+        sudo apt-get install -y clang-${{ matrix.clang_version }}
+    
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=clang-${{ matrix.clang_version }} \
+          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang_version }}
+    
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
+    
+    - name: Test
+      run: |
+        cd build
+        ctest --output-on-failure -C ${{ matrix.build_type }}
+
+  build-static-library:
+    name: Static Library Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure CMake (Static)
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_SHARED_LIBS=OFF
+    
+    - name: Build
+      run: cmake --build build -j$(nproc)
+    
+    - name: Test
+      run: |
+        cd build
+        ctest --output-on-failure
+
+  install-test:
+    name: Installation Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build and Install
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build -j$(nproc)
+        sudo cmake --install build
+    
+    - name: Test find_package
+      run: |
+        mkdir test-client && cd test-client
+        cat > CMakeLists.txt << 'EOF'
+        cmake_minimum_required(VERSION 3.20)
+        project(test_client)
+        find_package(dross REQUIRED)
+        add_executable(test_client main.cpp)
+        target_link_libraries(test_client PRIVATE dross::dross)
+        EOF
+        
+        cat > main.cpp << 'EOF'
+        #include <dross/dross.h>
+        #include <iostream>
+        
+        int main() {
+            dross::number n{"42"};
+            std::cout << "Dross number: " << n.str() << std::endl;
+            return 0;
+        }
+        EOF
+        
+        cmake -S . -B build
+        cmake --build build
+        ./build/test_client
+    
+    - name: Test pkg-config
+      run: |
+        pkg-config --exists dross
+        pkg-config --modversion dross
+        pkg-config --cflags dross
+        pkg-config --libs dross
