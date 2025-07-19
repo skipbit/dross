@@ -17,7 +17,7 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::fi
     try {
         std::error_code err;
         if (! std::filesystem::create_directories(absolute_path, err)) {
-            return std::unexpected(std::filesystem::filesystem_error("failled", absolute_path, err));
+            return std::unexpected(std::filesystem::filesystem_error("failed", absolute_path, err));
         }
     } catch (const std::filesystem::filesystem_error& e) {
         return std::unexpected(e);

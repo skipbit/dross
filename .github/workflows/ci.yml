@@ -14,25 +14,25 @@ jobs:
       matrix:
         build_type: [Debug, Release]
         gcc_version: [13, 14]
-    
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Install GCC ${{ matrix.gcc_version }}
+
+    - name: Install dependencies and GCC ${{ matrix.gcc_version }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
-    
+        sudo apt-get install -y cmake build-essential gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+
     - name: Configure CMake
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DCMAKE_C_COMPILER=gcc-${{ matrix.gcc_version }} \
           -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc_version }}
-    
+
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
-    
+
     - name: Test
       run: |
         cd build
@@ -44,26 +44,32 @@ jobs:
     strategy:
       matrix:
         build_type: [Debug, Release]
-        clang_version: [16, 17]
-    
+        clang_version: [17, 18]
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Install Clang ${{ matrix.clang_version }}
+
+    - name: Install dependencies and Clang ${{ matrix.clang_version }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang-${{ matrix.clang_version }}
-    
+        sudo apt-get install -y cmake build-essential
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+        echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${{ matrix.clang_version }} main" | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt-get update
+        sudo apt-get install -y clang-${{ matrix.clang_version }} libc++-${{ matrix.clang_version }}-dev libc++abi-${{ matrix.clang_version }}-dev
+
     - name: Configure CMake
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
           -DCMAKE_C_COMPILER=clang-${{ matrix.clang_version }} \
-          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang_version }}
-    
+          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang_version }} \
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
-    
+
     - name: Test
       run: |
         cd build
@@ -72,19 +78,24 @@ jobs:
   build-static-library:
     name: Static Library Build
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+
     - name: Configure CMake (Static)
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_SHARED_LIBS=OFF
-    
+
     - name: Build
       run: cmake --build build -j$(nproc)
-    
+
     - name: Test
       run: |
         cd build
@@ -93,16 +104,21 @@ jobs:
   install-test:
     name: Installation Test
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential pkg-config
+
     - name: Build and Install
       run: |
         cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
         cmake --build build -j$(nproc)
         sudo cmake --install build
-    
+
     - name: Test find_package
       run: |
         mkdir test-client && cd test-client
@@ -115,22 +131,22 @@ jobs:
         add_executable(test_client main.cpp)
         target_link_libraries(test_client PRIVATE dross::dross)
         EOF
-        
+
         cat > main.cpp << 'EOF'
         #include <dross/dross.h>
         #include <iostream>
-        
+
         int main() {
             dross::number n{"42"};
             std::cout << "Test passed: " << static_cast<std::string>(n) << std::endl;
             return 0;
         }
         EOF
-        
+
         cmake -S . -B build
         cmake --build build
         ./build/test_client
-    
+
     - name: Test pkg-config
       run: |
         pkg-config --exists dross
