@@ -34,3 +34,15 @@ install(EXPORT drossTargets
     NAMESPACE dross::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/dross
 )
+
+# pkg-config support
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/dross.pc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/dross.pc"
+    @ONLY
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/dross.pc"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)

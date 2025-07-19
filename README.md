@@ -89,6 +89,29 @@ FetchContent_MakeAvailable(dross)
 target_link_libraries(your_target PRIVATE dross::dross)
 ```
 
+#### pkg-config Integration
+
+```bash
+# Compile flags
+pkg-config --cflags dross
+
+# Link flags
+pkg-config --libs dross
+
+# Check version
+pkg-config --modversion dross
+```
+
+#### Manual Compilation
+
+```bash
+# Using pkg-config
+g++ -std=c++23 $(pkg-config --cflags dross) main.cpp $(pkg-config --libs dross)
+
+# Or manually
+g++ -std=c++23 -I/usr/local/include main.cpp -L/usr/local/lib -ldross
+```
+
 #### Basic Usage
 
 ```cpp
