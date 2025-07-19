@@ -41,6 +41,9 @@ public:
     value& operator=(const number&);
     value& operator=(const array&);
     value& operator=(const dictionary&);
+    
+    template <class T>
+    bool is() const noexcept;
 
 private:
     template <class T>

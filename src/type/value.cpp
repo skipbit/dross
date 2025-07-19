@@ -110,9 +110,26 @@ value& value::operator=(const dictionary& d)
 }
 
 template <class T>
+bool value::is() const noexcept
+{
+    return std::holds_alternative<T>(_store->value);
+}
+
+template <class T>
 T value_cast(const value& original) noexcept
 {
     return (std::holds_alternative<T>(original._store->value) ? std::get<T>(original._store->value) : T());
 }
+
+// Explicit instantiations
+template bool value::is<number>() const noexcept;
+template bool value::is<string>() const noexcept;
+template bool value::is<array>() const noexcept;
+template bool value::is<dictionary>() const noexcept;
+
+template number value_cast<number>(const value&) noexcept;
+template string value_cast<string>(const value&) noexcept;
+template array value_cast<array>(const value&) noexcept;
+template dictionary value_cast<dictionary>(const value&) noexcept;
 
 }

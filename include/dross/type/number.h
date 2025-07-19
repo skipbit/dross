@@ -53,6 +53,8 @@ public:
     template <number_type T>
     number& operator=(const T n) { return operator=(number(n)); }
 
+    operator std::string() const;
+
 private:
     class storage;
     std::unique_ptr<storage> _store;

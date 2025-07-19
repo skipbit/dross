@@ -94,4 +94,9 @@ number& number::operator=(const std::string& s)
     return *this;
 }
 
+number::operator std::string() const
+{
+    return _store->number;
+}
+
 }
