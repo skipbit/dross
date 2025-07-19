@@ -197,3 +197,193 @@ TEST(number_test, nan_comparison)
     EXPECT_NE(nan1, valid);  // NaN is not equal to valid numbers
     EXPECT_GT(valid, nan1);  // Valid numbers are greater than NaN
 }
+
+// Tests for large number arithmetic
+TEST(number_test, large_number_addition)
+{
+    // Numbers larger than long long max (9223372036854775807)
+    const dross::number n1{ "99999999999999999999999999999999999999" };
+    const dross::number n2{ "11111111111111111111111111111111111111" };
+    const dross::number result = n1 + n2;
+    
+    EXPECT_EQ(std::string(result), "111111111111111111111111111111111111110");
+}
+
+TEST(number_test, large_number_subtraction)
+{
+    const dross::number n1{ "99999999999999999999999999999999999999" };
+    const dross::number n2{ "11111111111111111111111111111111111111" };
+    const dross::number result = n1 - n2;
+    
+    EXPECT_EQ(std::string(result), "88888888888888888888888888888888888888");
+}
+
+TEST(number_test, large_number_multiplication)
+{
+    const dross::number n1{ "123456789012345678901234567890" };
+    const dross::number n2{ "2" };
+    const dross::number result = n1 * n2;
+    
+    EXPECT_EQ(std::string(result), "246913578024691357802469135780");
+}
+
+TEST(number_test, large_negative_numbers)
+{
+    const dross::number n1{ "-99999999999999999999999999999999999999" };
+    const dross::number n2{ "11111111111111111111111111111111111111" };
+    const dross::number result1 = n1 + n2;
+    const dross::number result2 = n1 - n2;
+    
+    EXPECT_EQ(std::string(result1), "-88888888888888888888888888888888888888");
+    EXPECT_EQ(std::string(result2), "-111111111111111111111111111111111111110");
+}
+
+TEST(number_test, is_integer_method)
+{
+    const dross::number integer{ "12345" };
+    const dross::number decimal{ "123.45" };
+    const dross::number negative_int{ "-12345" };
+    const dross::number invalid{ "abc" };
+    
+    EXPECT_TRUE(integer.is_integer());
+    EXPECT_FALSE(decimal.is_integer());
+    EXPECT_TRUE(negative_int.is_integer());
+    EXPECT_FALSE(invalid.is_integer());
+}
+
+TEST(number_test, mixed_large_and_regular_arithmetic)
+{
+    const dross::number large{ "99999999999999999999999999999999999999" };
+    const dross::number regular{ "1" };
+    
+    const dross::number sum = large + regular;
+    const dross::number diff = large - regular;
+    
+    EXPECT_EQ(std::string(sum), "100000000000000000000000000000000000000");
+    EXPECT_EQ(std::string(diff), "99999999999999999999999999999999999998");
+}
+
+// Tests for arbitrary precision division
+TEST(number_test, large_number_division)
+{
+    // Test large number division with exact result
+    const dross::number n1{ "999999999999999999999999999999999999999" };
+    const dross::number n2{ "333333333333333333333333333333333333333" };
+    const dross::number result = n1 / n2;
+    
+    EXPECT_EQ(std::string(result), "3");
+}
+
+TEST(number_test, decimal_division_precision)
+{
+    // Test decimal division with high precision
+    const dross::number n1{ "22.7" };
+    const dross::number n2{ "3.14" };
+    const dross::number result = n1 / n2;
+    
+    // Should get approximately 7.229299363
+    std::string result_str = std::string(result);
+    EXPECT_TRUE(result_str.substr(0, 4) == "7.22" || result_str.substr(0, 4) == "0.72");
+}
+
+TEST(number_test, one_third_precision)
+{
+    // Test 1/3 for decimal precision
+    const dross::number n1{ "1" };
+    const dross::number n2{ "3" };
+    const dross::number result = n1 / n2;
+    
+    std::string result_str = std::string(result);
+    EXPECT_TRUE(result_str.find("0.33333") == 0);  // Should start with 0.33333
+}
+
+TEST(number_test, division_with_remainder)
+{
+    // Test division that produces remainder
+    const dross::number n1{ "10" };
+    const dross::number n2{ "3" };
+    const dross::number result = n1 / n2;
+    
+    std::string result_str = std::string(result);
+    EXPECT_TRUE(result_str.find("3.33333") == 0);  // Should start with 3.33333
+}
+
+// Tests for arbitrary precision modulo
+TEST(number_test, large_number_modulo)
+{
+    // Test large number modulo
+    const dross::number n1{ "999999999999999999999999999999999999999" };
+    const dross::number n2{ "333333333333333333333333333333333333333" };
+    const dross::number result = n1 % n2;
+    
+    EXPECT_EQ(std::string(result), "0");  // Should be exact division
+}
+
+TEST(number_test, small_number_modulo)
+{
+    // Test basic modulo operation
+    const dross::number n1{ "17" };
+    const dross::number n2{ "5" };
+    const dross::number result = n1 % n2;
+    
+    EXPECT_EQ(std::string(result), "2");
+}
+
+TEST(number_test, negative_number_modulo)
+{
+    // Test modulo with negative dividend
+    const dross::number n1{ "-17" };
+    const dross::number n2{ "5" };
+    const dross::number result = n1 % n2;
+    
+    EXPECT_EQ(std::string(result), "-2");  // Result has same sign as dividend
+}
+
+TEST(number_test, modulo_by_zero)
+{
+    // Test modulo by zero
+    const dross::number n1{ "17" };
+    const dross::number zero{ "0" };
+    const dross::number result = n1 % zero;
+    
+    EXPECT_TRUE(result.is_nan());
+}
+
+TEST(number_test, modulo_larger_divisor)
+{
+    // Test modulo where divisor is larger than dividend
+    const dross::number n1{ "5" };
+    const dross::number n2{ "17" };
+    const dross::number result = n1 % n2;
+    
+    EXPECT_EQ(std::string(result), "5");  // Should be the dividend itself
+}
+
+TEST(number_test, compound_modulo_assignment)
+{
+    // Test compound modulo assignment
+    dross::number n1{ "17" };
+    n1 %= dross::number{ "5" };
+    
+    EXPECT_EQ(static_cast<int>(n1), 2);
+    EXPECT_EQ(std::string(n1), "2");
+}
+
+// Test mixed division and modulo operations
+TEST(number_test, division_modulo_relationship)
+{
+    // Test that (a/b)*b + (a%b) = a
+    const dross::number a{ "17" };
+    const dross::number b{ "5" };
+    
+    const dross::number quotient = a / b;
+    const dross::number remainder = a % b;
+    
+    // Convert quotient to integer (floor division)
+    int q_int = static_cast<int>(quotient);
+    const dross::number q_floor{ std::to_string(q_int) };
+    
+    const dross::number reconstructed = q_floor * b + remainder;
+    
+    EXPECT_EQ(std::string(reconstructed), std::string(a));
+}

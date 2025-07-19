@@ -1,6 +1,5 @@
 #pragma once
 
-#include <compare>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -23,6 +22,7 @@ public:
     ~number();
 
     bool is_nan() const;
+    bool is_integer() const;
     bool equals(const number&) const;
 
     template <number_type T>
