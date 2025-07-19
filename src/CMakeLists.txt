@@ -1,4 +1,7 @@
 
+# Include necessary modules
+include(GNUInstallDirs)
+
 option(BUILD_SHARED_LIBS "build dross as a shared library" ON)
 if (BUILD_SHARED_LIBS)
     add_library(${PROJECT_NAME} SHARED)
@@ -49,14 +52,25 @@ set(DROSS_HEADERS
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
     VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
     PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/include/dross/dross.h"
     POSITION_INDEPENDENT_CODE ON
 )
 
-include(GNUInstallDirs)
-install(TARGETS dross
+# Create alias for consistent usage
+add_library(dross::dross ALIAS ${PROJECT_NAME})
+
+# Modern CMake install with export
+install(TARGETS ${PROJECT_NAME}
+    EXPORT drossTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dross
 )
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/dross DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Install all headers
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/dross
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
