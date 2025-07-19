@@ -1,0 +1,13 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: @PROJECT_NAME@
+Description: A modern C++23 general-purpose library
+Version: @PROJECT_VERSION@
+URL: https://github.com/skipbit/dross
+
+Requires:
+Libs: -L${libdir} -ldross
+Cflags: -I${includedir}

@@ -1,0 +1,12 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find required dependencies
+# (Currently none, but this is where you'd add find_dependency calls)
+
+# Include the exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/drossTargets.cmake")
+
+# Check that the targets exist
+check_required_components(dross)
