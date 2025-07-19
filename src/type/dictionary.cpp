@@ -70,102 +70,115 @@ const value& dictionary::operator[](const std::string& key) const
     return _store->properties.at(key);
 }
 
-class dictionary::iterator {
+
+class dictionary::iterator::impl {
 public:
-    using iterator_type = std::map<std::string, dross::value>::iterator;
-    using value_type = std::pair<const std::string&, dross::value&>;
+    impl(std::map<std::string, dross::value>::iterator i) : cursor(i) {}
 
-    iterator(iterator_type it) : _it(it) {}
-
-    value_type operator*() const {
-        return {_it->first, _it->second};
-    }
-
-    iterator& operator++() {
-        ++_it;
-        return *this;
-    }
-
-    iterator operator++(int) {
-        iterator tmp = *this;
-        ++_it;
-        return tmp;
-    }
-
-    bool operator==(const iterator& other) const {
-        return _it == other._it;
-    }
-
-    bool operator!=(const iterator& other) const {
-        return _it != other._it;
-    }
-
-private:
-    iterator_type _it;
+    std::map<std::string, dross::value>::iterator cursor;
 };
 
-class dictionary::const_iterator {
+dictionary::iterator::iterator(const std::any& a)
+    : _impl(std::make_unique<impl>(std::any_cast<std::map<std::string, dross::value>::iterator>(a)))
+{
+}
+
+dictionary::iterator::iterator(const iterator& i)
+    : _impl(std::make_unique<impl>(*(i._impl)))
+{
+}
+
+dictionary::iterator::~iterator() = default;
+
+dictionary::iterator& dictionary::iterator::operator++()
+{
+    ++(_impl->cursor);
+    return *this;
+}
+
+dictionary::iterator::value_type dictionary::iterator::operator*() const
+{
+    return {_impl->cursor->first, _impl->cursor->second};
+}
+
+bool dictionary::iterator::operator==(const iterator& i) const
+{
+    return (_impl->cursor == i._impl->cursor);
+}
+
+bool dictionary::iterator::operator!=(const iterator& i) const
+{
+    return (_impl->cursor != i._impl->cursor);
+}
+
+class dictionary::const_iterator::impl {
 public:
-    using iterator_type = std::map<std::string, dross::value>::const_iterator;
-    using value_type = std::pair<const std::string&, const dross::value&>;
+    impl(std::map<std::string, dross::value>::const_iterator i) : cursor(i) {}
 
-    const_iterator(iterator_type it) : _it(it) {}
-
-    value_type operator*() const {
-        return {_it->first, _it->second};
-    }
-
-    const_iterator& operator++() {
-        ++_it;
-        return *this;
-    }
-
-    const_iterator operator++(int) {
-        const_iterator tmp = *this;
-        ++_it;
-        return tmp;
-    }
-
-    bool operator==(const const_iterator& other) const {
-        return _it == other._it;
-    }
-
-    bool operator!=(const const_iterator& other) const {
-        return _it != other._it;
-    }
-
-private:
-    iterator_type _it;
+    std::map<std::string, dross::value>::const_iterator cursor;
 };
+
+dictionary::const_iterator::const_iterator(const std::any& a)
+    : _impl(std::make_unique<impl>(std::any_cast<std::map<std::string, dross::value>::const_iterator>(a)))
+{
+}
+
+dictionary::const_iterator::const_iterator(const const_iterator& i)
+    : _impl(std::make_unique<impl>(*(i._impl)))
+{
+}
+
+dictionary::const_iterator::~const_iterator() = default;
+
+dictionary::const_iterator& dictionary::const_iterator::operator++()
+{
+    ++(_impl->cursor);
+    return *this;
+}
+
+dictionary::const_iterator::value_type dictionary::const_iterator::operator*() const
+{
+    return {_impl->cursor->first, _impl->cursor->second};
+}
+
+bool dictionary::const_iterator::operator==(const const_iterator& i) const
+{
+    return (_impl->cursor == i._impl->cursor);
+}
+
+bool dictionary::const_iterator::operator!=(const const_iterator& i) const
+{
+    return (_impl->cursor != i._impl->cursor);
+}
 
 dictionary::iterator dictionary::begin()
 {
-    return iterator(_store->properties.begin());
+    return iterator(std::make_any<std::map<std::string, dross::value>::iterator>(_store->properties.begin()));
 }
 
 dictionary::iterator dictionary::end()
 {
-    return iterator(_store->properties.end());
+    return iterator(std::make_any<std::map<std::string, dross::value>::iterator>(_store->properties.end()));
 }
 
 dictionary::const_iterator dictionary::begin() const
 {
-    return const_iterator(_store->properties.begin());
+    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cbegin()));
 }
 
 dictionary::const_iterator dictionary::end() const
 {
-    return const_iterator(_store->properties.end());
+    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cend()));
 }
 
 dictionary::const_iterator dictionary::cbegin() const
 {
-    return const_iterator(_store->properties.cbegin());
+    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cbegin()));
 }
 
 dictionary::const_iterator dictionary::cend() const
 {
-    return const_iterator(_store->properties.cend());
+    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cend()));
 }
 
 }

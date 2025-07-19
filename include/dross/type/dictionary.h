@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <memory>
 #include <string>
 
@@ -39,6 +40,56 @@ public:
 private:
     class storage;
     std::unique_ptr<storage> _store;
+};
+
+class dictionary::iterator final {
+public:
+    using value_type = std::pair<const std::string&, value&>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type;
+    using iterator_category = std::forward_iterator_tag;
+
+    iterator(const iterator&);
+    ~iterator();
+
+    iterator& operator++();
+    value_type operator*() const;
+    bool operator==(const iterator&) const;
+    bool operator!=(const iterator&) const;
+
+private:
+    friend class dictionary;
+    iterator(const std::any&);
+
+private:
+    class impl;
+    std::unique_ptr<impl> _impl;
+};
+
+class dictionary::const_iterator final {
+public:
+    using value_type = std::pair<const std::string&, const value&>;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const value_type*;
+    using reference = value_type;
+    using iterator_category = std::forward_iterator_tag;
+
+    const_iterator(const const_iterator&);
+    ~const_iterator();
+
+    const_iterator& operator++();
+    value_type operator*() const;
+    bool operator==(const const_iterator&) const;
+    bool operator!=(const const_iterator&) const;
+
+private:
+    friend class dictionary;
+    const_iterator(const std::any&);
+
+private:
+    class impl;
+    std::unique_ptr<impl> _impl;
 };
 
 }

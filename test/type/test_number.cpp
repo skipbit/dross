@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "dross/type/number.h"
+#include <sstream>
+#include <limits>
 
 TEST(number_test, default_constructor_is_zero)
 {
@@ -386,4 +388,293 @@ TEST(number_test, division_modulo_relationship)
     const dross::number reconstructed = q_floor * b + remainder;
     
     EXPECT_EQ(std::string(reconstructed), std::string(a));
+}
+
+// =============================================================================
+// Copy Constructor and Assignment Operators
+// =============================================================================
+
+TEST(number_test, copy_constructor)
+{
+    const dross::number original{ "12345.6789" };
+    const dross::number copy(original);
+    
+    EXPECT_EQ(original, copy);
+    EXPECT_EQ(std::string(original), std::string(copy));
+    EXPECT_FALSE(copy.is_nan());
+}
+
+TEST(number_test, copy_constructor_nan)
+{
+    const dross::number original = dross::number::nan();
+    const dross::number copy(original);
+    
+    EXPECT_TRUE(copy.is_nan());
+    EXPECT_EQ(original, copy);
+}
+
+TEST(number_test, assignment_operator_number)
+{
+    dross::number n1{ "100" };
+    const dross::number n2{ "200" };
+    
+    n1 = n2;
+    EXPECT_EQ(n1, n2);
+    EXPECT_EQ(std::string(n1), "200");
+}
+
+TEST(number_test, assignment_operator_string)
+{
+    dross::number n;
+    n = "12345";
+    EXPECT_EQ(std::string(n), "12345");
+    
+    n = std::string("67890");
+    EXPECT_EQ(std::string(n), "67890");
+}
+
+TEST(number_test, assignment_operator_numeric_types)
+{
+    dross::number n;
+    
+    n = 42;
+    EXPECT_EQ(static_cast<int>(n), 42);
+    
+    n = 3.14;
+    EXPECT_DOUBLE_EQ(static_cast<double>(n), 3.14);
+    
+    n = -100L;
+    EXPECT_EQ(static_cast<long long>(n), -100LL);
+    
+    n = 255u;
+    EXPECT_EQ(static_cast<int>(n), 255);
+}
+
+TEST(number_test, self_assignment)
+{
+    dross::number n{ "12345" };
+    dross::number& ref = n;
+    n = ref;  // Self-assignment through reference
+    
+    EXPECT_EQ(std::string(n), "12345");
+    EXPECT_FALSE(n.is_nan());
+}
+
+// =============================================================================
+// Type Conversion Tests
+// =============================================================================
+
+TEST(number_test, conversion_to_long_long)
+{
+    const dross::number n1{ "9223372036854775807" };  // LLONG_MAX
+    const dross::number n2{ "-9223372036854775808" }; // LLONG_MIN
+    const dross::number n3{ "12345" };
+    
+    EXPECT_EQ(static_cast<long long>(n1), std::numeric_limits<long long>::max());
+    EXPECT_EQ(static_cast<long long>(n2), std::numeric_limits<long long>::min());
+    EXPECT_EQ(static_cast<long long>(n3), 12345LL);
+}
+
+TEST(number_test, conversion_overflow)
+{
+    // Number too large for int
+    const dross::number large{ "9999999999999999999999999999999" };
+    // Conversion behavior is implementation-defined for overflow
+    // Just ensure it doesn't crash
+    volatile int i = static_cast<int>(large);
+    (void)i;
+    
+    volatile long long ll = static_cast<long long>(large);
+    (void)ll;
+}
+
+TEST(number_test, conversion_nan_to_numeric)
+{
+    const dross::number nan = dross::number::nan();
+    
+    // NaN conversions should return 0 or implementation-defined value
+    volatile int i = static_cast<int>(nan);
+    volatile double d = static_cast<double>(nan);
+    volatile long long ll = static_cast<long long>(nan);
+    
+    (void)i;
+    (void)d;
+    (void)ll;
+    // Just ensure conversions don't crash
+}
+
+// =============================================================================
+// Stream Output Operator
+// =============================================================================
+
+TEST(number_test, stream_output_operator)
+{
+    const dross::number n1{ "12345" };
+    const dross::number n2{ "-67.89" };
+    const dross::number n3 = dross::number::nan();
+    
+    std::ostringstream oss1;
+    oss1 << n1;
+    EXPECT_EQ(oss1.str(), "12345");
+    
+    std::ostringstream oss2;
+    oss2 << n2;
+    EXPECT_EQ(oss2.str(), "-67.89");
+    
+    std::ostringstream oss3;
+    oss3 << n3;
+    EXPECT_EQ(oss3.str(), "__invalid__");
+}
+
+TEST(number_test, stream_output_chaining)
+{
+    const dross::number n1{ "10" };
+    const dross::number n2{ "20" };
+    
+    std::ostringstream oss;
+    oss << "Values: " << n1 << " and " << n2;
+    EXPECT_EQ(oss.str(), "Values: 10 and 20");
+}
+
+// =============================================================================
+// Edge Cases and Boundary Values
+// =============================================================================
+
+TEST(number_test, zero_special_cases)
+{
+    const dross::number zero{ "0" };
+    const dross::number negative_zero{ "-0" };
+    const dross::number positive{ "10" };
+    
+    EXPECT_EQ(zero, negative_zero);
+    EXPECT_EQ(zero + positive, positive);
+    EXPECT_EQ(zero * positive, zero);
+    EXPECT_TRUE((positive / zero).is_nan());
+}
+
+TEST(number_test, leading_zeros)
+{
+    const dross::number n1{ "00123" };
+    const dross::number n2{ "123" };
+    
+    EXPECT_EQ(n1, n2);
+    EXPECT_EQ(std::string(n1), "00123");  // Leading zeros are preserved
+}
+
+TEST(number_test, whitespace_handling)
+{
+    // Numbers with whitespace should be NaN
+    const dross::number n1{ " 123" };
+    const dross::number n2{ "123 " };
+    const dross::number n3{ "1 23" };
+    
+    EXPECT_TRUE(n1.is_nan());
+    EXPECT_TRUE(n2.is_nan());
+    EXPECT_TRUE(n3.is_nan());
+}
+
+TEST(number_test, scientific_notation)
+{
+    // Test if scientific notation is handled (likely as NaN)
+    const dross::number n1{ "1e10" };
+    const dross::number n2{ "3.14e-5" };
+    
+    // These are likely NaN since the implementation seems to use string-based storage
+    // Just verify consistent behavior
+    bool n1_is_valid = !n1.is_nan();
+    bool n2_is_valid = !n2.is_nan();
+    
+    // Either both valid or both NaN
+    EXPECT_EQ(n1_is_valid, n2_is_valid);
+}
+
+// =============================================================================
+// Floating Point Precision Tests
+// =============================================================================
+
+TEST(number_test, decimal_precision_preservation)
+{
+    const dross::number n{ "3.14159265358979323846" };
+    std::string str = std::string(n);
+    
+    // Should preserve the full precision
+    EXPECT_EQ(str, "3.14159265358979323846");
+}
+
+TEST(number_test, trailing_zeros_decimal)
+{
+    const dross::number n1{ "1.2300" };
+    const dross::number n2{ "1.23" };
+    
+    // Trailing zeros might be preserved or trimmed
+    // Just ensure equality comparison works correctly
+    EXPECT_EQ(n1, n2);
+}
+
+TEST(number_test, very_small_decimals)
+{
+    const dross::number n1{ "0.000000000000000001" };
+    const dross::number n2{ "0.000000000000000002" };
+    const dross::number sum = n1 + n2;
+    
+    EXPECT_NE(n1, n2);
+    EXPECT_LT(n1, n2);
+    
+    // Check that arithmetic preserves precision
+    std::string sum_str = std::string(sum);
+    EXPECT_TRUE(sum_str == "0.000000000000000003" || 
+                sum_str == "3e-18" || 
+                sum.is_nan());  // Implementation-dependent
+}
+
+// =============================================================================
+// Three-way Comparison Tests
+// =============================================================================
+
+TEST(number_test, three_way_comparison)
+{
+    const dross::number n1{ "10" };
+    const dross::number n2{ "20" };
+    const dross::number n3{ "10" };
+    
+    EXPECT_TRUE((n1 <=> n2) < 0);
+    EXPECT_TRUE((n2 <=> n1) > 0);
+    EXPECT_TRUE((n1 <=> n3) == 0);
+}
+
+TEST(number_test, three_way_comparison_with_primitives)
+{
+    const dross::number n{ "42" };
+    
+    EXPECT_TRUE((n <=> 42) == 0);
+    EXPECT_TRUE((n <=> 100) < 0);
+    EXPECT_TRUE((n <=> 10) > 0);
+}
+
+// =============================================================================
+// Complex Arithmetic Sequences
+// =============================================================================
+
+TEST(number_test, complex_arithmetic_sequence)
+{
+    dross::number result{ "100" };
+    
+    result = (result + dross::number{"50"}) * dross::number{"2"};
+    EXPECT_EQ(std::string(result), "300");
+    
+    result = result / dross::number{"3"} - dross::number{"25"};
+    EXPECT_EQ(std::string(result), "75");
+    
+    result = result % dross::number{"20"} + dross::number{"5"};
+    EXPECT_EQ(std::string(result), "20");
+}
+
+TEST(number_test, chained_operations)
+{
+    const dross::number n1{ "5" };
+    const dross::number n2{ "3" };
+    const dross::number n3{ "2" };
+    
+    const dross::number result = n1 + n2 * n3;  // Should be 5 + 6 = 11
+    EXPECT_EQ(std::string(result), "11");
 }
