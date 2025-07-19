@@ -1,29 +1,30 @@
-## dross コーディング規約
+# dross Coding Style Guide
 
-### 1. 全般
+## 1. General
 
-*   **言語:** C++23 を使用する。
-*   **ファイルエンコーディング:** UTF-8 とする。
-*   **インクルードガード:** `#pragma once` を使用する。
-*   **依存性:** 標準ライブラリ、および dross 自身への依存に限定する。外部ライブラリへの依存は、ラッパーとして実装する場合のみ許容する。
+*   **Language:** Use C++23.
+*   **File Encoding:** UTF-8.
+*   **File Extensions:** Use `.h` for header files and `.cpp` for implementation files.
+*   **Include Guards:** Use `#pragma once`.
+*   **Dependencies:** Limit dependencies to the standard library and dross itself. External library dependencies are only permitted when implemented as wrappers.
 
-### 2. 命名規則
+## 2. Naming Conventions
 
-*   **名前空間:** `dross` とする。すべて小文字。
-*   **クラス・構造体名:** `lowercase` とする。(例: `class myclass;`)
-*   **関数・メソッド名:** `lower_snake_case` とする。(例: `void my_function();`)
-*   **変数名:** `lower_snake_case` とする。(例: `int my_variable;`)
-*   **プライベートメンバ変数:** `_` (アンダースコア) で始める `snake_case` とする。(例: `int _my_member;`)
-*   **コンセプト:** `snake_case` に `_type` を付けたサフィックスとする。(例: `template <typename T> concept my_concept_type = ...`)
-*   **定数:** `k` で始める `CamelCase` とする。(例: `const int kMyConstant = 10;`)
-*   **マクロ:** 定数としてや副作用のある利用は避ける。
+*   **Namespace:** Use `dross`. All lowercase.
+*   **Class/Struct Names:** Use `lowercase`. (e.g., `class myclass;`)
+*   **Function/Method Names:** Use `lower_snake_case`. (e.g., `void my_function();`)
+*   **Variable Names:** Use `lower_snake_case`. (e.g., `int my_variable;`)
+*   **Private Member Variables:** Use `snake_case` beginning with `_` (underscore). (e.g., `int _my_member;`)
+*   **Concepts:** Use `snake_case` with `_type` suffix. (e.g., `template <typename T> concept my_concept_type = ...`)
+*   **Constants:** Use `CamelCase` beginning with `k`. (e.g., `const int kMyConstant = 10;`)
+*   **Macros:** Avoid using macros for constants or operations with side effects.
 
-### 3. フォーマット
+## 3. Formatting
 
-*   **インデント:** 半角スペース4つ。
-    *  名前空間の中のクラスや関数の定義は、インデントしない。
-*   **波括弧 (`{}`):**
-    *   クラス・制御構文の波括弧は同じ行に置き、関数の波括弧は改行する。
+*   **Indentation:** Use 4 spaces.
+    *  Do not indent class or function definitions within namespaces.
+*   **Braces (`{}`):**
+    *   Place opening braces for classes and control structures on the same line; place opening braces for functions on a new line.
     ```cpp
     namespace dross {
     class MyClass {
@@ -37,38 +38,38 @@
     };
     }
     ```
-    *  ラムダ式の開始波括弧は同じ行に置き、閉じ波括弧は新しい行に置く。
-*   **宣言と実装:** ヘッダファイルとソースファイルを分け、ヘッダファイルにはクラスや関数の宣言のみを記述する。実装はソースファイルに記述する。
-*   **1行の文字数:** 80文字を目安とするが、可読性を損なわない範囲で柔軟に対応する。
-*   **空行:**
-    *   論理的なコードブロックの間に1行の空行を入れる。
-    *   クラスや関数の定義の間には2行の空行を入れる。
+    *  For lambda expressions, place the opening brace on the same line and the closing brace on a new line.
+*   **Declaration and Implementation:** Separate header files and source files. Header files should contain only class and function declarations. Implementations should be in source files.
+*   **Line Length:** Target 80 characters, but be flexible within reasonable limits to maintain readability.
+*   **Blank Lines:**
+    *   Insert one blank line between logical code blocks.
+    *   Insert two blank lines between class and function definitions.
 
-### 4. コーディングスタイル
+## 4. Coding Style
 
-*   **`Pimpl` イディオム:** ABI の安定性を保つため、公開ヘッダに置くクラスでは `Pimpl` (Pointer to implementation) イディオムを積極的に使用する。内部実装は `storage` または `impl` という名前のプライベートクラスに隠蔽する。
-*   **エラー処理:**
-    *   例外は使用しない。
-    *   失敗する可能性のある操作では、`std::optional` または `std::expected` を返す。
-    *   エラー情報は `dross::error` クラスで表現する。
-*   **`const` の使用:**
-    *   変更しない変数や引数には `const` を付ける。
-    *   メンバ変数を変更しないメソッドには `const` を付ける。
-    *   `constexpr` が 使用可能な場合は可能な限り使用して、コンパイル時定数を定義する。
-*   **`noexcept` の使用:** 例外を投げないことが保証される関数には `noexcept` を付ける。
-*   **スマートポインタ:** リソース管理には `std::unique_ptr` や `std::shared_ptr` を使用し、生のポインタの使用は避ける。
-*   **C++20/23 機能の活用:**
-    *   コンセプト (`concept`) を活用し、テンプレートの型制約を明確にする。
-    *   範囲 `for` ループ (`for (const auto& ...)` ) を積極的に使用する。
-    *   `std::ranges` を活用して、アルゴリズムを簡潔に記述する。
+*   **`Pimpl` Idiom:** To maintain ABI stability, actively use the `Pimpl` (Pointer to implementation) idiom for classes in public headers. Hide internal implementation in private classes named `storage` or `impl`.
+*   **Error Handling:**
+    *   Do not use exceptions.
+    *   For operations that may fail, return `std::optional` or `std::expected`.
+    *   Represent error information using the `dross::error` class.
+*   **`const` Usage:**
+    *   Apply `const` to variables and parameters that are not modified.
+    *   Apply `const` to methods that do not modify member variables.
+    *   Use `constexpr` whenever possible to define compile-time constants.
+*   **`noexcept` Usage:** Apply `noexcept` to functions that are guaranteed not to throw exceptions.
+*   **Smart Pointers:** Use `std::unique_ptr` and `std::shared_ptr` for resource management; avoid using raw pointers.
+*   **C++20/23 Features:**
+    *   Leverage concepts (`concept`) to clarify template type constraints.
+    *   Actively use range-based `for` loops (`for (const auto& ...)`).
+    *   Use `std::ranges` to write algorithms concisely.
 
-### 5. ドキュメンテーション
+## 5. Documentation
 
-*   **コメント:** Doxygen スタイルのコメントで、公開 API のドキュメントを記述する。
+*   **Comments:** Document public APIs using Doxygen-style comments.
     ```cpp
     /**
-     * @brief 〇〇を行う関数です。
-     * @param p1 第1引数の説明。
-     * @return 戻り値の説明。
+     * @brief Function that performs a specific operation.
+     * @param p1 Description of the first parameter.
+     * @return Description of the return value.
      */
     ```
