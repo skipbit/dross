@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <iostream>
 
 namespace dross {
 
@@ -56,10 +57,10 @@ public:
     number& operator=(const T n) { return operator=(number(n)); }
 
     // Conversion operators
-    operator std::string() const;
-    operator int() const;
-    operator double() const;
-    operator long long() const;
+    explicit operator std::string() const;
+    explicit operator int() const;
+    explicit operator double() const;
+    explicit operator long long() const;
 
     // Arithmetic operators
     number operator+(const number&) const;
@@ -82,5 +83,8 @@ private:
     class storage;
     std::unique_ptr<storage> _store;
 };
+
+// Stream output operator
+std::ostream& operator<<(std::ostream& os, const number& n);
 
 }

@@ -3,6 +3,7 @@
 #include <compare>
 #include <string>
 #include <optional>
+#include <ostream>
 
 namespace dross {
 
@@ -764,6 +765,12 @@ number& number::operator%=(const number& other)
 number number::nan()
 {
     return number{NAN_VALUE};
+}
+
+// Stream output operator
+std::ostream& operator<<(std::ostream& os, const number& n)
+{
+    return os << std::string(n);
 }
 
 }
