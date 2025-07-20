@@ -27,6 +27,7 @@ Type System
 ^^^^^^^^^^^
 
 - ``value`` class for polymorphic type holding
+- ``boolean`` class for type-safe boolean operations
 - ``number`` class with arbitrary precision arithmetic
 - ``string`` class with Unicode awareness
 - ``array`` class with range-based for loop support

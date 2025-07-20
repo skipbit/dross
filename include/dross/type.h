@@ -3,7 +3,7 @@
  * @brief Type system header with core types and utility functions.
  *
  * This header provides access to the complete dross type system including
- * the core polymorphic types (number, string, array, dictionary, value)
+ * the core polymorphic types (boolean, number, string, array, dictionary, value)
  * and utility functions for string manipulation and container operations.
  *
  * The type system is designed around value semantics with no exceptions,

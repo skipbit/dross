@@ -1,6 +1,7 @@
 #include "dross/type/value.h"
 
 #include "dross/type/array.h"
+#include "dross/type/boolean.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
@@ -12,7 +13,7 @@ namespace dross {
 
 class value::storage {
 public:
-    std::variant<std::monostate, dross::number, dross::string, dross::array, dross::dictionary> value;
+    std::variant<std::monostate, dross::boolean, dross::number, dross::string, dross::array, dross::dictionary> value;
 
     storage() = default;
     storage(const storage& s) : value(s.value) {}
@@ -26,6 +27,12 @@ value::value()
 value::value(const value& v)
     : _store(std::make_unique<storage>(*(v._store)))
 {
+}
+
+value::value(const boolean& b)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = b;
 }
 
 value::value(const number& n)
@@ -91,9 +98,21 @@ value& value::operator=(const value& v)
     return *this;
 }
 
+value& value::operator=(const boolean& b)
+{
+    _store->value = b;
+    return *this;
+}
+
 value& value::operator=(const number& n)
 {
     _store->value = n;
+    return *this;
+}
+
+value& value::operator=(const string& s)
+{
+    _store->value = s;
     return *this;
 }
 
@@ -122,11 +141,13 @@ T value_cast(const value& original) noexcept
 }
 
 // Explicit instantiations
+template bool value::is<boolean>() const noexcept;
 template bool value::is<number>() const noexcept;
 template bool value::is<string>() const noexcept;
 template bool value::is<array>() const noexcept;
 template bool value::is<dictionary>() const noexcept;
 
+template boolean value_cast<boolean>(const value&) noexcept;
 template number value_cast<number>(const value&) noexcept;
 template string value_cast<string>(const value&) noexcept;
 template array value_cast<array>(const value&) noexcept;

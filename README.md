@@ -139,6 +139,7 @@ auto app_config = config_dir / "myapp" / "config.toml";
 ## 📚 Core Modules
 
 ### Type System
+- **`boolean`** - Type-safe boolean operations with logical operators
 - **`number`** - Arbitrary precision arithmetic with string-based storage
 - **`string`** - Unicode-aware string handling
 - **`array`** - Dynamic arrays with value semantics

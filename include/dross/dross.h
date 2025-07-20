@@ -18,7 +18,7 @@
  * @endcode
  * 
  * Modules included:
- * - Type System: number, string, array, dictionary, value
+ * - Type System: boolean, number, string, array, dictionary, value
  * - Platform Layer: environment, path, xdg utilities
  * - Configuration: TOML and other format support (when available)
  * 

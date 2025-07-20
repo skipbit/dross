@@ -18,7 +18,7 @@ Type System
 
 The core type system provides dynamic typing with value semantics:
 
-- :doc:`type-system` - Dynamic types including value, number, string, array, dictionary, data, and error
+- :doc:`type-system` - Dynamic types including value, boolean, number, string, array, dictionary, data, and error
 
 Platform Utilities
 ~~~~~~~~~~~~~~~~~~

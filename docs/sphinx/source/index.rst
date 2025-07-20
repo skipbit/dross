@@ -131,6 +131,7 @@ The dross type system provides dynamic typing with strong value semantics:
     value v2 = "hello world";               // string
     value v3 = array{1, 2, 3};             // array
     value v4 = dictionary{{"key", "value"}}; // dictionary
+    value v5 = true;                        // boolean
     
     // Type checking
     if (v1.is_number()) {
