@@ -26,7 +26,7 @@ TEST(to_string_test, number_conversion)
     dross::number n3{"999999999999999999999999999999"};
 
     EXPECT_EQ(to_string(n1), "42");
-    EXPECT_EQ(to_string(n2), "3.14159");
+    EXPECT_EQ(to_string(n2), "3.141590");
     EXPECT_EQ(to_string(n3), "999999999999999999999999999999");
 }
 
