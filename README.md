@@ -153,6 +153,16 @@ auto app_config = config_dir / "myapp" / "config.toml";
 ### Configuration
 - **`toml`** - TOML configuration file parser
 
+## 📖 Documentation
+
+**[📘 API Reference & User Guide](https://skipbit.github.io/dross/)**
+
+Complete documentation including:
+- 🔍 **API Reference** - Detailed documentation of all classes and functions
+- 📚 **User Guide** - Tutorials and best practices
+- 💡 **Examples** - Practical code examples and use cases
+- 🏗️ **Architecture** - Design patterns and implementation details
+
 ## 🏗️ Architecture
 
 Dross follows modern C++ best practices:
