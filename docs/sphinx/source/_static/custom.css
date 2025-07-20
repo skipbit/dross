@@ -1,0 +1,180 @@
+/* Custom styles for dross documentation */
+
+/* GitHub badges styling */
+.github-badges {
+    text-align: center;
+    margin: 1.5rem 0 2rem 0;
+    padding: 0;
+}
+
+.github-badges a {
+    display: inline-block;
+    margin: 0.25rem 0.5rem;
+    text-decoration: none;
+}
+
+.github-badges img {
+    height: 20px;
+    vertical-align: middle;
+}
+
+/* Header GitHub link */
+.header-github-link {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+}
+
+.github-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--color-background-primary);
+    border: 1px solid var(--color-background-border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--color-foreground-primary);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.github-link:hover {
+    background: var(--color-background-secondary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Project info styling */
+.project-info {
+    text-align: center;
+    margin: 1rem 0 2rem 0;
+    padding: 1rem;
+    background: var(--color-background-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--color-background-border);
+}
+
+.version-info {
+    font-size: 0.9rem;
+    color: var(--color-foreground-muted);
+}
+
+.version-label {
+    font-weight: bold;
+}
+
+.version-number {
+    font-family: monospace;
+    background: var(--color-code-background);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+}
+
+/* Code blocks styling */
+.highlight pre {
+    font-size: 0.9em;
+    line-height: 1.4;
+    border-radius: 6px;
+}
+
+/* Improve readability of inline code */
+code.literal {
+    background-color: var(--color-background-secondary);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Style for introduction cards on main page */
+.intro-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.intro-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Better spacing for API documentation */
+.breathe-sectiondef {
+    margin-bottom: 2em;
+}
+
+/* Style for function signatures */
+.sig-name {
+    font-weight: bold;
+}
+
+/* Better visibility for notes and warnings */
+.admonition.note {
+    border-left: 4px solid #2962ff;
+}
+
+.admonition.warning {
+    border-left: 4px solid #ff9800;
+}
+
+.admonition.tip {
+    border-left: 4px solid #4caf50;
+}
+
+/* Code examples in documentation */
+.highlight-cpp .highlight {
+    background: var(--color-code-background);
+    border: 1px solid var(--color-background-border);
+    border-radius: 6px;
+    padding: 1em;
+}
+
+/* Navigation improvements */
+.sidebar-tree .reference {
+    text-decoration: none;
+}
+
+.sidebar-tree .reference:hover {
+    text-decoration: underline;
+}
+
+/* Table styling */
+table.docutils {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+table.docutils th,
+table.docutils td {
+    border: 1px solid var(--color-background-border);
+    padding: 0.5em;
+    text-align: left;
+}
+
+table.docutils th {
+    background-color: var(--color-background-secondary);
+    font-weight: bold;
+}
+
+/* Better spacing for lists */
+.simple ul,
+.simple ol {
+    margin-bottom: 1em;
+}
+
+.simple li {
+    margin-bottom: 0.5em;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+    .intro-card {
+        margin-bottom: 1em;
+    }
+    
+    .highlight pre {
+        font-size: 0.8em;
+        overflow-x: auto;
+    }
+}

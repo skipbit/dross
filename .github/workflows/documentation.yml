@@ -1,0 +1,142 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'include/**'
+      - 'src/**'
+      - '.github/workflows/documentation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'include/**'
+      - 'src/**'
+      - '.github/workflows/documentation.yml'
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Install Python dependencies
+        run: |
+          cd docs/sphinx
+          pip install -r requirements.txt
+
+      - name: Generate Doxygen documentation
+        run: |
+          mkdir -p docs/build/doxygen
+          cd docs/doxygen
+          doxygen Doxyfile
+
+      - name: Build Sphinx documentation
+        run: |
+          cd docs/sphinx
+          make html
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-html
+          path: docs/build/sphinx/html/
+          retention-days: 30
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+      
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+      
+    steps:
+      - name: Download documentation artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: documentation-html
+          path: ./html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  quality-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Install Python dependencies
+        run: |
+          cd docs/sphinx
+          pip install -r requirements.txt
+
+      - name: Generate Doxygen documentation
+        run: |
+          mkdir -p docs/build/doxygen
+          cd docs/doxygen
+          doxygen Doxyfile
+
+      - name: Check documentation build
+        run: |
+          cd docs/sphinx
+          make html
+
+      - name: Check for broken links
+        run: |
+          cd docs/sphinx
+          make linkcheck
+
+      - name: Run documentation linting
+        run: |
+          cd docs/sphinx
+          sphinx-lint source/
+        continue-on-error: true

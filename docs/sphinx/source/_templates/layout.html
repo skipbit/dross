@@ -1,0 +1,40 @@
+{% extends "furo/base.html" %}
+
+{%- block extrahead %}
+{{ super() }}
+<meta name="description" content="dross - A modern C++23 library providing fundamental building blocks">
+<meta name="keywords" content="C++, C++23, library, dross, modern C++, type system, error handling">
+<meta name="author" content="dross contributors">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://skipbit.github.io/dross/">
+<meta property="og:title" content="dross - Modern C++23 Library">
+<meta property="og:description" content="A modern C++23 library providing fundamental building blocks for applications">
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:url" content="https://skipbit.github.io/dross/">
+<meta property="twitter:title" content="dross - Modern C++23 Library">
+<meta property="twitter:description" content="A modern C++23 library providing fundamental building blocks for applications">
+
+{%- endblock %}
+
+{%- block footer %}
+{{ super() }}
+<script>
+  // Add version information to footer
+  document.addEventListener('DOMContentLoaded', function() {
+    const footer = document.querySelector('.footer');
+    if (footer) {
+      const versionInfo = document.createElement('div');
+      versionInfo.innerHTML = 'Documentation for dross {{ version }}';
+      versionInfo.style.textAlign = 'center';
+      versionInfo.style.marginTop = '1em';
+      versionInfo.style.fontSize = '0.9em';
+      versionInfo.style.opacity = '0.7';
+      footer.appendChild(versionInfo);
+    }
+  });
+</script>
+{%- endblock %}

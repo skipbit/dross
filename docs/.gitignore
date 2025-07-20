@@ -1,0 +1,30 @@
+# Build outputs
+build/
+_build/
+
+# Sphinx temporary files
+sphinx/source/_autosummary/
+
+# Doxygen temporary files
+doxygen/html/
+doxygen/latex/
+doxygen/xml/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local development builds (uncomment if you want to exclude)
+# build-docs.sh
