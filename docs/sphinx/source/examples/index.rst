@@ -26,7 +26,7 @@ Working with Values
     
     void print_type_info(const value& v)
     {
-        std::cout << "Value: " << v.to_string() << std::endl;
+        std::cout << "Value: " << v << std::endl;  // Direct stream output
         std::cout << "Type: ";
         
         if (v.is_null()) std::cout << "null";
@@ -333,7 +333,7 @@ Data Processing Pipeline
             return string("Unknown");
         });
         
-        std::cout << "Total value: $" << total.to_string() << std::endl;
+        std::cout << "Total value: $" << total << std::endl;  // Direct stream output
         std::cout << "Categories: " << by_category.size() << std::endl;
         
         return 0;

@@ -142,7 +142,7 @@ Here's a simple example using the dross type system:
                 auto feat_array = feat_val->as_array();
                 std::cout << "Features:" << std::endl;
                 for (const auto& feature : feat_array) {
-                    std::cout << "  - " << feature.to_string() << std::endl;
+                    std::cout << "  - " << feature << std::endl;  // Direct stream output
                 }
             }
         }

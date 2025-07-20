@@ -39,6 +39,23 @@
     }
     ```
     *  For lambda expressions, place the opening brace on the same line and the closing brace on a new line.
+*   **Member Initialization Lists:** For constructors with member initialization lists:
+    *   Place the colon (`:`) on a new line after the constructor declaration.
+    *   Indent the colon and initialization list with 4 spaces.
+    *   Place the opening brace (`{`) on a new line after the initialization list.
+    ```cpp
+    // Correct
+    MyClass::MyClass(int value)
+        : _member(value), _store(std::make_unique<storage>())
+    {
+        // constructor body
+    }
+
+    // Incorrect
+    MyClass::MyClass(int value) : _member(value), _store(std::make_unique<storage>()) {
+        // constructor body
+    }
+    ```
 *   **Declaration and Implementation:** Separate header files and source files. As a principle, header files should contain only declarations whenever possible, with all implementations (including `= default;`, `= delete;`, and function bodies) written in .cpp files. Exceptions are made only for special cases such as templates and iterator definitions required for range-based for loops. Header files should contain only class and function declarations.
 *   **Line Length:** Target 80 characters, but be flexible within reasonable limits to maintain readability.
 *   **Reference and Pointer Positioning:** Position reference (`&`) and pointer (`*`) symbols close to the variable name, with a space after the type.

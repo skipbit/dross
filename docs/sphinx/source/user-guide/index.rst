@@ -110,7 +110,7 @@ Error Handling
     // Function returning optional
     std::optional<string> get_env_config(const string& key)
     {
-        if (auto value = environment::get(key.to_string())) {
+        if (auto value = environment::get(key)) {  // Implicit string conversion
             return string(*value);
         }
         return std::nullopt;

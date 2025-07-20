@@ -25,12 +25,36 @@ The ``value`` class is the central polymorphic type that can hold any supported 
     dross::value v1 = 42;              // Holds a number
     dross::value v2 = "hello";          // Holds a string
     dross::value v3 = dross::array{};   // Holds an array
+    dross::value v4 = true;             // Holds a boolean
     
-    // Type checking
+    // Type checking with seamless string conversion
     if (v1.is_number()) {
         auto num = v1.as_number();
-        std::cout << num.to_string() << std::endl;
+        std::cout << num << std::endl;  // Direct output
     }
+
+boolean
+~~~~~~~
+
+.. doxygenclass:: dross::boolean
+   :project: dross
+   :members:
+   :protected-members:
+   :undoc-members:
+
+The ``boolean`` class provides type-safe boolean operations:
+
+.. code-block:: cpp
+
+    #include <dross/boolean.h>
+    
+    dross::boolean flag{true};
+    dross::boolean enabled{"true"};  // From string
+    dross::boolean active{1};        // From integer
+    
+    // Seamless string conversion
+    std::string status = flag;       // "true"
+    std::cout << flag << std::endl;  // Direct output
 
 number
 ~~~~~~
@@ -51,7 +75,9 @@ The ``number`` class provides arbitrary precision numeric values:
     dross::number n2("3.14159265358979323846");
     dross::number n3 = n1 + n2;
     
-    std::cout << n3.to_string() << std::endl;
+    // Seamless string conversion
+    std::string result = n3;         // Direct conversion
+    std::cout << n3 << std::endl;    // Direct output
 
 string
 ~~~~~~
@@ -72,7 +98,9 @@ The ``string`` class provides Unicode-aware string handling:
     dross::string s2(" World");
     dross::string s3 = s1 + s2;
     
-    std::cout << s3.to_string() << std::endl;
+    // Seamless string conversion
+    std::string result = s3;         // Direct conversion
+    std::cout << s3 << std::endl;    // Direct output
 
 array
 ~~~~~
@@ -96,7 +124,7 @@ The ``array`` class provides a dynamic array of values:
     
     // Range-based for loop
     for (const auto& val : arr) {
-        std::cout << val.to_string() << std::endl;
+        std::cout << val << std::endl;  // Direct stream output
     }
 
 dictionary
@@ -186,25 +214,42 @@ The type system uses C++20 concepts to constrain template parameters:
 Type Conversion
 ---------------
 
-All types provide consistent conversion methods:
+All types provide seamless string conversion through multiple approaches:
 
-- ``to_string()`` - Convert to string representation
-- ``as_T()`` - Convert value to specific type T
-- ``is_T()`` - Check if value is of type T
+- **Implicit conversion**: ``std::string s = type_instance;``
+- **STL-style function**: ``std::string s = to_string(type_instance);``
+- **Stream output**: ``std::cout << type_instance;``
+- ``as_T()`` - Convert value to specific type T (for value type)
+- ``is_T()`` - Check if value is of type T (for value type)
 
 Example:
 
 .. code-block:: cpp
 
-    dross::value v = 42;
+    // Multiple string conversion approaches
+    dross::boolean flag{true};
+    dross::number n{42};
+    dross::string text{"hello"};
     
-    // Check type
+    // 1. Implicit conversion to std::string
+    std::string flag_str = flag;  // "true"
+    std::string num_str = n;      // "42"
+    std::string text_str = text;  // "hello"
+    
+    // 2. STL-style explicit conversion
+    using dross::to_string;
+    auto flag_string = to_string(flag);  // "true"
+    auto num_string = to_string(n);      // "42"
+    auto text_string = to_string(text);  // "hello"
+    
+    // 3. Direct stream output
+    std::cout << flag << " " << n << " " << text << std::endl;
+    
+    // Value type conversion
+    dross::value v = 42;
     if (v.is_number()) {
-        // Convert to specific type
-        dross::number n = v.as_number();
-        
-        // Convert to string
-        std::string s = n.to_string();
+        dross::number num = v.as_number();
+        std::string s = to_string(num);  // STL-style conversion
     }
 
 Comparison Operations

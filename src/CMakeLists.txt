@@ -15,6 +15,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/xdg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/array.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/boolean.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/data.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/dictionary.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/error.cpp
@@ -42,6 +43,7 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/platform/xdg.h
     ${PROJECT_SOURCE_DIR}/include/dross/type.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/array.h
+    ${PROJECT_SOURCE_DIR}/include/dross/type/boolean.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/data.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/dictionary.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/error.h

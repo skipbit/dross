@@ -246,7 +246,7 @@ public:
      * Returns "NaN" for NaN values. The string format preserves
      * the full precision of the number.
      */
-    explicit operator std::string() const;
+    operator std::string() const;
 
     /**
      * @brief Convert to int.

@@ -31,4 +31,19 @@ std::string join(const std::vector<std::string>& c, const std::string& delimiter
     });
 }
 
+std::string to_string(const boolean& b)
+{
+    return static_cast<std::string>(b);
+}
+
+std::string to_string(const number& n)
+{
+    return static_cast<std::string>(n);
+}
+
+std::string to_string(const string& s)
+{
+    return static_cast<std::string>(s);
+}
+
 }

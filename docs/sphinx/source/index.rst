@@ -135,7 +135,7 @@ The dross type system provides dynamic typing with strong value semantics:
     // Type checking
     if (v1.is_number()) {
         auto n = v1.as_number();
-        std::cout << "Number: " << n.to_string() << std::endl;
+        std::cout << "Number: " << n << std::endl;  // Direct stream output
     }
 
 Platform Utilities
