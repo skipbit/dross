@@ -3,7 +3,7 @@
  * @brief Type system header with core types and utility functions.
  *
  * This header provides access to the complete dross type system including
- * the core polymorphic types (boolean, number, string, array, dictionary, value)
+ * the core polymorphic types (boolean, number, string, array, dictionary, datetime, timezone, value)
  * and utility functions for string manipulation and container operations.
  *
  * The type system is designed around value semantics with no exceptions,
@@ -15,6 +15,7 @@
  * - Unicode-aware string handling
  * - Type-safe boolean operations
  * - Dynamic arrays and key-value dictionaries
+ * - Date and time handling with timezone support
  * - Polymorphic value type using std::variant
  * - Seamless string conversion for all types
  * - Utility functions for common operations
@@ -27,6 +28,7 @@
  * boolean flag{true};
  * number precise{"99999999999999999999999999999"};
  * string text{"Hello, 世界!"};
+ * datetime meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
  * array list = {value{1}, value{"two"}, value{3.14}};
  * dictionary config = {{"host", value{string{"localhost"}}},
  *                      {"port", value{number{8080}}}};
@@ -35,14 +37,16 @@
  * std::string b_str = flag;    // "true"
  * std::string n_str = precise; // "99999999999999999999999999999"
  * std::string s_str = text;    // "Hello, 世界!"
+ * std::string d_str = meeting; // "2024-01-21T15:30:00+09:00"
  *
  * // STL-style explicit conversion
  * auto b_string = to_string(flag);    // "true"
  * auto n_string = to_string(precise); // "99999999999999999999999999999"
  * auto s_string = to_string(text);    // "Hello, 世界!"
+ * auto d_string = to_string(meeting); // "2024-01-21T15:30:00+09:00"
  *
  * // Stream output
- * std::cout << flag << " " << precise << " " << text << std::endl;
+ * std::cout << flag << " " << precise << " " << text << " " << meeting << std::endl;
  *
  * // Utility functions
  * auto tokens = split("a,b,c", ",");
@@ -54,9 +58,11 @@
 
 #include <dross/type/array.h>
 #include <dross/type/boolean.h>
+#include <dross/type/datetime.h>
 #include <dross/type/dictionary.h>
 #include <dross/type/number.h>
 #include <dross/type/string.h>
+#include <dross/type/timezone.h>
 #include <dross/type/value.h>
 
 #include <vector>
@@ -151,6 +157,41 @@ std::string to_string(const number& n);
  * @endcode
  */
 std::string to_string(const string& s);
+
+/**
+ * @brief Convert a datetime to string representation (STL-style).
+ * @param dt The datetime to convert
+ * @return ISO 8601 formatted string representation
+ *
+ * Provides STL-style explicit string conversion for consistency with
+ * other types. Returns the datetime in ISO 8601 format with timezone
+ * information if available.
+ *
+ * @code
+ * datetime meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
+ * auto str = to_string(meeting);  // "2024-01-21T15:30:00+09:00"
+ * @endcode
+ */
+std::string to_string(const datetime& dt);
+
+/**
+ * @brief Convert a timezone to string representation (STL-style).
+ * @param tz The timezone to convert
+ * @return ISO 8601 formatted timezone string
+ *
+ * Provides STL-style explicit string conversion for consistency with
+ * other types. Returns the timezone in ISO 8601 format (e.g., "+09:00", "Z").
+ * Local timezone returns empty string.
+ *
+ * @code
+ * timezone jst = timezone::offset(9);
+ * auto str = to_string(jst);  // "+09:00"
+ *
+ * timezone utc = timezone::utc();
+ * auto utc_str = to_string(utc);  // "Z"
+ * @endcode
+ */
+std::string to_string(const timezone& tz);
 
 /**
  * @brief Concept defining requirements for concatenatable container types.

@@ -3,6 +3,7 @@
 #include "dross/type/boolean.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
+#include "dross/type/datetime.h"
 
 #include <initializer_list>
 #include <memory>
@@ -14,6 +15,7 @@ class number;
 class string;
 class array;
 class dictionary;
+class datetime;
 
 /**
  * @brief Polymorphic value type that can hold any supported dross type.
@@ -37,6 +39,7 @@ class dictionary;
  * - string: Unicode-aware strings
  * - array: Dynamic arrays of values
  * - dictionary: Key-value mappings
+ * - datetime: Date and time values with timezone support
  * - Arithmetic types (automatically converted to number)
  * - String types (automatically converted to string)
  *
@@ -112,6 +115,12 @@ public:
      * @param dict The dictionary to store
      */
     value(const dictionary& dict);
+
+    /**
+     * @brief Construct from a datetime.
+     * @param dt The datetime to store
+     */
+    value(const datetime& dt);
 
     /**
      * @brief Construct an array from initializer list.
@@ -226,15 +235,34 @@ public:
     value& operator=(const dictionary& dict);
 
     /**
+     * @brief Assign a datetime to this value.
+     * @param dt The datetime to assign
+     * @return Reference to this value
+     */
+    value& operator=(const datetime& dt);
+
+    /**
      * @brief Check if the value contains a specific type.
      * @tparam T The type to check for
      * @return true if the value contains type T, false otherwise
      *
      * Use this for type checking before casting to avoid exceptions.
-     * Supports checking for boolean, number, string, array, and dictionary types.
+     * Supports checking for boolean, number, string, array, dictionary, and datetime types.
      */
     template <class T>
     bool is() const noexcept;
+
+    /**
+     * @brief Cast the value to a specific type.
+     * @tparam T The type to cast to
+     * @return The value as the specified type
+     *
+     * This is a convenience method that delegates to value_cast.
+     * If the value is not of the requested type, the behavior is undefined.
+     * Use is<T>() to check the type before casting.
+     */
+    template <class T>
+    T as() const noexcept;
 
 private:
     template <class T>

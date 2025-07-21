@@ -128,7 +128,8 @@ number result = big_num * big_num;  // No overflow!
 value data = dictionary{
     {"name", string{"Dross"}},
     {"version", number{"0.0.1"}},
-    {"features", array{string{"fast"}, string{"safe"}}}
+    {"features", array{string{"fast"}, string{"safe"}}},
+    {"release_date", datetime{2024, 1, 21, 15, 30, 0, timezone::utc()}}
 };
 
 // Platform utilities
@@ -142,6 +143,8 @@ auto app_config = config_dir / "myapp" / "config.toml";
 - **`boolean`** - Type-safe boolean operations with logical operators
 - **`number`** - Arbitrary precision arithmetic with string-based storage
 - **`string`** - Unicode-aware string handling
+- **`datetime`** - Date and time handling with timezone support
+- **`timezone`** - Type-safe timezone representation with ISO 8601 support
 - **`array`** - Dynamic arrays with value semantics
 - **`dictionary`** - Key-value containers
 - **`value`** - Polymorphic type holding any supported type
@@ -193,7 +196,7 @@ ctest -V
 ## 🗺️ Roadmap
 
 ### Current Modules
-- ✅ Type System (number, string, array, dictionary, value)
+- ✅ Type System (boolean, number, string, datetime, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
 - ✅ Configuration (TOML parser)
 
