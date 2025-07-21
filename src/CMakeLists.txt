@@ -22,6 +22,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/error.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/number.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/string.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/timezone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value.cpp
 )
 
@@ -51,6 +52,7 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/type/error.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/number.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/string.h
+    ${PROJECT_SOURCE_DIR}/include/dross/type/timezone.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/value.h
 )
 

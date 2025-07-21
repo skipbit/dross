@@ -5,6 +5,7 @@
 #include <chrono>
 #include <optional>
 #include <compare>
+#include "timezone.h"
 
 namespace dross {
 
@@ -16,6 +17,7 @@ enum class datetime_format {
     rfc3339,    // RFC 3339 format (essentially same as ISO 8601)
     custom      // Custom format using strftime-style format string
 };
+
 
 /**
  * @brief Concept that defines types suitable for datetime construction.
@@ -90,10 +92,43 @@ concept datetime_type = std::same_as<T, std::chrono::system_clock::time_point> |
 class datetime final {
 public:
     /**
+     * @brief Precision options for datetime representation.
+     *
+     * This enum defines the level of detail stored and displayed in datetime values.
+     * It replaces the previous boolean flags with a more explicit and type-safe approach.
+     */
+    enum class precision {
+        date_only,  // Date component only: 2024-01-21
+        time_only,  // Time component only: 15:30:00
+        datetime    // Full date and time: 2024-01-21T15:30:00
+    };
+    /**
      * @brief Create a datetime representing the current moment.
      * @return datetime object set to current system time with local timezone
      */
     static datetime now();
+
+    /**
+     * @brief Create a date-only datetime.
+     * @param year Year (e.g., 2024)
+     * @param month Month (1-12)
+     * @param day Day of month (1-31)
+     * @param tz Timezone information (default is local timezone)
+     * @return datetime with date precision
+     */
+    static datetime date(int year, int month, int day,
+                        const timezone& tz = timezone::local());
+
+    /**
+     * @brief Create a time-only datetime.
+     * @param hour Hour (0-23)
+     * @param minute Minute (0-59)
+     * @param second Second (0-59, default 0)
+     * @param tz Timezone information (default is local timezone)
+     * @return datetime with time precision
+     */
+    static datetime time(int hour, int minute, int second = 0,
+                        const timezone& tz = timezone::local());
 
     /**
      * @brief Default constructor creating epoch time (1970-01-01T00:00:00Z).
@@ -142,14 +177,27 @@ public:
      * @param hour Hour (0-23, default 0)
      * @param minute Minute (0-59, default 0)
      * @param second Second (0-59, default 0)
-     * @param timezone_offset_minutes Optional timezone offset in minutes from UTC
-     *
-     * If timezone_offset_minutes is not specified, the datetime is treated as local.
-     * Positive offsets are east of UTC, negative offsets are west of UTC.
+     * @param tz Timezone information (default is local timezone)
      */
     datetime(int year, int month, int day,
              int hour = 0, int minute = 0, int second = 0,
-             std::optional<int> timezone_offset_minutes = std::nullopt);
+             const timezone& tz = timezone::local());
+
+    /**
+     * @brief Legacy constructor with timezone offset in minutes.
+     * @deprecated Use timezone object constructor instead
+     * @param year Year (e.g., 2024)
+     * @param month Month (1-12)
+     * @param day Day of month (1-31)
+     * @param hour Hour (0-23)
+     * @param minute Minute (0-59)
+     * @param second Second (0-59)
+     * @param timezone_offset_minutes Timezone offset in minutes from UTC
+     */
+    [[deprecated("Use timezone object constructor instead")]]
+    datetime(int year, int month, int day,
+             int hour, int minute, int second,
+             int timezone_offset_minutes);
 
     /**
      * @brief Destructor.
@@ -293,12 +341,17 @@ public:
     bool has_timezone() const noexcept;
 
     /**
-     * @brief Get the timezone offset in minutes.
-     * @return Timezone offset from UTC in minutes, or nullopt if no timezone info
-     *
-     * Positive values indicate east of UTC, negative values indicate west of UTC.
+     * @brief Get the timezone information.
+     * @return timezone object representing the timezone
      */
-    std::optional<int> timezone_offset_minutes() const noexcept;
+    dross::timezone timezone() const noexcept;
+
+    /**
+     * @brief Get the precision of this datetime.
+     * @return Precision level (date_only, time_only, or datetime)
+     */
+    precision precision() const noexcept;
+
 
 private:
     class storage;

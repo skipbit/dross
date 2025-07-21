@@ -1,4 +1,5 @@
 #include <dross/type/datetime.h>
+#include <dross/type/timezone.h>
 #include <sstream>
 #include <iomanip>
 #include <regex>
@@ -8,23 +9,21 @@ namespace dross {
 
 class datetime::storage {
 public:
-    std::chrono::system_clock::time_point local_time_point;
-    std::optional<int> timezone_offset_minutes;
-
-    // Flags for format-specific representation
-    bool is_date_only = false;
-    bool is_time_only = false;
+    std::chrono::system_clock::time_point time_point;
+    dross::timezone tz;
+    enum datetime::precision precision;
 
     storage()
-        : local_time_point(std::chrono::system_clock::time_point{})
+        : time_point(std::chrono::system_clock::time_point{})
+        , tz(dross::timezone::local())
+        , precision(datetime::precision::datetime)
     {
     }
 
     storage(const storage& other)
-        : local_time_point(other.local_time_point)
-        , timezone_offset_minutes(other.timezone_offset_minutes)
-        , is_date_only(other.is_date_only)
-        , is_time_only(other.is_time_only)
+        : time_point(other.time_point)
+        , tz(other.tz)
+        , precision(other.precision)
     {
     }
 };
@@ -32,6 +31,20 @@ public:
 datetime datetime::now()
 {
     return datetime(std::chrono::system_clock::now());
+}
+
+datetime datetime::date(int year, int month, int day, const dross::timezone& tz)
+{
+    datetime dt(year, month, day, 0, 0, 0, tz);
+    dt._store->precision = datetime::precision::date_only;
+    return dt;
+}
+
+datetime datetime::time(int hour, int minute, int second, const dross::timezone& tz)
+{
+    datetime dt(1970, 1, 1, hour, minute, second, tz); // Use epoch date
+    dt._store->precision = datetime::precision::time_only;
+    return dt;
 }
 
 datetime::datetime()
@@ -47,7 +60,8 @@ datetime::datetime(const datetime& other)
 datetime::datetime(const std::chrono::system_clock::time_point& tp)
     : _store(std::make_unique<storage>())
 {
-    _store->local_time_point = tp;
+    _store->time_point = tp;
+    _store->tz = dross::timezone::local(); // time_point has no timezone info
 }
 
 datetime::datetime(const std::string& iso8601_str)
@@ -82,7 +96,7 @@ datetime::datetime(const std::string& iso8601_str)
 
                 // Handle timezone
                 if (match[8].matched) { // Z (UTC)
-                    _store->timezone_offset_minutes = 0;
+                    _store->tz = dross::timezone::utc();
                 } else if (match[9].matched) { // +/- offset
                     int tz_hour = std::stoi(match[10].str());
                     int tz_minute = std::stoi(match[11].str());
@@ -90,18 +104,22 @@ datetime::datetime(const std::string& iso8601_str)
                     if (match[9].str() == "-") {
                         offset = -offset;
                     }
-                    _store->timezone_offset_minutes = offset;
+                    _store->tz = dross::timezone::offset(offset / 60, std::abs(offset) % 60);
+                } else {
+                    _store->tz = dross::timezone::local();
                 }
             } else {
                 // Date without time component
-                _store->is_date_only = true;
+                _store->precision = datetime::precision::date_only;
+                _store->tz = dross::timezone::local();
             }
         } else if (match[12].matched) { // Time only
             hour = std::stoi(match[12].str());
             minute = std::stoi(match[13].str());
             second = std::stoi(match[14].str());
             // Time without date component
-            _store->is_time_only = true;
+            _store->precision = datetime::precision::time_only;
+            _store->tz = dross::timezone::local();
         }
 
         // Convert to time_point using modern chrono
@@ -115,7 +133,7 @@ datetime::datetime(const std::string& iso8601_str)
         auto days_since_epoch = std::chrono::sys_days{ymd}.time_since_epoch();
         auto time_of_day = hms.to_duration();
 
-        _store->local_time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
+        _store->time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
     }
     // If parsing fails, leave as epoch time
 }
@@ -127,10 +145,10 @@ datetime::datetime(const char* iso8601_str)
 
 datetime::datetime(int year, int month, int day,
                   int hour, int minute, int second,
-                  std::optional<int> timezone_offset_minutes)
+                  const dross::timezone& tz)
     : _store(std::make_unique<storage>())
 {
-    _store->timezone_offset_minutes = timezone_offset_minutes;
+    _store->tz = tz;
 
     // Use modern chrono calendar types
     auto ymd = std::chrono::year_month_day{std::chrono::year{year},
@@ -143,7 +161,28 @@ datetime::datetime(int year, int month, int day,
     auto days_since_epoch = std::chrono::sys_days{ymd}.time_since_epoch();
     auto time_of_day = hms.to_duration();
 
-    _store->local_time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
+    _store->time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
+}
+
+datetime::datetime(int year, int month, int day,
+                  int hour, int minute, int second,
+                  int timezone_offset_minutes)
+    : _store(std::make_unique<storage>())
+{
+    _store->tz = dross::timezone::offset(timezone_offset_minutes / 60, std::abs(timezone_offset_minutes) % 60);
+
+    // Use modern chrono calendar types
+    auto ymd = std::chrono::year_month_day{std::chrono::year{year},
+                                           std::chrono::month{static_cast<unsigned>(month)},
+                                           std::chrono::day{static_cast<unsigned>(day)}};
+
+    auto hms = std::chrono::hh_mm_ss{std::chrono::hours{hour} + std::chrono::minutes{minute} + std::chrono::seconds{second}};
+
+    // Create time_point from date and time
+    auto days_since_epoch = std::chrono::sys_days{ymd}.time_since_epoch();
+    auto time_of_day = hms.to_duration();
+
+    _store->time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
 }
 
 datetime::~datetime() = default;
@@ -159,10 +198,10 @@ datetime& datetime::operator=(const datetime& other)
 datetime::operator std::chrono::system_clock::time_point() const
 {
     // Return UTC time point if timezone is specified
-    if (_store->timezone_offset_minutes.has_value()) {
-        return _store->local_time_point - std::chrono::minutes(_store->timezone_offset_minutes.value());
+    if (_store->tz.has_offset()) {
+        return _store->time_point - std::chrono::minutes(_store->tz.offset_minutes().value());
     }
-    return _store->local_time_point;
+    return _store->time_point;
 }
 
 datetime::operator std::string() const
@@ -197,42 +236,42 @@ std::chrono::system_clock::duration datetime::operator-(const datetime& other) c
 datetime datetime::operator+(const std::chrono::minutes& duration) const
 {
     datetime result(*this);
-    result._store->local_time_point += duration;
+    result._store->time_point += duration;
     return result;
 }
 
 datetime datetime::operator-(const std::chrono::minutes& duration) const
 {
     datetime result(*this);
-    result._store->local_time_point -= duration;
+    result._store->time_point -= duration;
     return result;
 }
 
 datetime datetime::operator+(const std::chrono::hours& duration) const
 {
     datetime result(*this);
-    result._store->local_time_point += duration;
+    result._store->time_point += duration;
     return result;
 }
 
 datetime datetime::operator-(const std::chrono::hours& duration) const
 {
     datetime result(*this);
-    result._store->local_time_point -= duration;
+    result._store->time_point -= duration;
     return result;
 }
 
 datetime datetime::operator+(const std::chrono::seconds& duration) const
 {
     datetime result(*this);
-    result._store->local_time_point += duration;
+    result._store->time_point += duration;
     return result;
 }
 
 datetime datetime::operator-(const std::chrono::seconds& duration) const
 {
     datetime result(*this);
-    result._store->local_time_point -= duration;
+    result._store->time_point -= duration;
     return result;
 }
 
@@ -253,7 +292,7 @@ std::string datetime::format(const std::string& custom_format) const
 {
     // For custom formatting, we still need to use the legacy API temporarily
     // until std::format with chrono support is more widely available
-    auto time_c = std::chrono::system_clock::to_time_t(_store->local_time_point);
+    auto time_c = std::chrono::system_clock::to_time_t(_store->time_point);
     auto tm_ptr = std::gmtime(&time_c);
 
     if (!tm_ptr) {
@@ -267,7 +306,7 @@ std::string datetime::format(const std::string& custom_format) const
 
 int datetime::year() const
 {
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
+    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
     auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
 
     return static_cast<int>(ymd.year());
@@ -275,7 +314,7 @@ int datetime::year() const
 
 int datetime::month() const
 {
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
+    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
     auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
 
     return static_cast<unsigned>(ymd.month());
@@ -283,7 +322,7 @@ int datetime::month() const
 
 int datetime::day() const
 {
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
+    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
     auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
 
     return static_cast<unsigned>(ymd.day());
@@ -291,8 +330,8 @@ int datetime::day() const
 
 int datetime::hour() const
 {
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
-    auto time_of_day = _store->local_time_point - days_since_epoch;
+    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
+    auto time_of_day = _store->time_point - days_since_epoch;
     auto hms = std::chrono::hh_mm_ss{time_of_day};
 
     return static_cast<int>(hms.hours().count());
@@ -300,8 +339,8 @@ int datetime::hour() const
 
 int datetime::minute() const
 {
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
-    auto time_of_day = _store->local_time_point - days_since_epoch;
+    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
+    auto time_of_day = _store->time_point - days_since_epoch;
     auto hms = std::chrono::hh_mm_ss{time_of_day};
 
     return static_cast<int>(hms.minutes().count());
@@ -309,8 +348,8 @@ int datetime::minute() const
 
 int datetime::second() const
 {
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
-    auto time_of_day = _store->local_time_point - days_since_epoch;
+    auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
+    auto time_of_day = _store->time_point - days_since_epoch;
     auto hms = std::chrono::hh_mm_ss{time_of_day};
 
     return static_cast<int>(hms.seconds().count());
@@ -318,31 +357,37 @@ int datetime::second() const
 
 bool datetime::has_timezone() const noexcept
 {
-    return _store->timezone_offset_minutes.has_value();
+    return _store->tz.has_offset();
 }
 
-std::optional<int> datetime::timezone_offset_minutes() const noexcept
+dross::timezone datetime::timezone() const noexcept
 {
-    return _store->timezone_offset_minutes;
+    return _store->tz;
 }
+
+enum datetime::precision datetime::precision() const noexcept
+{
+    return _store->precision;
+}
+
 
 std::string datetime::format_iso8601() const
 {
     std::ostringstream oss;
 
-    if (_store->is_date_only) {
+    if (_store->precision == datetime::precision::date_only) {
         // Format date only using modern chrono
-        auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
+        auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
         auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
 
         oss << std::setfill('0')
             << std::setw(4) << static_cast<int>(ymd.year()) << "-"
             << std::setw(2) << static_cast<unsigned>(ymd.month()) << "-"
             << std::setw(2) << static_cast<unsigned>(ymd.day());
-    } else if (_store->is_time_only) {
+    } else if (_store->precision == datetime::precision::time_only) {
         // Format time only using modern chrono
-        auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
-        auto time_of_day = _store->local_time_point - days_since_epoch;
+        auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
+        auto time_of_day = _store->time_point - days_since_epoch;
         auto hms = std::chrono::hh_mm_ss{time_of_day};
 
         oss << std::setfill('0')
@@ -351,9 +396,9 @@ std::string datetime::format_iso8601() const
             << std::setw(2) << hms.seconds().count();
     } else {
         // Full datetime using modern chrono
-        auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->local_time_point);
+        auto days_since_epoch = std::chrono::floor<std::chrono::days>(_store->time_point);
         auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
-        auto time_of_day = _store->local_time_point - days_since_epoch;
+        auto time_of_day = _store->time_point - days_since_epoch;
         auto hms = std::chrono::hh_mm_ss{time_of_day};
 
         oss << std::setfill('0')
@@ -365,18 +410,8 @@ std::string datetime::format_iso8601() const
             << std::setw(2) << hms.seconds().count();
 
         // Add timezone information
-        if (_store->timezone_offset_minutes.has_value()) {
-            int offset = _store->timezone_offset_minutes.value();
-            if (offset == 0) {
-                oss << "Z";
-            } else {
-                char sign = offset >= 0 ? '+' : '-';
-                int abs_offset = std::abs(offset);
-                int hours = abs_offset / 60;
-                int minutes = abs_offset % 60;
-                oss << sign << std::setfill('0') << std::setw(2) << hours
-                    << ":" << std::setw(2) << minutes;
-            }
+        if (_store->tz.has_offset()) {
+            oss << _store->tz.format();
         }
     }
 

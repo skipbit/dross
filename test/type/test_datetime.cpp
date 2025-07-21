@@ -29,7 +29,7 @@ TEST(datetime_test, default_constructor) {
 
 // Test copy constructor
 TEST(datetime_test, copy_constructor) {
-    dross::datetime dt1(2024, 1, 21, 15, 30, 45, 540); // +09:00
+    dross::datetime dt1(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)); // +09:00
     dross::datetime dt2(dt1);
     
     EXPECT_EQ(dt1, dt2);
@@ -40,7 +40,7 @@ TEST(datetime_test, copy_constructor) {
     EXPECT_EQ(dt2.minute(), 30);
     EXPECT_EQ(dt2.second(), 45);
     EXPECT_TRUE(dt2.has_timezone());
-    EXPECT_EQ(dt2.timezone_offset_minutes().value(), 540);
+    EXPECT_EQ(dt2.timezone().offset_minutes().value(), 540);
 }
 
 // Test time_point constructor
@@ -69,7 +69,7 @@ TEST(datetime_test, component_constructor_local) {
 
 // Test component constructor with timezone
 TEST(datetime_test, component_constructor_with_timezone) {
-    dross::datetime dt(2024, 12, 25, 10, 30, 45, -300); // -05:00
+    dross::datetime dt(2024, 12, 25, 10, 30, 45, dross::timezone::offset(-5)); // -05:00
     
     EXPECT_EQ(dt.year(), 2024);
     EXPECT_EQ(dt.month(), 12);
@@ -78,7 +78,7 @@ TEST(datetime_test, component_constructor_with_timezone) {
     EXPECT_EQ(dt.minute(), 30);
     EXPECT_EQ(dt.second(), 45);
     EXPECT_TRUE(dt.has_timezone());
-    EXPECT_EQ(dt.timezone_offset_minutes().value(), -300);
+    EXPECT_EQ(dt.timezone().offset_minutes().value(), -300);
 }
 
 // Test string constructor - offset datetime
@@ -92,7 +92,7 @@ TEST(datetime_test, string_constructor_offset_datetime) {
     EXPECT_EQ(dt.minute(), 30);
     EXPECT_EQ(dt.second(), 0);
     EXPECT_TRUE(dt.has_timezone());
-    EXPECT_EQ(dt.timezone_offset_minutes().value(), 540);
+    EXPECT_EQ(dt.timezone().offset_minutes().value(), 540);
 }
 
 // Test string constructor - UTC datetime
@@ -106,7 +106,7 @@ TEST(datetime_test, string_constructor_utc_datetime) {
     EXPECT_EQ(dt.minute(), 30);
     EXPECT_EQ(dt.second(), 0);
     EXPECT_TRUE(dt.has_timezone());
-    EXPECT_EQ(dt.timezone_offset_minutes().value(), 0);
+    EXPECT_EQ(dt.timezone().offset_minutes().value(), 0);
 }
 
 // Test string constructor - local datetime
@@ -160,7 +160,7 @@ TEST(datetime_test, cstring_constructor) {
     EXPECT_EQ(dt.minute(), 0);
     EXPECT_EQ(dt.second(), 0);
     EXPECT_TRUE(dt.has_timezone());
-    EXPECT_EQ(dt.timezone_offset_minutes().value(), 120);
+    EXPECT_EQ(dt.timezone().offset_minutes().value(), 120);
 }
 
 // Test assignment operator
@@ -224,7 +224,7 @@ TEST(datetime_test, duration_arithmetic) {
 
 // Test string conversion operator
 TEST(datetime_test, string_conversion) {
-    dross::datetime dt(2024, 1, 21, 15, 30, 45, 540); // +09:00
+    dross::datetime dt(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)); // +09:00
     std::string iso_str = dt; // Implicit conversion
     
     // Should produce ISO 8601 format
@@ -233,7 +233,7 @@ TEST(datetime_test, string_conversion) {
 
 // Test formatting
 TEST(datetime_test, formatting) {
-    dross::datetime dt(2024, 1, 21, 15, 30, 45, 540); // +09:00
+    dross::datetime dt(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)); // +09:00
     
     // ISO 8601 format (default)
     EXPECT_EQ(dt.format(), "2024-01-21T15:30:45+09:00");
@@ -308,15 +308,15 @@ TEST(datetime_test, edge_cases) {
 
 // Test timezone preservation in arithmetic
 TEST(datetime_test, timezone_preservation_in_arithmetic) {
-    dross::datetime dt(2024, 1, 21, 15, 30, 0, 540); // +09:00
+    dross::datetime dt(2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)); // +09:00
     
     auto plus_hour = dt + std::chrono::hours(1);
     EXPECT_TRUE(plus_hour.has_timezone());
-    EXPECT_EQ(plus_hour.timezone_offset_minutes().value(), 540);
+    EXPECT_EQ(plus_hour.timezone().offset_minutes().value(), 540);
     EXPECT_EQ(plus_hour.hour(), 16);
     
     auto minus_day = dt - std::chrono::hours(24);
     EXPECT_TRUE(minus_day.has_timezone());
-    EXPECT_EQ(minus_day.timezone_offset_minutes().value(), 540);
+    EXPECT_EQ(minus_day.timezone().offset_minutes().value(), 540);
     EXPECT_EQ(minus_day.day(), 20);
 }

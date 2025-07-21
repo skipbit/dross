@@ -47,7 +47,7 @@ TEST(to_string_test, datetime_conversion)
 {
     using dross::to_string;
 
-    dross::datetime dt1{2024, 1, 21, 15, 30, 45, 540}; // +09:00
+    dross::datetime dt1{2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)}; // +09:00
     dross::datetime dt2{2024, 12, 31, 23, 59, 59}; // No timezone
     dross::datetime dt3; // Epoch
 
@@ -61,7 +61,7 @@ TEST(to_string_test, consistency_with_operator)
     dross::boolean b{true};
     dross::number n{42.5};
     dross::string s{"test"};
-    dross::datetime dt{2024, 6, 15, 12, 30, 0, 120}; // +02:00
+    dross::datetime dt{2024, 6, 15, 12, 30, 0, dross::timezone::offset(2)}; // +02:00
 
     // to_string() should match operator std::string()
     EXPECT_EQ(dross::to_string(b), static_cast<std::string>(b));
