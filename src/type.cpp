@@ -51,4 +51,9 @@ std::string to_string(const datetime& dt)
     return static_cast<std::string>(dt);
 }
 
+std::string to_string(const timezone& tz)
+{
+    return static_cast<std::string>(tz);
+}
+
 }

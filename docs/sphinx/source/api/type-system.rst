@@ -26,7 +26,7 @@ The ``value`` class is the central polymorphic type that can hold any supported 
     dross::value v2 = "hello";                               // Holds a string
     dross::value v3 = dross::array{};                        // Holds an array
     dross::value v4 = true;                                  // Holds a boolean
-    dross::value v5 = dross::datetime{2024, 1, 21, 15, 30}; // Holds a datetime
+    dross::value v5 = dross::datetime{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // Holds a datetime
     
     // Type checking with seamless string conversion
     if (v1.is<dross::number>()) {
@@ -117,15 +117,67 @@ datetime
    :protected-members:
    :undoc-members:
 
+timezone
+~~~~~~~~
+
+.. doxygenclass:: dross::timezone
+   :project: dross
+   :members:
+   :protected-members:
+   :undoc-members:
+
+The ``timezone`` class provides type-safe timezone representation:
+
+.. code-block:: cpp
+
+    #include <dross/timezone.h>
+    
+    // Factory methods for common timezones
+    auto utc = dross::timezone::utc();           // UTC (+00:00)
+    auto local = dross::timezone::local();       // System local timezone
+    auto jst = dross::timezone::offset(9);       // Japan Standard Time (+09:00)
+    auto pdt = dross::timezone::offset(-7, 0);   // Pacific Daylight Time (-07:00)
+    auto ist = dross::timezone::offset(5, 30);   // India Standard Time (+05:30)
+    
+    // Parse from ISO 8601 strings
+    auto parsed_utc = dross::timezone::from_string("Z");
+    auto parsed_offset = dross::timezone::from_string("+09:00");
+    
+    // Timezone operations
+    if (jst.is_utc()) {
+        std::cout << "This is UTC" << std::endl;
+    }
+    if (local.is_local()) {
+        std::cout << "This is local timezone" << std::endl;
+    }
+    if (jst.has_offset()) {
+        auto minutes = jst.offset_minutes().value(); // 540 minutes
+        std::cout << "Offset: " << minutes << " minutes" << std::endl;
+    }
+    
+    // Formatting and string conversion
+    std::string utc_str = utc.format();     // "Z"
+    std::string jst_str = jst.format();     // "+09:00"
+    std::string local_str = local.format(); // "" (empty for local)
+    
+    // Implicit string conversion
+    std::string tz_string = jst;            // "+09:00"
+    std::cout << "Timezone: " << jst << std::endl;
+
 The ``datetime`` class provides comprehensive date and time handling with timezone support:
 
 .. code-block:: cpp
 
     #include <dross/datetime.h>
     
-    // Construction from components
-    dross::datetime meeting{2024, 1, 21, 15, 30, 0, 540}; // +09:00
-    dross::datetime local_time{2024, 6, 15, 12, 30, 45};   // No timezone
+    // Construction with timezone objects (modern API)
+    dross::datetime meeting{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // +09:00
+    dross::datetime local_time{2024, 6, 15, 12, 30, 45, dross::timezone::local()}; // Local timezone
+    dross::datetime utc_meeting{2024, 1, 21, 6, 30, 0, dross::timezone::utc()}; // UTC
+    
+    // Factory methods for specific precision
+    auto birthday = dross::datetime::date(1990, 12, 25); // Date only
+    auto alarm = dross::datetime::time(7, 30, 0); // Time only
     
     // Construction from ISO 8601 strings
     dross::datetime utc_time{"2024-01-21T15:30:00Z"};
@@ -138,7 +190,7 @@ The ``datetime`` class provides comprehensive date and time handling with timezo
     
     // Duration arithmetic
     auto tomorrow = now + std::chrono::hours(24);
-    auto next_week = now + std::chrono::days(7);
+    auto next_week = now + std::chrono::hours(24 * 7);
     
     // Formatting
     std::string iso_str = meeting.format();  // ISO 8601 format
@@ -148,6 +200,14 @@ The ``datetime`` class provides comprehensive date and time handling with timezo
     int year = meeting.year();
     int month = meeting.month();
     bool has_tz = meeting.has_timezone();
+    auto tz = meeting.timezone(); // Get timezone object
+    auto prec = meeting.precision(); // Get precision level
+    
+    // Timezone operations
+    if (meeting.timezone().is_utc()) {
+        std::cout << "Meeting is in UTC" << std::endl;
+    }
+    std::cout << "Timezone offset: " << meeting.timezone().format() << std::endl;
     
     // Seamless string conversion
     std::string meeting_str = meeting;       // "2024-01-21T15:30:00+09:00"
@@ -284,7 +344,7 @@ Example:
     dross::boolean flag{true};
     dross::number n{42};
     dross::string text{"hello"};
-    dross::datetime meeting{2024, 1, 21, 15, 30, 0, 540}; // +09:00
+    dross::datetime meeting{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // +09:00
     
     // 1. Implicit conversion to std::string
     std::string flag_str = flag;      // "true"

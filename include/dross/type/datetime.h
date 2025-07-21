@@ -36,25 +36,28 @@ concept datetime_type = std::same_as<T, std::chrono::system_clock::time_point> |
                        std::same_as<T, const char*>;
 
 /**
- * @brief Date and time handling with timezone support.
+ * @brief Date and time handling with modern timezone support.
  *
  * The datetime class provides comprehensive date and time operations with
- * full timezone support. It uses std::chrono internally for high precision
- * time calculations while providing a user-friendly API for common operations.
- * This class is designed as a general-purpose datetime type suitable for
- * configuration files, data serialization, logging, scheduling, and any
- * application requiring robust datetime handling.
+ * full timezone support using type-safe timezone objects. It uses std::chrono
+ * internally for high precision time calculations while providing a user-friendly
+ * API for common operations. This class is designed as a general-purpose datetime
+ * type suitable for configuration files, data serialization, logging, scheduling,
+ * and any application requiring robust datetime handling.
  *
  * Key features:
  * - ISO 8601 and RFC 3339 format support
- * - Timezone-aware operations
+ * - Type-safe timezone operations with timezone class
  * - Integration with std::chrono for duration arithmetic
  * - Value semantics (copyable and assignable)
  * - Thread-safe for read operations
  * - Support for date-only, time-only, and full datetime values
+ * - Factory methods for common datetime patterns
+ * - Precision control (date_only, time_only, datetime)
  *
  * Supported datetime formats (ISO 8601 standard):
  * - Offset datetime: 2024-01-21T15:30:00+09:00
+ * - UTC datetime: 2024-01-21T15:30:00Z
  * - Local datetime: 2024-01-21T15:30:00
  * - Local date: 2024-01-21
  * - Local time: 15:30:00
@@ -70,16 +73,27 @@ concept datetime_type = std::same_as<T, std::chrono::system_clock::time_point> |
  * - Non-const operations require external synchronization
  *
  * @code
- * // Basic usage
+ * // Basic usage with timezone objects
  * datetime now = datetime::now();
- * datetime birthday(1990, 12, 25, 10, 30, 0);
+ * datetime meeting(2024, 1, 21, 15, 30, 0, timezone::offset(9)); // +09:00
+ * datetime utc_meeting(2024, 1, 21, 6, 30, 0, timezone::utc());   // UTC
+ *
+ * // Factory methods for specific precision
+ * datetime birthday = datetime::date(1990, 12, 25);  // Date only
+ * datetime alarm = datetime::time(7, 30, 0);         // Time only
  *
  * // String parsing
- * datetime meeting("2024-01-21T15:30:00+09:00");
+ * datetime iso_meeting("2024-01-21T15:30:00+09:00");
  *
  * // Duration arithmetic
  * datetime tomorrow = now + std::chrono::hours(24);
  * auto age = now - birthday;
+ *
+ * // Timezone operations
+ * if (meeting.timezone().is_utc()) {
+ *     std::cout << "Meeting is in UTC" << std::endl;
+ * }
+ * std::cout << "Timezone: " << meeting.timezone().format() << std::endl;
  *
  * // Formatting
  * std::string iso_str = meeting.format(datetime_format::iso8601);

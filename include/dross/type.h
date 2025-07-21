@@ -3,7 +3,7 @@
  * @brief Type system header with core types and utility functions.
  *
  * This header provides access to the complete dross type system including
- * the core polymorphic types (boolean, number, string, array, dictionary, datetime, value)
+ * the core polymorphic types (boolean, number, string, array, dictionary, datetime, timezone, value)
  * and utility functions for string manipulation and container operations.
  *
  * The type system is designed around value semantics with no exceptions,
@@ -28,7 +28,7 @@
  * boolean flag{true};
  * number precise{"99999999999999999999999999999"};
  * string text{"Hello, 世界!"};
- * datetime meeting{2024, 1, 21, 15, 30, 0, 540}; // +09:00
+ * datetime meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
  * array list = {value{1}, value{"two"}, value{3.14}};
  * dictionary config = {{"host", value{string{"localhost"}}},
  *                      {"port", value{number{8080}}}};
@@ -62,6 +62,7 @@
 #include <dross/type/dictionary.h>
 #include <dross/type/number.h>
 #include <dross/type/string.h>
+#include <dross/type/timezone.h>
 #include <dross/type/value.h>
 
 #include <vector>
@@ -167,11 +168,30 @@ std::string to_string(const string& s);
  * information if available.
  *
  * @code
- * datetime meeting{2024, 1, 21, 15, 30, 0, 540}; // +09:00
+ * datetime meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
  * auto str = to_string(meeting);  // "2024-01-21T15:30:00+09:00"
  * @endcode
  */
 std::string to_string(const datetime& dt);
+
+/**
+ * @brief Convert a timezone to string representation (STL-style).
+ * @param tz The timezone to convert
+ * @return ISO 8601 formatted timezone string
+ *
+ * Provides STL-style explicit string conversion for consistency with
+ * other types. Returns the timezone in ISO 8601 format (e.g., "+09:00", "Z").
+ * Local timezone returns empty string.
+ *
+ * @code
+ * timezone jst = timezone::offset(9);
+ * auto str = to_string(jst);  // "+09:00"
+ *
+ * timezone utc = timezone::utc();
+ * auto utc_str = to_string(utc);  // "Z"
+ * @endcode
+ */
+std::string to_string(const timezone& tz);
 
 /**
  * @brief Concept defining requirements for concatenatable container types.
