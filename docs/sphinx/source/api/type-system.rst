@@ -22,15 +22,21 @@ The ``value`` class is the central polymorphic type that can hold any supported 
 
     #include <dross/value.h>
     
-    dross::value v1 = 42;              // Holds a number
-    dross::value v2 = "hello";          // Holds a string
-    dross::value v3 = dross::array{};   // Holds an array
-    dross::value v4 = true;             // Holds a boolean
+    dross::value v1 = 42;                                    // Holds a number
+    dross::value v2 = "hello";                               // Holds a string
+    dross::value v3 = dross::array{};                        // Holds an array
+    dross::value v4 = true;                                  // Holds a boolean
+    dross::value v5 = dross::datetime{2024, 1, 21, 15, 30}; // Holds a datetime
     
     // Type checking with seamless string conversion
-    if (v1.is_number()) {
-        auto num = v1.as_number();
+    if (v1.is<dross::number>()) {
+        auto num = v1.as<dross::number>();
         std::cout << num << std::endl;  // Direct output
+    }
+    
+    if (v5.is<dross::datetime>()) {
+        auto dt = v5.as<dross::datetime>();
+        std::cout << "Meeting time: " << dt << std::endl;
     }
 
 boolean
@@ -101,6 +107,51 @@ The ``string`` class provides Unicode-aware string handling:
     // Seamless string conversion
     std::string result = s3;         // Direct conversion
     std::cout << s3 << std::endl;    // Direct output
+
+datetime
+~~~~~~~~
+
+.. doxygenclass:: dross::datetime
+   :project: dross
+   :members:
+   :protected-members:
+   :undoc-members:
+
+The ``datetime`` class provides comprehensive date and time handling with timezone support:
+
+.. code-block:: cpp
+
+    #include <dross/datetime.h>
+    
+    // Construction from components
+    dross::datetime meeting{2024, 1, 21, 15, 30, 0, 540}; // +09:00
+    dross::datetime local_time{2024, 6, 15, 12, 30, 45};   // No timezone
+    
+    // Construction from ISO 8601 strings
+    dross::datetime utc_time{"2024-01-21T15:30:00Z"};
+    dross::datetime offset_time{"2024-01-21T15:30:00+09:00"};
+    dross::datetime date_only{"2024-01-21"};
+    dross::datetime time_only{"15:30:00"};
+    
+    // Current time
+    dross::datetime now = dross::datetime::now();
+    
+    // Duration arithmetic
+    auto tomorrow = now + std::chrono::hours(24);
+    auto next_week = now + std::chrono::days(7);
+    
+    // Formatting
+    std::string iso_str = meeting.format();  // ISO 8601 format
+    std::string custom = meeting.format("%Y-%m-%d %H:%M");
+    
+    // Component access
+    int year = meeting.year();
+    int month = meeting.month();
+    bool has_tz = meeting.has_timezone();
+    
+    // Seamless string conversion
+    std::string meeting_str = meeting;       // "2024-01-21T15:30:00+09:00"
+    std::cout << meeting << std::endl;       // Direct output
 
 array
 ~~~~~
@@ -211,6 +262,9 @@ The type system uses C++20 concepts to constrain template parameters:
 .. doxygenconcept:: dross::dictionary_type
    :project: dross
 
+.. doxygenconcept:: dross::datetime_type
+   :project: dross
+
 Type Conversion
 ---------------
 
@@ -230,26 +284,36 @@ Example:
     dross::boolean flag{true};
     dross::number n{42};
     dross::string text{"hello"};
+    dross::datetime meeting{2024, 1, 21, 15, 30, 0, 540}; // +09:00
     
     // 1. Implicit conversion to std::string
-    std::string flag_str = flag;  // "true"
-    std::string num_str = n;      // "42"
-    std::string text_str = text;  // "hello"
+    std::string flag_str = flag;      // "true"
+    std::string num_str = n;          // "42"
+    std::string text_str = text;      // "hello"
+    std::string datetime_str = meeting; // "2024-01-21T15:30:00+09:00"
     
     // 2. STL-style explicit conversion
     using dross::to_string;
-    auto flag_string = to_string(flag);  // "true"
-    auto num_string = to_string(n);      // "42"
-    auto text_string = to_string(text);  // "hello"
+    auto flag_string = to_string(flag);      // "true"
+    auto num_string = to_string(n);          // "42"
+    auto text_string = to_string(text);      // "hello"
+    auto datetime_string = to_string(meeting); // "2024-01-21T15:30:00+09:00"
     
     // 3. Direct stream output
-    std::cout << flag << " " << n << " " << text << std::endl;
+    std::cout << flag << " " << n << " " << text << " " << meeting << std::endl;
     
     // Value type conversion
     dross::value v = 42;
-    if (v.is_number()) {
-        dross::number num = v.as_number();
+    if (v.is<dross::number>()) {
+        dross::number num = v.as<dross::number>();
         std::string s = to_string(num);  // STL-style conversion
+    }
+    
+    // Datetime in value
+    dross::value dt_value = dross::datetime::now();
+    if (dt_value.is<dross::datetime>()) {
+        auto dt = dt_value.as<dross::datetime>();
+        std::cout << "Current time: " << dt.format("%Y-%m-%d %H:%M:%S") << std::endl;
     }
 
 Comparison Operations

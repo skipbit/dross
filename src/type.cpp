@@ -46,4 +46,9 @@ std::string to_string(const string& s)
     return static_cast<std::string>(s);
 }
 
+std::string to_string(const datetime& dt)
+{
+    return static_cast<std::string>(dt);
+}
+
 }
