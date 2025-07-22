@@ -322,9 +322,6 @@ The type system uses C++20 concepts to constrain template parameters:
 .. doxygenconcept:: dross::dictionary_type
    :project: dross
 
-.. doxygenconcept:: dross::datetime_type
-   :project: dross
-
 Type Conversion
 ---------------
 

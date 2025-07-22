@@ -237,8 +237,8 @@ TEST(datetime_test, formatting) {
     
     // ISO 8601 format (default)
     EXPECT_EQ(dt.format(), "2024-01-21T15:30:45+09:00");
-    EXPECT_EQ(dt.format(dross::datetime_format::iso8601), "2024-01-21T15:30:45+09:00");
-    EXPECT_EQ(dt.format(dross::datetime_format::rfc3339), "2024-01-21T15:30:45+09:00");
+    EXPECT_EQ(dt.format(dross::datetime::format_type::iso8601), "2024-01-21T15:30:45+09:00");
+    EXPECT_EQ(dt.format(dross::datetime::format_type::rfc3339), "2024-01-21T15:30:45+09:00");
     
     // Custom format
     EXPECT_EQ(dt.format("%Y-%m-%d"), "2024-01-21");

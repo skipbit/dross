@@ -164,27 +164,6 @@ datetime::datetime(int year, int month, int day,
     _store->time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
 }
 
-datetime::datetime(int year, int month, int day,
-                  int hour, int minute, int second,
-                  int timezone_offset_minutes)
-    : _store(std::make_unique<storage>())
-{
-    _store->tz = dross::timezone::offset(timezone_offset_minutes / 60, std::abs(timezone_offset_minutes) % 60);
-
-    // Use modern chrono calendar types
-    auto ymd = std::chrono::year_month_day{std::chrono::year{year},
-                                           std::chrono::month{static_cast<unsigned>(month)},
-                                           std::chrono::day{static_cast<unsigned>(day)}};
-
-    auto hms = std::chrono::hh_mm_ss{std::chrono::hours{hour} + std::chrono::minutes{minute} + std::chrono::seconds{second}};
-
-    // Create time_point from date and time
-    auto days_since_epoch = std::chrono::sys_days{ymd}.time_since_epoch();
-    auto time_of_day = hms.to_duration();
-
-    _store->time_point = std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
-}
-
 datetime::~datetime() = default;
 
 datetime& datetime::operator=(const datetime& other)
@@ -206,7 +185,7 @@ datetime::operator std::chrono::system_clock::time_point() const
 
 datetime::operator std::string() const
 {
-    return format(datetime_format::iso8601);
+    return format(format_type::iso8601);
 }
 
 std::strong_ordering datetime::operator<=>(const datetime& other) const
@@ -275,14 +254,11 @@ datetime datetime::operator-(const std::chrono::seconds& duration) const
     return result;
 }
 
-std::string datetime::format(datetime_format fmt) const
+std::string datetime::format(format_type fmt) const
 {
     switch (fmt) {
-        case datetime_format::iso8601:
-        case datetime_format::rfc3339:
-            return format_iso8601();
-        case datetime_format::custom:
-            // This shouldn't happen with this overload
+        case format_type::iso8601:
+        case format_type::rfc3339:
             return format_iso8601();
     }
     return format_iso8601();
