@@ -21,7 +21,10 @@ jobs:
     - name: Install dependencies and GCC ${{ matrix.gcc_version }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake build-essential gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+        sudo apt-get install -y cmake build-essential software-properties-common
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        sudo apt-get update
+        sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
 
     - name: Configure CMake
       run: |
