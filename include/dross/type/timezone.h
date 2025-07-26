@@ -1,10 +1,11 @@
 #pragma once
 
 #include <string>
-#include <optional>
 #include <compare>
 #include <iosfwd>
 #include <memory>
+#include <chrono>
+#include <optional>
 
 namespace dross {
 
@@ -19,12 +20,11 @@ namespace dross {
  * - Type-safe timezone representation
  * - Clear factory methods for common timezone types
  * - ISO 8601 compliant formatting
- * - Integration with datetime class
+ * - Integration with timestamp class
  * - Value semantics (copyable and assignable)
  *
  * Supported timezone types:
  * - UTC: Coordinated Universal Time (offset +00:00)
- * - Local: System local timezone (no offset stored)
  * - Fixed offset: Custom offset from UTC in hours/minutes
  *
  * @code
@@ -34,8 +34,8 @@ namespace dross {
  * auto pdt = timezone::offset(-7, 0);       // -07:00
  * auto custom = timezone::from_string("+05:30");  // India Standard Time
  *
- * // Usage with datetime
- * datetime dt(2024, 1, 21, 15, 30, 0, timezone::offset(9));
+ * // Usage with timestamp
+ * timestamp ts(2024, 1, 21, 15, 30, 0, timezone::offset(9));
  * @endcode
  */
 class timezone final {
@@ -45,12 +45,6 @@ public:
      * @return timezone representing UTC
      */
     static timezone utc();
-
-    /**
-     * @brief Create local system timezone.
-     * @return timezone representing local system time
-     */
-    static timezone local();
 
     /**
      * @brief Create timezone with fixed offset.
@@ -64,14 +58,36 @@ public:
     static timezone offset(int hours, int minutes = 0);
 
     /**
-     * @brief Parse timezone from ISO 8601 offset string.
-     * @param tz_str Timezone string (e.g., "+09:00", "-05:30", "Z")
-     * @return timezone parsed from string, or local timezone if parsing fails
+     * @brief Create timezone with chrono-based offset.
+     * @param offset_duration Offset from UTC as chrono::minutes
+     * @return timezone with specified offset
+     *
+     * Positive values are east of UTC, negative values are west of UTC.
+     * @code
+     * auto jst = timezone::offset(std::chrono::minutes(540));  // +09:00
+     * auto ist = timezone::offset(std::chrono::hours(5) + std::chrono::minutes(30));  // +05:30
+     * @endcode
      */
-    static timezone from_string(const std::string& tz_str);
+    static timezone offset(std::chrono::minutes offset_duration);
 
     /**
-     * @brief Default constructor creating local timezone.
+     * @brief Parse timezone from ISO 8601 offset string.
+     * @param tz_str Timezone string (e.g., "+09:00", "-05:30", "Z")
+     * @return optional timezone parsed from string, nullopt if parsing fails
+     *
+     * @code
+     * auto tz = timezone::from_string("+09:00");
+     * if (tz) {
+     *     std::cout << "Parsed: " << tz->format() << std::endl;
+     * } else {
+     *     std::cout << "Invalid timezone string" << std::endl;
+     * }
+     * @endcode
+     */
+    static std::optional<timezone> from_string(const std::string& tz_str);
+
+    /**
+     * @brief Default constructor creating UTC timezone.
      */
     timezone();
 
@@ -92,34 +108,23 @@ public:
     timezone& operator=(const timezone& other);
 
     /**
-     * @brief Check if this is a local timezone.
-     * @return True if timezone represents local system time
-     */
-    bool is_local() const noexcept;
-
-    /**
      * @brief Check if this is UTC timezone.
      * @return True if timezone represents UTC (+00:00)
      */
     bool is_utc() const noexcept;
 
     /**
-     * @brief Check if this timezone has a fixed offset.
-     * @return True if timezone has a specific offset from UTC
-     */
-    bool has_offset() const noexcept;
-
-    /**
-     * @brief Get the timezone offset in minutes from UTC.
-     * @return Offset in minutes, or nullopt for local timezone
+     * @brief Get the timezone offset from UTC.
+     * @return Offset as chrono::minutes (UTC=0min, JST=540min, PST=-480min)
      *
      * Positive values indicate east of UTC, negative values indicate west of UTC.
+     * Use std::chrono::duration_cast to convert to hours if needed.
      */
-    std::optional<int> offset_minutes() const noexcept;
+    std::chrono::minutes offset() const noexcept;
 
     /**
      * @brief Format timezone as ISO 8601 offset string.
-     * @return Formatted string (e.g., "+09:00", "-05:30", "Z", or empty for local)
+     * @return Formatted string (e.g., "+09:00", "-05:30", "Z" for UTC)
      */
     std::string format() const;
 
@@ -149,9 +154,9 @@ private:
 
     /**
      * @brief Private constructor for internal use.
-     * @param offset_minutes Optional offset in minutes from UTC
+     * @param offset Offset from UTC as chrono::minutes
      */
-    explicit timezone(std::optional<int> offset_minutes);
+    explicit timezone(std::chrono::minutes offset);
 };
 
 /**

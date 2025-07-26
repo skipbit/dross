@@ -4,39 +4,35 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
-#include <algorithm>
+#include <chrono>
 
 namespace dross {
 
 class timezone::storage {
 public:
-    std::optional<int> offset_minutes;
+    int offset_minutes;
 
-    storage() : offset_minutes(std::nullopt) {}
+    storage() : offset_minutes(0) {}  // Default UTC
 
-    storage(std::optional<int> offset) : offset_minutes(offset) {}
+    storage(int offset) : offset_minutes(offset) {}
 
     storage(const storage& other) : offset_minutes(other.offset_minutes) {}
 };
 
 timezone timezone::utc()
 {
-    return timezone(0);
+    return timezone(std::chrono::minutes(0));
 }
 
-timezone timezone::local()
-{
-    return timezone(std::nullopt);
-}
 
 timezone timezone::offset(int hours, int minutes)
 {
     // Validate input ranges
     if (hours < -12 || hours > 14) {
-        return timezone::local(); // Invalid hours, fallback to local
+        return timezone::utc(); // Invalid hours, fallback to UTC
     }
     if (minutes < 0 || minutes > 59) {
-        return timezone::local(); // Invalid minutes, fallback to local
+        return timezone::utc(); // Invalid minutes, fallback to UTC
     }
 
     // Calculate total offset in minutes
@@ -45,10 +41,23 @@ timezone timezone::offset(int hours, int minutes)
         total_minutes = -total_minutes;
     }
 
-    return timezone(total_minutes);
+    return timezone(std::chrono::minutes(total_minutes));
 }
 
-timezone timezone::from_string(const std::string& tz_str)
+timezone timezone::offset(std::chrono::minutes offset_duration)
+{
+    // Validate range: -12 hours to +14 hours
+    const auto min_offset = std::chrono::minutes(-12 * 60);
+    const auto max_offset = std::chrono::minutes(14 * 60);
+
+    if (offset_duration < min_offset || offset_duration > max_offset) {
+        return timezone::utc(); // Invalid offset, fallback to UTC
+    }
+
+    return timezone(offset_duration);
+}
+
+std::optional<timezone> timezone::from_string(const std::string& tz_str)
 {
     // Handle UTC indicators
     if (tz_str == "Z" || tz_str == "z") {
@@ -66,7 +75,7 @@ timezone timezone::from_string(const std::string& tz_str)
 
         // Validate ranges
         if (hours > 14 || minutes > 59) {
-            return local(); // Invalid format, fallback to local
+            return std::nullopt; // Invalid format
         }
 
         // Calculate offset
@@ -75,11 +84,11 @@ timezone timezone::from_string(const std::string& tz_str)
             total_minutes = -total_minutes;
         }
 
-        return timezone(total_minutes);
+        return timezone(std::chrono::minutes(total_minutes));
     }
 
-    // Parsing failed, return local timezone
-    return local();
+    // Parsing failed
+    return std::nullopt;
 }
 
 timezone::timezone() : _store(std::make_unique<storage>())
@@ -90,7 +99,7 @@ timezone::timezone(const timezone& other) : _store(std::make_unique<storage>(*ot
 {
 }
 
-timezone::timezone(std::optional<int> offset_minutes) : _store(std::make_unique<storage>(offset_minutes))
+timezone::timezone(std::chrono::minutes offset) : _store(std::make_unique<storage>(offset.count()))
 {
 }
 
@@ -104,33 +113,19 @@ timezone& timezone::operator=(const timezone& other)
     return *this;
 }
 
-bool timezone::is_local() const noexcept
-{
-    return !_store->offset_minutes.has_value();
-}
-
 bool timezone::is_utc() const noexcept
 {
-    return _store->offset_minutes.has_value() && _store->offset_minutes.value() == 0;
+    return _store->offset_minutes == 0;
 }
 
-bool timezone::has_offset() const noexcept
+std::chrono::minutes timezone::offset() const noexcept
 {
-    return _store->offset_minutes.has_value();
-}
-
-std::optional<int> timezone::offset_minutes() const noexcept
-{
-    return _store->offset_minutes;
+    return std::chrono::minutes(_store->offset_minutes);
 }
 
 std::string timezone::format() const
 {
-    if (!_store->offset_minutes.has_value()) {
-        return ""; // Local timezone has no string representation
-    }
-
-    int offset = _store->offset_minutes.value();
+    int offset = _store->offset_minutes;
     if (offset == 0) {
         return "Z"; // UTC
     }
@@ -160,21 +155,8 @@ bool timezone::operator==(const timezone& other) const noexcept
 
 std::strong_ordering timezone::operator<=>(const timezone& other) const noexcept
 {
-    // Local timezones are considered equal to each other
-    if (!_store->offset_minutes.has_value() && !other._store->offset_minutes.has_value()) {
-        return std::strong_ordering::equal;
-    }
-
-    // Local timezone is always "less than" any fixed offset
-    if (!_store->offset_minutes.has_value()) {
-        return std::strong_ordering::less;
-    }
-    if (!other._store->offset_minutes.has_value()) {
-        return std::strong_ordering::greater;
-    }
-
-    // Compare offset values
-    return _store->offset_minutes.value() <=> other._store->offset_minutes.value();
+    // Simply compare offset minutes
+    return _store->offset_minutes <=> other._store->offset_minutes;
 }
 
 std::ostream& operator<<(std::ostream& os, const timezone& tz)

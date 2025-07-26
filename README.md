@@ -34,7 +34,7 @@
 # vcpkg (coming soon)
 vcpkg install dross
 
-# Conan (coming soon)  
+# Conan (coming soon)
 conan install dross/0.0.1@
 
 # CPM (CMake Package Manager)
@@ -68,7 +68,7 @@ cd build && ctest -V
 # Shared library (default)
 cmake -DBUILD_SHARED_LIBS=ON ...
 
-# Static library  
+# Static library
 cmake -DBUILD_SHARED_LIBS=OFF ...
 ```
 
@@ -129,7 +129,7 @@ value data = dictionary{
     {"name", string{"Dross"}},
     {"version", number{"0.0.1"}},
     {"features", array{string{"fast"}, string{"safe"}}},
-    {"release_date", datetime{2024, 1, 21, 15, 30, 0, timezone::utc()}}
+    {"release_date", timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()}}
 };
 
 // Platform utilities
@@ -143,7 +143,7 @@ auto app_config = config_dir / "myapp" / "config.toml";
 - **`boolean`** - Type-safe boolean operations with logical operators
 - **`number`** - Arbitrary precision arithmetic with string-based storage
 - **`string`** - Unicode-aware string handling
-- **`datetime`** - Date and time handling with timezone support
+- **`timestamp`** - Date and time handling with timezone support
 - **`timezone`** - Type-safe timezone representation with ISO 8601 support
 - **`array`** - Dynamic arrays with value semantics
 - **`dictionary`** - Key-value containers
@@ -196,7 +196,7 @@ ctest -V
 ## 🗺️ Roadmap
 
 ### Current Modules
-- ✅ Type System (boolean, number, string, datetime, timezone, array, dictionary, value)
+- ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
 - ✅ Configuration (TOML parser)
 

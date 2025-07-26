@@ -3,7 +3,7 @@
 #include "dross/type/boolean.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
-#include "dross/type/datetime.h"
+#include "dross/type/timestamp.h"
 
 #include <initializer_list>
 #include <memory>
@@ -15,13 +15,13 @@ class number;
 class string;
 class array;
 class dictionary;
-class datetime;
+class timestamp;
 
 /**
  * @brief Polymorphic value type that can hold any supported dross type.
  *
  * The value class provides a type-safe polymorphic container that can hold
- * any of the core dross types (number, string, array, dictionary). It uses
+ * any of the core dross types (number, string, array, dictionary, timestamp). It uses
  * std::variant internally for type safety and performance, and provides
  * convenient construction and conversion methods.
  *
@@ -39,7 +39,7 @@ class datetime;
  * - string: Unicode-aware strings
  * - array: Dynamic arrays of values
  * - dictionary: Key-value mappings
- * - datetime: Date and time values with timezone support
+ * - timestamp: Date and time values with timezone support
  * - Arithmetic types (automatically converted to number)
  * - String types (automatically converted to string)
  *
@@ -117,10 +117,10 @@ public:
     value(const dictionary& dict);
 
     /**
-     * @brief Construct from a datetime.
-     * @param dt The datetime to store
+     * @brief Construct from a timestamp.
+     * @param ts The timestamp to store
      */
-    value(const datetime& dt);
+    value(const timestamp& ts);
 
     /**
      * @brief Construct an array from initializer list.
@@ -235,11 +235,11 @@ public:
     value& operator=(const dictionary& dict);
 
     /**
-     * @brief Assign a datetime to this value.
-     * @param dt The datetime to assign
+     * @brief Assign a timestamp to this value.
+     * @param ts The timestamp to assign
      * @return Reference to this value
      */
-    value& operator=(const datetime& dt);
+    value& operator=(const timestamp& ts);
 
     /**
      * @brief Check if the value contains a specific type.
@@ -247,7 +247,7 @@ public:
      * @return true if the value contains type T, false otherwise
      *
      * Use this for type checking before casting to avoid exceptions.
-     * Supports checking for boolean, number, string, array, dictionary, and datetime types.
+     * Supports checking for boolean, number, string, array, dictionary, and timestamp types.
      */
     template <class T>
     bool is() const noexcept;

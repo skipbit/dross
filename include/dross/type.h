@@ -3,7 +3,7 @@
  * @brief Type system header with core types and utility functions.
  *
  * This header provides access to the complete dross type system including
- * the core polymorphic types (boolean, number, string, array, dictionary, datetime, timezone, value)
+ * the core polymorphic types (boolean, number, string, array, dictionary, timestamp, timezone, value)
  * and utility functions for string manipulation and container operations.
  *
  * The type system is designed around value semantics with no exceptions,
@@ -28,7 +28,7 @@
  * boolean flag{true};
  * number precise{"99999999999999999999999999999"};
  * string text{"Hello, 世界!"};
- * datetime meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
+ * timestamp meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
  * array list = {value{1}, value{"two"}, value{3.14}};
  * dictionary config = {{"host", value{string{"localhost"}}},
  *                      {"port", value{number{8080}}}};
@@ -58,7 +58,7 @@
 
 #include <dross/type/array.h>
 #include <dross/type/boolean.h>
-#include <dross/type/datetime.h>
+#include <dross/type/timestamp.h>
 #include <dross/type/dictionary.h>
 #include <dross/type/number.h>
 #include <dross/type/string.h>
@@ -159,20 +159,20 @@ std::string to_string(const number& n);
 std::string to_string(const string& s);
 
 /**
- * @brief Convert a datetime to string representation (STL-style).
- * @param dt The datetime to convert
+ * @brief Convert a timestamp to string representation (STL-style).
+ * @param ts The timestamp to convert
  * @return ISO 8601 formatted string representation
  *
  * Provides STL-style explicit string conversion for consistency with
- * other types. Returns the datetime in ISO 8601 format with timezone
+ * other types. Returns the timestamp in ISO 8601 format with timezone
  * information if available.
  *
  * @code
- * datetime meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
+ * timestamp meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
  * auto str = to_string(meeting);  // "2024-01-21T15:30:00+09:00"
  * @endcode
  */
-std::string to_string(const datetime& dt);
+std::string to_string(const timestamp& ts);
 
 /**
  * @brief Convert a timezone to string representation (STL-style).

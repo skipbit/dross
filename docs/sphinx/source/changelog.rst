@@ -12,10 +12,23 @@ Unreleased
 Added
 ~~~~~
 
+- ``timestamp`` class for date and time handling with timezone support
+- ``timezone`` class with type-safe timezone representation and ISO 8601 support
+- Modern C++23 chrono integration for timezone offsets
+- Optional error handling for timezone parsing (``from_string`` returns ``std::optional``)
+- Compositional design with ``date_part`` and ``time_part`` nested classes
 - Initial documentation system with Sphinx + Breathe
 - GitHub Actions workflow for automatic documentation deployment
 - Comprehensive API reference documentation
 - User guide with examples and best practices
+
+Changed
+~~~~~~~
+
+- Improved timezone API: ``offset()`` returns ``std::chrono::minutes`` instead of int
+- Enhanced error handling: ``timezone::from_string()`` returns ``std::optional<timezone>``
+- Simplified API: removed redundant timezone methods (``is_local()``, ``has_offset()``)
+- Updated documentation to reflect timestamp and timezone APIs
 
 v0.1.0 - 2024-01-20
 -------------------
@@ -112,7 +125,6 @@ Future Releases
 Planned for v0.2.0
 ~~~~~~~~~~~~~~~~~~~
 
-- ``datetime`` module for date and time handling
 - ``uuid`` module for UUID generation and manipulation
 - ``url`` module for URL parsing and construction
 - Improved Windows platform support
