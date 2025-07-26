@@ -441,7 +441,7 @@ public:
      * @brief Get the timezone information.
      * @return Reference to the timezone (always present, defaults to UTC)
      */
-    const timezone& timezone() const noexcept;
+    const dross::timezone& timezone() const noexcept;
 
 private:
     class storage;
