@@ -4,6 +4,9 @@
 #include <string>
 #include <optional>
 #include <ostream>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace dross {
 
@@ -711,8 +714,16 @@ number::operator std::string() const
 
 number::operator int() const
 {
-    auto val = parse_long_long(_store->number);
-    return val ? static_cast<int>(*val) : 0;
+    auto val = parse_number(_store->number);
+    if (!val) return 0;
+
+    // Apply rounding for decimal numbers
+    double rounded = std::round(*val);
+
+    // Clamp to int range to prevent overflow
+    return static_cast<int>(std::clamp(rounded,
+        static_cast<double>(std::numeric_limits<int>::min()),
+        static_cast<double>(std::numeric_limits<int>::max())));
 }
 
 number::operator double() const
