@@ -14,68 +14,204 @@ namespace {
     // Internal NaN representation (implementation detail)
     constexpr const char* NAN_VALUE = "__invalid__";
 
-    // Helper function to parse number string to double
-    std::optional<double> parse_number(const std::string& str) {
-        if (str.empty()) return std::nullopt;
+    /**
+     * @brief Comprehensive number representation after parsing.
+     *
+     * This struct holds all parsed components of a number string, providing
+     * a unified interface for all conversion operations. It avoids the need
+     * for multiple parsing functions and ensures consistency across all
+     * type conversions.
+     */
+    struct parsed_number {
+        bool is_negative = false;           // Sign of the number
+        std::string integer_part = "0";     // Integer portion (without sign)
+        std::optional<std::string> fractional_part; // Fractional portion (if any)
+        bool is_valid = true;               // Whether parsing was successful
 
-        try {
-            size_t processed = 0;
-            double value = std::stod(str, &processed);
+        /**
+         * @brief Convert to double with proper error handling.
+         * @return std::optional<double> containing the value or nullopt on error
+         */
+        std::optional<double> to_double() const {
+            if (!is_valid) return std::nullopt;
 
-            // Check if entire string was processed
-            if (processed == str.length()) {
-                return value;
+            std::string full_str = (is_negative ? "-" : "") + integer_part;
+            if (fractional_part) {
+                full_str += "." + *fractional_part;
             }
-        } catch (const std::exception&) {
-            // Invalid number format
-        }
-        return std::nullopt;
-    }
 
-    // Helper function to parse number string to long long (avoiding double precision loss)
-    std::optional<long long> parse_long_long(const std::string& str) {
-        if (str.empty()) return std::nullopt;
-
-        // Handle decimal numbers by truncating fractional part
-        std::string integer_part = str;
-        size_t decimal_pos = str.find('.');
-        if (decimal_pos != std::string::npos) {
-            integer_part = str.substr(0, decimal_pos);
-        }
-
-        if (integer_part.empty() || integer_part == "+" || integer_part == "-") {
+            try {
+                size_t processed = 0;
+                double value = std::stod(full_str, &processed);
+                if (processed == full_str.length()) {
+                    return value;
+                }
+            } catch (const std::exception&) {
+                // Invalid conversion
+            }
             return std::nullopt;
         }
 
-        try {
-            size_t processed = 0;
-            long long value = std::stoll(integer_part, &processed);
-            // Check if entire integer part was processed
-            if (processed == integer_part.length()) {
-                return value;
+        /**
+         * @brief Convert to long long with proper overflow handling.
+         * @return std::optional<long long> containing the value or nullopt on error
+         */
+        std::optional<long long> to_long_long() const {
+            if (!is_valid) return std::nullopt;
+
+            // For long long conversion, we only use the integer part
+            std::string int_str = (is_negative ? "-" : "") + integer_part;
+
+            try {
+                size_t processed = 0;
+                long long value = std::stoll(int_str, &processed);
+                if (processed == int_str.length()) {
+                    return value;
+                }
+            } catch (const std::exception&) {
+                // Invalid conversion or overflow
             }
-        } catch (const std::exception&) {
-            // Invalid number format or overflow
+            return std::nullopt;
         }
-        return std::nullopt;
-    }
 
-    // Check if string represents an integer (no decimal point)
-    bool is_integer_string(const std::string& str) {
-        if (str.empty()) return false;
+        /**
+         * @brief Convert to int with rounding and clamping.
+         * @return int value with proper overflow protection
+         */
+        int to_int() const {
+            auto double_val = to_double();
+            if (!double_val) return 0;
 
+            // Apply rounding for decimal numbers
+            double rounded = std::round(*double_val);
+
+            // Clamp to int range to prevent overflow
+            return static_cast<int>(std::clamp(rounded,
+                static_cast<double>(std::numeric_limits<int>::min()),
+                static_cast<double>(std::numeric_limits<int>::max())));
+        }
+
+        /**
+         * @brief Check if this represents an integer (no fractional part).
+         * @return true if the number has no fractional component
+         */
+        bool is_integer() const {
+            return is_valid && !fractional_part.has_value();
+        }
+    };
+
+    /**
+     * @brief Unified number parsing function.
+     *
+     * This function provides a single point for parsing number strings,
+     * replacing the multiple specialized parsing functions. It handles
+     * all number formats and provides comprehensive error checking.
+     *
+     * @param str The string to parse
+     * @return parsed_number struct containing all components
+     */
+    parsed_number parse_number_unified(const std::string& str) {
+        parsed_number result;
+
+        if (str.empty()) {
+            result.is_valid = false;
+            return result;
+        }
+
+        std::string work_str = str;
         size_t start = 0;
-        if (str[0] == '-' || str[0] == '+') {
-            if (str.length() == 1) return false;
+
+        // Handle sign
+        if (work_str[0] == '-') {
+            result.is_negative = true;
+            start = 1;
+        } else if (work_str[0] == '+') {
             start = 1;
         }
 
-        for (size_t i = start; i < str.length(); ++i) {
-            if (!std::isdigit(str[i])) {
-                return false;
+        if (start >= work_str.length()) {
+            result.is_valid = false;
+            return result;
+        }
+
+        // Find decimal point
+        size_t decimal_pos = work_str.find('.', start);
+        bool has_decimal = (decimal_pos != std::string::npos);
+
+        // Extract integer part
+        std::string integer_str;
+        if (has_decimal) {
+            integer_str = work_str.substr(start, decimal_pos - start);
+        } else {
+            integer_str = work_str.substr(start);
+        }
+
+        // Validate integer part
+        if (integer_str.empty()) {
+            // Handle cases like ".5" or "-.5"
+            if (has_decimal && decimal_pos + 1 < work_str.length()) {
+                integer_str = "0";
+            } else {
+                result.is_valid = false;
+                return result;
             }
         }
-        return true;
+
+        // Check if integer part contains only digits
+        for (char c : integer_str) {
+            if (!std::isdigit(c)) {
+                result.is_valid = false;
+                return result;
+            }
+        }
+
+        result.integer_part = integer_str;
+
+        // Extract fractional part if present
+        if (has_decimal) {
+            if (decimal_pos + 1 >= work_str.length()) {
+                // Handle trailing decimal point like "5."
+                result.fractional_part = std::nullopt;
+            } else {
+                std::string frac_str = work_str.substr(decimal_pos + 1);
+
+                // Validate fractional part
+                for (char c : frac_str) {
+                    if (!std::isdigit(c)) {
+                        result.is_valid = false;
+                        return result;
+                    }
+                }
+
+                // Remove trailing zeros from fractional part
+                while (!frac_str.empty() && frac_str.back() == '0') {
+                    frac_str.pop_back();
+                }
+
+                if (!frac_str.empty()) {
+                    result.fractional_part = frac_str;
+                }
+            }
+        }
+
+        // Remove leading zeros from integer part (but keep at least one digit)
+        while (result.integer_part.length() > 1 && result.integer_part[0] == '0') {
+            result.integer_part = result.integer_part.substr(1);
+        }
+
+        // Handle special case of zero
+        if (result.integer_part == "0" && !result.fractional_part.has_value()) {
+            result.is_negative = false; // Zero is always positive
+        }
+
+        // Also handle case where fractional part is present but all zeros
+        if (result.integer_part == "0" && result.fractional_part.has_value() &&
+            result.fractional_part->empty()) {
+            result.is_negative = false; // Zero is always positive
+            result.fractional_part = std::nullopt; // Remove empty fractional part
+        }
+
+        return result;
     }
 
     // Check if string represents a valid number (integer or decimal)
@@ -106,9 +242,6 @@ namespace {
 
         return true;
     }
-
-
-
 
     // Normalize number string (remove unnecessary zeros, handle decimal point)
     std::string normalize_number(const std::string& str) {
@@ -635,7 +768,8 @@ bool number::is_nan() const
 
 bool number::is_integer() const
 {
-    return is_integer_string(_store->number);
+    auto parsed = parse_number_unified(_store->number);
+    return parsed.is_integer();
 }
 
 bool number::equals(const number& n) const
@@ -714,27 +848,21 @@ number::operator std::string() const
 
 number::operator int() const
 {
-    auto val = parse_number(_store->number);
-    if (!val) return 0;
-
-    // Apply rounding for decimal numbers
-    double rounded = std::round(*val);
-
-    // Clamp to int range to prevent overflow
-    return static_cast<int>(std::clamp(rounded,
-        static_cast<double>(std::numeric_limits<int>::min()),
-        static_cast<double>(std::numeric_limits<int>::max())));
+    auto parsed = parse_number_unified(_store->number);
+    return parsed.to_int();
 }
 
 number::operator double() const
 {
-    auto val = parse_number(_store->number);
+    auto parsed = parse_number_unified(_store->number);
+    auto val = parsed.to_double();
     return val ? *val : 0.0;
 }
 
 number::operator long long() const
 {
-    auto val = parse_long_long(_store->number);
+    auto parsed = parse_number_unified(_store->number);
+    auto val = parsed.to_long_long();
     return val ? *val : 0LL;
 }
 
