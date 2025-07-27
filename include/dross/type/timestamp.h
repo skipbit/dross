@@ -169,7 +169,7 @@ public:
      *
      * This class represents the time part of a timestamp and can only be
      * constructed through the timestamp class. It provides read-only access
-     * to hour, minute, and second components with microsecond precision.
+     * to hour, minute, and second components with nanosecond precision.
      */
     class time_part {
         friend class timestamp;
@@ -239,7 +239,7 @@ public:
          * @brief Conversion to std::chrono::hh_mm_ss.
          * @return The hh_mm_ss representation
          */
-        std::chrono::hh_mm_ss<std::chrono::microseconds> to_hh_mm_ss() const noexcept;
+        std::chrono::hh_mm_ss<std::chrono::nanoseconds> to_hh_mm_ss() const noexcept;
 
         /**
          * @brief Three-way comparison operator.

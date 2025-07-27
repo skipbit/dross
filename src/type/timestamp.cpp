@@ -131,22 +131,22 @@ bool timestamp::date_part::operator==(const date_part& other) const noexcept
 // Time implementation
 class timestamp::time_part::impl {
 public:
-    std::chrono::hh_mm_ss<std::chrono::microseconds> hms;
+    std::chrono::hh_mm_ss<std::chrono::nanoseconds> hms;
 
     impl()
-        : hms{std::chrono::microseconds{0}}
+        : hms{std::chrono::nanoseconds{0}}
     {
     }
 
     impl(int hour, int minute, int second)
-        : hms{std::chrono::duration_cast<std::chrono::microseconds>(
+        : hms{std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::hours{hour} + std::chrono::minutes{minute} + std::chrono::seconds{second})}
     {
     }
 
     template<typename Duration>
     impl(const std::chrono::hh_mm_ss<Duration>& hms_in)
-        : hms{std::chrono::duration_cast<std::chrono::microseconds>(hms_in.to_duration())}
+        : hms{std::chrono::duration_cast<std::chrono::nanoseconds>(hms_in.to_duration())}
     {
     }
 
@@ -185,7 +185,7 @@ timestamp::time_part::time_part(const std::string& iso8601_time)
                        std::chrono::minutes{minute} +
                        std::chrono::seconds{second};
         _impl->hms = std::chrono::hh_mm_ss{
-            std::chrono::duration_cast<std::chrono::microseconds>(duration)
+            std::chrono::duration_cast<std::chrono::nanoseconds>(duration)
         };
     }
     // If parsing fails, leave as midnight
@@ -199,7 +199,7 @@ timestamp::time_part::time_part(const std::chrono::hh_mm_ss<Duration>& hms)
 
 // Explicit instantiations for common durations
 template timestamp::time_part::time_part(const std::chrono::hh_mm_ss<std::chrono::seconds>&);
-template timestamp::time_part::time_part(const std::chrono::hh_mm_ss<std::chrono::microseconds>&);
+template timestamp::time_part::time_part(const std::chrono::hh_mm_ss<std::chrono::nanoseconds>&);
 
 timestamp::time_part::time_part(const time_part& other)
     : _impl(std::make_unique<impl>(*other._impl))
@@ -246,7 +246,7 @@ timestamp::time_part::operator std::string() const
     return oss.str();
 }
 
-std::chrono::hh_mm_ss<std::chrono::microseconds> timestamp::time_part::to_hh_mm_ss() const noexcept
+std::chrono::hh_mm_ss<std::chrono::nanoseconds> timestamp::time_part::to_hh_mm_ss() const noexcept
 {
     return _impl->hms;
 }
@@ -286,7 +286,9 @@ public:
         auto ymd = static_cast<std::chrono::year_month_day>(date_value);
         auto days_since_epoch = std::chrono::sys_days{ymd}.time_since_epoch();
         auto time_of_day = time_value.to_hh_mm_ss().to_duration();
-        return std::chrono::system_clock::time_point{days_since_epoch + time_of_day};
+        auto total_duration = days_since_epoch + time_of_day;
+        return std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            std::chrono::sys_time<std::chrono::nanoseconds>{total_duration});
     }
 };
 
@@ -318,8 +320,8 @@ timestamp::timestamp(const std::chrono::system_clock::time_point& tp)
     _store->date_value = timestamp::date_part{ymd};
 
     // Always store time part (even if it's midnight)
-    auto time_of_day_us = std::chrono::duration_cast<std::chrono::microseconds>(time_of_day);
-    auto hms = std::chrono::hh_mm_ss{time_of_day_us};
+    auto time_of_day_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(time_of_day);
+    auto hms = std::chrono::hh_mm_ss{time_of_day_ns};
     _store->time_value = timestamp::time_part{hms};
 
     // time_point has no timezone info
@@ -467,7 +469,7 @@ timestamp timestamp::operator+(const std::chrono::minutes& duration) const
     auto days_since_epoch = std::chrono::floor<std::chrono::days>(tp);
     auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
     auto time_of_day = tp - days_since_epoch;
-    auto hms = std::chrono::hh_mm_ss{std::chrono::duration_cast<std::chrono::microseconds>(time_of_day)};
+    auto hms = std::chrono::hh_mm_ss{std::chrono::duration_cast<std::chrono::nanoseconds>(time_of_day)};
 
     result._store->date_value = timestamp::date_part{ymd};
     result._store->time_value = timestamp::time_part{hms};
@@ -498,7 +500,7 @@ timestamp timestamp::operator+(const std::chrono::seconds& duration) const
     auto days_since_epoch = std::chrono::floor<std::chrono::days>(tp);
     auto ymd = std::chrono::year_month_day{std::chrono::sys_days{days_since_epoch}};
     auto time_of_day = tp - days_since_epoch;
-    auto hms = std::chrono::hh_mm_ss{std::chrono::duration_cast<std::chrono::microseconds>(time_of_day)};
+    auto hms = std::chrono::hh_mm_ss{std::chrono::duration_cast<std::chrono::nanoseconds>(time_of_day)};
 
     result._store->date_value = timestamp::date_part{ymd};
     result._store->time_value = timestamp::time_part{hms};

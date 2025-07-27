@@ -29,6 +29,34 @@ namespace {
         return std::nullopt;
     }
 
+    // Helper function to parse number string to long long (avoiding double precision loss)
+    std::optional<long long> parse_long_long(const std::string& str) {
+        if (str.empty()) return std::nullopt;
+
+        // Handle decimal numbers by truncating fractional part
+        std::string integer_part = str;
+        size_t decimal_pos = str.find('.');
+        if (decimal_pos != std::string::npos) {
+            integer_part = str.substr(0, decimal_pos);
+        }
+
+        if (integer_part.empty() || integer_part == "+" || integer_part == "-") {
+            return std::nullopt;
+        }
+
+        try {
+            size_t processed = 0;
+            long long value = std::stoll(integer_part, &processed);
+            // Check if entire integer part was processed
+            if (processed == integer_part.length()) {
+                return value;
+            }
+        } catch (const std::exception&) {
+            // Invalid number format or overflow
+        }
+        return std::nullopt;
+    }
+
     // Check if string represents an integer (no decimal point)
     bool is_integer_string(const std::string& str) {
         if (str.empty()) return false;
@@ -683,7 +711,7 @@ number::operator std::string() const
 
 number::operator int() const
 {
-    auto val = parse_number(_store->number);
+    auto val = parse_long_long(_store->number);
     return val ? static_cast<int>(*val) : 0;
 }
 
@@ -695,8 +723,8 @@ number::operator double() const
 
 number::operator long long() const
 {
-    auto val = parse_number(_store->number);
-    return val ? static_cast<long long>(*val) : 0LL;
+    auto val = parse_long_long(_store->number);
+    return val ? *val : 0LL;
 }
 
 // Arithmetic operators
