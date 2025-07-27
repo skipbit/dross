@@ -37,7 +37,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
 
     - name: Test
-      run: ./build/dross_test --gtest_color=yes
+      run: ./build/test/dross_test --gtest_color=yes
 
   build-ubuntu-clang:
     name: Ubuntu Clang Build
@@ -72,7 +72,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
 
     - name: Test
-      run: ./build/dross_test --gtest_color=yes
+      run: ./build/test/dross_test --gtest_color=yes
 
   build-static-library:
     name: Static Library Build
@@ -96,7 +96,7 @@ jobs:
       run: cmake --build build -j$(nproc)
 
     - name: Test
-      run: ./build/dross_test --gtest_color=yes
+      run: ./build/test/dross_test --gtest_color=yes
 
   install-test:
     name: Installation Test

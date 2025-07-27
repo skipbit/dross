@@ -32,7 +32,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j$(sysctl -n hw.ncpu)
 
     - name: Test
-      run: ./build/dross_test --gtest_color=yes
+      run: ./build/test/dross_test --gtest_color=yes
 
   build-macos-gcc:
     name: macOS GCC Build
@@ -71,7 +71,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j$(sysctl -n hw.ncpu)
 
     - name: Test
-      run: ./build/dross_test --gtest_color=yes
+      run: ./build/test/dross_test --gtest_color=yes
 
   build-static-library:
     name: macOS Static Library Build
@@ -95,7 +95,7 @@ jobs:
       run: cmake --build build -j$(sysctl -n hw.ncpu)
 
     - name: Test
-      run: ./build/dross_test --gtest_color=yes
+      run: ./build/test/dross_test --gtest_color=yes
 
   install-test:
     name: macOS Installation Test
