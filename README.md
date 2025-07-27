@@ -2,8 +2,8 @@
 
 > A modern C++23 general-purpose library designed for robust, self-contained applications
 
-[![GCC Build](https://github.com/skipbit/dross/actions/workflows/ci.yml/badge.svg?event=push&job=build-ubuntu-gcc)](https://github.com/skipbit/dross/actions/workflows/ci.yml)
-[![Clang Build](https://github.com/skipbit/dross/actions/workflows/ci.yml/badge.svg?event=push&job=build-ubuntu-clang)](https://github.com/skipbit/dross/actions/workflows/ci.yml)
+[![Linux Build](https://github.com/skipbit/dross/actions/workflows/linux.yml/badge.svg)](https://github.com/skipbit/dross/actions/workflows/linux.yml)
+[![macOS Build](https://github.com/skipbit/dross/actions/workflows/macos.yml/badge.svg)](https://github.com/skipbit/dross/actions/workflows/macos.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)

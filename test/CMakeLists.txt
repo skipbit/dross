@@ -43,7 +43,6 @@ target_include_directories(${TEST_NAME}
 )
 target_link_libraries(${TEST_NAME}
     dross
-    GTest::gmock
     GTest::gmock_main
 )
 
