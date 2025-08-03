@@ -30,6 +30,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_to_string.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_value.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_type.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/format/test_toml_simple.cpp
 )
 
 target_compile_options(${TEST_NAME}
