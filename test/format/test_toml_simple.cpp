@@ -13,8 +13,7 @@ data make_data(const std::string& content) {
 TEST(toml_simple_test, empty_document) {
     auto result = toml::deserialize(make_data(""));
     ASSERT_TRUE(result.has_value());
-    EXPECT_TRUE(result.value().is<dictionary>());
-    auto dict = result.value().as<dictionary>();
+    auto& dict = result.value();
     EXPECT_TRUE(dict.empty());
 }
 
@@ -22,7 +21,7 @@ TEST(toml_simple_test, simple_key_value) {
     auto result = toml::deserialize(make_data("key = \"value\""));
     ASSERT_TRUE(result.has_value());
 
-    auto dict = result.value().as<dictionary>();
+    auto& dict = result.value();
     EXPECT_EQ(dict.size(), 1u);
     EXPECT_TRUE(dict.contains("key"));
     auto value_obj = dict["key"];
@@ -35,7 +34,7 @@ TEST(toml_simple_test, integer_value) {
     auto result = toml::deserialize(make_data("number = 42"));
     ASSERT_TRUE(result.has_value());
 
-    auto dict = result.value().as<dictionary>();
+    auto& dict = result.value();
     EXPECT_TRUE(dict.contains("number"));
     auto value_obj = dict["number"];
     EXPECT_TRUE(value_obj.is<number>());
@@ -47,7 +46,7 @@ TEST(toml_simple_test, boolean_value) {
     auto result = toml::deserialize(make_data("flag = true"));
     ASSERT_TRUE(result.has_value());
 
-    auto dict = result.value().as<dictionary>();
+    auto& dict = result.value();
     EXPECT_TRUE(dict.contains("flag"));
     auto value_obj = dict["flag"];
     EXPECT_TRUE(value_obj.is<boolean>());
@@ -58,11 +57,10 @@ TEST(toml_simple_test, boolean_value) {
 // Serialization Tests
 TEST(toml_simple_test, serialize_simple) {
     dictionary dict;
-    dict["title"] = value{string{"Example"}};
-    dict["version"] = value{number{"1.0"}};
+    dict["title"] = value(string{"Example"});
+    dict["version"] = value(number{"1.0"});
 
-    value input{dict};
-    auto result = toml::serialize(input);
+    auto result = toml::serialize(dict);
     ASSERT_TRUE(result.has_value());
 
     std::string output = result.value();
@@ -79,7 +77,9 @@ TEST(toml_simple_test, invalid_syntax) {
 }
 
 TEST(toml_simple_test, serialize_non_dictionary_root) {
-    value input{string{"not a dictionary"}};
-    auto result = toml::serialize(input);
-    EXPECT_FALSE(result.has_value());
+    // This test is no longer relevant since serialize now takes dictionary directly
+    // We can test serialize with an empty dictionary instead
+    dictionary empty_dict;
+    auto result = toml::serialize(empty_dict);
+    EXPECT_TRUE(result.has_value());
 }

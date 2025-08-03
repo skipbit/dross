@@ -23,7 +23,7 @@ public:
     explicit parser(const std::string& input)
         : _input(input), _pos(0), _line(1), _column(1) {}
 
-    std::expected<value, error> parse()
+    std::expected<dictionary, error> parse()
     {
         try {
             auto result = parse_document();
@@ -106,7 +106,7 @@ private:
         }
     }
 
-    std::expected<value, error> parse_document()
+    std::expected<dictionary, error> parse_document()
     {
         dictionary result;
 
@@ -133,7 +133,7 @@ private:
             }
         }
 
-        return value{result};
+        return result;
     }
 
     std::expected<std::vector<std::string>, error> parse_table_header()
@@ -344,7 +344,7 @@ private:
         }
         advance(); // skip closing quote
 
-        return value{string{result}};
+        return value(string{result});
     }
 
     std::expected<value, error> parse_array()
@@ -359,7 +359,7 @@ private:
         skip_whitespace_and_comments();
         if (current_char() == ']') {
             advance();
-            return value{result};
+            return value(result);
         }
 
         while (true) {
@@ -381,7 +381,7 @@ private:
             }
         }
 
-        return value{result};
+        return value(result);
     }
 
     std::expected<value, error> parse_inline_table()
@@ -396,7 +396,7 @@ private:
         skip_whitespace();
         if (current_char() == '}') {
             advance();
-            return value{result};
+            return value(result);
         }
 
         while (true) {
@@ -419,7 +419,7 @@ private:
             }
         }
 
-        return value{result};
+        return value(result);
     }
 
     std::expected<value, error> parse_boolean()
@@ -427,11 +427,11 @@ private:
         if (_pos + 4 <= _input.size() && _input.substr(_pos, 4) == "true") {
             _pos += 4;
             _column += 4;
-            return value{boolean{true}};
+            return value(boolean{true});
         } else if (_pos + 5 <= _input.size() && _input.substr(_pos, 5) == "false") {
             _pos += 5;
             _column += 5;
-            return value{boolean{false}};
+            return value(boolean{false});
         } else {
             return std::unexpected(create_error("Invalid boolean value"));
         }
@@ -463,7 +463,7 @@ private:
             return std::unexpected(create_error("Invalid number format"));
         }
 
-        return value{number{num_str}};
+        return value(number{num_str});
     }
 
     void set_nested_value(dictionary& root, const std::vector<std::string>& key_path, const value& val)
@@ -492,18 +492,13 @@ private:
  */
 class serializer {
 public:
-    std::expected<data, error> serialize(const value& input)
+    std::expected<data, error> serialize(const dictionary& input)
     {
         try {
             _output.clear();
             _indent_level = 0;
 
-            if (!input.is<dictionary>()) {
-                return std::unexpected(error{static_cast<int>(std::errc::invalid_argument), std::generic_category()});
-            }
-
-            auto dict = input.as<dictionary>();
-            serialize_dictionary(dict, {});
+            serialize_dictionary(input, {});
 
             return data{_output};
         } catch (const std::exception& e) {
@@ -645,10 +640,10 @@ private:
 
 } // anonymous namespace
 
-std::expected<value, error> deserialize(const data& input)
+std::expected<dictionary, error> deserialize(const data& input)
 {
     if (input.empty()) {
-        return value{dictionary{}};
+        return dictionary{};
     }
 
     // Convert binary data to string
@@ -658,7 +653,7 @@ std::expected<value, error> deserialize(const data& input)
     return p.parse();
 }
 
-std::expected<data, error> serialize(const value& input)
+std::expected<data, error> serialize(const dictionary& input)
 {
     serializer s;
     return s.serialize(input);

@@ -20,7 +20,7 @@
  * Modules included:
  * - Type System: boolean, number, string, array, dictionary, value
  * - Platform Layer: environment, path, xdg utilities
- * - Format Layer: TOML parsing and serialization (dross::toml)
+ * - Format Layer: TOML parsing with type-safe dictionary API (dross::toml)
  * - Configuration: Structured data format support
  * 
  * @author Yuma Endo
@@ -33,7 +33,7 @@
 
 #include <dross/type.h>
 #include <dross/platform.h>
-#include <dross/format/toml.h>
+#include <dross/format.h>
 
 /**
  * @brief Main namespace for all dross library functionality.
@@ -45,7 +45,7 @@
  * Key components:
  * - Type system: Polymorphic value types with arbitrary precision
  * - Platform layer: Cross-platform environment and filesystem utilities
- * - Format layer: Structured data parsing (TOML, with JSON/YAML planned)
+ * - Format layer: Type-safe TOML parsing returning dictionary directly
  * - Modern C++23: Concepts, ranges, and error handling without exceptions
  * 
  * @namespace dross

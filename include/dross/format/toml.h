@@ -33,19 +33,20 @@ namespace dross::toml {
  *
  * @example
  * @code
- * // Deserialize TOML data to structured format
+ * // Deserialize TOML data to dictionary structure
  * data toml_content{"title = \"Example\"\nversion = 1.0"};
  * auto result = dross::toml::deserialize(toml_content);
  * if (result) {
- *     auto config = result.value();
- *     // Access parsed data through value interface
+ *     auto& config = result.value();
+ *     // Access parsed data through dictionary interface
+ *     auto title = config["title"].as<string>();
+ *     auto version = config["version"].as<number>();
  * }
  *
- * // Serialize structured data to TOML format
- * value config = dictionary{
- *     {"title", string{"My App"}},
- *     {"version", number{"1.0"}}
- * };
+ * // Serialize dictionary structure to TOML format
+ * dictionary config;
+ * config["title"] = value(string{"My App"});
+ * config["version"] = value(number{"1.0"});
  * auto toml_data = dross::toml::serialize(config);
  * if (toml_data) {
  *     std::string toml_string = toml_data.value();
@@ -54,13 +55,14 @@ namespace dross::toml {
  */
 
 /**
- * @brief Deserialize TOML format binary data to structured data.
+ * @brief Deserialize TOML format binary data to dictionary structure.
  * 
- * Converts TOML format text data to dross structured value type.
+ * Converts TOML format text data to dross dictionary type.
  * The input data is expected to be valid UTF-8 encoded TOML content.
+ * TOML documents always have a table (dictionary) as their root structure.
  *
  * @param input TOML format binary data (UTF-8 encoded)
- * @return Parsed structured data on success, error on failure
+ * @return Parsed dictionary structure on success, error on failure
  *
  * Error conditions:
  * - Invalid TOML syntax
@@ -72,17 +74,18 @@ namespace dross::toml {
  *
  * @note The parser follows TOML v1.0.0 specification strictly.
  *       Comments are preserved in internal representation but not
- *       accessible through standard value interface.
+ *       accessible through standard dictionary interface.
  */
-std::expected<value, error> deserialize(const data& input);
+std::expected<dictionary, error> deserialize(const data& input);
 
 /**
- * @brief Serialize structured data to TOML format binary data.
+ * @brief Serialize dictionary structure to TOML format binary data.
  *
- * Converts dross structured value type to TOML format text data.
+ * Converts dross dictionary type to TOML format text data.
  * The output will be valid UTF-8 encoded TOML content.
+ * TOML documents always have a table (dictionary) as their root structure.
  *
- * @param input Structured data to serialize
+ * @param input Dictionary structure to serialize
  * @return TOML format binary data on success, error on failure
  *
  * Error conditions:
@@ -101,6 +104,6 @@ std::expected<value, error> deserialize(const data& input);
  * @note The serializer produces clean, readable TOML output
  *       suitable for human editing and version control.
  */
-std::expected<data, error> serialize(const value& input);
+std::expected<data, error> serialize(const dictionary& input);
 
 }

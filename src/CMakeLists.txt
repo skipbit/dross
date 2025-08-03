@@ -41,6 +41,7 @@ target_include_directories(${PROJECT_NAME}
 
 set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/dross.h
+    ${PROJECT_SOURCE_DIR}/include/dross/platform.h
     ${PROJECT_SOURCE_DIR}/include/dross/platform/environment.h
     ${PROJECT_SOURCE_DIR}/include/dross/platform/path.h
     ${PROJECT_SOURCE_DIR}/include/dross/platform/xdg.h
@@ -55,6 +56,7 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/type/timestamp.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/timezone.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/value.h
+    ${PROJECT_SOURCE_DIR}/include/dross/format.h
     ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
 )
 
