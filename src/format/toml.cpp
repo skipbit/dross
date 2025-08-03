@@ -468,19 +468,37 @@ private:
 
     void set_nested_value(dictionary& root, const std::vector<std::string>& key_path, const value& val)
     {
-        // Simple approach: for now, just set the final key directly
-        // This doesn't handle nested tables properly, but allows compilation
-        if (key_path.size() == 1) {
-            root[key_path[0]] = val;
-        } else {
-            // Join path with dots for simple key
-            std::string joined_key;
-            for (size_t i = 0; i < key_path.size(); ++i) {
-                if (i > 0) joined_key += ".";
-                joined_key += key_path[i];
-            }
-            root[joined_key] = val;
+        set_nested_value_recursive(root, key_path, 0, val);
+    }
+
+    void set_nested_value_recursive(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const value& val)
+    {
+        if (key_path.empty() || index >= key_path.size()) {
+            return;
         }
+
+        const std::string& current_key = key_path[index];
+
+        if (index == key_path.size() - 1) {
+            // This is the final key, set the value
+            current_dict[current_key] = val;
+            return;
+        }
+
+        // This is an intermediate key, ensure it's a dictionary
+        if (!current_dict.contains(current_key)) {
+            current_dict[current_key] = value(dictionary{});
+        } else if (!current_dict[current_key].is<dictionary>()) {
+            // Key exists but is not a dictionary - replace it
+            current_dict[current_key] = value(dictionary{});
+        }
+
+        // Get the nested dictionary and continue recursively
+        dictionary nested_dict = current_dict[current_key].as<dictionary>();
+        set_nested_value_recursive(nested_dict, key_path, index + 1, val);
+
+        // Put the modified dictionary back
+        current_dict[current_key] = value(nested_dict);
     }
 };
 
@@ -525,9 +543,7 @@ private:
                 auto nested_path = path;
                 nested_path.push_back(key);
 
-                if (!path.empty() || has_non_dict_values(dict)) {
-                    _output += "\n[" + join_path(nested_path) + "]\n";
-                }
+                _output += "\n[" + join_path(nested_path) + "]\n";
 
                 serialize_dictionary(val.as<dictionary>(), nested_path);
             }
