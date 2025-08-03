@@ -3,6 +3,7 @@
 #include "dross/type/number.h"
 #include <sstream>
 #include <limits>
+#include <cmath>
 
 TEST(number_test, default_constructor_is_zero)
 {
@@ -575,17 +576,146 @@ TEST(number_test, whitespace_handling)
 
 TEST(number_test, scientific_notation)
 {
-    // Test if scientific notation is handled (likely as NaN)
+    // Test scientific notation support
+    const dross::number n1{ "1e10" };
+    const dross::number n2{ "3.14e-5" };
+    const dross::number n3{ "2.5E+3" };
+    const dross::number n4{ "1.5e0" };
+
+    // Should be valid numbers now
+    EXPECT_FALSE(n1.is_nan());
+    EXPECT_FALSE(n2.is_nan());
+    EXPECT_FALSE(n3.is_nan());
+    EXPECT_FALSE(n4.is_nan());
+
+    // Test conversions
+    EXPECT_DOUBLE_EQ(static_cast<double>(n1), 1e10);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n2), 3.14e-5);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n3), 2.5e3);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n4), 1.5);
+}
+
+TEST(number_test, scientific_notation_edge_cases)
+{
+    // Test various scientific notation formats
+    const dross::number n1{ "1E10" };          // Capital E
+    const dross::number n2{ "1e+10" };         // explicit positive exponent
+    const dross::number n3{ "1e-10" };         // negative exponent
+    const dross::number n4{ "123.456e-3" };    // decimal with exponent
+    const dross::number n5{ "0.1e1" };         // should equal 1.0
+    const dross::number n6{ "1000e-3" };       // should equal 1.0
+
+    EXPECT_FALSE(n1.is_nan());
+    EXPECT_FALSE(n2.is_nan());
+    EXPECT_FALSE(n3.is_nan());
+    EXPECT_FALSE(n4.is_nan());
+    EXPECT_FALSE(n5.is_nan());
+    EXPECT_FALSE(n6.is_nan());
+
+    EXPECT_DOUBLE_EQ(static_cast<double>(n1), 1e10);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n2), 1e10);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n3), 1e-10);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n4), 0.123456);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n5), 1.0);
+    EXPECT_DOUBLE_EQ(static_cast<double>(n6), 1.0);
+
+    // Test equality
+    EXPECT_EQ(n5, n6);  // Both should equal 1.0
+}
+
+TEST(number_test, scientific_notation_arithmetic)
+{
+    // Test arithmetic with scientific notation
+    const dross::number n1{ "1e3" };    // 1000
+    const dross::number n2{ "2e2" };    // 200
+    const dross::number n3{ "1e-3" };   // 0.001
+
+    // Addition
+    auto result1 = n1 + n2;  // 1000 + 200 = 1200
+    EXPECT_DOUBLE_EQ(static_cast<double>(result1), 1200.0);
+
+    // Multiplication
+    auto result2 = n1 * n3;  // 1000 * 0.001 = 1
+    EXPECT_DOUBLE_EQ(static_cast<double>(result2), 1.0);
+
+    // Division
+    auto result3 = n1 / n2;  // 1000 / 200 = 5
+    EXPECT_DOUBLE_EQ(static_cast<double>(result3), 5.0);
+}
+
+TEST(number_test, scientific_notation_comparison)
+{
+    // Test comparison with scientific notation
+    const dross::number n1{ "1e3" };    // 1000
+    const dross::number n2{ "1000" };   // 1000
+    const dross::number n3{ "1e4" };    // 10000
+    const dross::number n4{ "1e-3" };   // 0.001
+
+    EXPECT_EQ(n1, n2);  // 1e3 == 1000
+    EXPECT_LT(n1, n3);  // 1e3 < 1e4
+    EXPECT_GT(n1, n4);  // 1e3 > 1e-3
+}
+
+TEST(number_test, scientific_notation_string_conversion)
+{
+    // Test string conversion behavior with scientific notation
     const dross::number n1{ "1e10" };
     const dross::number n2{ "3.14e-5" };
 
-    // These are likely NaN since the implementation seems to use string-based storage
-    // Just verify consistent behavior
-    bool n1_is_valid = !n1.is_nan();
-    bool n2_is_valid = !n2.is_nan();
+    // String conversion should maintain precision
+    std::string str1 = std::string(n1);
+    std::string str2 = std::string(n2);
 
-    // Either both valid or both NaN
-    EXPECT_EQ(n1_is_valid, n2_is_valid);
+    // Parse back and ensure equality
+    const dross::number parsed1{ str1 };
+    const dross::number parsed2{ str2 };
+
+    EXPECT_EQ(n1, parsed1);
+    EXPECT_EQ(n2, parsed2);
+}
+
+TEST(number_test, scientific_notation_invalid_formats)
+{
+    // Test invalid scientific notation formats
+    const dross::number n1{ "1ee10" };      // double e
+    const dross::number n2{ "1e" };         // incomplete exponent
+    const dross::number n3{ "e10" };        // missing mantissa
+    const dross::number n4{ "1e10.5" };     // decimal in exponent
+    const dross::number n5{ "1e++" };       // invalid exponent
+    const dross::number n6{ "1e--5" };      // double minus
+    const dross::number n7{ "1.2.3e4" };    // multiple decimals
+
+    // These should all be NaN (invalid)
+    EXPECT_TRUE(n1.is_nan());
+    EXPECT_TRUE(n2.is_nan());
+    EXPECT_TRUE(n3.is_nan());
+    EXPECT_TRUE(n4.is_nan());
+    EXPECT_TRUE(n5.is_nan());
+    EXPECT_TRUE(n6.is_nan());
+    EXPECT_TRUE(n7.is_nan());
+}
+
+TEST(number_test, scientific_notation_boundary_values)
+{
+    // Test very large and very small scientific notation values
+    const dross::number very_large{ "1e308" };    // near double max
+    const dross::number very_small{ "1e-307" };   // near double min (within representable range)
+    const dross::number zero_exp{ "123e0" };      // exponent 0
+
+    EXPECT_FALSE(very_large.is_nan());
+    EXPECT_FALSE(very_small.is_nan());
+    EXPECT_FALSE(zero_exp.is_nan());
+
+    EXPECT_DOUBLE_EQ(static_cast<double>(zero_exp), 123.0);
+
+    // Test that very large/small values are finite
+    double large_val = static_cast<double>(very_large);
+    double small_val = static_cast<double>(very_small);
+
+    EXPECT_TRUE(std::isfinite(large_val));
+    EXPECT_TRUE(std::isfinite(small_val));
+    EXPECT_GT(large_val, 0.0);
+    EXPECT_GT(small_val, 0.0);
 }
 
 // =============================================================================

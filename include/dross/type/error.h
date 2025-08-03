@@ -47,6 +47,7 @@ private:
 template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& os, const error& e) {
     os << e.domain() << ":" << e.code();
+    return os;
 }
 
 }

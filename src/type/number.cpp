@@ -4,6 +4,8 @@
 #include <string>
 #include <optional>
 #include <ostream>
+#include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -105,7 +107,8 @@ namespace {
      *
      * This function provides a single point for parsing number strings,
      * replacing the multiple specialized parsing functions. It handles
-     * all number formats and provides comprehensive error checking.
+     * all number formats including scientific notation and provides
+     * comprehensive error checking.
      *
      * @param str The string to parse
      * @return parsed_number struct containing all components
@@ -118,7 +121,36 @@ namespace {
             return result;
         }
 
+        // We'll validate the format as part of the parsing process
+
+        // For scientific notation, we convert to regular decimal first
         std::string work_str = str;
+
+        // Check for scientific notation
+        size_t exp_pos = work_str.find_first_of("eE");
+        if (exp_pos != std::string::npos) {
+            // Use std::stod to convert scientific notation to regular decimal
+            try {
+                double value = std::stod(work_str);
+
+                // Use stringstream with high precision to preserve accuracy
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(17) << value;
+                work_str = oss.str();
+
+                // Remove trailing zeros after decimal point
+                if (work_str.find('.') != std::string::npos) {
+                    work_str = work_str.substr(0, work_str.find_last_not_of('0') + 1);
+                    if (work_str.back() == '.') {
+                        work_str.pop_back();
+                    }
+                }
+            } catch (const std::exception&) {
+                result.is_valid = false;
+                return result;
+            }
+        }
+
         size_t start = 0;
 
         // Handle sign
@@ -214,19 +246,30 @@ namespace {
         return result;
     }
 
-    // Check if string represents a valid number (integer or decimal)
+    // Check if string represents a valid number (integer, decimal, or scientific notation)
     bool is_valid_number(const std::string& str) {
         if (str.empty()) return false;
 
         size_t start = 0;
         bool has_dot = false;
 
+        // Handle optional sign
         if (str[0] == '-' || str[0] == '+') {
             if (str.length() == 1) return false;
             start = 1;
         }
 
-        for (size_t i = start; i < str.length(); ++i) {
+        // Check for exponent position
+        size_t exp_pos = str.find_first_of("eE", start);
+        bool has_exp = (exp_pos != std::string::npos);
+
+        // Validate mantissa (part before exponent)
+        size_t mantissa_end = has_exp ? exp_pos : str.length();
+
+        // For scientific notation, mantissa cannot be empty
+        if (has_exp && mantissa_end <= start) return false;
+
+        for (size_t i = start; i < mantissa_end; ++i) {
             if (str[i] == '.') {
                 if (has_dot) return false;  // Multiple dots
                 has_dot = true;
@@ -235,12 +278,92 @@ namespace {
             }
         }
 
-        // Don't allow trailing or leading dot
-        if (has_dot && (str[start] == '.' || str.back() == '.')) {
-            return str.length() > start + 1;  // Allow ".5" or "5."
+        // Don't allow trailing or leading dot in mantissa
+        if (has_dot && (str[start] == '.' || (mantissa_end > start && str[mantissa_end - 1] == '.'))) {
+            // Allow ".5" or "5." patterns
+            if (mantissa_end <= start + 1) return false;
+        }
+
+        // Validate exponent part if present
+        if (has_exp) {
+            if (exp_pos + 1 >= str.length()) return false;  // Nothing after 'e'
+
+            size_t exp_start = exp_pos + 1;
+
+            // Handle optional sign in exponent
+            if (str[exp_start] == '-' || str[exp_start] == '+') {
+                exp_start++;
+                if (exp_start >= str.length()) return false;  // Nothing after sign
+            }
+
+            // Exponent must have at least one digit
+            if (exp_start >= str.length()) return false;
+
+            // Check that exponent contains only digits
+            for (size_t i = exp_start; i < str.length(); ++i) {
+                if (!std::isdigit(str[i])) {
+                    return false;
+                }
+            }
         }
 
         return true;
+    }
+
+    /**
+     * @brief Normalize a number string to decimal representation.
+     *
+     * This function converts scientific notation to decimal representation
+     * for internal storage and calculations, ensuring consistent behavior.
+     */
+    std::string normalize_to_decimal(const std::string& str) {
+        if (!is_valid_number(str)) return str;
+
+        // Check for scientific notation
+        size_t exp_pos = str.find_first_of("eE");
+        if (exp_pos != std::string::npos) {
+            try {
+                double value = std::stod(str);
+
+                // Check if the value is zero or infinite
+                if (value == 0.0) {
+                    return "0";
+                }
+                if (!std::isfinite(value)) {
+                    return str; // Keep original for non-finite values
+                }
+
+                // Use scientific notation format for very small or very large numbers
+                // to maintain precision
+                if (std::abs(value) < 1e-100 || std::abs(value) > 1e100) {
+                    std::ostringstream oss;
+                    oss << std::scientific << std::setprecision(16) << value;
+                    return oss.str();
+                }
+
+                // Use stringstream with high precision to preserve accuracy
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(17) << value;
+                std::string result = oss.str();
+
+                // Remove trailing zeros after decimal point
+                if (result.find('.') != std::string::npos) {
+                    result = result.substr(0, result.find_last_not_of('0') + 1);
+                    if (result.back() == '.') {
+                        result.pop_back();
+                    }
+                }
+
+                return result;
+            } catch (const std::out_of_range&) {
+                // Value is outside double range - keep original scientific notation
+                return str;
+            } catch (const std::exception&) {
+                return str; // Return original if conversion fails
+            }
+        }
+
+        return str; // Return as-is if not scientific notation
     }
 
     // Normalize number string (remove unnecessary zeros, handle decimal point)
@@ -282,8 +405,8 @@ namespace {
 
     // Compare two number strings (handles both integers and decimals)
     int compare_numbers(const std::string& a, const std::string& b) {
-        std::string na = normalize_number(a);
-        std::string nb = normalize_number(b);
+        std::string na = normalize_number(normalize_to_decimal(a));
+        std::string nb = normalize_number(normalize_to_decimal(b));
 
         if (na == nb) return 0;
 
@@ -655,8 +778,8 @@ namespace {
             return NAN_VALUE;
         }
 
-        std::string na = normalize_number(a);
-        std::string nb = normalize_number(b);
+        std::string na = normalize_number(normalize_to_decimal(a));
+        std::string nb = normalize_number(normalize_to_decimal(b));
 
         bool a_neg = (na[0] == '-');
         bool b_neg = (nb[0] == '-');
@@ -732,8 +855,8 @@ public:
     std::string number{ "0" };
 
     storage() = default;
-    storage(const char* s) : number(s) {}
-    storage(const std::string& s) : number(s) {}
+    storage(const char* s) : number(normalize_to_decimal(s)) {}
+    storage(const std::string& s) : number(normalize_to_decimal(s)) {}
 
     template <number_type T>
     storage(const T& n) : number(std::to_string(n)) {}
@@ -831,13 +954,13 @@ number& number::operator=(const number& n)
 
 number& number::operator=(const char* s)
 {
-    _store->number = s;
+    _store->number = normalize_to_decimal(s);
     return *this;
 }
 
 number& number::operator=(const std::string& s)
 {
-    _store->number = s;
+    _store->number = normalize_to_decimal(s);
     return *this;
 }
 
@@ -854,6 +977,18 @@ number::operator int() const
 
 number::operator double() const
 {
+    // If the stored string is in scientific notation, try direct conversion first
+    if (_store->number.find_first_of("eE") != std::string::npos) {
+        try {
+            return std::stod(_store->number);
+        } catch (const std::out_of_range&) {
+            // Value is outside double range - return 0
+            return 0.0;
+        } catch (const std::exception&) {
+            // Fall through to parsed approach
+        }
+    }
+
     auto parsed = parse_number_unified(_store->number);
     auto val = parsed.to_double();
     return val ? *val : 0.0;
