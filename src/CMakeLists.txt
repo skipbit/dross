@@ -24,6 +24,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timestamp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timezone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
 )
 
 target_compile_options(${PROJECT_NAME}
@@ -40,6 +41,7 @@ target_include_directories(${PROJECT_NAME}
 
 set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/dross.h
+    ${PROJECT_SOURCE_DIR}/include/dross/platform.h
     ${PROJECT_SOURCE_DIR}/include/dross/platform/environment.h
     ${PROJECT_SOURCE_DIR}/include/dross/platform/path.h
     ${PROJECT_SOURCE_DIR}/include/dross/platform/xdg.h
@@ -54,6 +56,8 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/type/timestamp.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/timezone.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/value.h
+    ${PROJECT_SOURCE_DIR}/include/dross/format.h
+    ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

@@ -23,6 +23,7 @@
 
 *   **Indentation:** Use 4 spaces.
     *  Do not indent class or function definitions within namespaces.
+*   **Empty Lines:** Empty lines must not contain any whitespace or indentation characters. Keep them completely empty.
 *   **Braces (`{}`):**
     *   Place opening braces for classes and control structures on the same line; place opening braces for functions on a new line.
     ```cpp
