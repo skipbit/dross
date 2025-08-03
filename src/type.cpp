@@ -46,6 +46,11 @@ std::string to_string(const string& s)
     return static_cast<std::string>(s);
 }
 
+std::string to_string(const data& d)
+{
+    return static_cast<std::string>(d);
+}
+
 std::string to_string(const timestamp& ts)
 {
     return static_cast<std::string>(ts);

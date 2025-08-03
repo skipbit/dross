@@ -1,9 +1,10 @@
 #pragma once
 
 #include "dross/type/boolean.h"
-#include "dross/type/number.h"
+#include "dross/type/number.h"  
 #include "dross/type/string.h"
 #include "dross/type/timestamp.h"
+#include "dross/type/data.h"
 
 #include <initializer_list>
 #include <memory>
@@ -16,12 +17,13 @@ class string;
 class array;
 class dictionary;
 class timestamp;
+class data;
 
 /**
  * @brief Polymorphic value type that can hold any supported dross type.
  *
  * The value class provides a type-safe polymorphic container that can hold
- * any of the core dross types (number, string, array, dictionary, timestamp). It uses
+ * any of the core dross types (boolean, number, string, array, dictionary, timestamp, data). It uses
  * std::variant internally for type safety and performance, and provides
  * convenient construction and conversion methods.
  *
@@ -40,6 +42,7 @@ class timestamp;
  * - array: Dynamic arrays of values
  * - dictionary: Key-value mappings
  * - timestamp: Date and time values with timezone support
+ * - data: Binary data with encoding and I/O capabilities
  * - Arithmetic types (automatically converted to number)
  * - String types (automatically converted to string)
  *
@@ -121,6 +124,12 @@ public:
      * @param ts The timestamp to store
      */
     value(const timestamp& ts);
+
+    /**
+     * @brief Construct from data.
+     * @param d The data to store
+     */
+    value(const data& d);
 
     /**
      * @brief Construct an array from initializer list.
@@ -242,12 +251,19 @@ public:
     value& operator=(const timestamp& ts);
 
     /**
+     * @brief Assign data to this value.
+     * @param d The data to assign
+     * @return Reference to this value
+     */
+    value& operator=(const data& d);
+
+    /**
      * @brief Check if the value contains a specific type.
      * @tparam T The type to check for
      * @return true if the value contains type T, false otherwise
      *
      * Use this for type checking before casting to avoid exceptions.
-     * Supports checking for boolean, number, string, array, dictionary, and timestamp types.
+     * Supports checking for boolean, number, string, array, dictionary, timestamp, and data types.
      */
     template <class T>
     bool is() const noexcept;
@@ -280,7 +296,7 @@ private:
  * @throws std::bad_cast if the value doesn't contain type T
  *
  * Use value.is<T>() to check the type before casting to avoid exceptions.
- * Supported types: boolean, number, string, array, dictionary.
+ * Supported types: boolean, number, string, array, dictionary, timestamp, data.
  *
  * @code
  * value val = number{42};

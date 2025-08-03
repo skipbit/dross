@@ -2,6 +2,7 @@
 
 #include "dross/type/array.h"
 #include "dross/type/boolean.h"
+#include "dross/type/data.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
@@ -14,7 +15,7 @@ namespace dross {
 
 class value::storage {
 public:
-    std::variant<std::monostate, dross::boolean, dross::number, dross::string, dross::array, dross::dictionary, dross::timestamp> value;
+    std::variant<std::monostate, dross::boolean, dross::number, dross::string, dross::array, dross::dictionary, dross::timestamp, dross::data> value;
 
     storage() = default;
     storage(const storage& s) : value(s.value) {}
@@ -64,6 +65,12 @@ value::value(const timestamp& ts)
     : _store(std::make_unique<storage>())
 {
     _store->value = ts;
+}
+
+value::value(const data& d)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = d;
 }
 
 value::value(const std::initializer_list<value>& v)
@@ -141,6 +148,12 @@ value& value::operator=(const timestamp& ts)
     return *this;
 }
 
+value& value::operator=(const data& d)
+{
+    _store->value = d;
+    return *this;
+}
+
 template <class T>
 bool value::is() const noexcept
 {
@@ -166,6 +179,7 @@ template bool value::is<string>() const noexcept;
 template bool value::is<array>() const noexcept;
 template bool value::is<dictionary>() const noexcept;
 template bool value::is<timestamp>() const noexcept;
+template bool value::is<data>() const noexcept;
 
 template boolean value::as<boolean>() const noexcept;
 template number value::as<number>() const noexcept;
@@ -173,6 +187,7 @@ template string value::as<string>() const noexcept;
 template array value::as<array>() const noexcept;
 template dictionary value::as<dictionary>() const noexcept;
 template timestamp value::as<timestamp>() const noexcept;
+template data value::as<data>() const noexcept;
 
 template boolean value_cast<boolean>(const value&) noexcept;
 template number value_cast<number>(const value&) noexcept;
@@ -180,5 +195,6 @@ template string value_cast<string>(const value&) noexcept;
 template array value_cast<array>(const value&) noexcept;
 template dictionary value_cast<dictionary>(const value&) noexcept;
 template timestamp value_cast<timestamp>(const value&) noexcept;
+template data value_cast<data>(const value&) noexcept;
 
 }

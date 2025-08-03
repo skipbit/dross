@@ -154,8 +154,6 @@ auto app_config = config_dir / "myapp" / "config.toml";
 - **`path`** - Filesystem operations with error handling
 - **`xdg`** - XDG Base Directory specification support
 
-### Configuration
-- **`toml`** - TOML configuration file parser
 
 ## 📖 Documentation
 
@@ -198,13 +196,12 @@ ctest -V
 ### Current Modules
 - ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
-- ✅ Configuration (TOML parser)
 
 ### Planned Features
+- **Configuration** - TOML, JSON, XML, YAML parsers
 - **Concurrency** - Thread management, async operations, coroutines
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
-- **Additional Formats** - JSON, XML, YAML parsers
 
 ## 🤝 Contributing
 

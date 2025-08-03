@@ -58,6 +58,7 @@
 
 #include <dross/type/array.h>
 #include <dross/type/boolean.h>
+#include <dross/type/data.h>
 #include <dross/type/timestamp.h>
 #include <dross/type/dictionary.h>
 #include <dross/type/number.h>
@@ -157,6 +158,22 @@ std::string to_string(const number& n);
  * @endcode
  */
 std::string to_string(const string& s);
+
+/**
+ * @brief Convert binary data to string representation (STL-style).
+ * @param d The data to convert
+ * @return String representation of the byte data (UTF-8 interpretation)
+ *
+ * Provides STL-style explicit string conversion for consistency with
+ * other types. Treats the byte data as UTF-8 encoded text.
+ * Invalid UTF-8 sequences may result in replacement characters.
+ *
+ * @code
+ * data binary_data{"Hello, 世界!"};
+ * auto str = to_string(binary_data);  // "Hello, 世界!"
+ * @endcode
+ */
+std::string to_string(const data& d);
 
 /**
  * @brief Convert a timestamp to string representation (STL-style).
