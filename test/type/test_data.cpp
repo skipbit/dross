@@ -261,10 +261,14 @@ TEST(data_test, move_assignment) {
 
 TEST(data_test, self_assignment) {
     data d{"Hello"};
+    #ifdef __clang__
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wself-assign-overloaded"
+    #endif
     d = d; // Should not crash
+    #ifdef __clang__
     #pragma clang diagnostic pop
+    #endif
     EXPECT_EQ(to_string(d), "Hello");
 }
 
