@@ -56,7 +56,7 @@ jobs:
           make html
 
       - name: Upload documentation artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: documentation-html
           path: docs/build/sphinx/html/
