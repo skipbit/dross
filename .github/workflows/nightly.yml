@@ -1,0 +1,160 @@
+name: Nightly Toolchain Watch
+
+on:
+  schedule:
+    # 03:00 UTC daily
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+# Early warning for environments outside the verified range: the newest
+# compilers and the floating runner labels. These jobs deliberately use the
+# wiring the required gates avoid — floating OS labels and compilers from
+# external repositories — because breaking here is the signal we want, ahead
+# of users hitting it. They never gate a pull request and must not be added to
+# required status checks.
+
+jobs:
+  newest-gcc:
+    name: Newest GCC
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+
+    # Resolve the newest versioned g++ available once the toolchain PPA is in
+    # place, rather than pinning a major, so this keeps tracking upstream
+    # without edits.
+    - name: Install newest GCC
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        sudo apt-get update
+        version=$(apt-cache search --names-only '^g\+\+-[0-9]+$' \
+          | sed 's/^g++-//; s/ .*//' | sort -n | tail -1)
+        if [ -z "$version" ]; then
+          echo "No versioned g++ package found in the toolchain PPA" >&2
+          exit 1
+        fi
+        sudo apt-get install -y "gcc-$version" "g++-$version"
+        echo "GCC_VERSION=$version" >> "$GITHUB_ENV"
+
+    - name: Report toolchain versions
+      run: |
+        gcc-"$GCC_VERSION" --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=gcc-"$GCC_VERSION" \
+          -DCMAKE_CXX_COMPILER=g++-"$GCC_VERSION"
+
+    - name: Build
+      run: cmake --build build -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
+  newest-clang:
+    name: Newest Clang
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+
+    # llvm.sh adds the apt.llvm.org repository for the current stable release,
+    # then we take the newest versioned clang package available. Tracking the
+    # stable release rather than trunk (llvm.sh all) is deliberate: this watches
+    # what users will actually reach for, not what is still in development.
+    - name: Install newest Clang
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh
+        version=$(apt-cache search --names-only '^clang-[0-9]+$' \
+          | sed 's/^clang-//; s/ .*//' | sort -n | tail -1)
+        if [ -z "$version" ]; then
+          echo "No versioned clang package found in the apt.llvm.org repository" >&2
+          exit 1
+        fi
+        sudo apt-get install -y "clang-$version"
+        echo "CLANG_VERSION=$version" >> "$GITHUB_ENV"
+
+    - name: Report toolchain versions
+      run: |
+        clang-"$CLANG_VERSION" --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=clang-"$CLANG_VERSION" \
+          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_VERSION"
+
+    - name: Build
+      run: cmake --build build -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
+  # The required gates build Clang against the default standard library.
+  # This covers the other choice, so neither ends up being the only one that
+  # works.
+  libcxx:
+    name: Clang with libc++
+    runs-on: ubuntu-26.04
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install libc++
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libc++-20-dev libc++abi-20-dev
+
+    - name: Report toolchain versions
+      run: |
+        clang-20 --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=clang-20 \
+          -DCMAKE_CXX_COMPILER=clang++-20 \
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+
+    - name: Build
+      run: cmake --build build -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
+  floating-runners:
+    name: Floating Runner (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Report toolchain versions
+      run: |
+        cc --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --parallel
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes

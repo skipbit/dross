@@ -6,22 +6,28 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# macOS users build with the Apple Clang that ships with the OS, so the OS
+# generation is the axis worth varying: pinning to the two current releases
+# covers two Apple Clang generations without a separate compiler axis.
+
 jobs:
   build-macos-clang:
-    name: macOS Clang Build
+    name: macOS Clang (${{ matrix.os }}, ${{ matrix.build_type }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-14, macos-15]
+        os: [macos-15, macos-26]
         build_type: [Debug, Release]
 
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install dependencies
+    - name: Report toolchain versions
       run: |
-        brew update
-        brew install cmake
+        clang --version
+        xcrun --show-sdk-version
+        cmake --version
 
     - name: Configure CMake
       run: |
@@ -29,61 +35,17 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
     - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j$(sysctl -n hw.ncpu)
-
-    - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
-
-  build-macos-gcc:
-    name: macOS GCC Build
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
-        gcc_version: [13, 14]
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Install dependencies and GCC ${{ matrix.gcc_version }}
-      run: |
-        brew update
-        brew install cmake gcc@${{ matrix.gcc_version }}
-
-    - name: Configure CMake
-      run: |
-        # Find GCC path (different for Intel and Apple Silicon)
-        if [ -x "/usr/local/bin/gcc-${{ matrix.gcc_version }}" ]; then
-          GCC_PATH="/usr/local/bin"
-        elif [ -x "/opt/homebrew/bin/gcc-${{ matrix.gcc_version }}" ]; then
-          GCC_PATH="/opt/homebrew/bin"
-        else
-          echo "GCC ${{ matrix.gcc_version }} not found"
-          exit 1
-        fi
-
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCMAKE_C_COMPILER=$GCC_PATH/gcc-${{ matrix.gcc_version }} \
-          -DCMAKE_CXX_COMPILER=$GCC_PATH/g++-${{ matrix.gcc_version }}
-
-    - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j$(sysctl -n hw.ncpu)
+      run: cmake --build build --config ${{ matrix.build_type }} -j"$(sysctl -n hw.ncpu)"
 
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
   build-static-library:
     name: macOS Static Library Build
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
     - uses: actions/checkout@v7
-
-    - name: Install dependencies
-      run: |
-        brew update
-        brew install cmake
 
     - name: Configure CMake (Static)
       run: |
@@ -92,27 +54,27 @@ jobs:
           -DBUILD_SHARED_LIBS=OFF
 
     - name: Build
-      run: cmake --build build -j$(sysctl -n hw.ncpu)
+      run: cmake --build build -j"$(sysctl -n hw.ncpu)"
 
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
   install-test:
     name: macOS Installation Test
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install dependencies
+    - name: Report toolchain versions
       run: |
-        brew update
-        brew install cmake pkg-config
+        cmake --version
+        pkg-config --version
 
     - name: Build and Install
       run: |
         cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-        cmake --build build -j$(sysctl -n hw.ncpu)
+        cmake --build build -j"$(sysctl -n hw.ncpu)"
         sudo cmake --install build
 
     - name: Test find_package

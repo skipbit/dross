@@ -33,7 +33,8 @@ Development Setup
 Build Requirements
 ~~~~~~~~~~~~~~~~~~
 
-- C++23 compatible compiler (GCC 13+, Clang 16+, MSVC 2022+)
+- C++23 compatible compiler: on Linux, GCC 13-15 or Clang 20-22; on macOS,
+  the Apple Clang shipped with macOS 15 or 26. Newer versions are best effort.
 - CMake 3.20 or later
 - Git
 

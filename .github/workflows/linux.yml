@@ -6,85 +6,87 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Compilers come from the runner images only. Pinning the OS pins the compiler
+# set, which keeps an upstream repository change from breaking a required gate.
+#
+# The lower bounds do not line up across compilers. GCC is verified from 13 on
+# ubuntu-24.04, but Clang starts at 20 on ubuntu-26.04: older Clang releases
+# cannot build this library's C++23 usage against the libstdc++ they are paired
+# with on ubuntu-24.04. Both are verified up to what ubuntu-26.04 provides.
+
 jobs:
   build-ubuntu-gcc:
-    name: Ubuntu GCC Build
-    runs-on: ubuntu-latest
+    name: Ubuntu GCC ${{ matrix.toolchain.gcc }} (${{ matrix.build_type }})
+    runs-on: ${{ matrix.toolchain.os }}
     strategy:
+      fail-fast: false
       matrix:
         build_type: [Debug, Release]
-        gcc_version: [13, 14]
+        toolchain:
+          - { os: ubuntu-24.04, gcc: 13 }
+          - { os: ubuntu-26.04, gcc: 15 }
 
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install dependencies and GCC ${{ matrix.gcc_version }}
+    - name: Report toolchain versions
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential software-properties-common
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-        sudo apt-get update
-        sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+        gcc-${{ matrix.toolchain.gcc }} --version
+        cmake --version
 
     - name: Configure CMake
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCMAKE_C_COMPILER=gcc-${{ matrix.gcc_version }} \
-          -DCMAKE_CXX_COMPILER=g++-${{ matrix.gcc_version }}
+          -DCMAKE_C_COMPILER=gcc-${{ matrix.toolchain.gcc }} \
+          -DCMAKE_CXX_COMPILER=g++-${{ matrix.toolchain.gcc }}
 
     - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
+      run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
 
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
   build-ubuntu-clang:
-    name: Ubuntu Clang Build
-    runs-on: ubuntu-latest
+    name: Ubuntu Clang ${{ matrix.toolchain.clang }} (${{ matrix.build_type }})
+    runs-on: ${{ matrix.toolchain.os }}
     strategy:
+      fail-fast: false
       matrix:
         build_type: [Debug, Release]
-        clang_version: [17, 18]
+        toolchain:
+          - { os: ubuntu-26.04, clang: 20 }
+          - { os: ubuntu-26.04, clang: 22 }
 
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install dependencies and Clang ${{ matrix.clang_version }}
+    - name: Report toolchain versions
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${{ matrix.clang_version }} main" | sudo tee /etc/apt/sources.list.d/llvm.list
-        sudo apt-get update
-        sudo apt-get install -y clang-${{ matrix.clang_version }} libc++-${{ matrix.clang_version }}-dev libc++abi-${{ matrix.clang_version }}-dev
+        clang-${{ matrix.toolchain.clang }} --version
+        cmake --version
 
+    # No -stdlib override: the default standard library is what most Clang
+    # users on Linux build against.
     - name: Configure CMake
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCMAKE_C_COMPILER=clang-${{ matrix.clang_version }} \
-          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang_version }} \
-          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+          -DCMAKE_C_COMPILER=clang-${{ matrix.toolchain.clang }} \
+          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.toolchain.clang }}
 
     - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j$(nproc)
+      run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
 
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
   build-static-library:
     name: Static Library Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v7
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential
 
     - name: Configure CMake (Static)
       run: |
@@ -93,27 +95,27 @@ jobs:
           -DBUILD_SHARED_LIBS=OFF
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
   install-test:
     name: Installation Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v7
 
-    - name: Install dependencies
+    - name: Report toolchain versions
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake build-essential pkg-config
+        cmake --version
+        pkg-config --version
 
     - name: Build and Install
       run: |
         cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-        cmake --build build -j$(nproc)
+        cmake --build build -j"$(nproc)"
         sudo cmake --install build
 
     - name: Test find_package
