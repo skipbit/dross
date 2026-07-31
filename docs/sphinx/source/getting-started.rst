@@ -9,13 +9,16 @@ System Requirements
 To build and use dross, you need:
 
 - **C++ Compiler**: Supporting C++23 standard
-  
-  - GCC 13 or later
-  - Clang 16 or later (with libc++ for full C++23 support)
-  - MSVC 2022 or later
+
+  - GCC 13 through 15
+  - Clang 17 through 22
+  - Apple Clang shipped with macOS 15 or 26
+
+  Newer versions are best effort: they are exercised by the nightly toolchain
+  watch rather than by the required build matrix.
 
 - **Build System**: CMake 3.20 or later
-- **Operating System**: Linux, macOS, Windows, or any POSIX-compliant system
+- **Operating System**: Linux or macOS
 
 Installation
 ------------

@@ -1,0 +1,150 @@
+name: Nightly Toolchain Watch
+
+on:
+  schedule:
+    # 03:00 UTC daily
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+# Early warning for environments outside the verified range: the newest
+# compilers and the floating runner labels. These jobs deliberately use the
+# wiring the required gates avoid — floating OS labels and compilers from
+# external repositories — because breaking here is the signal we want, ahead
+# of users hitting it. They never gate a pull request and must not be added to
+# required status checks.
+
+jobs:
+  newest-gcc:
+    name: Newest GCC
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install newest GCC
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+        sudo apt-get update
+        sudo apt-get install -y gcc-16 g++-16
+
+    - name: Report toolchain versions
+      run: |
+        gcc-16 --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=gcc-16 \
+          -DCMAKE_CXX_COMPILER=g++-16
+
+    - name: Build
+      run: cmake --build build -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
+  newest-clang:
+    name: Newest Clang
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install newest Clang
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh
+        version=$(find /usr/lib -maxdepth 1 -name 'llvm-[0-9]*' -printf '%f\n' \
+          | sed 's/llvm-//' | sort -n | tail -1)
+        echo "CLANG_VERSION=$version" >> "$GITHUB_ENV"
+
+    - name: Report toolchain versions
+      run: |
+        clang-"$CLANG_VERSION" --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=clang-"$CLANG_VERSION" \
+          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_VERSION"
+
+    - name: Build
+      run: cmake --build build -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
+  libcxx:
+    name: Clang with libc++
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install libc++
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libc++-17-dev libc++abi-17-dev
+
+    - name: Report toolchain versions
+      run: |
+        clang-17 --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=clang-17 \
+          -DCMAKE_CXX_COMPILER=clang++-17 \
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+
+    - name: Build
+      run: cmake --build build -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
+  floating-runners:
+    name: Floating Runner
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Report toolchain versions
+      run: |
+        cc --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build -j2
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
