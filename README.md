@@ -23,8 +23,9 @@
 
 ### Requirements
 
-- **C++23** compatible compiler
-  - Verified in CI: GCC 13–15, Clang 17–22, Apple Clang (macOS 15 and 26)
+- **C++23** compatible compiler, verified in CI as:
+  - Linux: GCC 13–15 or Clang 17–22
+  - macOS: the Apple Clang shipped with macOS 15 or 26
   - Newer versions are best effort, exercised by the nightly toolchain watch
 - **CMake 3.20+**
 

@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-macos-clang:
-    name: macOS Clang Build
+    name: macOS Clang (${{ matrix.os }}, ${{ matrix.build_type }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -65,6 +65,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+
+    - name: Report toolchain versions
+      run: |
+        cmake --version
+        pkg-config --version
 
     - name: Build and Install
       run: |

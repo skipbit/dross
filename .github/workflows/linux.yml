@@ -13,7 +13,7 @@ on:
 
 jobs:
   build-ubuntu-gcc:
-    name: Ubuntu GCC Build
+    name: Ubuntu GCC ${{ matrix.toolchain.gcc }} (${{ matrix.build_type }})
     runs-on: ${{ matrix.toolchain.os }}
     strategy:
       fail-fast: false
@@ -45,7 +45,7 @@ jobs:
       run: ./build/test/dross_test --gtest_color=yes
 
   build-ubuntu-clang:
-    name: Ubuntu Clang Build
+    name: Ubuntu Clang ${{ matrix.toolchain.clang }} (${{ matrix.build_type }})
     runs-on: ${{ matrix.toolchain.os }}
     strategy:
       fail-fast: false
@@ -103,6 +103,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+
+    - name: Report toolchain versions
+      run: |
+        cmake --version
+        pkg-config --version
 
     - name: Build and Install
       run: |

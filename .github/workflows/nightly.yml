@@ -17,31 +17,36 @@ jobs:
   newest-gcc:
     name: Newest GCC
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        build_type: [Release]
 
     steps:
     - uses: actions/checkout@v7
 
+    # Resolve the newest g++ the toolchain PPA offers rather than pinning a
+    # major, so this keeps tracking upstream without edits.
     - name: Install newest GCC
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
         sudo apt-get update
-        sudo apt-get install -y gcc-16 g++-16
+        version=$(apt-cache search --names-only '^g\+\+-[0-9]+$' \
+          | sed 's/^g++-//; s/ .*//' | sort -n | tail -1)
+        if [ -z "$version" ]; then
+          echo "No versioned g++ package found in the toolchain PPA" >&2
+          exit 1
+        fi
+        sudo apt-get install -y "gcc-$version" "g++-$version"
+        echo "GCC_VERSION=$version" >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
       run: |
-        gcc-16 --version
+        gcc-"$GCC_VERSION" --version
         cmake --version
 
     - name: Configure CMake
       run: |
         cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCMAKE_C_COMPILER=gcc-16 \
-          -DCMAKE_CXX_COMPILER=g++-16
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=gcc-"$GCC_VERSION" \
+          -DCMAKE_CXX_COMPILER=g++-"$GCC_VERSION"
 
     - name: Build
       run: cmake --build build -j"$(nproc)"
@@ -52,21 +57,25 @@ jobs:
   newest-clang:
     name: Newest Clang
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        build_type: [Release]
 
     steps:
     - uses: actions/checkout@v7
 
+    # llvm.sh adds the apt.llvm.org repository and installs the current stable
+    # release. Query apt afterwards so the version comes from that repository
+    # rather than from whatever the runner image happens to ship.
     - name: Install newest Clang
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         sudo ./llvm.sh
-        version=$(find /usr/lib -maxdepth 1 -name 'llvm-[0-9]*' -printf '%f\n' \
-          | sed 's/llvm-//' | sort -n | tail -1)
+        version=$(apt-cache search --names-only '^clang-[0-9]+$' \
+          | sed 's/^clang-//; s/ .*//' | sort -n | tail -1)
+        if [ -z "$version" ]; then
+          echo "No versioned clang package found in the apt.llvm.org repository" >&2
+          exit 1
+        fi
+        sudo apt-get install -y "clang-$version"
         echo "CLANG_VERSION=$version" >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
@@ -77,7 +86,7 @@ jobs:
     - name: Configure CMake
       run: |
         cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER=clang-"$CLANG_VERSION" \
           -DCMAKE_CXX_COMPILER=clang++-"$CLANG_VERSION"
 
@@ -90,10 +99,6 @@ jobs:
   libcxx:
     name: Clang with libc++
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        build_type: [Release]
 
     steps:
     - uses: actions/checkout@v7
@@ -111,7 +116,7 @@ jobs:
     - name: Configure CMake
       run: |
         cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER=clang-17 \
           -DCMAKE_CXX_COMPILER=clang++-17 \
           -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
@@ -124,7 +129,7 @@ jobs:
       run: ./build/test/dross_test --gtest_color=yes
 
   floating-runners:
-    name: Floating Runner
+    name: Floating Runner (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -144,7 +149,7 @@ jobs:
         cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
-      run: cmake --build build -j2
+      run: cmake --build build --parallel
 
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
