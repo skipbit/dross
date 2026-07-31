@@ -52,11 +52,20 @@ jobs:
       matrix:
         build_type: [Debug, Release]
         toolchain:
-          - { os: ubuntu-24.04, clang: 18 }
-          - { os: ubuntu-26.04, clang: 22 }
+          - { os: ubuntu-24.04, clang: 18, stdlib_pkg: libstdc++-14-dev }
+          - { os: ubuntu-26.04, clang: 22, stdlib_pkg: '' }
 
     steps:
     - uses: actions/checkout@v7
+
+    # Clang picks the newest libstdc++ headers it can find. The 13 series that
+    # ubuntu-24.04 defaults to cannot be consumed by Clang for C++23, so pull in
+    # the 14 headers there.
+    - name: Install standard library headers
+      if: matrix.toolchain.stdlib_pkg != ''
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.toolchain.stdlib_pkg }}
 
     - name: Report toolchain versions
       run: |
