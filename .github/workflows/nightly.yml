@@ -21,8 +21,9 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
-    # Resolve the newest g++ the toolchain PPA offers rather than pinning a
-    # major, so this keeps tracking upstream without edits.
+    # Resolve the newest versioned g++ available once the toolchain PPA is in
+    # place, rather than pinning a major, so this keeps tracking upstream
+    # without edits.
     - name: Install newest GCC
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -61,9 +62,10 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
-    # llvm.sh adds the apt.llvm.org repository and installs the current stable
-    # release. Query apt afterwards so the version comes from that repository
-    # rather than from whatever the runner image happens to ship.
+    # llvm.sh adds the apt.llvm.org repository for the current stable release,
+    # then we take the newest versioned clang package available. Tracking the
+    # stable release rather than trunk (llvm.sh all) is deliberate: this watches
+    # what users will actually reach for, not what is still in development.
     - name: Install newest Clang
       run: |
         wget https://apt.llvm.org/llvm.sh
