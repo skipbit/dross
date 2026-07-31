@@ -81,6 +81,52 @@ jobs:
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
+  # The requirements say either standard library works across the whole Clang
+  # range, so libc++ is verified at both ends rather than left to best effort.
+  # Covering only the lower bound would leave the upper end of the declared
+  # range unverified against libc++ header changes and newly added warnings —
+  # and -Werror is public, so those reach consumers.
+  #
+  # libc++ is not part of the runner image, but it comes from the
+  # distribution's own repository, so no external source enters a required gate.
+  build-ubuntu-clang-libcxx:
+    name: Ubuntu Clang ${{ matrix.clang }} libc++ (${{ matrix.build_type }})
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+        clang: [20, 22]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install libc++
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libc++-${{ matrix.clang }}-dev libc++abi-${{ matrix.clang }}-dev
+
+    - name: Report toolchain versions
+      run: |
+        clang-${{ matrix.clang }} --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=clang-${{ matrix.clang }} \
+          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }} \
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
   build-static-library:
     name: Static Library Build
     runs-on: ubuntu-24.04
