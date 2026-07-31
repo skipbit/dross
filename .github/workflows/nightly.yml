@@ -98,41 +98,6 @@ jobs:
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
-  # The required gates build Clang against the default standard library.
-  # This covers the other choice, so neither ends up being the only one that
-  # works.
-  libcxx:
-    name: Clang with libc++
-    runs-on: ubuntu-26.04
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Install libc++
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libc++-20-dev libc++abi-20-dev
-
-    - name: Report toolchain versions
-      run: |
-        clang-20 --version
-        cmake --version
-
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=clang-20 \
-          -DCMAKE_CXX_COMPILER=clang++-20 \
-          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
-
-    - name: Build
-      run: cmake --build build -j"$(nproc)"
-
-    - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
-
   floating-runners:
     name: Floating Runner (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

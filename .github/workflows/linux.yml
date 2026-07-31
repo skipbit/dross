@@ -81,6 +81,48 @@ jobs:
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
+  # The requirements say either standard library works with Clang, so both are
+  # verified here rather than leaving one to best effort. libc++ is not part of
+  # the runner image, but it comes from the distribution's own repository, so
+  # no external source enters a required gate. Verifying it at the lower bound
+  # is what matters: a newer libc++ paired with a newer Clang is the easier
+  # combination.
+  build-ubuntu-clang-libcxx:
+    name: Ubuntu Clang 20 libc++ (${{ matrix.build_type }})
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install libc++
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libc++-20-dev libc++abi-20-dev
+
+    - name: Report toolchain versions
+      run: |
+        clang-20 --version
+        cmake --version
+
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=clang-20 \
+          -DCMAKE_CXX_COMPILER=clang++-20 \
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
   build-static-library:
     name: Static Library Build
     runs-on: ubuntu-24.04
