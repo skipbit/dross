@@ -10,11 +10,17 @@ To build and use dross, you need:
 
 - **C++ Compiler**: Supporting C++23 standard
 
-  - On Linux: GCC 13 through 15, or Clang 17 through 22
+  - On Linux: GCC 13 through 15, or Clang 20 through 22
   - On macOS: the Apple Clang shipped with macOS 15 or 26
 
   Newer versions are best effort: they are exercised by the nightly toolchain
   watch rather than by the required build matrix.
+
+  The Clang lower bound is higher than the GCC one because older Clang
+  releases cannot compile this library's C++23 ``std::expected`` usage against
+  the libstdc++ they are paired with on Ubuntu 24.04, whether or not newer
+  libstdc++ headers are installed alongside. Either standard library works
+  from Clang 20 onwards, so neither is imposed.
 
 - **Build System**: CMake 3.20 or later
 - **Operating System**: Linux or macOS
