@@ -8,8 +8,11 @@ on:
 
 # Compilers come from the runner images only. Pinning the OS pins the compiler
 # set, which keeps an upstream repository change from breaking a required gate.
-# ubuntu-24.04 covers the lower bound of the supported range, ubuntu-26.04 the
-# newest versions we verify.
+#
+# The lower bounds do not line up across compilers. GCC is verified from 13 on
+# ubuntu-24.04, but Clang starts at 20 on ubuntu-26.04: older Clang releases
+# cannot build this library's C++23 usage against the libstdc++ they are paired
+# with on ubuntu-24.04. Both are verified up to what ubuntu-26.04 provides.
 
 jobs:
   build-ubuntu-gcc:
