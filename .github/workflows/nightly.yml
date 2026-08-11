@@ -6,12 +6,16 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
-# Early warning for environments outside the verified range: the newest
-# compilers and the floating runner labels. These jobs deliberately use the
-# wiring the required gates avoid — floating OS labels and compilers from
-# external repositories — because breaking here is the signal we want, ahead
-# of users hitting it. They never gate a pull request and must not be added to
-# required status checks.
+# Early warning for environments outside the verified range: the newest GCC,
+# the Clang release next in line to enter the declared range, and the
+# floating runner labels. These jobs deliberately use wiring the required
+# gates avoid — floating OS labels, and compilers pulled from outside the
+# distribution's own repositories — because breaking here is the signal we
+# want, ahead of users hitting it. The Clang job watches a release pinned
+# above the declared range; the GCC job tracks the newest versioned g++
+# available once the toolchain PPA is in place, which is normally above
+# that range too but is never checked against it. They never gate a pull
+# request and must not be added to required status checks.
 
 jobs:
   newest-gcc:
@@ -56,46 +60,216 @@ jobs:
       run: ./build/test/dross_test --gtest_color=yes
 
   newest-clang:
-    name: Newest Clang
+    name: Next Clang
     runs-on: ubuntu-latest
+
+    # Watches the smallest "-N" apt.llvm.org suite above the declared Clang
+    # range (CLANG_WATCH_VERSION below), not the largest one available:
+    # taking the largest would skip past the release most likely to enter the
+    # declared range next, leaving it with no CI evidence at the moment the
+    # decision is made. The unsuffixed suite (a rolling development snapshot)
+    # is never watched either, because -Werror is a PUBLIC compile option
+    # (src/CMakeLists.txt) and a diagnostic newly added upstream would turn a
+    # healthy build red for reasons unrelated to this project. The pinned
+    # version below is bumped together with the declared range so both move
+    # in the same commit and the watched release stays visible in the diff.
+    #
+    # The apt source line is composed directly instead of fetching and
+    # running apt.llvm.org's install script: this job only needs one source
+    # line and one package, so there is no need to pull a remote script and
+    # execute it as root. The script's own version table also points its
+    # newest entries at the unsuffixed development suite, which is exactly
+    # what this job is designed to avoid.
+    env:
+      CLANG_WATCH_VERSION: '23'
 
     steps:
     - uses: actions/checkout@v7
 
-    # llvm.sh adds the apt.llvm.org repository for the current stable release,
-    # then we take the newest versioned clang package available. Tracking the
-    # stable release rather than trunk (llvm.sh all) is deliberate: this watches
-    # what users will actually reach for, not what is still in development.
-    - name: Install newest Clang
+    - name: Probe and install the watched Clang release
+      id: watch
       run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh
-        version=$(apt-cache search --names-only '^clang-[0-9]+$' \
-          | sed 's/^clang-//; s/ .*//' | sort -n | tail -1)
-        if [ -z "$version" ]; then
-          echo "No versioned clang package found in the apt.llvm.org repository" >&2
+        set -euo pipefail
+        . /etc/os-release
+        codename="${UBUNTU_CODENAME:-}"
+        if [ -z "$codename" ]; then
+          echo "Could not read UBUNTU_CODENAME from /etc/os-release" >&2
           exit 1
         fi
-        sudo apt-get install -y "clang-$version"
-        echo "CLANG_VERSION=$version" >> "$GITHUB_ENV"
+
+        suite="llvm-toolchain-${codename}-${CLANG_WATCH_VERSION}"
+        base="https://apt.llvm.org/${codename}"
+        # binary-amd64 is hardcoded: ubuntu-latest is an x86-64 runner today,
+        # so that's the architecture whose package index this job needs.
+        index_url="${base}/dists/${suite}/main/binary-amd64/Packages.gz"
+
+        # A 200 on dists/<suite>/Release would only prove the suite exists,
+        # not that the compiler package is in it, so the package index itself
+        # is what gets probed. Capture the HTTP status without letting a
+        # transport failure abort the script before the branch below runs.
+        status=$(curl -sS -L -o /tmp/Packages.gz -w '%{http_code}' \
+          --retry 2 --retry-connrefused \
+          "$index_url") || {
+          echo "Failed to reach $index_url (curl transport error)" >&2
+          exit 1
+        }
+
+        case "$status" in
+          200)
+            ;;
+          404)
+            # A bare 404 here is ambiguous: it's the expected shape while
+            # the suite simply hasn't been branched yet, but it is also
+            # what a *dead* watch looks like if apt.llvm.org has moved the
+            # index (e.g. to .xz/.zst) or stopped serving this codename —
+            # and a dead watch reporting green every night is worse than
+            # one that fails loudly. Two follow-up requests, made only on
+            # this branch, tell those cases apart. Each is judged strictly
+            # against 200 vs. 404: anything else (a 5xx, a 403, ...) is not
+            # evidence of either outcome, so it fails the job on its own
+            # rather than falling through to the next check.
+
+            # Does the suite exist at all, just not with an index at this
+            # path? A 200 here alongside the 404 on Packages.gz means
+            # upstream changed how (or where) the index is served, which
+            # this job cannot follow silently.
+            release_status=$(curl -sS -L -o /dev/null -w '%{http_code}' \
+              --retry 2 --retry-connrefused \
+              "${base}/dists/${suite}/Release") || {
+              echo "Failed to reach ${base}/dists/${suite}/Release (curl transport error)" >&2
+              exit 1
+            }
+            case "$release_status" in
+              200)
+                echo "$suite is published (${base}/dists/${suite}/Release is 200) but its package index is not at $index_url; apt.llvm.org may have moved or recompressed it." >&2
+                exit 1
+                ;;
+              404)
+                ;;
+              *)
+                echo "Unexpected HTTP $release_status probing ${base}/dists/${suite}/Release" >&2
+                exit 1
+                ;;
+            esac
+
+            # Is this codename served by apt.llvm.org at all? The
+            # codename's own unsuffixed suite is published independently
+            # of any -N release, so it works as a version-independent
+            # oracle here. This job still never builds from the unsuffixed
+            # suite (see the header comment above) — it's read here only
+            # to answer "does apt.llvm.org know this codename", never as a
+            # source of packages.
+            codename_status=$(curl -sS -L -o /dev/null -w '%{http_code}' \
+              --retry 2 --retry-connrefused \
+              "${base}/dists/llvm-toolchain-${codename}/Release") || {
+              echo "Failed to reach ${base}/dists/llvm-toolchain-${codename}/Release (curl transport error)" >&2
+              exit 1
+            }
+            case "$codename_status" in
+              200)
+                ;;
+              404)
+                echo "${base}/dists/llvm-toolchain-${codename}/Release returned 404, so apt.llvm.org does not serve codename '$codename'; the ubuntu-latest label may have moved to a codename apt.llvm.org doesn't carry yet." >&2
+                exit 1
+                ;;
+              *)
+                echo "Unexpected HTTP $codename_status probing ${base}/dists/llvm-toolchain-${codename}/Release" >&2
+                exit 1
+                ;;
+            esac
+
+            echo "::notice::$suite's package index was not found at $index_url; apt.llvm.org serves codename '$codename', so this suite may simply not have been branched yet."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+          *)
+            echo "Unexpected HTTP $status probing $index_url" >&2
+            exit 1
+            ;;
+        esac
+
+        # Decompression failure (corrupt/truncated download) and "package not
+        # listed" are different outcomes and must not be conflated: the first
+        # fails the job, the second is a plain notice-and-skip. /tmp/Packages
+        # is a real file rather than a pipe for the same reason: piping
+        # straight into `grep -q` would let grep exit as soon as it matched,
+        # killing gunzip with SIGPIPE, and pipefail would then report the
+        # whole pipeline as failed — misclassifying "the compiler IS
+        # published" as "not published yet".
+        if ! gunzip -c /tmp/Packages.gz > /tmp/Packages 2>/tmp/gunzip.err; then
+          echo "Failed to decompress $index_url: $(cat /tmp/gunzip.err)" >&2
+          exit 1
+        fi
+
+        # grep's exit status distinguishes "no match" (1, the expected
+        # not-yet-published case) from "grep itself failed" (anything else,
+        # e.g. an unreadable file) — the two must not be conflated, or a
+        # broken probe would silently read as a routine skip.
+        if grep -q "^Package: clang-${CLANG_WATCH_VERSION}\$" /tmp/Packages; then
+          grep_status=0
+        else
+          grep_status=$?
+        fi
+
+        case "$grep_status" in
+          0)
+            ;;
+          1)
+            # The specific version wasn't found, but that reading only holds
+            # if this index lists clang packages under that name at all. If
+            # it has no "^Package: clang-" line whatsoever, the assumption
+            # behind the search has gone stale the same way a bare 404
+            # would have — and the file is already local, so checking costs
+            # no extra request.
+            if ! grep -q "^Package: clang-" /tmp/Packages; then
+              echo "$index_url has no '^Package: clang-' entries at all; the index format or clang package naming may have changed upstream." >&2
+              exit 1
+            fi
+            echo "::notice::$suite exists but clang-$CLANG_WATCH_VERSION is not published in it yet."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+          *)
+            echo "grep exited $grep_status searching the decompressed index from $index_url for clang-$CLANG_WATCH_VERSION" >&2
+            exit 1
+            ;;
+        esac
+
+        # apt-get update verifies this suite's InRelease signature against
+        # the keyring named by signed-by below, and package hashes chain
+        # from that signed release — which is why the key must stay scoped
+        # to this one source.
+        sudo install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL --proto '=https' --proto-redir '=https' \
+          https://apt.llvm.org/llvm-snapshot.gpg.key \
+          | sudo gpg --dearmor -o /etc/apt/keyrings/llvm-snapshot.gpg
+        sudo chmod a+r /etc/apt/keyrings/llvm-snapshot.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] $base/ $suite main" \
+          | sudo tee /etc/apt/sources.list.d/llvm-watch.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y "clang-$CLANG_WATCH_VERSION"
+        echo "available=true" >> "$GITHUB_OUTPUT"
 
     - name: Report toolchain versions
+      if: steps.watch.outputs.available == 'true'
       run: |
-        clang-"$CLANG_VERSION" --version
+        clang-"$CLANG_WATCH_VERSION" --version
         cmake --version
 
     - name: Configure CMake
+      if: steps.watch.outputs.available == 'true'
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=clang-"$CLANG_VERSION" \
-          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_VERSION"
+          -DCMAKE_C_COMPILER=clang-"$CLANG_WATCH_VERSION" \
+          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_WATCH_VERSION"
 
     - name: Build
+      if: steps.watch.outputs.available == 'true'
       run: cmake --build build -j"$(nproc)"
 
     - name: Test
+      if: steps.watch.outputs.available == 'true'
       run: ./build/test/dross_test --gtest_color=yes
 
   floating-runners:

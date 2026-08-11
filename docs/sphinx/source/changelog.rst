@@ -29,6 +29,10 @@ Changed
 - Enhanced error handling: ``timezone::from_string()`` returns ``std::optional<timezone>``
 - Simplified API: removed redundant timezone methods (``is_local()``, ``has_offset()``)
 - Updated documentation to reflect timestamp and timezone APIs
+- **Breaking:** ``split()`` now takes its arguments as ``std::string_view``
+  instead of ``const std::string&``; callers passing a type that converts
+  implicitly to ``std::string`` but not to ``std::string_view`` will no
+  longer compile
 
 v0.1.0 - 2024-01-20
 -------------------
