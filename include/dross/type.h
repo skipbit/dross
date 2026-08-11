@@ -93,7 +93,7 @@ namespace dross {
  * // Result: {"a", "b", "c"}
  * @endcode
  */
-std::vector<std::string> split(std::string_view s, std::string_view delimiter);
+std::vector<std::string> split(const std::string& s, const std::string& delimiter);
 
 /**
  * @brief Join string tokens into a single string using a delimiter.
