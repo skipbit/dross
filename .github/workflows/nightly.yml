@@ -10,9 +10,11 @@ on:
 # the Clang release next in line to enter the declared range, and the
 # floating runner labels. These jobs deliberately use wiring the required
 # gates avoid — floating OS labels, and compilers pulled from outside the
-# distribution's own repositories at versions above what the required gates
-# verify — because breaking here is the signal we want, ahead of users
-# hitting it. They never gate a pull request and must not be added to
+# distribution's own repositories — because breaking here is the signal we
+# want, ahead of users hitting it. The Clang job watches a release pinned
+# above the declared range; the GCC job tracks the newest g++ the toolchain
+# PPA offers, which is normally above that range too but is never checked
+# against it. They never gate a pull request and must not be added to
 # required status checks.
 
 jobs:
@@ -97,13 +99,17 @@ jobs:
 
         suite="llvm-toolchain-${codename}-${CLANG_WATCH_VERSION}"
         base="https://apt.llvm.org/${codename}"
+        # binary-amd64 is hardcoded: ubuntu-latest is an x86-64 runner today,
+        # so that's the architecture whose package index this job needs.
         index_url="${base}/dists/${suite}/main/binary-amd64/Packages.gz"
 
         # A 200 on dists/<suite>/Release would only prove the suite exists,
         # not that the compiler package is in it, so the package index itself
         # is what gets probed. Capture the HTTP status without letting a
         # transport failure abort the script before the branch below runs.
-        status=$(curl -sS -L -o /tmp/Packages.gz -w '%{http_code}' "$index_url") || {
+        status=$(curl -sS -L -o /tmp/Packages.gz -w '%{http_code}' \
+          --retry 2 --retry-connrefused \
+          "$index_url") || {
           echo "Failed to reach $index_url (curl transport error)" >&2
           exit 1
         }
@@ -118,7 +124,10 @@ jobs:
             # index (e.g. to .xz/.zst) or stopped serving this codename —
             # and a dead watch reporting green every night is worse than
             # one that fails loudly. Two follow-up requests, made only on
-            # this branch, tell those cases apart.
+            # this branch, tell those cases apart. Each is judged strictly
+            # against 200 vs. 404: anything else (a 5xx, a 403, ...) is not
+            # evidence of either outcome, so it fails the job on its own
+            # rather than falling through to the next check.
 
             # Does the suite exist at all, just not with an index at this
             # path? A 200 here alongside the 404 on Packages.gz means
@@ -130,10 +139,18 @@ jobs:
               echo "Failed to reach ${base}/dists/${suite}/Release (curl transport error)" >&2
               exit 1
             }
-            if [ "$release_status" = "200" ]; then
-              echo "$suite is published (${base}/dists/${suite}/Release is 200) but its package index is not at $index_url; apt.llvm.org may have moved or recompressed it." >&2
-              exit 1
-            fi
+            case "$release_status" in
+              200)
+                echo "$suite is published (${base}/dists/${suite}/Release is 200) but its package index is not at $index_url; apt.llvm.org may have moved or recompressed it." >&2
+                exit 1
+                ;;
+              404)
+                ;;
+              *)
+                echo "Unexpected HTTP $release_status probing ${base}/dists/${suite}/Release" >&2
+                exit 1
+                ;;
+            esac
 
             # Is this codename served by apt.llvm.org at all? The
             # codename's own unsuffixed suite is published independently
@@ -148,12 +165,20 @@ jobs:
               echo "Failed to reach ${base}/dists/llvm-toolchain-${codename}/Release (curl transport error)" >&2
               exit 1
             }
-            if [ "$codename_status" != "200" ]; then
-              echo "apt.llvm.org does not serve codename '$codename' (${base}/dists/llvm-toolchain-${codename}/Release is $codename_status); the ubuntu-latest label may have moved to a codename apt.llvm.org doesn't carry yet." >&2
-              exit 1
-            fi
+            case "$codename_status" in
+              200)
+                ;;
+              404)
+                echo "${base}/dists/llvm-toolchain-${codename}/Release returned 404, so apt.llvm.org does not serve codename '$codename'; the ubuntu-latest label may have moved to a codename apt.llvm.org doesn't carry yet." >&2
+                exit 1
+                ;;
+              *)
+                echo "Unexpected HTTP $codename_status probing ${base}/dists/llvm-toolchain-${codename}/Release" >&2
+                exit 1
+                ;;
+            esac
 
-            echo "::notice::$suite's package index was not found at $index_url; apt.llvm.org serves codename '$codename', so this suite simply hasn't been branched yet."
+            echo "::notice::$suite's package index was not found at $index_url; apt.llvm.org serves codename '$codename', so this suite may simply not have been branched yet."
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 0
             ;;
@@ -190,6 +215,16 @@ jobs:
           0)
             ;;
           1)
+            # The specific version wasn't found, but that reading only holds
+            # if this index lists clang packages under that name at all. If
+            # it has no "^Package: clang-" line whatsoever, the assumption
+            # behind the search has gone stale the same way a bare 404
+            # would have — and the file is already local, so checking costs
+            # no extra request.
+            if ! grep -q "^Package: clang-" /tmp/Packages; then
+              echo "$index_url has no '^Package: clang-' entries at all; the index format or clang package naming may have changed upstream." >&2
+              exit 1
+            fi
             echo "::notice::$suite exists but clang-$CLANG_WATCH_VERSION is not published in it yet."
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 0

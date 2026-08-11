@@ -38,11 +38,11 @@ Build Requirements
   Newer versions are best effort.
 - Within that range, the required Linux jobs currently build GCC 13/15 and
   Clang 20/22, with Clang built against the libstdc++ present on Ubuntu
-  26.04 or against libc++. GCC 14, Clang 21, and Clang against the older
-  libstdc++ releases available on Ubuntu 24.04 (13 and 14) are inside the
-  declared range but not yet built by a required job; verification for
-  those combinations is to be added, and this note will be removed once it
-  lands.
+  26.04 or against libc++. Clang against the older libstdc++ releases
+  available on Ubuntu 24.04 (13 and 14) is not yet built by a required job;
+  verification for that combination is to be added, and this note will be
+  removed once it lands. GCC 14 and Clang 21 are inside the declared range
+  but are not built by a required job either.
 - CMake 3.20 or later
 - Git
 

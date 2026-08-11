@@ -14,8 +14,10 @@ To build and use dross, you need:
     or libc++
   - On macOS: the Apple Clang shipped with macOS 15 or 26
 
-  Newer versions are best effort: they are exercised by the nightly toolchain
-  watch rather than by the required build matrix.
+  Newer versions are best effort: GCC is exercised by the nightly toolchain
+  watch tracking the newest the toolchain PPA offers, and Clang by the same
+  watch tracking the specific release next in line to enter this range,
+  rather than by the required build matrix.
 
   The Clang lower bound is higher than the GCC one because older Clang
   releases cannot compile this library's C++23 ``std::expected`` usage against
@@ -25,9 +27,9 @@ To build and use dross, you need:
   matrix currently exercises only Clang 20 and 22 (not the intermediate 21),
   and only against the libstdc++ present on Ubuntu 26.04 or against libc++
   — not against the older libstdc++ releases available on Ubuntu 24.04
-  (13 and 14). GCC 14 sits inside the declared range the same way, without
-  a required job of its own yet. Verification for these inside-range
-  combinations is to be added; this paragraph will be trimmed once it is.
+  (13 and 14). Verification for that lower-bound combination is to be added;
+  this paragraph will be trimmed once it is. GCC 14 and Clang 21 sit inside
+  the declared range the same way, without a required job of their own.
 
 - **Build System**: CMake 3.20 or later
 - **Operating System**: Linux or macOS
