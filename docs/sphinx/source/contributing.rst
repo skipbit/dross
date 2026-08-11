@@ -36,6 +36,12 @@ Build Requirements
 - C++23 compatible compiler: on Linux, GCC 13-15, or Clang 20-22 with either
   libstdc++ or libc++; on macOS, the Apple Clang shipped with macOS 15 or 26.
   Newer versions are best effort.
+- Within that range, the required Linux jobs currently build GCC 13/15 and
+  Clang 20/22, with Clang built against Ubuntu 26.04's default libstdc++ or
+  against libc++. GCC 14, Clang 21, and Clang against the libstdc++ 13/14
+  that Ubuntu 24.04 installs are inside the declared range but not yet built
+  by a required job; verification for those combinations is to be added, and
+  this note will be removed once it lands.
 - CMake 3.20 or later
 - Git
 

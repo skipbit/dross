@@ -21,8 +21,13 @@ To build and use dross, you need:
   releases cannot compile this library's C++23 ``std::expected`` usage against
   the libstdc++ they are paired with on Ubuntu 24.04 — installing the
   libstdc++ 14 headers alongside them does not change that either. From Clang
-  20 onwards both standard libraries work, and the build matrix verifies each
-  of them, so neither is imposed on you.
+  20 onwards both standard libraries are supported, but the required build
+  matrix currently exercises only Clang 20 and 22 (not the intermediate 21),
+  and only against Ubuntu 26.04's default libstdc++ or against libc++ — not
+  against the libstdc++ 13/14 that Ubuntu 24.04 installs. GCC 14 sits inside
+  the declared range the same way, without a required job of its own yet.
+  Verification for these inside-range combinations is to be added; this
+  paragraph will be trimmed once it is.
 
 - **Build System**: CMake 3.20 or later
 - **Operating System**: Linux or macOS

@@ -5,7 +5,7 @@
 
 namespace dross {
 
-std::vector<std::string> split(const std::string& s, const std::string& delimiter)
+std::vector<std::string> split(std::string_view s, std::string_view delimiter)
 {
     std::vector<std::string> tokens;
 

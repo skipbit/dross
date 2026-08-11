@@ -6,11 +6,12 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
-# Early warning for environments outside the verified range: the newest
-# compilers and the floating runner labels. These jobs deliberately use the
-# wiring the required gates avoid — floating OS labels and compilers from
-# external repositories — because breaking here is the signal we want, ahead
-# of users hitting it. They never gate a pull request and must not be added to
+# Early warning for environments outside the verified range: the newest GCC,
+# the Clang release next in line to enter the declared range, and the
+# floating runner labels. These jobs deliberately use wiring the required
+# gates avoid — floating OS labels, and (for Clang) a compiler from outside
+# the declared range — because breaking here is the signal we want, ahead of
+# users hitting it. They never gate a pull request and must not be added to
 # required status checks.
 
 jobs:
@@ -59,43 +60,111 @@ jobs:
     name: Newest Clang
     runs-on: ubuntu-latest
 
+    # Watches the smallest "-N" apt.llvm.org suite above the declared Clang
+    # range (CLANG_WATCH_VERSION below), not the largest one available:
+    # taking the largest would skip past the release most likely to enter the
+    # declared range next, leaving it with no CI evidence at the moment the
+    # decision is made. The unsuffixed suite (a rolling development snapshot)
+    # is never watched either, because -Werror is a PUBLIC compile option
+    # (src/CMakeLists.txt) and a diagnostic newly added upstream would turn a
+    # healthy build red for reasons unrelated to this project. The pinned
+    # version below is bumped together with the declared range so both move
+    # in the same commit and the watched release stays visible in the diff.
+    #
+    # The apt source line is composed directly instead of fetching and
+    # running apt.llvm.org's install script: this job only needs one source
+    # line and one package, so there is no need to pull a remote script and
+    # execute it as root. The script's own version table also points its
+    # newest entries at the unsuffixed development suite, which is exactly
+    # what this job is designed to avoid.
+    env:
+      CLANG_WATCH_VERSION: '23'
+
     steps:
     - uses: actions/checkout@v7
 
-    # llvm.sh adds the apt.llvm.org repository for the current stable release,
-    # then we take the newest versioned clang package available. Tracking the
-    # stable release rather than trunk (llvm.sh all) is deliberate: this watches
-    # what users will actually reach for, not what is still in development.
-    - name: Install newest Clang
+    - name: Probe and install the watched Clang release
+      id: watch
       run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh
-        version=$(apt-cache search --names-only '^clang-[0-9]+$' \
-          | sed 's/^clang-//; s/ .*//' | sort -n | tail -1)
-        if [ -z "$version" ]; then
-          echo "No versioned clang package found in the apt.llvm.org repository" >&2
+        set -euo pipefail
+        . /etc/os-release
+        codename="${UBUNTU_CODENAME:-}"
+        if [ -z "$codename" ]; then
+          echo "Could not read UBUNTU_CODENAME from /etc/os-release" >&2
           exit 1
         fi
-        sudo apt-get install -y "clang-$version"
-        echo "CLANG_VERSION=$version" >> "$GITHUB_ENV"
+
+        suite="llvm-toolchain-${codename}-${CLANG_WATCH_VERSION}"
+        base="https://apt.llvm.org/${codename}"
+        index_url="${base}/dists/${suite}/main/binary-amd64/Packages.gz"
+
+        # A 200 on dists/<suite>/Release would only prove the suite exists,
+        # not that the compiler package is in it, so the package index itself
+        # is what gets probed. Capture the HTTP status without letting a
+        # transport failure abort the script before the branch below runs.
+        status=$(curl -sS -L -o /tmp/Packages.gz -w '%{http_code}' "$index_url") || {
+          echo "Failed to reach $index_url (curl transport error)" >&2
+          exit 1
+        }
+
+        case "$status" in
+          200)
+            ;;
+          404)
+            echo "::notice::$suite does not exist yet at $index_url; nothing above the declared range to watch."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+          *)
+            echo "Unexpected HTTP $status probing $index_url" >&2
+            exit 1
+            ;;
+        esac
+
+        # Decompression failure (corrupt/truncated download) and "package not
+        # listed" are different outcomes and must not be conflated: the first
+        # fails the job, the second is a plain notice-and-skip.
+        if ! gunzip -c /tmp/Packages.gz > /tmp/Packages 2>/tmp/gunzip.err; then
+          echo "Failed to decompress $index_url: $(cat /tmp/gunzip.err)" >&2
+          exit 1
+        fi
+
+        if ! grep -q "^Package: clang-${CLANG_WATCH_VERSION}\$" /tmp/Packages; then
+          echo "::notice::$suite exists but clang-$CLANG_WATCH_VERSION is not published in it yet."
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        sudo install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+          | sudo gpg --dearmor -o /etc/apt/keyrings/llvm-snapshot.gpg
+        sudo chmod a+r /etc/apt/keyrings/llvm-snapshot.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] $base/ $suite main" \
+          | sudo tee /etc/apt/sources.list.d/llvm-watch.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y "clang-$CLANG_WATCH_VERSION"
+        echo "available=true" >> "$GITHUB_OUTPUT"
 
     - name: Report toolchain versions
+      if: steps.watch.outputs.available == 'true'
       run: |
-        clang-"$CLANG_VERSION" --version
+        clang-"$CLANG_WATCH_VERSION" --version
         cmake --version
 
     - name: Configure CMake
+      if: steps.watch.outputs.available == 'true'
       run: |
         cmake -S . -B build \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=clang-"$CLANG_VERSION" \
-          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_VERSION"
+          -DCMAKE_C_COMPILER=clang-"$CLANG_WATCH_VERSION" \
+          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_WATCH_VERSION"
 
     - name: Build
+      if: steps.watch.outputs.available == 'true'
       run: cmake --build build -j"$(nproc)"
 
     - name: Test
+      if: steps.watch.outputs.available == 'true'
       run: ./build/test/dross_test --gtest_color=yes
 
   floating-runners:
