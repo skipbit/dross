@@ -9,9 +9,10 @@ on:
 # Early warning for environments outside the verified range: the newest GCC,
 # the Clang release next in line to enter the declared range, and the
 # floating runner labels. These jobs deliberately use wiring the required
-# gates avoid — floating OS labels, and (for Clang) a compiler from outside
-# the declared range — because breaking here is the signal we want, ahead of
-# users hitting it. They never gate a pull request and must not be added to
+# gates avoid — floating OS labels, and compilers pulled from outside the
+# distribution's own repositories at versions above what the required gates
+# verify — because breaking here is the signal we want, ahead of users
+# hitting it. They never gate a pull request and must not be added to
 # required status checks.
 
 jobs:
@@ -57,7 +58,7 @@ jobs:
       run: ./build/test/dross_test --gtest_color=yes
 
   newest-clang:
-    name: Newest Clang
+    name: Next Clang
     runs-on: ubuntu-latest
 
     # Watches the smallest "-N" apt.llvm.org suite above the declared Clang
@@ -111,7 +112,48 @@ jobs:
           200)
             ;;
           404)
-            echo "::notice::$suite does not exist yet at $index_url; nothing above the declared range to watch."
+            # A bare 404 here is ambiguous: it's the expected shape while
+            # the suite simply hasn't been branched yet, but it is also
+            # what a *dead* watch looks like if apt.llvm.org has moved the
+            # index (e.g. to .xz/.zst) or stopped serving this codename —
+            # and a dead watch reporting green every night is worse than
+            # one that fails loudly. Two follow-up requests, made only on
+            # this branch, tell those cases apart.
+
+            # Does the suite exist at all, just not with an index at this
+            # path? A 200 here alongside the 404 on Packages.gz means
+            # upstream changed how (or where) the index is served, which
+            # this job cannot follow silently.
+            release_status=$(curl -sS -L -o /dev/null -w '%{http_code}' \
+              --retry 2 --retry-connrefused \
+              "${base}/dists/${suite}/Release") || {
+              echo "Failed to reach ${base}/dists/${suite}/Release (curl transport error)" >&2
+              exit 1
+            }
+            if [ "$release_status" = "200" ]; then
+              echo "$suite is published (${base}/dists/${suite}/Release is 200) but its package index is not at $index_url; apt.llvm.org may have moved or recompressed it." >&2
+              exit 1
+            fi
+
+            # Is this codename served by apt.llvm.org at all? The
+            # codename's own unsuffixed suite is published independently
+            # of any -N release, so it works as a version-independent
+            # oracle here. This job still never builds from the unsuffixed
+            # suite (see the header comment above) — it's read here only
+            # to answer "does apt.llvm.org know this codename", never as a
+            # source of packages.
+            codename_status=$(curl -sS -L -o /dev/null -w '%{http_code}' \
+              --retry 2 --retry-connrefused \
+              "${base}/dists/llvm-toolchain-${codename}/Release") || {
+              echo "Failed to reach ${base}/dists/llvm-toolchain-${codename}/Release (curl transport error)" >&2
+              exit 1
+            }
+            if [ "$codename_status" != "200" ]; then
+              echo "apt.llvm.org does not serve codename '$codename' (${base}/dists/llvm-toolchain-${codename}/Release is $codename_status); the ubuntu-latest label may have moved to a codename apt.llvm.org doesn't carry yet." >&2
+              exit 1
+            fi
+
+            echo "::notice::$suite's package index was not found at $index_url; apt.llvm.org serves codename '$codename', so this suite simply hasn't been branched yet."
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 0
             ;;
@@ -123,20 +165,48 @@ jobs:
 
         # Decompression failure (corrupt/truncated download) and "package not
         # listed" are different outcomes and must not be conflated: the first
-        # fails the job, the second is a plain notice-and-skip.
+        # fails the job, the second is a plain notice-and-skip. /tmp/Packages
+        # is a real file rather than a pipe for the same reason: piping
+        # straight into `grep -q` would let grep exit as soon as it matched,
+        # killing gunzip with SIGPIPE, and pipefail would then report the
+        # whole pipeline as failed — misclassifying "the compiler IS
+        # published" as "not published yet".
         if ! gunzip -c /tmp/Packages.gz > /tmp/Packages 2>/tmp/gunzip.err; then
           echo "Failed to decompress $index_url: $(cat /tmp/gunzip.err)" >&2
           exit 1
         fi
 
-        if ! grep -q "^Package: clang-${CLANG_WATCH_VERSION}\$" /tmp/Packages; then
-          echo "::notice::$suite exists but clang-$CLANG_WATCH_VERSION is not published in it yet."
-          echo "available=false" >> "$GITHUB_OUTPUT"
-          exit 0
+        # grep's exit status distinguishes "no match" (1, the expected
+        # not-yet-published case) from "grep itself failed" (anything else,
+        # e.g. an unreadable file) — the two must not be conflated, or a
+        # broken probe would silently read as a routine skip.
+        if grep -q "^Package: clang-${CLANG_WATCH_VERSION}\$" /tmp/Packages; then
+          grep_status=0
+        else
+          grep_status=$?
         fi
 
+        case "$grep_status" in
+          0)
+            ;;
+          1)
+            echo "::notice::$suite exists but clang-$CLANG_WATCH_VERSION is not published in it yet."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+          *)
+            echo "grep exited $grep_status searching the decompressed index from $index_url for clang-$CLANG_WATCH_VERSION" >&2
+            exit 1
+            ;;
+        esac
+
+        # apt-get update verifies this suite's InRelease signature against
+        # the keyring named by signed-by below, and package hashes chain
+        # from that signed release — which is why the key must stay scoped
+        # to this one source.
         sudo install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+        curl -fsSL --proto '=https' --proto-redir '=https' \
+          https://apt.llvm.org/llvm-snapshot.gpg.key \
           | sudo gpg --dearmor -o /etc/apt/keyrings/llvm-snapshot.gpg
         sudo chmod a+r /etc/apt/keyrings/llvm-snapshot.gpg
         echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] $base/ $suite main" \
