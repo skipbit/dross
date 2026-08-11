@@ -2,14 +2,21 @@
 
 #include <numeric>
 #include <ranges>
+#include <string_view>
 
 namespace dross {
 
-std::vector<std::string> split(std::string_view s, std::string_view delimiter)
+std::vector<std::string> split(const std::string& s, const std::string& delimiter)
 {
     std::vector<std::string> tokens;
 
-    auto range = s | std::views::split(delimiter) | std::views::transform([](auto&& p) {
+    // Pipe over views rather than over the arguments themselves. On some of
+    // the compiler and standard library pairings this project supports, a
+    // const std::string is not accepted as the left operand of the pipe.
+    const std::string_view sv{s};
+    const std::string_view dv{delimiter};
+
+    auto range = sv | std::views::split(dv) | std::views::transform([](auto&& p) {
         return std::string(p.begin(), p.end());
     });
 
