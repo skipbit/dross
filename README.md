@@ -27,15 +27,15 @@
   - Linux: GCC 13–15, or Clang 20–22 with either libstdc++ or libc++
   - macOS: the Apple Clang shipped with macOS 15 or 26
   - Newer versions are best effort: the nightly toolchain watch tracks the
-    newest GCC the toolchain PPA offers, and the specific Clang release next
-    in line to enter this range
+    newest versioned GCC available once the toolchain PPA is in place, and
+    the specific Clang release next in line to enter this range
   - Within the declared range, the required Linux jobs build GCC 13/15 and
     Clang 20/22, with the Clang jobs pairing against the libstdc++ present
     on Ubuntu 26.04 or against libc++. Clang against the older libstdc++
     releases available on Ubuntu 24.04 (13 and 14) is not yet verified;
-    verification for that combination is to be added, and this note is
-    provisional and will be removed once it is. GCC 14 and Clang 21 are
-    inside the declared range but are not built by a required job.
+    verification for that combination is to be added, and this sentence
+    will be removed once it is. GCC 14 and Clang 21 are inside the declared
+    range but are not built by a required job.
 - **CMake 3.20+**
 
 ### Installation

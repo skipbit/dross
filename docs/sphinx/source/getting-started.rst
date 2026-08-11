@@ -15,9 +15,10 @@ To build and use dross, you need:
   - On macOS: the Apple Clang shipped with macOS 15 or 26
 
   Newer versions are best effort: GCC is exercised by the nightly toolchain
-  watch tracking the newest the toolchain PPA offers, and Clang by the same
-  watch tracking the specific release next in line to enter this range,
-  rather than by the required build matrix.
+  watch tracking the newest versioned GCC available once the toolchain PPA
+  is in place, and Clang by the same watch tracking the specific release
+  next in line to enter this range, rather than by the required build
+  matrix.
 
   The Clang lower bound is higher than the GCC one because older Clang
   releases cannot compile this library's C++23 ``std::expected`` usage against

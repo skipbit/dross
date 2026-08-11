@@ -12,10 +12,10 @@ on:
 # gates avoid — floating OS labels, and compilers pulled from outside the
 # distribution's own repositories — because breaking here is the signal we
 # want, ahead of users hitting it. The Clang job watches a release pinned
-# above the declared range; the GCC job tracks the newest g++ the toolchain
-# PPA offers, which is normally above that range too but is never checked
-# against it. They never gate a pull request and must not be added to
-# required status checks.
+# above the declared range; the GCC job tracks the newest versioned g++
+# available once the toolchain PPA is in place, which is normally above
+# that range too but is never checked against it. They never gate a pull
+# request and must not be added to required status checks.
 
 jobs:
   newest-gcc:
