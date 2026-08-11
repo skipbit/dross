@@ -2,6 +2,7 @@
 
 #include <numeric>
 #include <ranges>
+#include <string_view>
 
 namespace dross {
 

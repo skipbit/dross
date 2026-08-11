@@ -67,7 +67,6 @@
 #include <dross/type/value.h>
 
 #include <string>
-#include <string_view>
 #include <vector>
 
 /**
