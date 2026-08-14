@@ -73,8 +73,8 @@ jobs:
     # that line — the captured output goes to the log rather than being
     # dropped, so the log never claims the driver said nothing when it said
     # something else. Reading the capture directly also leaves no pipeline
-    # whose exit status would turn on whether pipefail is set, which this
-    # workflow does not set. No branch fails the step.
+    # whose exit status would hinge on whether pipefail is set, which this
+    # step does not set. No branch fails the step.
     - name: Report toolchain versions
       run: |
         clang-${{ matrix.toolchain.clang }} --version
@@ -218,8 +218,8 @@ jobs:
     # on the test executable's — but that is CMake filling in language flags
     # for its own reasons, not a promise about linking. Naming the linker
     # variables states the requirement instead of resting on it. The libc++
-    # jobs below name CMAKE_EXE_LINKER_FLAGS for that same reason; they set no
-    # CMAKE_SHARED_LINKER_FLAGS, so the two are alike but not identical.
+    # jobs below set CMAKE_EXE_LINKER_FLAGS as well; they set no
+    # CMAKE_SHARED_LINKER_FLAGS.
     - name: Configure CMake
       run: |
         cmake -S . -B build \
