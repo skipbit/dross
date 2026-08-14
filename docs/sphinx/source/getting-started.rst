@@ -8,11 +8,39 @@ System Requirements
 
 To build and use dross, you need:
 
-- **C++ Compiler**: Supporting C++23 standard
+- **C++ Standard**: C++23 or later in your own project
 
-  - On Linux: GCC 13 through 15, or Clang 20 through 22 with either libstdc++
-    or libc++
-  - On macOS: the Apple Clang shipped with macOS 15 or 26
+  The public headers use C++23, so C++17 and C++20 are outside the supported
+  range. C++26 consumers are best effort: no required job builds one, so
+  neither compiling these headers as C++26 nor the ABI and ODR compatibility
+  of linking such a consumer against a C++23 build of the library is verified.
+
+- **C++ Compiler and Standard Library**: on Linux, one of these pairings
+
+  - GCC 13 through 15 with the libstdc++ it is paired with (13, 14 or 15)
+  - Clang 20 through 22 with libstdc++ 13, 14 or 15
+  - Clang 20 through 22 with libc++ 20 or 22
+
+  The version in each pairing is the version of the standard library headers
+  the compiler builds against. The shared runtime a resulting binary loads
+  comes from the system's own runtime package, which is versioned and updated
+  separately.
+
+  GCC with libc++ is not one of them, because upstream does not support that
+  pairing: GCC has no ``-stdlib`` option to select libc++ with in the first
+  place. It would be worth revisiting if GCC gained an equivalent option, or
+  if libc++ started supporting GCC officially. On macOS the compiler is the
+  Apple Clang shipped with macOS 15 or 26, and the standard library is not a
+  separate axis there, because libc++ comes with the OS toolchain.
+
+  The required Linux build matrix builds GCC 13 and 15, each against the
+  libstdc++ paired with it, and Clang 20 and 22 (not the intermediate 21)
+  against libstdc++ 13, 14 and 15 — 15 being the release Ubuntu 26.04
+  provides — as well as against libc++ 20 and 22. Every libstdc++ release in
+  the supported range is therefore covered in the Clang pairings; among the
+  GCC ones only 13 and 15 are, since the libstdc++ version follows the
+  compiler version there. GCC 14 and Clang 21 sit inside the declared range
+  the same way, without a required job of their own.
 
   Newer versions are best effort: GCC is exercised by the nightly toolchain
   watch tracking the newest versioned GCC available once the toolchain PPA
@@ -20,17 +48,12 @@ To build and use dross, you need:
   next in line to enter this range, rather than by the required build
   matrix.
 
-  The Clang lower bound is higher than the GCC one because older Clang
-  releases cannot compile this library's C++23 ``std::expected`` usage against
-  the libstdc++ they are paired with on Ubuntu 24.04 — installing the
-  libstdc++ 14 headers alongside them does not change that either. From Clang
-  20 onwards both standard libraries are supported, but the required build
-  matrix currently exercises only Clang 20 and 22 (not the intermediate 21),
-  and only against the libstdc++ present on Ubuntu 26.04 or against libc++
-  — not against the older libstdc++ releases available on Ubuntu 24.04
-  (13 and 14). Verification for that lower-bound combination is to be added;
-  this paragraph will be trimmed once it is. GCC 14 and Clang 21 sit inside
-  the declared range the same way, without a required job of their own.
+  The Clang lower bound is higher than the GCC one because Clang releases
+  older than 20 cannot compile this library's C++23 ``std::expected`` usage
+  against the libstdc++ they are paired with on Ubuntu 24.04 — and installing
+  the libstdc++ 14 headers alongside those older releases does not change that
+  either. From Clang 20 onwards both standard libraries work, which is why
+  every pairing listed above starts there.
 
 - **Build System**: CMake 3.20 or later
 - **Operating System**: Linux or macOS
