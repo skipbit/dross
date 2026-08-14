@@ -67,12 +67,25 @@ jobs:
     # that record cannot be derived from the image name either. Reported, not
     # asserted on: these two jobs exist to build against whatever the image
     # provides, so a change of release is news, not a failure.
+    #
+    # The driver's output is captured before it is filtered. Whenever the
+    # marker cannot be reported — the driver failed, or it stopped printing
+    # that line — the captured output goes to the log rather than being
+    # dropped, so the log never claims the driver said nothing when it said
+    # something else. Reading the capture directly also leaves no pipeline
+    # whose exit status would turn on whether pipefail is set, which this
+    # workflow does not set. No branch fails the step.
     - name: Report toolchain versions
       run: |
         clang-${{ matrix.toolchain.clang }} --version
-        clang++-${{ matrix.toolchain.clang }} -std=c++23 -E -x c++ -v /dev/null 2>&1 \
-          | grep -m1 'Selected GCC installation:' \
-          || echo "(the driver reported no GCC installation selection)"
+        if ! probe=$(clang++-${{ matrix.toolchain.clang }} -std=c++23 \
+          -E -x c++ -v /dev/null 2>&1); then
+          printf '%s\n' "$probe"
+          echo "(the driver exited non-zero; no GCC installation selection recorded)"
+        elif ! grep -m1 'Selected GCC installation:' <<< "$probe"; then
+          printf '%s\n' "$probe"
+          echo "(the driver reported no GCC installation selection)"
+        fi
         cmake --version
 
     # No -stdlib override: the default standard library is what most Clang
@@ -134,10 +147,10 @@ jobs:
     # This job's name claims a specific libstdc++, and a green build is not
     # evidence for that claim: were --gcc-install-dir to resolve to another
     # release than the one pinned, the build would still succeed, just not
-    # against what the name says. So the include search path is read back, and
-    # the first entry in it that canonicalises under /usr/include/c++ — the
-    # one the standard library headers are taken from — is compared against
-    # the pinned release. No other entry is examined.
+    # against what the name says. So the include search path is read back and
+    # its entries are canonicalised in order until one of them falls under
+    # /usr/include/c++. That one is where the standard library headers come
+    # from, and it is the only entry compared against the pinned release.
     #
     # The directory check and the search path check do not subsume each other:
     # the directory comes from libgcc-N-dev while the headers come from
@@ -204,8 +217,9 @@ jobs:
     # lines — the build file CMake writes puts it on the shared library's and
     # on the test executable's — but that is CMake filling in language flags
     # for its own reasons, not a promise about linking. Naming the linker
-    # variables states the requirement instead of resting on it, the same
-    # shape in which the libc++ jobs below pass -stdlib.
+    # variables states the requirement instead of resting on it. The libc++
+    # jobs below name CMAKE_EXE_LINKER_FLAGS for that same reason; they set no
+    # CMAKE_SHARED_LINKER_FLAGS, so the two are alike but not identical.
     - name: Configure CMake
       run: |
         cmake -S . -B build \
