@@ -81,6 +81,123 @@ jobs:
     - name: Test
       run: ./build/test/dross_test --gtest_color=yes
 
+  # The jobs above cover only the libstdc++ that comes with the runner image
+  # (15 on ubuntu-26.04), but the declared range promises the older releases a
+  # consumer may still be sitting on. Which libstdc++ Clang uses is an axis of
+  # its own — it does not follow from the Clang version the way it does for
+  # GCC — so the rest of the range is pinned here instead of being left to
+  # best effort. The pairing is what needs the evidence: these releases predate
+  # both Clang versions, and -Werror is public, so a diagnostic or a header
+  # difference on this axis reaches consumers.
+  #
+  # Like libc++ below, these headers come from the distribution's own
+  # repository (universe), so no external source enters a required gate.
+  build-ubuntu-clang-libstdcxx:
+    name: Ubuntu Clang ${{ matrix.clang }} libstdc++ ${{ matrix.libstdcxx }} (${{ matrix.build_type }})
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+        clang: [20, 22]
+        # 15 is the runner default, already covered by the jobs above.
+        libstdcxx: [13, 14]
+
+    env:
+      # x86_64-linux-gnu is hardcoded: ubuntu-26.04 is an x86-64 runner today,
+      # so that is the only triple whose GCC installation this job has to name.
+      GCC_INSTALL_DIR: /usr/lib/gcc/x86_64-linux-gnu/${{ matrix.libstdcxx }}
+      LIBSTDCXX_HEADERS: /usr/include/c++/${{ matrix.libstdcxx }}
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install libstdc++ ${{ matrix.libstdcxx }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libstdc++-${{ matrix.libstdcxx }}-dev
+
+    - name: Report toolchain versions
+      run: |
+        clang-${{ matrix.clang }} --version
+        cmake --version
+
+    # This job's name claims a specific libstdc++, and a green build is not
+    # evidence for that claim: were --gcc-install-dir to resolve to another
+    # release than the one pinned, the build would still succeed, just not
+    # against what the name says. So the include search path is read back and
+    # its first standard library entry is compared against the pinned release.
+    #
+    # The directory check and the search path check do not subsume each other:
+    # the directory comes from libgcc-N-dev while the headers come from
+    # libstdc++-N-dev, so the directory can exist with no headers behind it —
+    # in which case Clang drops the standard library entries entirely and the
+    # comparison below reports that rather than a wrong version.
+    #
+    # What this does not cover is the flag going missing from the configure
+    # step below: this check would still pass, and the build would quietly fall
+    # back to the runner default.
+    - name: Verify the pinned libstdc++ is the one Clang selects
+      run: |
+        set -euo pipefail
+
+        if [ ! -d "$GCC_INSTALL_DIR" ]; then
+          echo "$GCC_INSTALL_DIR does not exist: installing libstdc++-${{ matrix.libstdcxx }}-dev did not bring in the GCC installation this job pins." >&2
+          exit 1
+        fi
+
+        search=$(clang++-${{ matrix.clang }} -std=c++23 \
+          "--gcc-install-dir=$GCC_INSTALL_DIR" -E -x c++ -v /dev/null 2>&1)
+        entries=$(printf '%s\n' "$search" | awk '
+          /search starts here:/ { inside = 1; next }
+          /End of search list/  { inside = 0 }
+          inside && NF          { print $1 }')
+        if [ -z "$entries" ]; then
+          echo "No include search path in the driver output below; the marker Clang prints may have changed." >&2
+          printf '%s\n' "$search" >&2
+          exit 1
+        fi
+        printf '%s\n' "$entries"
+
+        # Clang prints these relative to the GCC installation, as
+        # .../13/../../../../include/c++/13, so they are canonicalised before
+        # being compared.
+        selected=
+        while read -r entry; do
+          resolved=$(readlink -m "$entry")
+          case "$resolved" in
+            /usr/include/c++/*)
+              selected=$resolved
+              break
+              ;;
+          esac
+        done <<< "$entries"
+
+        if [ "$selected" != "$LIBSTDCXX_HEADERS" ]; then
+          echo "Expected $LIBSTDCXX_HEADERS to come first, found ${selected:-no standard library headers at all}." >&2
+          exit 1
+        fi
+        echo "$selected comes first in the include search path, as pinned."
+
+    # --gcc-install-dir has to reach the link as well as the compile: it
+    # selects the GCC installation the driver takes its startup files and its
+    # libstdc++ from. Setting both variables mirrors how the libc++ jobs below
+    # pass -stdlib.
+    - name: Configure CMake
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=clang-${{ matrix.clang }} \
+          -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }} \
+          -DCMAKE_CXX_FLAGS="--gcc-install-dir=$GCC_INSTALL_DIR" \
+          -DCMAKE_EXE_LINKER_FLAGS="--gcc-install-dir=$GCC_INSTALL_DIR"
+
+    - name: Build
+      run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
+
+    - name: Test
+      run: ./build/test/dross_test --gtest_color=yes
+
   # The requirements say either standard library works across the whole Clang
   # range, so libc++ is verified at both ends rather than left to best effort.
   # Covering only the lower bound would leave the upper end of the declared
