@@ -61,9 +61,18 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
+    # The standard library is left to the image here, so the only record of
+    # which one a run used is this log. Clang selects the newest GCC
+    # installation it finds rather than the distribution's default alias, so
+    # that record cannot be derived from the image name either. Reported, not
+    # asserted on: these two jobs exist to build against whatever the image
+    # provides, so a change of release is news, not a failure.
     - name: Report toolchain versions
       run: |
         clang-${{ matrix.toolchain.clang }} --version
+        clang++-${{ matrix.toolchain.clang }} -std=c++23 -E -x c++ -v /dev/null 2>&1 \
+          | grep -m1 'Selected GCC installation:' \
+          || echo "(the driver reported no GCC installation selection)"
         cmake --version
 
     # No -stdlib override: the default standard library is what most Clang
@@ -125,8 +134,10 @@ jobs:
     # This job's name claims a specific libstdc++, and a green build is not
     # evidence for that claim: were --gcc-install-dir to resolve to another
     # release than the one pinned, the build would still succeed, just not
-    # against what the name says. So the include search path is read back and
-    # its first standard library entry is compared against the pinned release.
+    # against what the name says. So the include search path is read back, and
+    # the first entry in it that canonicalises under /usr/include/c++ — the
+    # one the standard library headers are taken from — is compared against
+    # the pinned release. No other entry is examined.
     #
     # The directory check and the search path check do not subsume each other:
     # the directory comes from libgcc-N-dev while the headers come from
@@ -146,12 +157,20 @@ jobs:
           exit 1
         fi
 
-        search=$(clang++-${{ matrix.clang }} -std=c++23 \
-          "--gcc-install-dir=$GCC_INSTALL_DIR" -E -x c++ -v /dev/null 2>&1)
+        # The driver's own output is the only diagnosis available when it
+        # refuses the pinned directory — a GCC installation it will not accept
+        # exists as far as the check above is concerned — so print it rather
+        # than letting the failed assignment end the step in silence.
+        if ! search=$(clang++-${{ matrix.clang }} -std=c++23 \
+          "--gcc-install-dir=$GCC_INSTALL_DIR" -E -x c++ -v /dev/null 2>&1); then
+          echo "The driver failed with --gcc-install-dir=$GCC_INSTALL_DIR; its output follows." >&2
+          printf '%s\n' "$search" >&2
+          exit 1
+        fi
         entries=$(printf '%s\n' "$search" | awk '
           /search starts here:/ { inside = 1; next }
           /End of search list/  { inside = 0 }
-          inside && NF          { print $1 }')
+          inside && NF          { sub(/^[ \t]+/, ""); print }')
         if [ -z "$entries" ]; then
           echo "No include search path in the driver output below; the marker Clang prints may have changed." >&2
           printf '%s\n' "$search" >&2
@@ -181,8 +200,12 @@ jobs:
 
     # --gcc-install-dir has to reach the link as well as the compile: it
     # selects the GCC installation the driver takes its startup files and its
-    # libstdc++ from. Setting both variables mirrors how the libc++ jobs below
-    # pass -stdlib.
+    # libstdc++ from. CMAKE_CXX_FLAGS alone already carries it to both link
+    # lines — the build file CMake writes puts it on the shared library's and
+    # on the test executable's — but that is CMake filling in language flags
+    # for its own reasons, not a promise about linking. Naming the linker
+    # variables states the requirement instead of resting on it, the same
+    # shape in which the libc++ jobs below pass -stdlib.
     - name: Configure CMake
       run: |
         cmake -S . -B build \
@@ -190,7 +213,8 @@ jobs:
           -DCMAKE_C_COMPILER=clang-${{ matrix.clang }} \
           -DCMAKE_CXX_COMPILER=clang++-${{ matrix.clang }} \
           -DCMAKE_CXX_FLAGS="--gcc-install-dir=$GCC_INSTALL_DIR" \
-          -DCMAKE_EXE_LINKER_FLAGS="--gcc-install-dir=$GCC_INSTALL_DIR"
+          -DCMAKE_EXE_LINKER_FLAGS="--gcc-install-dir=$GCC_INSTALL_DIR" \
+          -DCMAKE_SHARED_LINKER_FLAGS="--gcc-install-dir=$GCC_INSTALL_DIR"
 
     - name: Build
       run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"

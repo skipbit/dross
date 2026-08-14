@@ -33,19 +33,25 @@
   - Clang 20–22 with libstdc++ 13, 14 or 15
   - Clang 20–22 with libc++ 20 or 22
 
+  The version in each pairing is the version of the standard library headers
+  the compiler builds against. The shared runtime a resulting binary loads
+  comes from the system's own runtime package, which is versioned and updated
+  separately.
+
   GCC with libc++ is not one of them, because upstream does not support that
   pairing: GCC has no `-stdlib` option to select libc++ with in the first
   place. It would be worth revisiting if GCC gained an equivalent option, or
   if libc++ started supporting GCC officially. On macOS the compiler is the
   Apple Clang shipped with macOS 15 or 26, and the standard library is not a
   separate axis there, because libc++ comes with the OS toolchain.
-- **What the required jobs build.** GCC 13 and 15, each against the libstdc++
-  paired with it, and Clang 20 and 22 against libstdc++ 13, 14 and 15 (15
-  being the release Ubuntu 26.04 provides) as well as against libc++ 20 and
-  22. Every libstdc++ release in the supported range is therefore covered in
-  the Clang pairings; among the GCC ones only 13 and 15 are, since the
+- **What the required Linux jobs build.** GCC 13 and 15, each against the
+  libstdc++ paired with it, and Clang 20 and 22 against libstdc++ 13, 14 and
+  15 (15 being the release Ubuntu 26.04 provides) as well as against libc++ 20
+  and 22. Every libstdc++ release in the supported range is therefore covered
+  in the Clang pairings; among the GCC ones only 13 and 15 are, since the
   libstdc++ version follows the compiler version there. GCC 14 and Clang 21
-  are inside the declared range but are not built by a required job. Newer
+  are inside the declared range but are not built by a required job. On macOS
+  the required jobs build with the Apple Clang of macOS 15 and 26. Newer
   versions are best effort: the nightly toolchain watch tracks the newest
   versioned GCC available once the toolchain PPA is in place, and the specific
   Clang release next in line to enter this range.
