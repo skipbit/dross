@@ -85,9 +85,6 @@ Development Tools
 ^^^^^^^^^^^^^^^^^
 
 - Coding style guide (``CODINGSTYLE.md``)
-- Project documentation (``CLAUDE.md``)
-- Git hooks for code quality
-- VS Code configuration for development
 
 Known Issues
 ~~~~~~~~~~~~
