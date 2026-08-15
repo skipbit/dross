@@ -152,8 +152,11 @@ Platform Utilities
     xdg app{"myapp"};
     const std::string app_data = app.data_home().value_or(config_path.string());
 
-    // Create directory if needed
-    if (auto result = path::mkdir(app_data); !result) {
-        std::cerr << "Failed to create directory: "
-                  << result.error().what() << std::endl;
+    // Create the directory. mkdir() succeeds only when it actually creates
+    // one, so an existing directory is reported as an error; test first.
+    if (!path{app_data}.exists()) {
+        if (auto result = path::mkdir(app_data); !result) {
+            std::cerr << "Failed to create directory: "
+                      << result.error().what() << std::endl;
+        }
     }

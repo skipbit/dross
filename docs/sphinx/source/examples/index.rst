@@ -5,7 +5,6 @@ Examples
    :maxdepth: 2
    
    basic-types
-   json-processing
    configuration
    data-structures
 
@@ -406,7 +405,6 @@ More Examples
 For more examples, visit:
 
 - :doc:`basic-types` - Working with individual type classes
-- :doc:`json-processing` - JSON parsing and generation
 - :doc:`configuration` - Configuration file handling
 - :doc:`data-structures` - Building complex data structures
 

@@ -36,7 +36,8 @@ The ``value`` class is the central polymorphic type that can hold any supported 
     // A bare `true` would select the arithmetic constructor and end up as a
     // number, so the boolean above is wrapped explicitly.
 
-    // Check the type before casting: as<T>() is undefined on a mismatch
+    // Always ask is<T>() first: as<T>() has no defined result when the
+    // value is holding some other type
     if (v1.is<dross::number>()) {
         auto num = v1.as<dross::number>();
         std::cout << num << std::endl;  // number has operator<<
@@ -127,7 +128,8 @@ The ``string`` class provides Unicode-aware string handling:
     // Concatenation is in place; there is no operator+
     s1 += s2;
 
-    // Length is counted in Unicode code points, not bytes
+    // The buffer is UTF-8 and length() reports its size in bytes, so this is
+    // 11 only because the content is ASCII
     std::cout << s1.length() << std::endl;  // 11
 
     // Seamless conversion to std::string, which is what streams accept
@@ -441,8 +443,8 @@ printing it.
 ``value`` is inspected and unwrapped with member templates:
 
 - ``is<T>()`` - Check whether the value currently holds type ``T``
-- ``as<T>()`` - Retrieve the value as type ``T``; undefined unless ``is<T>()``
-  is true first
+- ``as<T>()`` - Retrieve the value as type ``T``. The result is unspecified
+  unless ``is<T>()`` is true, so always check first. It does not throw
 
 Example:
 
@@ -467,8 +469,9 @@ Example:
     auto text_string = to_string(text);      // "hello"
     auto timestamp_string = to_string(meeting); // "2024-01-21T15:30:00+09:00"
 
-    // 3. Direct stream output
-    std::cout << flag << " " << n << " " << text << " " << meeting << std::endl;
+    // 3. Direct stream output. string has no operator<<, so it reaches the
+    //    stream through its std::string conversion (text_str above).
+    std::cout << flag << " " << n << " " << text_str << " " << meeting << std::endl;
 
     // Value type conversion
     dross::value v = 42;
@@ -487,18 +490,28 @@ Example:
 Comparison Operations
 ---------------------
 
-All types support three-way comparison (spaceship operator):
+``boolean``, ``number``, ``data``, ``timestamp``, ``timezone`` and ``error``
+provide three-way comparison (the spaceship operator). ``value``, ``string``,
+``array`` and ``dictionary`` provide only ``==`` and ``!=``.
 
 .. code-block:: cpp
 
+    dross::number n1 = 42;
+    dross::number n2 = 43;
+
+    if (n1 < n2) {
+        std::cout << "n1 is less than n2" << std::endl;
+    }
+
+    auto ordering = n1 <=> n2;  // std::strong_ordering
+
+    // value is only equality-comparable
     dross::value v1 = 42;
     dross::value v2 = 43;
 
-    if (v1 < v2) {
-        std::cout << "v1 is less than v2" << std::endl;
+    if (v1 != v2) {
+        std::cout << "v1 and v2 hold different values" << std::endl;
     }
-
-    auto result = v1 <=> v2;  // std::strong_ordering
 
 Error Handling
 --------------

@@ -69,8 +69,11 @@ public:
      * @return Expected containing the created path on success, or filesystem_error on failure
      * 
      * Creates the specified directory and any necessary parent directories.
-     * If the directory already exists, the operation succeeds.
-     * 
+     * Succeeds only when a directory is actually created: if dir_path is
+     * already present the call reports failure, and that error carries no
+     * diagnostic code. Test with exists() first when an already-provisioned
+     * directory should not count as an error.
+     *
      * @code
      * if (auto result = path::mkdir("/tmp/myapp/data")) {
      *     std::cout << "Created: " << result->string() << std::endl;

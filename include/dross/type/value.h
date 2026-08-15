@@ -274,8 +274,8 @@ public:
      * @return The value as the specified type
      *
      * This is a convenience method that delegates to value_cast.
-     * If the value is not of the requested type, the behavior is undefined.
-     * Use is<T>() to check the type before casting.
+     * Call is<T>() first: the result is unspecified unless the value
+     * currently holds type T. This method does not throw.
      */
     template <class T>
     T as() const noexcept;

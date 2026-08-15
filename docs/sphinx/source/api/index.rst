@@ -41,10 +41,20 @@ The dross library follows consistent naming conventions:
 Error Handling
 --------------
 
-dross does not use exceptions. All operations that may fail return either:
+Operations that may fail report it through the return type rather than by
+throwing:
 
 - ``std::optional<T>`` for operations that may not produce a value
 - ``std::expected<T, error>`` for operations that may fail with error information
+
+Two kinds of operation are exceptions to that rule. The bounds-checked
+accessors — the const ``dictionary::operator[]``, ``array::operator[]`` and
+``array::value_at()`` — throw ``std::out_of_range`` when the key or index is
+not present, so ask ``dictionary::contains()`` or ``array::length()`` before
+indexing. And ``path::expand()``, despite returning ``std::expected``, lets a
+``std::filesystem::filesystem_error`` escape when the path begins with ``~``
+and the expanded location does not exist; ``path::resolve()`` catches that
+condition and returns it.
 
 Example:
 

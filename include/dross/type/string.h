@@ -104,11 +104,11 @@ public:
     bool starts_with(const std::string& prefix) const;
 
     /**
-     * @brief Get the Unicode character length of the string.
-     * @return The number of Unicode characters (not bytes)
+     * @brief Get the length of the string in bytes.
+     * @return The number of bytes in the UTF-8 encoded content
      * 
-     * Returns the count of Unicode code points, which may be different
-     * from the byte length for strings containing non-ASCII characters.
+     * Counts UTF-8 code units, not code points: a string holding non-ASCII
+     * characters reports more than the number of characters it contains.
      */
     size_t length() const;
     

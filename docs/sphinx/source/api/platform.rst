@@ -57,11 +57,16 @@ The ``path`` class provides filesystem path operations:
         dross::path config_path = home->append(".config").append("app");
         std::cout << "Config path: " << config_path.string() << std::endl;
 
-        // Create the directory, including any missing parents
-        if (auto created = dross::path::mkdir(config_path.string())) {
-            std::cout << "Created: " << created->string() << std::endl;
-        } else {
-            std::cerr << "mkdir failed: " << created.error().what() << std::endl;
+        // Create the directory, including any missing parents. mkdir()
+        // reports failure when the directory is already there, so test for
+        // it first if re-running must succeed.
+        if (!config_path.exists()) {
+            if (auto created = dross::path::mkdir(config_path.string())) {
+                std::cout << "Created: " << created->string() << std::endl;
+            } else {
+                std::cerr << "mkdir failed: " << created.error().what()
+                          << std::endl;
+            }
         }
     }
 
@@ -81,7 +86,9 @@ The ``path`` class provides filesystem path operations:
         std::cout << "The relative path exists" << std::endl;
     }
 
-    // Expand a leading ~ to the home directory
+    // Expand a leading ~ to the home directory. The expanded location has to
+    // exist: on a missing target expand() lets a filesystem_error escape
+    // instead of returning one, so reach for resolve() when unsure.
     dross::path user_config{std::string{"~/.config/app"}};
     if (auto expanded = user_config.expand()) {
         std::cout << "Expanded: " << expanded->string() << std::endl;
@@ -107,10 +114,23 @@ Operations that consult the filesystem:
 - **mkdir()** - Create a directory and any missing parents (static)
 - **home()** - Get the user's home directory (static)
 
-``expand()``, ``resolve()`` and ``mkdir()`` return
+``expand()``, ``resolve()`` and ``mkdir()`` are declared to return
 ``std::expected<path, std::filesystem::filesystem_error>``; ``home()`` returns
 ``std::optional<path>``. Reading and writing file *contents* is deliberately
 not part of ``path`` — use the standard library's ``<fstream>`` for that.
+
+Two caveats apply to the current implementation:
+
+- ``mkdir()`` succeeds only when it actually creates the directory. If the
+  path already exists it returns an error, and that error carries no
+  diagnostic code. Guard the call with ``exists()`` when an
+  already-provisioned directory should not be treated as a failure.
+- ``expand()`` does not route every failure through its return type. When the
+  path begins with ``~`` and the expanded location does not exist, a
+  ``std::filesystem::filesystem_error`` escapes the call instead of being
+  returned, which terminates a program that is not catching it. ``resolve()``
+  catches the same condition and returns it as an error, so prefer
+  ``resolve()`` when the target may be absent.
 
 xdg
 ---
@@ -170,7 +190,8 @@ the application name passed to the constructor:
 
 Every accessor returns ``std::optional<std::string>`` and yields
 ``std::nullopt`` when the home directory cannot be determined. The directory
-itself is not created for you — pass the result to ``path::mkdir()``.
+itself is not created for you — pass the result to ``path::mkdir()``, keeping
+in mind that ``mkdir()`` reports an already-existing directory as an error.
 
 Example Usage
 ~~~~~~~~~~~~~
@@ -186,14 +207,18 @@ Creating application directories:
 
     dross::xdg app{"myapp"};
 
-    // Create the config directory, then name a file inside it
+    // Create the config directory, then name a file inside it. mkdir() only
+    // succeeds when it creates the directory, so skip it if it is there.
     if (auto config_home = app.config_home()) {
-        if (auto created = dross::path::mkdir(*config_home)) {
-            dross::path config_file = created->append("settings.toml");
-            std::cout << "Config file: " << config_file.string() << std::endl;
-        } else {
-            std::cerr << "mkdir failed: " << created.error().what() << std::endl;
+        const dross::path config_dir{*config_home};
+        if (!config_dir.exists()) {
+            if (auto created = dross::path::mkdir(*config_home); !created) {
+                std::cerr << "mkdir failed: " << created.error().what()
+                          << std::endl;
+            }
         }
+        dross::path config_file = config_dir.append("settings.toml");
+        std::cout << "Config file: " << config_file.string() << std::endl;
     }
 
     // The data directory works the same way
