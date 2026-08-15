@@ -51,15 +51,15 @@ Example:
 .. code-block:: cpp
 
     // Using std::optional
-    auto env_value = environment::get("MY_VAR");
+    auto env_value = environment::value("MY_VAR");
     if (env_value) {
         std::cout << "Value: " << *env_value << std::endl;
     }
-    
+
     // Using std::expected
-    auto result = path::read_file("/path/to/file");
+    auto result = path::mkdir(std::string{"/path/to/dir"});
     if (result) {
-        process_content(*result);
+        process_path(result->string());
     } else {
         handle_error(result.error());
     }

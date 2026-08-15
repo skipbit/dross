@@ -20,18 +20,26 @@ The ``value`` class is the central polymorphic type that can hold any supported 
 
 .. code-block:: cpp
 
-    #include <dross/value.h>
+    #include <iostream>
 
-    dross::value v1 = 42;                                    // Holds a number
-    dross::value v2 = "hello";                               // Holds a string
-    dross::value v3 = dross::array{};                        // Holds an array
-    dross::value v4 = true;                                  // Holds a boolean
-    dross::value v5 = dross::timestamp{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // Holds a timestamp
+    #include <dross/type/array.h>
+    #include <dross/type/timezone.h>
+    #include <dross/type/value.h>
 
-    // Type checking with seamless string conversion
+    dross::value v1 = 42;                       // Holds a number
+    dross::value v2 = "hello";                  // Holds a string
+    dross::value v3 = dross::array{};           // Holds an array
+    dross::value v4 = dross::boolean{true};     // Holds a boolean
+    dross::value v5 = dross::timestamp{2024, 1, 21, 15, 30, 0,
+                                       dross::timezone::offset(9)};  // Holds a timestamp
+
+    // A bare `true` would select the arithmetic constructor and end up as a
+    // number, so the boolean above is wrapped explicitly.
+
+    // Check the type before casting: as<T>() is undefined on a mismatch
     if (v1.is<dross::number>()) {
         auto num = v1.as<dross::number>();
-        std::cout << num << std::endl;  // Direct output
+        std::cout << num << std::endl;  // number has operator<<
     }
 
     if (v5.is<dross::timestamp>()) {
@@ -52,7 +60,10 @@ The ``boolean`` class provides type-safe boolean operations:
 
 .. code-block:: cpp
 
-    #include <dross/boolean.h>
+    #include <iostream>
+    #include <string>
+
+    #include <dross/type/boolean.h>
 
     dross::boolean flag{true};
     dross::boolean enabled{"true"};  // From string
@@ -60,7 +71,10 @@ The ``boolean`` class provides type-safe boolean operations:
 
     // Seamless string conversion
     std::string status = flag;       // "true"
-    std::cout << flag << std::endl;  // Direct output
+    std::cout << status << std::endl;
+
+    // Direct output
+    std::cout << flag << " " << enabled << " " << active << std::endl;
 
 number
 ~~~~~~
@@ -75,15 +89,19 @@ The ``number`` class provides arbitrary precision numeric values:
 
 .. code-block:: cpp
 
-    #include <dross/number.h>
+    #include <iostream>
+    #include <string>
+
+    #include <dross/type/number.h>
 
     dross::number n1(42);
     dross::number n2("3.14159265358979323846");
     dross::number n3 = n1 + n2;
 
     // Seamless string conversion
-    std::string result = n3;         // Direct conversion
-    std::cout << n3 << std::endl;    // Direct output
+    std::string result = n3;           // Direct conversion
+    std::cout << result << std::endl;  // Via std::string
+    std::cout << n3 << std::endl;      // Direct output
 
 string
 ~~~~~~
@@ -98,15 +116,23 @@ The ``string`` class provides Unicode-aware string handling:
 
 .. code-block:: cpp
 
-    #include <dross/string.h>
+    #include <iostream>
+    #include <string>
+
+    #include <dross/type/string.h>
 
     dross::string s1("Hello");
     dross::string s2(" World");
-    dross::string s3 = s1 + s2;
 
-    // Seamless string conversion
-    std::string result = s3;         // Direct conversion
-    std::cout << s3 << std::endl;    // Direct output
+    // Concatenation is in place; there is no operator+
+    s1 += s2;
+
+    // Length is counted in Unicode code points, not bytes
+    std::cout << s1.length() << std::endl;  // 11
+
+    // Seamless conversion to std::string, which is what streams accept
+    std::string result = s1;                // "Hello World"
+    std::cout << result << std::endl;
 
 timestamp
 ~~~~~~~~~
@@ -121,19 +147,27 @@ The ``timestamp`` class provides comprehensive date and time handling with timez
 
 .. code-block:: cpp
 
-    #include <dross/timestamp.h>
+    #include <chrono>
+    #include <iostream>
+    #include <string>
 
-    // Construction with timezone objects
+    #include <dross/type/timestamp.h>
+    #include <dross/type/timezone.h>
+
+    // Construction from components, with a timezone object
     dross::timestamp meeting{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // +09:00
     dross::timestamp utc_meeting{2024, 1, 21, 6, 30, 0, dross::timezone::utc()}; // UTC
 
-    // Date-only timestamps (time defaults to 00:00:00)
-    dross::timestamp birthday{1990, 12, 25}; // Date only, UTC timezone
+    // Date-only timestamps (time defaults to 00:00:00, timezone to UTC)
+    dross::timestamp birthday{1990, 12, 25};
 
-    // Construction from ISO 8601 strings
-    dross::timestamp utc_time{"2024-01-21T15:30:00Z"};
+    // Construction from ISO 8601 strings. Each of these compares equal to the
+    // component-built timestamp above it.
     dross::timestamp offset_time{"2024-01-21T15:30:00+09:00"};
-    dross::timestamp date_only{"2024-01-21"};
+    dross::timestamp utc_time{"2024-01-21T06:30:00Z"};
+    dross::timestamp date_only{"1990-12-25"};
+    std::cout << (offset_time == meeting) << " " << (utc_time == utc_meeting)
+              << " " << (date_only == birthday) << std::endl;  // 1 1 1
 
     // Current time
     dross::timestamp now = dross::timestamp::now();
@@ -141,10 +175,12 @@ The ``timestamp`` class provides comprehensive date and time handling with timez
     // Duration arithmetic
     auto tomorrow = now + std::chrono::hours(24);
     auto next_week = now + std::chrono::hours(24 * 7);
+    std::cout << tomorrow << " " << next_week << std::endl;
 
     // Formatting
     std::string iso_str = meeting.format();  // ISO 8601 format
     std::string custom = meeting.format("%Y-%m-%d %H:%M");
+    std::cout << iso_str << " / " << custom << std::endl;
 
     // Component access (always present)
     const auto& date_part = meeting.date();
@@ -157,8 +193,12 @@ The ``timestamp`` class provides comprehensive date and time handling with timez
     int minute = time_part.minute();
     int second = time_part.second();
 
+    std::cout << year << "/" << month << "/" << day << " "
+              << hour << ":" << minute << ":" << second << std::endl;
+
     const auto& tz = meeting.timezone(); // Always present (default UTC)
     auto offset_minutes = tz.offset(); // Returns std::chrono::minutes
+    std::cout << offset_minutes.count() << " minutes" << std::endl;
 
     // Timezone operations
     if (meeting.timezone().is_utc()) {
@@ -168,7 +208,8 @@ The ``timestamp`` class provides comprehensive date and time handling with timez
 
     // Seamless string conversion
     std::string meeting_str = meeting;       // "2024-01-21T15:30:00+09:00"
-    std::cout << meeting << std::endl;       // Direct output
+    std::cout << meeting_str << std::endl;
+    std::cout << utc_meeting << " " << birthday << std::endl;  // Direct output
 
 timezone
 ~~~~~~~~
@@ -183,7 +224,11 @@ The ``timezone`` class provides type-safe timezone representation with modern ch
 
 .. code-block:: cpp
 
-    #include <dross/timezone.h>
+    #include <chrono>
+    #include <iostream>
+    #include <string>
+
+    #include <dross/type/timezone.h>
 
     // Factory methods for common timezones
     auto utc = dross::timezone::utc();           // UTC (+00:00)
@@ -194,6 +239,7 @@ The ``timezone`` class provides type-safe timezone representation with modern ch
     // Chrono-based factory method for type safety
     auto cet = dross::timezone::offset(std::chrono::minutes(60)); // Central European Time (+01:00)
     auto jst_chrono = dross::timezone::offset(std::chrono::minutes(540)); // +09:00
+    std::cout << pdt << " " << ist << " " << cet << " " << jst_chrono << std::endl;
 
     // Parse from ISO 8601 strings (returns optional for error handling)
     if (auto parsed_utc = dross::timezone::from_string("Z")) {
@@ -221,10 +267,11 @@ The ``timezone`` class provides type-safe timezone representation with modern ch
     // Formatting and string conversion
     std::string utc_str = utc.format();     // "Z"
     std::string jst_str = jst.format();     // "+09:00"
+    std::cout << utc_str << " " << jst_str << std::endl;
 
     // Implicit string conversion
     std::string tz_string = jst;            // "+09:00"
-    std::cout << "Timezone: " << jst << std::endl;
+    std::cout << "Timezone: " << tz_string << " " << jst << std::endl;
 
 array
 ~~~~~
@@ -239,16 +286,31 @@ The ``array`` class provides a dynamic array of values:
 
 .. code-block:: cpp
 
-    #include <dross/array.h>
+    #include <iostream>
+    #include <string>
+
+    #include <dross/type/array.h>
+    #include <dross/type/value.h>
 
     dross::array arr;
     arr.append(42);
     arr.append("hello");
     arr.append(dross::array{1, 2, 3});
 
-    // Range-based for loop
+    std::cout << "Length: " << arr.length() << std::endl;  // 3
+
+    // Range-based for loop. value itself has no operator<<, so dispatch on
+    // the contained type and print that.
     for (const auto& val : arr) {
-        std::cout << val << std::endl;  // Direct stream output
+        if (val.is<dross::number>()) {
+            std::cout << val.as<dross::number>() << std::endl;
+        } else if (val.is<dross::string>()) {
+            std::string text = val.as<dross::string>();
+            std::cout << text << std::endl;
+        } else if (val.is<dross::array>()) {
+            std::cout << "array of " << val.as<dross::array>().length()
+                      << std::endl;
+        }
     }
 
 dictionary
@@ -264,15 +326,32 @@ The ``dictionary`` class provides key-value storage:
 
 .. code-block:: cpp
 
-    #include <dross/dictionary.h>
+    #include <iostream>
+    #include <string>
+
+    #include <dross/type/dictionary.h>
+    #include <dross/type/value.h>
 
     dross::dictionary dict;
-    dict.set("name", "John Doe");
-    dict.set("age", 30);
-    dict.set("active", true);
 
-    if (auto name = dict.get("name")) {
-        std::cout << "Name: " << name->to_string() << std::endl;
+    // Name the dross type on the right-hand side. A bare `dict["age"] = 30;`
+    // is ambiguous between value's boolean, number and value assignment
+    // operators, and `dross::value{x}` with braces selects the
+    // initializer-list constructor, producing a one-element array.
+    dict["name"] = dross::string("John Doe");
+    dict["age"] = dross::number(30);
+    dict["active"] = dross::boolean(true);
+
+    std::cout << "Size: " << dict.size() << std::endl;  // 3
+
+    // operator[] inserts a default-constructed value for a missing key,
+    // so ask contains() first when you only mean to read.
+    if (dict.contains("name")) {
+        const dross::value& name = dict["name"];
+        if (name.is<dross::string>()) {
+            std::string text = name.as<dross::string>();
+            std::cout << "Name: " << text << std::endl;
+        }
     }
 
 data
@@ -288,7 +367,11 @@ The ``data`` class provides raw byte storage:
 
 .. code-block:: cpp
 
-    #include <dross/data.h>
+    #include <cstdint>
+    #include <iostream>
+    #include <vector>
+
+    #include <dross/type/data.h>
 
     std::vector<uint8_t> bytes = {0x48, 0x65, 0x6C, 0x6C, 0x6F};
     dross::data d(bytes);
@@ -308,11 +391,19 @@ The ``error`` class provides structured error information:
 
 .. code-block:: cpp
 
-    #include <dross/error.h>
+    #include <iostream>
+    #include <system_error>
 
-    dross::error err(dross::error_code::invalid_argument,
-                     "Invalid value provided");
+    #include <dross/type/error.h>
 
+    // error wraps a std::error_code: a numeric value plus its category.
+    // std::errc is an error *condition* enum, so it is converted explicitly
+    // rather than passed to the error_enum_type constructor.
+    dross::error err{static_cast<int>(std::errc::invalid_argument),
+                     std::generic_category()};
+
+    std::cout << "Domain: " << err.domain() << std::endl;
+    std::cout << "Code: " << err.code() << std::endl;
     std::cout << "Error: " << err.message() << std::endl;
 
 Type Concepts
@@ -320,31 +411,38 @@ Type Concepts
 
 The type system uses C++20 concepts to constrain template parameters:
 
-.. doxygenconcept:: dross::value_type
-   :project: dross
-
 .. doxygenconcept:: dross::number_type
    :project: dross
 
 .. doxygenconcept:: dross::string_type
    :project: dross
 
-.. doxygenconcept:: dross::array_type
+.. doxygenconcept:: dross::error_enum_type
    :project: dross
 
-.. doxygenconcept:: dross::dictionary_type
+.. doxygenconcept:: dross::container_type
    :project: dross
 
 Type Conversion
 ---------------
 
-All types provide seamless string conversion through multiple approaches:
+``boolean``, ``number``, ``string``, ``data``, ``timestamp`` and ``timezone``
+convert to ``std::string`` in two ways:
 
 - **Implicit conversion**: ``std::string s = type_instance;``
-- **STL-style function**: ``std::string s = to_string(type_instance);``
-- **Stream output**: ``std::cout << type_instance;``
-- ``as_T()`` - Convert value to specific type T (for value type)
-- ``is_T()`` - Check if value is of type T (for value type)
+- **STL-style function**: ``std::string s = to_string(type_instance);`` —
+  declared in ``<dross/type.h>``, not in the individual type headers
+
+Stream output is provided for ``boolean``, ``number``, ``data``, ``timestamp``,
+``timezone`` and ``error``. ``string`` and ``value`` have no ``operator<<``:
+convert a ``string`` to ``std::string`` first, and unwrap a ``value`` before
+printing it.
+
+``value`` is inspected and unwrapped with member templates:
+
+- ``is<T>()`` - Check whether the value currently holds type ``T``
+- ``as<T>()`` - Retrieve the value as type ``T``; undefined unless ``is<T>()``
+  is true first
 
 Example:
 
@@ -409,15 +507,13 @@ Type operations that may fail use ``std::optional`` or ``std::expected``:
 
 .. code-block:: cpp
 
-    dross::dictionary dict;
-
-    // Returns std::optional<value>
-    if (auto val = dict.get("key")) {
-        process(*val);
+    // Returns std::optional<timezone>
+    if (auto tz = dross::timezone::from_string("+09:00")) {
+        process(tz->format());
     }
 
     // Error handling with expected
-    auto result = parse_json(json_string);
+    auto result = dross::toml::deserialize(toml_input);
     if (!result) {
         std::cerr << "Parse error: " << result.error().message() << std::endl;
     }

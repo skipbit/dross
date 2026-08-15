@@ -83,20 +83,27 @@ Type System
 .. code-block:: cpp
 
     using namespace dross;
-    
-    // Dynamic typing with type safety
-    value data = dictionary{
-        {"users", array{
-            dictionary{{"name", "Alice"}, {"age", 30}},
-            dictionary{{"name", "Bob"}, {"age", 25}}
-        }},
-        {"count", 2}
-    };
-    
-    // Safe access with optional
-    if (auto users = data.as_dictionary().get("users")) {
-        if (users->is_array()) {
-            for (const auto& user : users->as_array()) {
+
+    // dictionary has no initializer-list constructor, so it is built up
+    dictionary alice;
+    alice["name"] = string("Alice");
+    alice["age"] = number(30);
+
+    dictionary bob;
+    bob["name"] = string("Bob");
+    bob["age"] = number(25);
+
+    dictionary root;
+    root["users"] = array{alice, bob};
+    root["count"] = number(2);
+
+    value data = root;
+
+    // Safe access: ask contains() before reading, is<T>() before casting
+    if (data.is<dictionary>()) {
+        dictionary top = data.as<dictionary>();
+        if (top.contains("users") && top["users"].is<array>()) {
+            for (const auto& user : top["users"].as<array>()) {
                 // Process each user
             }
         }
@@ -110,22 +117,26 @@ Error Handling
     // Function returning optional
     std::optional<string> get_env_config(const string& key)
     {
-        if (auto value = environment::get(key)) {  // Implicit string conversion
-            return string(*value);
+        if (auto found = environment::value(key)) {  // Implicit string conversion
+            return string(*found);
         }
         return std::nullopt;
     }
-    
-    // Function returning expected
-    std::expected<dictionary, error> load_config(const string& path)
+
+    // Function returning expected. dross parses TOML; reading the bytes is
+    // left to the standard library.
+    std::expected<dictionary, error> load_config(const path& file)
     {
-        auto result = read_file(path);
-        if (!result) {
-            return std::unexpected(error(error_code::file_not_found, 
-                                       "Config file not found"));
+        std::ifstream input{file.string(), std::ios::binary};
+        if (!input) {
+            return std::unexpected(
+                error{static_cast<int>(std::errc::no_such_file_or_directory),
+                      std::generic_category()});
         }
-        
-        return parse_json(*result);
+
+        const std::string text{std::istreambuf_iterator<char>{input},
+                               std::istreambuf_iterator<char>{}};
+        return toml::deserialize(data{text});
     }
 
 Platform Utilities
@@ -134,15 +145,15 @@ Platform Utilities
 .. code-block:: cpp
 
     // Working with paths
-    auto home = environment::get("HOME").value_or("/tmp");
-    auto config_path = path::join(home, ".config", "myapp");
-    
-    // XDG directories
-    auto data_home = xdg::data_home();
-    auto app_data = path::join(data_home, "myapp");
-    
+    const std::string home = environment::value("HOME").value_or("/tmp");
+    const path config_path = path{home}.append(".config").append("myapp");
+
+    // XDG directories: the application name is already part of the result
+    xdg app{"myapp"};
+    const std::string app_data = app.data_home().value_or(config_path.string());
+
     // Create directory if needed
-    if (auto result = path::create_directory(app_data); !result) {
-        std::cerr << "Failed to create directory: " 
-                  << result.error().message() << std::endl;
+    if (auto result = path::mkdir(app_data); !result) {
+        std::cerr << "Failed to create directory: "
+                  << result.error().what() << std::endl;
     }

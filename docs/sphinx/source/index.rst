@@ -122,21 +122,29 @@ The dross type system provides dynamic typing with strong value semantics:
 
 .. code-block:: cpp
 
-    #include <dross/value.h>
-    
+    #include <iostream>
+
+    #include <dross/type/array.h>
+    #include <dross/type/dictionary.h>
+    #include <dross/type/value.h>
+
     using namespace dross;
-    
+
+    // dictionary has no initializer-list constructor
+    dictionary dict;
+    dict["key"] = string("value");
+
     // Create various types
-    value v1 = 42;                          // number
-    value v2 = "hello world";               // string
-    value v3 = array{1, 2, 3};             // array
-    value v4 = dictionary{{"key", "value"}}; // dictionary
-    value v5 = true;                        // boolean
-    
-    // Type checking
-    if (v1.is_number()) {
-        auto n = v1.as_number();
-        std::cout << "Number: " << n << std::endl;  // Direct stream output
+    value v1 = 42;                 // number
+    value v2 = "hello world";      // string
+    value v3 = array{1, 2, 3};     // array
+    value v4 = dict;               // dictionary
+    value v5 = boolean{true};      // boolean
+
+    // Type checking, then casting
+    if (v1.is<number>()) {
+        auto n = v1.as<number>();
+        std::cout << "Number: " << n << std::endl;  // number has operator<<
     }
 
 Platform Utilities
@@ -146,18 +154,27 @@ Cross-platform utilities for common operations:
 
 .. code-block:: cpp
 
-    #include <dross/environment.h>
-    #include <dross/path.h>
-    #include <dross/xdg.h>
-    
+    #include <iostream>
+    #include <string>
+
+    #include <dross/platform/environment.h>
+    #include <dross/platform/path.h>
+    #include <dross/platform/xdg.h>
+
+    using namespace dross;
+
     // Environment variables
-    auto home = environment::get("HOME");
-    
+    const std::string home = environment::value("HOME").value_or("/tmp");
+
     // Path operations
-    auto config_dir = path::join(home.value_or("/tmp"), ".config");
-    
+    const path config_dir = path{home}.append(".config");
+    std::cout << "Config: " << config_dir.string() << std::endl;
+
     // XDG Base Directory support
-    auto data_home = xdg::data_home();
+    xdg app{"myapp"};
+    if (auto data_home = app.data_home()) {
+        std::cout << "Data: " << *data_home << std::endl;
+    }
 
 Features
 --------
