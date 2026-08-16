@@ -201,7 +201,7 @@ Complete documentation including:
 Dross follows modern C++ best practices:
 
 - **Pimpl Idiom** - ABI stability through opaque pointers
-- **Value Semantics** - All types are copyable and assignable
+- **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
 - **Error Handling** - `std::expected` and `std::optional` instead of exceptions
 - **Type Safety** - Concepts for compile-time constraints
 - **Zero-Cost Abstractions** - Performance without compromise

@@ -85,7 +85,8 @@ Example:
 Memory Management
 -----------------
 
-All types in dross provide value semantics:
+The value types provide value semantics, apart from ``environment``, which
+exposes only static members:
 
 - Types are copyable and movable
 - No manual memory management required
