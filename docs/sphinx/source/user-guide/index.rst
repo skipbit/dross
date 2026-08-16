@@ -21,7 +21,8 @@ The dross library is designed around several core principles:
 2. **Value Semantics**: The value types are copyable and assignable;
    ``environment`` is the exception, exposing only static members
 3. **Error Handling**: Errors are returned, not thrown - ``std::optional``
-   and ``std::expected`` - apart from the bounds-checked accessors
+   and ``std::expected`` - apart from the bounds-checked accessors and the
+   ``path`` calls that let ``std::filesystem`` exceptions through
 4. **Modern C++**: Leverages C++23 features throughout
 5. **ABI Stability**: Uses Pimpl idiom to maintain stable ABI
 
