@@ -18,7 +18,8 @@ Overview
 The dross library is designed around several core principles:
 
 1. **Zero Dependencies**: Only requires the standard C++ library
-2. **Value Semantics**: All types are copyable and follow value semantics
+2. **Value Semantics**: The value types are copyable and assignable;
+   ``environment`` is the exception, exposing only static members
 3. **Error Handling**: Errors are returned, not thrown - ``std::optional``
    and ``std::expected`` - apart from the bounds-checked accessors
 4. **Modern C++**: Leverages C++23 features throughout

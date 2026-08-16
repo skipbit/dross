@@ -63,8 +63,8 @@ Core Features
 - C++23 concepts for type constraints
 - Three-way comparison operators for ``boolean``, ``number``, ``data``,
   ``timestamp``, ``timezone`` and ``error``
-- Value semantics (copyable and assignable) for every class except
-  ``environment``, which is a static utility with no instances
+- Value semantics (copyable and assignable) for the classes listed above,
+  apart from ``environment``, which exposes only static members
 - Zero external dependencies (standard library only)
 
 Build System
