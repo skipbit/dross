@@ -12,7 +12,7 @@
  *
  * Key features:
  * - Arbitrary precision arithmetic with number
- * - Unicode-aware string handling
+ * - UTF-8 string handling with byte-oriented operations
  * - Type-safe boolean operations
  * - Dynamic arrays and key-value dictionaries
  * - Date and time handling with timezone support

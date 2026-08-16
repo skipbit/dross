@@ -180,7 +180,7 @@ Features
 --------
 
 - **Dynamic Type System**: Polymorphic value type using ``std::variant``
-- **Unicode Support**: Built-in Unicode-aware string handling
+- **UTF-8 Strings**: Text held as UTF-8 bytes, with byte-oriented operations
 - **Arbitrary Precision**: Number type with string-based storage
 - **Error Handling**: Consistent use of ``std::optional`` and ``std::expected``
 - **Modern C++**: Concepts, ranges, three-way comparison, and more

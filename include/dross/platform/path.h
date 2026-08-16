@@ -71,8 +71,7 @@ public:
      * Creates the specified directory and any necessary parent directories.
      * Succeeds only when a directory is actually created: if dir_path is
      * already present the call reports failure, and that error carries no
-     * diagnostic code. Test with exists() first when an already-provisioned
-     * directory should not count as an error.
+     * diagnostic code.
      *
      * @code
      * if (auto result = path::mkdir("/tmp/myapp/data")) {
@@ -90,7 +89,10 @@ public:
      * @return Expected containing the created path on success, or filesystem_error on failure
      * 
      * Creates the specified directory and any necessary parent directories.
-     * If the directory already exists, the operation succeeds.
+     * Succeeds only when a directory is actually created: if dir_path is
+     * already present the call reports failure, and that error carries no
+     * diagnostic code. This overload holds the logic; the std::string one
+     * forwards to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);
     
@@ -122,7 +124,11 @@ public:
     static std::string separator();
 
     /**
-     * @brief Default constructor creating an empty path.
+     * @brief Default constructor holding the current working directory.
+     *
+     * Resolves "." to an absolute path, so the result is the working
+     * directory at the time of construction, not an empty path. Uses the
+     * throwing form of std::filesystem::absolute.
      */
     path();
     
@@ -155,6 +161,11 @@ public:
      * 
      * Checks whether the path refers to an existing filesystem entity.
      * This includes files, directories, symbolic links, and other filesystem objects.
+     *
+     * Uses the throwing form of std::filesystem::exists. A path that is
+     * merely absent yields false, but an error while querying it — an
+     * over-long name, or a directory the process may not traverse — escapes
+     * as a std::filesystem::filesystem_error.
      */
     bool exists() const;
     

@@ -38,7 +38,7 @@ class data;
  * Supported types:
  * - boolean: True/false values with logical operations
  * - number: Arbitrary precision arithmetic
- * - string: Unicode-aware strings
+ * - string: UTF-8 text held as bytes
  * - array: Dynamic arrays of values
  * - dictionary: Key-value mappings
  * - timestamp: Date and time values with timezone support
@@ -262,7 +262,7 @@ public:
      * @tparam T The type to check for
      * @return true if the value contains type T, false otherwise
      *
-     * Use this for type checking before casting to avoid exceptions.
+     * Use this before casting: as<T>() has no defined result otherwise.
      * Supports checking for boolean, number, string, array, dictionary, timestamp, and data types.
      */
     template <class T>
@@ -293,9 +293,9 @@ private:
  * @tparam T The target type to cast to
  * @param val The value to cast from
  * @return The contained object of type T
- * @throws std::bad_cast if the value doesn't contain type T
  *
- * Use value.is<T>() to check the type before casting to avoid exceptions.
+ * Call value.is<T>() first: the result is unspecified unless the value
+ * currently holds type T. This function does not throw.
  * Supported types: boolean, number, string, array, dictionary, timestamp, data.
  *
  * @code

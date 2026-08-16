@@ -22,8 +22,9 @@ through a single static accessor, ``value()``:
 
     #include <dross/platform/environment.h>
 
-    // Read an environment variable. The result is std::nullopt when the
-    // variable is unset or empty, so handle that case explicitly.
+    // Read an environment variable. The result is std::nullopt only when
+    // the variable is unset; a variable set to "" yields an optional
+    // holding an empty string. Handle the missing case explicitly.
     if (auto home = dross::environment::value("HOME")) {
         std::cout << "Home directory: " << *home << std::endl;
     } else {
@@ -58,15 +59,13 @@ The ``path`` class provides filesystem path operations:
         std::cout << "Config path: " << config_path.string() << std::endl;
 
         // Create the directory, including any missing parents. mkdir()
-        // reports failure when the directory is already there, so test for
-        // it first if re-running must succeed.
-        if (!config_path.exists()) {
-            if (auto created = dross::path::mkdir(config_path.string())) {
-                std::cout << "Created: " << created->string() << std::endl;
-            } else {
-                std::cerr << "mkdir failed: " << created.error().what()
-                          << std::endl;
-            }
+        // reports failure when the directory is already there, and the
+        // error carries no code, so this branch cannot tell that case apart
+        // from a real failure.
+        if (auto created = dross::path::mkdir(config_path.string())) {
+            std::cout << "Created: " << created->string() << std::endl;
+        } else {
+            std::cerr << "mkdir: " << created.error().what() << std::endl;
         }
     }
 
@@ -86,9 +85,10 @@ The ``path`` class provides filesystem path operations:
         std::cout << "The relative path exists" << std::endl;
     }
 
-    // Expand a leading ~ to the home directory. The expanded location has to
-    // exist: on a missing target expand() lets a filesystem_error escape
-    // instead of returning one, so reach for resolve() when unsure.
+    // Expand a leading ~ to the home directory. For a ~ path, expand()
+    // canonicalises without catching, so any canonicalisation failure --
+    // a missing target, a permission problem, a symlink loop -- escapes as
+    // a filesystem_error instead of being returned. resolve() catches it.
     dross::path user_config{std::string{"~/.config/app"}};
     if (auto expanded = user_config.expand()) {
         std::cout << "Expanded: " << expanded->string() << std::endl;
@@ -123,14 +123,21 @@ Two caveats apply to the current implementation:
 
 - ``mkdir()`` succeeds only when it actually creates the directory. If the
   path already exists it returns an error, and that error carries no
-  diagnostic code. Guard the call with ``exists()`` when an
-  already-provisioned directory should not be treated as a failure.
-- ``expand()`` does not route every failure through its return type. When the
-  path begins with ``~`` and the expanded location does not exist, a
-  ``std::filesystem::filesystem_error`` escapes the call instead of being
-  returned, which terminates a program that is not catching it. ``resolve()``
-  catches the same condition and returns it as an error, so prefer
-  ``resolve()`` when the target may be absent.
+  diagnostic code, so a caller cannot tell that case apart from a real
+  failure. ``exists()`` is not a way around this — see below.
+- ``expand()`` does not route every failure through its return type. For a
+  path beginning with ``~`` it canonicalises without catching, so *any*
+  canonicalisation failure — a missing target, a permission problem, a
+  symlink loop, an invalid component — escapes as a
+  ``std::filesystem::filesystem_error`` instead of being returned, which
+  terminates a program that is not catching it. A path that does not begin
+  with ``~`` is returned unchanged and never throws. ``resolve()`` catches
+  the same failures and returns them, so prefer it when the target may not
+  be reachable.
+- ``exists()`` calls the throwing form of ``std::filesystem::exists``. An
+  absent path is simply ``false``, but an error while querying it — an
+  over-long name, or a directory the process may not traverse — escapes as a
+  ``std::filesystem::filesystem_error``.
 
 xdg
 ---
@@ -191,7 +198,7 @@ the application name passed to the constructor:
 Every accessor returns ``std::optional<std::string>`` and yields
 ``std::nullopt`` when the home directory cannot be determined. The directory
 itself is not created for you — pass the result to ``path::mkdir()``, keeping
-in mind that ``mkdir()`` reports an already-existing directory as an error.
+in mind that ``mkdir()`` reports an already-present directory as an error.
 
 Example Usage
 ~~~~~~~~~~~~~
@@ -207,15 +214,13 @@ Creating application directories:
 
     dross::xdg app{"myapp"};
 
-    // Create the config directory, then name a file inside it. mkdir() only
-    // succeeds when it creates the directory, so skip it if it is there.
+    // Create the config directory, then name a file inside it. mkdir()
+    // reports an already-present directory as a failure, with an error that
+    // carries no code, so this branch cannot tell the two apart.
     if (auto config_home = app.config_home()) {
         const dross::path config_dir{*config_home};
-        if (!config_dir.exists()) {
-            if (auto created = dross::path::mkdir(*config_home); !created) {
-                std::cerr << "mkdir failed: " << created.error().what()
-                          << std::endl;
-            }
+        if (auto created = dross::path::mkdir(*config_home); !created) {
+            std::cerr << "mkdir: " << created.error().what() << std::endl;
         }
         dross::path config_file = config_dir.append("settings.toml");
         std::cout << "Config file: " << config_file.string() << std::endl;

@@ -47,14 +47,22 @@ throwing:
 - ``std::optional<T>`` for operations that may not produce a value
 - ``std::expected<T, error>`` for operations that may fail with error information
 
-Two kinds of operation are exceptions to that rule. The bounds-checked
-accessors — the const ``dictionary::operator[]``, ``array::operator[]`` and
-``array::value_at()`` — throw ``std::out_of_range`` when the key or index is
-not present, so ask ``dictionary::contains()`` or ``array::length()`` before
-indexing. And ``path::expand()``, despite returning ``std::expected``, lets a
-``std::filesystem::filesystem_error`` escape when the path begins with ``~``
-and the expanded location does not exist; ``path::resolve()`` catches that
-condition and returns it.
+Some operations are exceptions to that rule:
+
+- The bounds-checked accessors — the const ``dictionary::operator[]``,
+  ``array::operator[]`` and ``array::value_at()`` — throw
+  ``std::out_of_range`` when the key or index is not present. Ask
+  ``dictionary::contains()`` or ``array::length()`` before indexing.
+- ``path::expand()``, despite returning ``std::expected``, lets a
+  ``std::filesystem::filesystem_error`` escape for any canonicalisation
+  failure on a ``~`` path. ``path::resolve()`` catches those and returns
+  them.
+- ``path``'s ``exists()`` calls the throwing form of
+  ``std::filesystem::exists``, so an error while querying the path — as
+  opposed to the path simply being absent — escapes as a
+  ``std::filesystem::filesystem_error``.
+- The default ``path`` constructor resolves ``"."`` with the throwing form of
+  ``std::filesystem::absolute``.
 
 Example:
 

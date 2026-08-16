@@ -153,10 +153,7 @@ Platform Utilities
     const std::string app_data = app.data_home().value_or(config_path.string());
 
     // Create the directory. mkdir() succeeds only when it actually creates
-    // one, so an existing directory is reported as an error; test first.
-    if (!path{app_data}.exists()) {
-        if (auto result = path::mkdir(app_data); !result) {
-            std::cerr << "Failed to create directory: "
-                      << result.error().what() << std::endl;
-        }
+    // one, so an already-present directory is reported as an error too.
+    if (auto result = path::mkdir(app_data); !result) {
+        std::cerr << "mkdir: " << result.error().what() << std::endl;
     }

@@ -113,7 +113,8 @@ string
    :protected-members:
    :undoc-members:
 
-The ``string`` class provides Unicode-aware string handling:
+The ``string`` class holds text as UTF-8 bytes; its length and comparison
+operations work on those bytes:
 
 .. code-block:: cpp
 
