@@ -14,14 +14,17 @@ template <typename T>
 concept string_type = std::same_as<T, const char*> || std::same_as<T, std::string>;
 
 /**
- * @brief Unicode-aware string class with value semantics.
+ * @brief UTF-8 string class with value semantics.
  * 
- * The string class provides Unicode-aware string handling with a focus on
- * correctness and safety. It uses internal UTF-8 encoding and provides
- * methods for common string operations while maintaining encoding integrity.
+ * The string class holds text as UTF-8 bytes and hands those bytes back
+ * unchanged. Its operations work on the bytes rather than on characters:
+ * length() counts bytes, and the prefix and equality comparisons compare
+ * bytes, so they can split or match across a multi-byte character. Nothing
+ * validates the content, so the class neither repairs nor rejects malformed
+ * UTF-8.
  * 
  * Key features:
- * - Unicode-aware string operations
+ * - Byte-oriented operations over UTF-8 content
  * - UTF-8 internal encoding
  * - Value semantics (copyable and assignable)
  * - Safe string manipulation methods
@@ -42,14 +45,17 @@ concept string_type = std::same_as<T, const char*> || std::same_as<T, std::strin
  * // Basic usage
  * string greeting{"Hello, 世界!"};
  * string name{"Alice"};
- * 
- * // String operations
+ *
+ * // Length is in bytes: 14 here, for 10 characters
+ * size_t len = greeting.length();
+ *
+ * // Concatenation is in place; there is no operator+
  * if (greeting.starts_with("Hello")) {
- *     greeting += " " + name;
+ *     greeting += " ";
+ *     greeting += name;
  * }
- * 
- * // Length and comparison
- * size_t len = greeting.length();  // Unicode-aware length
+ *
+ * // Comparison
  * if (greeting == "Hello, 世界! Alice") {
  *     // Handle match
  * }
@@ -75,8 +81,9 @@ public:
      * @brief Construct from std::string.
      * @param str The std::string to copy from
      * 
-     * The input string is assumed to be valid UTF-8. Invalid UTF-8
-     * sequences may result in undefined behavior.
+     * The bytes are stored as given. Nothing validates them, so content
+     * that is not valid UTF-8 is kept and returned unchanged, and the
+     * byte-oriented operations simply operate on it.
      */
     string(const std::string& str);
     
@@ -84,8 +91,7 @@ public:
      * @brief Construct from C-style string.
      * @param str Null-terminated C-style string
      * 
-     * The input string is assumed to be valid UTF-8. Invalid UTF-8
-     * sequences may result in undefined behavior.
+     * The bytes are stored as given, with no UTF-8 validation.
      */
     string(const char* str);
     
@@ -99,23 +105,24 @@ public:
      * @param prefix The prefix to check for
      * @return true if the string starts with the prefix, false otherwise
      * 
-     * The comparison is Unicode-aware and case-sensitive.
+     * The comparison is byte-wise over the UTF-8 content and
+     * case-sensitive, so a prefix that ends mid-character still matches.
      */
     bool starts_with(const std::string& prefix) const;
 
     /**
-     * @brief Get the Unicode character length of the string.
-     * @return The number of Unicode characters (not bytes)
+     * @brief Get the length of the string in bytes.
+     * @return The number of bytes in the UTF-8 encoded content
      * 
-     * Returns the count of Unicode code points, which may be different
-     * from the byte length for strings containing non-ASCII characters.
+     * Counts UTF-8 code units, not code points: a string holding non-ASCII
+     * characters reports more than the number of characters it contains.
      */
     size_t length() const;
     
     /**
      * @brief Test equality with another string.
      * @param other The string to compare with
-     * @return true if both strings contain the same Unicode sequence
+     * @return true if both strings hold the same bytes
      */
     bool equals(const string& other) const;
     

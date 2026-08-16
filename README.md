@@ -155,17 +155,22 @@ using namespace dross;
 number big_num{"99999999999999999999999999999999999999"};
 number result = big_num * big_num;  // No overflow!
 
-// Dynamic typing
-value data = dictionary{
-    {"name", string{"Dross"}},
-    {"version", number{"0.0.1"}},
-    {"features", array{string{"fast"}, string{"safe"}}},
-    {"release_date", timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()}}
-};
+// Dynamic typing. dictionary has no initializer-list constructor, so
+// entries are assigned after construction.
+dictionary config;
+config["name"] = string("Dross");
+config["version"] = number("0.0.1");
+config["features"] = array{string{"fast"}, string{"safe"}};
+config["release_date"] = timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()};
 
-// Platform utilities
-auto config_dir = xdg::config_home();
-auto app_config = config_dir / "myapp" / "config.toml";
+value data = config;
+
+// Platform utilities. The XDG accessors are instance methods, and the
+// application name is already part of what they return.
+xdg app{"myapp"};
+if (auto config_dir = app.config_home()) {
+    path app_config = path{*config_dir}.append("config.toml");
+}
 ```
 
 ## 📚 Core Modules
@@ -173,7 +178,7 @@ auto app_config = config_dir / "myapp" / "config.toml";
 ### Type System
 - **`boolean`** - Type-safe boolean operations with logical operators
 - **`number`** - Arbitrary precision arithmetic with string-based storage
-- **`string`** - Unicode-aware string handling
+- **`string`** - UTF-8 text held as bytes, with byte-oriented operations
 - **`timestamp`** - Date and time handling with timezone support
 - **`timezone`** - Type-safe timezone representation with ISO 8601 support
 - **`array`** - Dynamic arrays with value semantics
@@ -201,8 +206,8 @@ Complete documentation including:
 Dross follows modern C++ best practices:
 
 - **Pimpl Idiom** - ABI stability through opaque pointers
-- **Value Semantics** - All types are copyable and assignable
-- **Error Handling** - `std::expected` and `std::optional` instead of exceptions
+- **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
+- **Error Handling** - `std::expected` and `std::optional` for failures, apart from the bounds-checked accessors and the `path` calls that let `std::filesystem` exceptions through
 - **Type Safety** - Concepts for compile-time constraints
 - **Zero-Cost Abstractions** - Performance without compromise
 

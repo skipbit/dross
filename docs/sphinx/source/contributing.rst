@@ -131,18 +131,23 @@ Tests use GoogleTest and are located in the ``test/`` directory:
 
 .. code-block:: cpp
 
-    #include <gtest/gtest.h>
-    #include <dross/value.h>
+    #include <string>
 
-    TEST(ValueTest, DefaultConstruction) {
-        dross::value v;
-        EXPECT_TRUE(v.is_null());
-    }
+    #include <gtest/gtest.h>
+
+    #include <dross/type/value.h>
 
     TEST(ValueTest, NumberConstruction) {
         dross::value v(42);
-        EXPECT_TRUE(v.is_number());
-        EXPECT_EQ(v.as_number(), dross::number(42));
+        EXPECT_TRUE(v.is<dross::number>());
+        EXPECT_EQ(v.as<dross::number>(), dross::number(42));
+    }
+
+    TEST(ValueTest, StringConstruction) {
+        dross::value v("hello");
+        ASSERT_TRUE(v.is<dross::string>());
+        const std::string text = v.as<dross::string>();
+        EXPECT_EQ(text, "hello");
     }
 
 Running Tests
@@ -281,12 +286,6 @@ Community
 - **GitHub Issues**: Bug reports and feature requests
 - **GitHub Discussions**: General questions and discussions
 - **Pull Requests**: Code contributions
-
-Code of Conduct
----------------
-
-Please note that this project is released with a Contributor Code of Conduct. 
-By participating in this project you agree to abide by its terms.
 
 License
 -------

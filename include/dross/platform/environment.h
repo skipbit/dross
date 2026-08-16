@@ -54,7 +54,8 @@ public:
      * @return std::optional containing the value if the variable exists, std::nullopt otherwise
      * 
      * Safely retrieves the value of the specified environment variable.
-     * Returns std::nullopt if the variable is not set or is empty.
+     * Returns std::nullopt only when the variable is not set. A variable set
+     * to an empty string yields an optional holding an empty string.
      * 
      * Thread safety:
      * - Safe for concurrent read access from multiple threads

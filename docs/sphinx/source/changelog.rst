@@ -42,7 +42,7 @@ Type System
 - ``value`` class for polymorphic type holding
 - ``boolean`` class for type-safe boolean operations
 - ``number`` class with arbitrary precision arithmetic
-- ``string`` class with Unicode awareness
+- ``string`` class holding UTF-8 text
 - ``array`` class with range-based for loop support
 - ``dictionary`` class for key-value storage
 - ``data`` class for raw byte storage
@@ -58,11 +58,13 @@ Platform Utilities
 Core Features
 ^^^^^^^^^^^^^
 
-- Pimpl idiom for ABI stability across all types
+- Pimpl idiom for ABI stability across the core types
 - ``std::expected`` and ``std::optional`` for error handling
 - C++23 concepts for type constraints
-- Three-way comparison operators for all types
-- Value semantics (copyable and assignable) for all types
+- Three-way comparison operators for ``boolean``, ``number``, ``data``,
+  ``timestamp``, ``timezone`` and ``error``
+- Value semantics (copyable and assignable) for the classes listed above,
+  apart from ``environment``, which exposes only static members
 - Zero external dependencies (standard library only)
 
 Build System
@@ -76,7 +78,7 @@ Build System
 Testing
 ^^^^^^^
 
-- Comprehensive unit tests for all public APIs
+- Unit tests for the type system, ``environment`` and the TOML format layer
 - Error path testing alongside success paths
 - Boundary condition and edge case testing
 - >90% code coverage for public interfaces

@@ -41,25 +41,43 @@ The dross library follows consistent naming conventions:
 Error Handling
 --------------
 
-dross does not use exceptions. All operations that may fail return either:
+Operations that may fail report it through the return type rather than by
+throwing:
 
 - ``std::optional<T>`` for operations that may not produce a value
 - ``std::expected<T, error>`` for operations that may fail with error information
+
+Some operations are exceptions to that rule:
+
+- The bounds-checked accessors — the const ``dictionary::operator[]``,
+  ``array::operator[]`` and ``array::value_at()`` — throw
+  ``std::out_of_range`` when the key or index is not present. Ask
+  ``dictionary::contains()`` or ``array::length()`` before indexing.
+- ``path::expand()``, despite returning ``std::expected``, lets a
+  ``std::filesystem::filesystem_error`` escape for any canonicalisation
+  failure on a ``~`` path. ``path::resolve()`` catches those and returns
+  them.
+- ``path``'s ``exists()`` calls the throwing form of
+  ``std::filesystem::exists``, so an error while querying the path — as
+  opposed to the path simply being absent — escapes as a
+  ``std::filesystem::filesystem_error``.
+- The default ``path`` constructor resolves ``"."`` with the throwing form of
+  ``std::filesystem::absolute``.
 
 Example:
 
 .. code-block:: cpp
 
     // Using std::optional
-    auto env_value = environment::get("MY_VAR");
+    auto env_value = environment::value("MY_VAR");
     if (env_value) {
         std::cout << "Value: " << *env_value << std::endl;
     }
-    
+
     // Using std::expected
-    auto result = path::read_file("/path/to/file");
+    auto result = path::mkdir(std::string{"/path/to/dir"});
     if (result) {
-        process_content(*result);
+        process_path(result->string());
     } else {
         handle_error(result.error());
     }
@@ -67,7 +85,8 @@ Example:
 Memory Management
 -----------------
 
-All types in dross provide value semantics:
+The value types provide value semantics, apart from ``environment``, which
+exposes only static members:
 
 - Types are copyable and movable
 - No manual memory management required

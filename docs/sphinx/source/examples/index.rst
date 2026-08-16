@@ -5,7 +5,6 @@ Examples
    :maxdepth: 2
    
    basic-types
-   json-processing
    configuration
    data-structures
 
@@ -20,37 +19,55 @@ Working with Values
 .. code-block:: cpp
 
     #include <iostream>
-    #include <dross/value.h>
-    
+
+    // The umbrella header: to_string() is declared here, not in the
+    // individual type headers.
+    #include <dross/type.h>
+
     using namespace dross;
-    
+
     void print_type_info(const value& v)
     {
-        std::cout << "Value: " << v << std::endl;  // Direct stream output
         std::cout << "Type: ";
-        
-        if (v.is_null()) std::cout << "null";
-        else if (v.is_boolean()) std::cout << "boolean";
-        else if (v.is_number()) std::cout << "number";
-        else if (v.is_string()) std::cout << "string";
-        else if (v.is_array()) std::cout << "array";
-        else if (v.is_dictionary()) std::cout << "dictionary";
-        else if (v.is_data()) std::cout << "data";
-        else if (v.is_error()) std::cout << "error";
-        
-        std::cout << std::endl << std::endl;
+
+        // is<T>() is the only way to ask what a value holds. A default
+        // constructed value holds none of these, and no separate predicate
+        // for the empty case exists.
+        if (v.is<boolean>()) {
+            std::cout << "boolean: " << to_string(v.as<boolean>());
+        } else if (v.is<number>()) {
+            std::cout << "number: " << to_string(v.as<number>());
+        } else if (v.is<string>()) {
+            std::cout << "string: " << to_string(v.as<string>());
+        } else if (v.is<timestamp>()) {
+            std::cout << "timestamp: " << to_string(v.as<timestamp>());
+        } else if (v.is<data>()) {
+            std::cout << "data: " << to_string(v.as<data>());
+        } else if (v.is<array>()) {
+            // array and dictionary have no to_string overload
+            std::cout << "array of " << v.as<array>().length();
+        } else if (v.is<dictionary>()) {
+            std::cout << "dictionary of " << v.as<dictionary>().size();
+        } else {
+            std::cout << "empty";
+        }
+
+        std::cout << std::endl;
     }
-    
+
     int main()
     {
+        dictionary dict;
+        dict["x"] = number(1);
+
         // Different value types
-        print_type_info(value());                    // null
-        print_type_info(value(true));                // boolean
+        print_type_info(value());                    // empty
+        print_type_info(value(boolean(true)));       // boolean
         print_type_info(value(42));                  // number
         print_type_info(value("hello"));             // string
-        print_type_info(value(array{1, 2, 3}));     // array
-        print_type_info(value(dictionary{{"x", 1}})); // dictionary
-        
+        print_type_info(value(array{1, 2, 3}));      // array
+        print_type_info(value(dict));                // dictionary
+
         return 0;
     }
 
@@ -59,60 +76,66 @@ Building Data Structures
 
 .. code-block:: cpp
 
+    #include <cstddef>
     #include <iostream>
-    #include <dross/dictionary.h>
-    #include <dross/array.h>
-    
+    #include <string>
+
+    #include <dross/type/array.h>
+    #include <dross/type/dictionary.h>
+    #include <dross/type/value.h>
+
     using namespace dross;
-    
-    dictionary create_person(const string& name, int age, 
-                           const array& hobbies)
+
+    dictionary create_person(const string& name, int age,
+                             const array& hobbies)
     {
         dictionary person;
-        person.set("name", name);
-        person.set("age", age);
-        person.set("hobbies", hobbies);
-        person.set("created", "2024-01-20");
-        
+        person["name"] = name;
+        person["age"] = number(age);
+        person["hobbies"] = hobbies;
+        person["created"] = string("2024-01-20");
+
         return person;
     }
-    
+
     int main()
     {
         // Create a list of people
         array people;
-        
-        people.append(create_person("Alice", 30, 
-                                  array{"reading", "hiking"}));
-        people.append(create_person("Bob", 25, 
-                                  array{"gaming", "cooking"}));
-        people.append(create_person("Charlie", 35, 
-                                  array{"photography", "travel"}));
-        
-        // Create a database-like structure
+
+        people.append(create_person("Alice", 30,
+                                    array{"reading", "hiking"}));
+        people.append(create_person("Bob", 25,
+                                    array{"gaming", "cooking"}));
+        people.append(create_person("Charlie", 35,
+                                    array{"photography", "travel"}));
+
+        // Create a database-like structure. array reports its size through
+        // length(); dictionary and data use size().
         dictionary database;
-        database.set("version", "1.0");
-        database.set("people", people);
-        database.set("count", people.size());
-        
+        database["version"] = string("1.0");
+        database["people"] = people;
+        database["count"] = number(people.length());
+
         // Access and print data
-        if (auto people_val = database.get("people")) {
-            if (people_val->is_array()) {
-                auto people_array = people_val->as_array();
-                
-                for (size_t i = 0; i < people_array.size(); ++i) {
-                    if (people_array[i].is_dictionary()) {
-                        auto person = people_array[i].as_dictionary();
-                        
-                        if (auto name = person.get("name")) {
-                            std::cout << "Person " << i + 1 << ": " 
-                                     << name->to_string() << std::endl;
-                        }
-                    }
+        if (database.contains("people") && database["people"].is<array>()) {
+            array people_array = database["people"].as<array>();
+
+            for (size_t i = 0; i < people_array.length(); ++i) {
+                const value& entry = people_array[i];
+                if (!entry.is<dictionary>()) {
+                    continue;
+                }
+
+                dictionary person = entry.as<dictionary>();
+                if (person.contains("name") && person["name"].is<string>()) {
+                    std::string name = person["name"].as<string>();
+                    std::cout << "Person " << i + 1 << ": "
+                              << name << std::endl;
                 }
             }
         }
-        
+
         return 0;
     }
 
@@ -122,90 +145,111 @@ Advanced Examples
 Configuration Management
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
+dross parses TOML, and leaves file I/O to the standard library. The two meet at
+``data``, which is what ``toml::deserialize`` consumes and ``toml::serialize``
+produces.
+
 .. code-block:: cpp
 
-    #include <dross/dictionary.h>
-    #include <dross/path.h>
-    #include <dross/environment.h>
-    
+    #include <expected>
+    #include <fstream>
+    #include <ios>
+    #include <iterator>
+    #include <string>
+    #include <system_error>
+
+    #include <dross/format/toml.h>
+    #include <dross/platform/path.h>
+    #include <dross/type/data.h>
+    #include <dross/type/dictionary.h>
+    #include <dross/type/value.h>
+
     using namespace dross;
-    
+
     class config_manager {
     private:
         dictionary _config;
-        string _config_path;
-        
+        path _config_path;
+
     public:
-        config_manager()
+        explicit config_manager(const path& config_path)
+            : _config_path(config_path)
         {
-            // Determine config path
-            auto home = environment::get("HOME").value_or("/tmp");
-            _config_path = path::join(home, ".config", "myapp", "config.json");
-            
-            // Set defaults
             set_defaults();
-            
-            // Load user config if exists
-            load();
         }
-        
+
         void set_defaults()
         {
-            _config.set("theme", "dark");
-            _config.set("language", "en");
-            _config.set("auto_save", true);
-            _config.set("save_interval", 300); // 5 minutes
-            
+            _config["theme"] = string("dark");
+            _config["language"] = string("en");
+            _config["auto_save"] = boolean(true);
+            _config["save_interval"] = number(300); // 5 minutes
+
             dictionary window;
-            window.set("width", 1024);
-            window.set("height", 768);
-            window.set("maximized", false);
-            _config.set("window", window);
+            window["width"] = number(1024);
+            window["height"] = number(768);
+            window["maximized"] = boolean(false);
+            _config["window"] = window;
         }
-        
+
+        // Merges the file over the defaults. A missing file is not an error:
+        // the defaults simply stay in place.
         std::expected<void, error> load()
         {
-            auto content = path::read_file(_config_path);
-            if (!content) {
-                // File doesn't exist, use defaults
+            std::ifstream input{_config_path.string(), std::ios::binary};
+            if (!input) {
                 return {};
             }
-            
-            auto parsed = parse_json(*content);
+
+            const std::string text{std::istreambuf_iterator<char>{input},
+                                   std::istreambuf_iterator<char>{}};
+
+            const auto parsed = toml::deserialize(data{text});
             if (!parsed) {
                 return std::unexpected(parsed.error());
             }
-            
-            // Merge with defaults
-            if (parsed->is_dictionary()) {
-                merge_config(parsed->as_dictionary());
+
+            for (const auto& [key, val] : *parsed) {
+                _config[key] = val;
             }
-            
+
             return {};
         }
-        
-        std::expected<void, error> save()
+
+        std::expected<void, error> save() const
         {
-            auto json = to_json(_config);
-            return path::write_file(_config_path, json);
-        }
-        
-        std::optional<value> get(const string& key) const
-        {
-            return _config.get(key);
-        }
-        
-        void set(const string& key, const value& val)
-        {
-            _config.set(key, val);
-        }
-        
-    private:
-        void merge_config(const dictionary& user_config)
-        {
-            for (const auto& [key, value] : user_config) {
-                _config.set(key, value);
+            const auto serialized = toml::serialize(_config);
+            if (!serialized) {
+                return std::unexpected(serialized.error());
             }
+
+            std::ofstream output{_config_path.string(), std::ios::binary};
+            const std::string text = *serialized;
+            output << text;
+            if (!output) {
+                return std::unexpected(
+                    error{static_cast<int>(std::errc::io_error),
+                          std::generic_category()});
+            }
+
+            return {};
+        }
+
+        bool contains(const std::string& key) const
+        {
+            return _config.contains(key);
+        }
+
+        // Callers must check contains() first: the const operator[] throws
+        // std::out_of_range for a key that is not present.
+        const value& get(const std::string& key) const
+        {
+            return _config[key];
+        }
+
+        void set(const std::string& key, const value& val)
+        {
+            _config[key] = val;
         }
     };
 
@@ -214,18 +258,20 @@ Data Processing Pipeline
 
 .. code-block:: cpp
 
-    #include <dross/array.h>
-    #include <dross/dictionary.h>
-    #include <algorithm>
-    #include <numeric>
-    
+    #include <functional>
+    #include <iostream>
+
+    #include <dross/type/array.h>
+    #include <dross/type/dictionary.h>
+    #include <dross/type/value.h>
+
     using namespace dross;
-    
+
     class data_processor {
     public:
         // Filter items based on a condition
-        array filter(const array& items, 
-                    std::function<bool(const value&)> predicate)
+        array filter(const array& items,
+                     std::function<bool(const value&)> predicate)
         {
             array result;
             for (const auto& item : items) {
@@ -235,10 +281,10 @@ Data Processing Pipeline
             }
             return result;
         }
-        
+
         // Transform items using a function
-        array map(const array& items, 
-                 std::function<value(const value&)> transform)
+        array map(const array& items,
+                  std::function<value(const value&)> transform)
         {
             array result;
             for (const auto& item : items) {
@@ -246,11 +292,11 @@ Data Processing Pipeline
             }
             return result;
         }
-        
+
         // Reduce array to single value
-        value reduce(const array& items, 
-                    std::function<value(const value&, const value&)> reducer,
-                    const value& initial)
+        value reduce(const array& items,
+                     std::function<value(const value&, const value&)> reducer,
+                     const value& initial)
         {
             value result = initial;
             for (const auto& item : items) {
@@ -258,84 +304,98 @@ Data Processing Pipeline
             }
             return result;
         }
-        
+
         // Group items by a key
         dictionary group_by(const array& items,
-                           std::function<string(const value&)> key_func)
+                            std::function<string(const value&)> key_func)
         {
             dictionary groups;
-            
+
             for (const auto& item : items) {
-                string key = key_func(item);
-                
-                if (auto group = groups.get(key)) {
-                    if (group->is_array()) {
-                        auto arr = group->as_array();
-                        arr.append(item);
-                        groups.set(key, arr);
-                    }
+                const string key = key_func(item);
+
+                if (groups.contains(key) && groups[key].is<array>()) {
+                    array group = groups[key].as<array>();
+                    group.append(item);
+                    groups[key] = group;
                 } else {
-                    groups.set(key, array{item});
+                    groups[key] = array{item};
                 }
             }
-            
+
             return groups;
         }
     };
-    
+
     // Example usage
     int main()
     {
-        // Sample data: list of products
-        array products{
-            dictionary{{"name", "Laptop"}, {"price", 999}, {"category", "Electronics"}},
-            dictionary{{"name", "Mouse"}, {"price", 29}, {"category", "Electronics"}},
-            dictionary{{"name", "Desk"}, {"price", 299}, {"category", "Furniture"}},
-            dictionary{{"name", "Chair"}, {"price", 199}, {"category", "Furniture"}},
-            dictionary{{"name", "Monitor"}, {"price", 399}, {"category", "Electronics"}}
+        // dictionary has no initializer-list constructor, so entries are
+        // assigned after construction.
+        auto make_product = [](const char* name, int price,
+                               const char* category) {
+            dictionary product;
+            product["name"] = string(name);
+            product["price"] = number(price);
+            product["category"] = string(category);
+            return product;
         };
-        
+
+        // Sample data: list of products
+        array products;
+        products.append(make_product("Laptop", 999, "Electronics"));
+        products.append(make_product("Mouse", 29, "Electronics"));
+        products.append(make_product("Desk", 299, "Furniture"));
+        products.append(make_product("Chair", 199, "Furniture"));
+        products.append(make_product("Monitor", 399, "Electronics"));
+
         data_processor processor;
-        
+
         // Filter expensive items (price > 200)
         auto expensive = processor.filter(products, [](const value& v) {
-            if (v.is_dictionary()) {
-                auto dict = v.as_dictionary();
-                if (auto price = dict.get("price")) {
-                    return price->as_number() > number(200);
+            if (v.is<dictionary>()) {
+                dictionary product = v.as<dictionary>();
+                if (product.contains("price") &&
+                    product["price"].is<number>()) {
+                    return product["price"].as<number>() > number(200);
                 }
             }
             return false;
         });
-        
+
         // Calculate total price
-        auto total = processor.reduce(products, 
+        auto total = processor.reduce(products,
             [](const value& sum, const value& item) {
-                if (item.is_dictionary()) {
-                    auto dict = item.as_dictionary();
-                    if (auto price = dict.get("price")) {
-                        return sum.as_number() + price->as_number();
+                if (item.is<dictionary>()) {
+                    dictionary product = item.as<dictionary>();
+                    if (product.contains("price") &&
+                        product["price"].is<number>()) {
+                        return value(sum.as<number>() +
+                                     product["price"].as<number>());
                     }
                 }
                 return sum;
-            }, 
-            number(0)
+            },
+            value(number(0))
         );
-        
+
         // Group by category
         auto by_category = processor.group_by(products, [](const value& v) {
-            if (v.is_dictionary()) {
-                auto dict = v.as_dictionary();
-                if (auto cat = dict.get("category")) {
-                    return cat->as_string();
+            if (v.is<dictionary>()) {
+                dictionary product = v.as<dictionary>();
+                if (product.contains("category") &&
+                    product["category"].is<string>()) {
+                    return product["category"].as<string>();
                 }
             }
             return string("Unknown");
         });
-        
-        std::cout << "Total value: $" << total << std::endl;  // Direct stream output
+
+        // value has no operator<<, so unwrap it before printing
+        std::cout << "Expensive items: " << expensive.length() << std::endl;
+        std::cout << "Total value: $" << total.as<number>() << std::endl;
         std::cout << "Categories: " << by_category.size() << std::endl;
-        
+
         return 0;
     }
 
@@ -345,8 +405,8 @@ More Examples
 For more examples, visit:
 
 - :doc:`basic-types` - Working with individual type classes
-- :doc:`json-processing` - JSON parsing and generation
 - :doc:`configuration` - Configuration file handling
 - :doc:`data-structures` - Building complex data structures
 
-You can also find runnable examples in the `examples/` directory of the source repository.
+The library's own test suite, under ``test/`` in the source repository, is a
+further source of compiling, executable usage.

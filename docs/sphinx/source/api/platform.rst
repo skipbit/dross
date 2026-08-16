@@ -12,28 +12,28 @@ environment
    :protected-members:
    :undoc-members:
 
-The ``environment`` class provides access to environment variables:
+The ``environment`` class provides read-only access to environment variables
+through a single static accessor, ``value()``:
 
 .. code-block:: cpp
 
-    #include <dross/environment.h>
-    
-    // Get environment variable
-    if (auto home = dross::environment::get("HOME")) {
+    #include <iostream>
+    #include <string>
+
+    #include <dross/platform/environment.h>
+
+    // Read an environment variable. The result is std::nullopt only when
+    // the variable is unset; a variable set to "" yields an optional
+    // holding an empty string. Handle the missing case explicitly.
+    if (auto home = dross::environment::value("HOME")) {
         std::cout << "Home directory: " << *home << std::endl;
+    } else {
+        std::cout << "HOME is not set" << std::endl;
     }
-    
-    // Set environment variable
-    dross::environment::set("MY_VAR", "my_value");
-    
-    // Remove environment variable
-    dross::environment::unset("MY_VAR");
-    
-    // Get all environment variables
-    auto all_vars = dross::environment::get_all();
-    for (const auto& [key, value] : all_vars) {
-        std::cout << key << "=" << value << std::endl;
-    }
+
+    // Or fold the missing case into a default
+    std::string shell = dross::environment::value("SHELL").value_or("/bin/sh");
+    std::cout << "Shell: " << shell << std::endl;
 
 path
 ----
@@ -48,62 +48,96 @@ The ``path`` class provides filesystem path operations:
 
 .. code-block:: cpp
 
-    #include <dross/path.h>
-    
-    // Join path components
-    auto config_path = dross::path::join("/home/user", ".config", "app");
-    
-    // Get absolute path
-    auto abs_path = dross::path::absolute("../file.txt");
-    
-    // Check if path exists
-    if (dross::path::exists("/etc/passwd")) {
-        std::cout << "System has passwd file" << std::endl;
+    #include <iostream>
+    #include <string>
+
+    #include <dross/platform/path.h>
+
+    // home() returns std::optional<path>; append() builds on top of it
+    if (auto home = dross::path::home()) {
+        dross::path config_path = home->append(".config").append("app");
+        std::cout << "Config path: " << config_path.string() << std::endl;
+
+        // Create the directory, including any missing parents. mkdir()
+        // reports failure when the directory is already there, so tell that
+        // case apart by its code(): zero means it was already present.
+        if (auto created = dross::path::mkdir(config_path.string())) {
+            std::cout << "Created: " << created->string() << std::endl;
+        } else if (created.error().code()) {
+            std::cerr << "mkdir: " << created.error().what() << std::endl;
+        }
     }
-    
-    // Read file contents
-    auto result = dross::path::read_file("/path/to/file.txt");
-    if (result) {
-        std::cout << "Content: " << *result << std::endl;
+
+    // A bare string literal is ambiguous between the std::string and the
+    // std::filesystem::path constructor, so name the type you mean.
+    dross::path relative{std::string{"../file.txt"}};
+
+    // Convert to an absolute, canonical path
+    if (auto resolved = relative.resolve()) {
+        std::cout << "Resolved: " << resolved->string() << std::endl;
     } else {
-        std::cerr << "Error: " << result.error().message() << std::endl;
+        std::cerr << "Resolve failed: " << resolved.error().what() << std::endl;
     }
-    
-    // Write file contents
-    auto write_result = dross::path::write_file("/path/to/output.txt", 
-                                                "Hello, World!");
-    if (!write_result) {
-        std::cerr << "Write failed: " << write_result.error().message() << std::endl;
+
+    // Check whether a path exists
+    if (relative.exists()) {
+        std::cout << "The relative path exists" << std::endl;
+    }
+
+    // Expand a leading ~ to the home directory. For a ~ path, expand()
+    // canonicalises without catching, so any canonicalisation failure --
+    // a missing target, a permission problem, a symlink loop -- escapes as
+    // a filesystem_error instead of being returned. resolve() catches it.
+    dross::path user_config{std::string{"~/.config/app"}};
+    if (auto expanded = user_config.expand()) {
+        std::cout << "Expanded: " << expanded->string() << std::endl;
     }
 
 Path Operations
 ~~~~~~~~~~~~~~~
 
-Common path operations include:
+Building and inspecting a path, without touching the filesystem:
 
-- **join()** - Join multiple path components
-- **dirname()** - Get directory part of path
-- **basename()** - Get filename part of path
-- **extension()** - Get file extension
-- **stem()** - Get filename without extension
-- **absolute()** - Convert to absolute path
-- **normalize()** - Normalize path (remove . and ..)
-- **relative()** - Get relative path between two paths
+- **append()** - Return a new path with a component appended
+- **string()** - Get the native string representation
+- **separator()** - Get the platform's path separator (static)
 
-File Operations
-~~~~~~~~~~~~~~~
+Filesystem Operations
+~~~~~~~~~~~~~~~~~~~~~
 
-File and directory operations:
+Operations that consult the filesystem:
 
-- **exists()** - Check if path exists
-- **is_file()** - Check if path is a regular file
-- **is_directory()** - Check if path is a directory
-- **file_size()** - Get file size in bytes
-- **read_file()** - Read entire file contents
-- **write_file()** - Write data to file
-- **create_directory()** - Create directory (with parents)
-- **remove()** - Remove file or empty directory
-- **remove_all()** - Remove recursively
+- **exists()** - Check whether the path exists
+- **expand()** - Expand a leading ``~`` to the home directory
+- **resolve()** - Convert to an absolute, canonical path
+- **mkdir()** - Create a directory and any missing parents (static)
+- **home()** - Get the user's home directory (static)
+
+``expand()``, ``resolve()`` and ``mkdir()`` are declared to return
+``std::expected<path, std::filesystem::filesystem_error>``; ``home()`` returns
+``std::optional<path>``. Reading and writing file *contents* is not part of
+``path`` — use the standard library's ``<fstream>`` for that.
+
+Some caveats apply to the current implementation:
+
+- ``mkdir()`` succeeds only when it actually creates the directory. If the
+  path already exists it returns an error, but one whose ``code()`` is zero,
+  so a caller can tell it apart from a real filesystem failure, which
+  carries a nonzero code. Testing with ``exists()`` beforehand is not a
+  better answer — see below, and it races with other processes anyway.
+- ``expand()`` does not route every failure through its return type. For a
+  path beginning with ``~`` it canonicalises without catching, so *any*
+  canonicalisation failure — a missing target, a permission problem, a
+  symlink loop, an invalid component — escapes as a
+  ``std::filesystem::filesystem_error`` instead of being returned, which
+  terminates a program that is not catching it. A path that does not begin
+  with ``~`` is returned unchanged and never throws. ``resolve()`` catches
+  the same failures and returns them, so prefer it when the target may not
+  be reachable.
+- ``exists()`` calls the throwing form of ``std::filesystem::exists``. An
+  absent path is simply ``false``, but an error while querying it — an
+  over-long name, or a directory the process may not traverse — escapes as a
+  ``std::filesystem::filesystem_error``.
 
 xdg
 ---
@@ -118,47 +152,54 @@ The ``xdg`` class implements the XDG Base Directory Specification:
 
 .. code-block:: cpp
 
-    #include <dross/xdg.h>
-    
-    // Get user-specific data directory
-    auto data_home = dross::xdg::data_home();
-    // Default: $HOME/.local/share
-    
-    // Get user-specific configuration directory
-    auto config_home = dross::xdg::config_home();
-    // Default: $HOME/.config
-    
-    // Get user-specific cache directory
-    auto cache_home = dross::xdg::cache_home();
-    // Default: $HOME/.cache
-    
-    // Get user-specific state directory
-    auto state_home = dross::xdg::state_home();
-    // Default: $HOME/.local/state
-    
-    // Get runtime directory
-    if (auto runtime_dir = dross::xdg::runtime_dir()) {
-        std::cout << "Runtime dir: " << *runtime_dir << std::endl;
+    #include <iostream>
+
+    #include <dross/platform/xdg.h>
+
+    // The accessors are instance methods: the application name given here is
+    // appended to every directory they return.
+    dross::xdg app{"myapp"};
+
+    // User-specific data directory
+    if (auto data_home = app.data_home()) {
+        std::cout << "Data: " << *data_home << std::endl;
+        // Default: $HOME/.local/share/myapp
     }
-    
-    // Get system data directories
-    auto data_dirs = dross::xdg::data_dirs();
-    // Default: /usr/local/share:/usr/share
-    
-    // Get system config directories
-    auto config_dirs = dross::xdg::config_dirs();
-    // Default: /etc/xdg
+
+    // User-specific configuration directory
+    if (auto config_home = app.config_home()) {
+        std::cout << "Config: " << *config_home << std::endl;
+        // Default: $HOME/.config/myapp
+    }
+
+    // User-specific cache directory
+    if (auto cache_home = app.cache_home()) {
+        std::cout << "Cache: " << *cache_home << std::endl;
+        // Default: $HOME/.cache/myapp
+    }
+
+    // User-specific state directory
+    if (auto state_home = app.state_home()) {
+        std::cout << "State: " << *state_home << std::endl;
+        // Default: $HOME/.local/state/myapp
+    }
 
 XDG Directories
 ~~~~~~~~~~~~~~~
 
-The XDG Base Directory Specification defines standard locations for:
+``xdg`` exposes the four per-user base directories, each already suffixed with
+the application name passed to the constructor:
 
-- **Data files** - Application data that should persist
-- **Configuration** - User-specific configuration files
-- **Cache** - Non-essential cached data
-- **State** - Application state data (logs, history, etc.)
-- **Runtime** - Runtime files (sockets, PIDs, etc.)
+- **data_home()** - Application data that should persist
+- **config_home()** - User-specific configuration files
+- **cache_home()** - Non-essential cached data
+- **state_home()** - Application state data (logs, history, etc.)
+
+Every accessor returns ``std::optional<std::string>`` and yields
+``std::nullopt`` when the home directory cannot be determined. The directory
+itself is not created for you — pass the result to ``path::mkdir()``, keeping
+in mind that ``mkdir()`` reports an already-present directory as an error,
+recognisable by its zero ``code()``.
 
 Example Usage
 ~~~~~~~~~~~~~
@@ -167,28 +208,38 @@ Creating application directories:
 
 .. code-block:: cpp
 
-    #include <dross/xdg.h>
-    #include <dross/path.h>
-    
-    // Create app-specific directories
-    auto app_config = dross::path::join(dross::xdg::config_home(), "myapp");
-    auto app_data = dross::path::join(dross::xdg::data_home(), "myapp");
-    auto app_cache = dross::path::join(dross::xdg::cache_home(), "myapp");
-    
-    // Create directories if they don't exist
-    dross::path::create_directory(app_config);
-    dross::path::create_directory(app_data);
-    dross::path::create_directory(app_cache);
-    
-    // Store configuration
-    auto config_file = dross::path::join(app_config, "settings.json");
-    dross::path::write_file(config_file, config_json);
-    
-    // Store application data
-    auto data_file = dross::path::join(app_data, "database.db");
-    
-    // Store cached data
-    auto cache_file = dross::path::join(app_cache, "thumbnails.cache");
+    #include <iostream>
+
+    #include <dross/platform/path.h>
+    #include <dross/platform/xdg.h>
+
+    dross::xdg app{"myapp"};
+
+    // Create the config directory, then name a file inside it. mkdir()
+    // reports an already-present directory as a failure too, but with a
+    // zero code(), so only a nonzero one is a real problem.
+    if (auto config_home = app.config_home()) {
+        const dross::path config_dir{*config_home};
+        if (auto created = dross::path::mkdir(*config_home);
+            !created && created.error().code()) {
+            std::cerr << "mkdir: " << created.error().what() << std::endl;
+        }
+        dross::path config_file = config_dir.append("settings.toml");
+        std::cout << "Config file: " << config_file.string() << std::endl;
+    }
+
+    // The data directory works the same way
+    if (auto data_home = app.data_home()) {
+        dross::path data_file = dross::path{*data_home}.append("database.db");
+        std::cout << "Data file: " << data_file.string() << std::endl;
+    }
+
+    // ...and so does the cache directory
+    if (auto cache_home = app.cache_home()) {
+        dross::path cache_file =
+            dross::path{*cache_home}.append("thumbnails.cache");
+        std::cout << "Cache file: " << cache_file.string() << std::endl;
+    }
 
 Platform Considerations
 -----------------------
@@ -214,20 +265,21 @@ On macOS:
 Error Handling
 --------------
 
-All filesystem operations return ``std::expected`` for error handling:
+Fallible ``path`` operations return
+``std::expected<path, std::filesystem::filesystem_error>``. The error type is
+the standard library's, so it is inspected with ``code()`` and reported with
+``what()``:
 
 .. code-block:: cpp
 
-    auto result = dross::path::read_file("/nonexistent/file");
+    auto result = dross::path::mkdir(std::string{"/nonexistent/dir"});
     if (!result) {
-        switch (result.error().code()) {
-            case dross::error_code::file_not_found:
-                std::cerr << "File not found" << std::endl;
-                break;
-            case dross::error_code::permission_denied:
-                std::cerr << "Permission denied" << std::endl;
-                break;
-            default:
-                std::cerr << "Error: " << result.error().message() << std::endl;
+        const std::error_code code = result.error().code();
+        if (code == std::errc::no_such_file_or_directory) {
+            std::cerr << "No such file or directory" << std::endl;
+        } else if (code == std::errc::permission_denied) {
+            std::cerr << "Permission denied" << std::endl;
+        } else {
+            std::cerr << "Error: " << result.error().what() << std::endl;
         }
     }

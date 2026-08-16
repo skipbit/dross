@@ -6,18 +6,22 @@
  * the core polymorphic types (boolean, number, string, array, dictionary, timestamp, timezone, value)
  * and utility functions for string manipulation and container operations.
  *
- * The type system is designed around value semantics with no exceptions,
- * using std::optional and std::expected for error handling. All types
- * use the Pimpl idiom for ABI stability.
+ * The type system is designed around value semantics, using std::optional
+ * and std::expected for error handling rather than exceptions. The
+ * bounds-checked accessors are the exception: array and dictionary throw
+ * std::out_of_range for an index or key that is not present. The core
+ * types use the Pimpl idiom for ABI stability; error wraps a
+ * std::error_code directly.
  *
  * Key features:
  * - Arbitrary precision arithmetic with number
- * - Unicode-aware string handling
+ * - UTF-8 string handling with byte-oriented operations
  * - Type-safe boolean operations
  * - Dynamic arrays and key-value dictionaries
  * - Date and time handling with timezone support
  * - Polymorphic value type using std::variant
- * - Seamless string conversion for all types
+ * - Seamless string conversion for boolean, number, string, data,
+ *   timestamp and timezone (not array, dictionary or value)
  * - Utility functions for common operations
  *
  * @code

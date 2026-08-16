@@ -38,7 +38,7 @@ class data;
  * Supported types:
  * - boolean: True/false values with logical operations
  * - number: Arbitrary precision arithmetic
- * - string: Unicode-aware strings
+ * - string: UTF-8 text held as bytes
  * - array: Dynamic arrays of values
  * - dictionary: Key-value mappings
  * - timestamp: Date and time values with timezone support
@@ -262,7 +262,8 @@ public:
      * @tparam T The type to check for
      * @return true if the value contains type T, false otherwise
      *
-     * Use this for type checking before casting to avoid exceptions.
+     * Use this before casting: as<T>() hands back a default-constructed T
+     * when the value holds something else.
      * Supports checking for boolean, number, string, array, dictionary, timestamp, and data types.
      */
     template <class T>
@@ -274,8 +275,9 @@ public:
      * @return The value as the specified type
      *
      * This is a convenience method that delegates to value_cast.
-     * If the value is not of the requested type, the behavior is undefined.
-     * Use is<T>() to check the type before casting.
+     * When the value holds another type this returns a default-constructed
+     * T rather than the contained object, so call is<T>() first. It does
+     * not throw.
      */
     template <class T>
     T as() const noexcept;
@@ -293,9 +295,10 @@ private:
  * @tparam T The target type to cast to
  * @param val The value to cast from
  * @return The contained object of type T
- * @throws std::bad_cast if the value doesn't contain type T
  *
- * Use value.is<T>() to check the type before casting to avoid exceptions.
+ * When the value holds another type this returns a default-constructed T
+ * rather than the contained object, so call value.is<T>() first. It does
+ * not throw.
  * Supported types: boolean, number, string, array, dictionary, timestamp, data.
  *
  * @code

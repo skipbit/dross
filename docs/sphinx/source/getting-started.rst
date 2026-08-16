@@ -151,43 +151,52 @@ Here's a simple example using the dross type system:
 .. code-block:: cpp
 
     #include <iostream>
-    #include <dross/value.h>
-    #include <dross/array.h>
-    #include <dross/dictionary.h>
-    
+    #include <string>
+
+    #include <dross/type/array.h>
+    #include <dross/type/dictionary.h>
+    #include <dross/type/value.h>
+
     int main()
     {
         using namespace dross;
-        
-        // Create a dictionary with mixed types
+
+        // Create a dictionary with mixed types. Name the dross type on the
+        // right-hand side: a bare literal is ambiguous between value's
+        // boolean, number and value assignment operators, and value{x} with
+        // braces builds a one-element array instead of holding x.
         dictionary config;
-        config.set("name", "My Application");
-        config.set("version", 1.0);
-        config.set("debug", true);
-        
+        config["name"] = string("My Application");
+        config["version"] = number("1.0");
+        config["debug"] = boolean(true);
+
         // Create an array of features
         array features;
         features.append("logging");
         features.append("caching");
         features.append("monitoring");
-        
-        config.set("features", features);
-        
-        // Access values
-        if (auto name = config.get("name")) {
-            std::cout << "Application: " << name->to_string() << std::endl;
+
+        config["features"] = features;
+
+        // Access values. operator[] would insert a default value for a key
+        // that is absent, so ask contains() before reading.
+        if (config.contains("name") && config["name"].is<string>()) {
+            std::string name = config["name"].as<string>();
+            std::cout << "Application: " << name << std::endl;
         }
-        
-        if (auto feat_val = config.get("features")) {
-            if (feat_val->is_array()) {
-                auto feat_array = feat_val->as_array();
-                std::cout << "Features:" << std::endl;
-                for (const auto& feature : feat_array) {
-                    std::cout << "  - " << feature << std::endl;  // Direct stream output
+
+        if (config.contains("features") && config["features"].is<array>()) {
+            array feature_array = config["features"].as<array>();
+            std::cout << "Features:" << std::endl;
+            for (const auto& feature : feature_array) {
+                // value has no operator<<; unwrap it first
+                if (feature.is<string>()) {
+                    std::string text = feature.as<string>();
+                    std::cout << "  - " << text << std::endl;
                 }
             }
         }
-        
+
         return 0;
     }
 

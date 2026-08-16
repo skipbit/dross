@@ -250,25 +250,29 @@ public:
 
     /**
      * @brief Convert to int.
-     * @return Integer representation, truncated if necessary
-     * @throws std::runtime_error if the number is NaN or out of range
+     * @return Rounded integer, clamped to the range of int
+     *
+     * Does not throw. A NaN yields 0, a value outside the range of int is
+     * clamped to the nearest bound, and a fractional value is rounded to
+     * nearest rather than truncated.
      */
     explicit operator int() const;
 
     /**
      * @brief Convert to double.
      * @return Double-precision floating-point representation
-     * @throws std::runtime_error if the number is NaN
      *
-     * May lose precision for very large numbers or numbers with
+     * Does not throw. A NaN, or a value that cannot be parsed as a double,
+     * yields 0.0. May lose precision for very large numbers or numbers with
      * many decimal places.
      */
     explicit operator double() const;
 
     /**
      * @brief Convert to long long.
-     * @return Long long integer representation, truncated if necessary
-     * @throws std::runtime_error if the number is NaN or out of range
+     * @return Long long built from the integer part, discarding any fraction
+     *
+     * Does not throw. A NaN, or a value that overflows long long, yields 0.
      */
     explicit operator long long() const;
 
