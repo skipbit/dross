@@ -45,14 +45,17 @@ concept string_type = std::same_as<T, const char*> || std::same_as<T, std::strin
  * // Basic usage
  * string greeting{"Hello, 世界!"};
  * string name{"Alice"};
- * 
- * // String operations
+ *
+ * // Length is in bytes: 14 here, for 10 characters
+ * size_t len = greeting.length();
+ *
+ * // Concatenation is in place; there is no operator+
  * if (greeting.starts_with("Hello")) {
- *     greeting += " " + name;
+ *     greeting += " ";
+ *     greeting += name;
  * }
- * 
- * // Length and comparison
- * size_t len = greeting.length();  // 14: bytes, not the 10 characters
+ *
+ * // Comparison
  * if (greeting == "Hello, 世界! Alice") {
  *     // Handle match
  * }

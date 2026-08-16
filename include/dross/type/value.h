@@ -262,7 +262,8 @@ public:
      * @tparam T The type to check for
      * @return true if the value contains type T, false otherwise
      *
-     * Use this before casting: as<T>() has no defined result otherwise.
+     * Use this before casting: as<T>() hands back a default-constructed T
+     * when the value holds something else.
      * Supports checking for boolean, number, string, array, dictionary, timestamp, and data types.
      */
     template <class T>
@@ -274,8 +275,9 @@ public:
      * @return The value as the specified type
      *
      * This is a convenience method that delegates to value_cast.
-     * Call is<T>() first: the result is unspecified unless the value
-     * currently holds type T. This method does not throw.
+     * When the value holds another type this returns a default-constructed
+     * T rather than the contained object, so call is<T>() first. It does
+     * not throw.
      */
     template <class T>
     T as() const noexcept;
@@ -294,8 +296,9 @@ private:
  * @param val The value to cast from
  * @return The contained object of type T
  *
- * Call value.is<T>() first: the result is unspecified unless the value
- * currently holds type T. This function does not throw.
+ * When the value holds another type this returns a default-constructed T
+ * rather than the contained object, so call value.is<T>() first. It does
+ * not throw.
  * Supported types: boolean, number, string, array, dictionary, timestamp, data.
  *
  * @code

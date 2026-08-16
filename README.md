@@ -173,7 +173,7 @@ auto app_config = config_dir / "myapp" / "config.toml";
 ### Type System
 - **`boolean`** - Type-safe boolean operations with logical operators
 - **`number`** - Arbitrary precision arithmetic with string-based storage
-- **`string`** - Unicode-aware string handling
+- **`string`** - UTF-8 text held as bytes, with byte-oriented operations
 - **`timestamp`** - Date and time handling with timezone support
 - **`timezone`** - Type-safe timezone representation with ISO 8601 support
 - **`array`** - Dynamic arrays with value semantics

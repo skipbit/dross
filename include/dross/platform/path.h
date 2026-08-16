@@ -25,7 +25,9 @@ namespace dross {
  * Error handling:
  * - Uses std::expected<path, std::filesystem::filesystem_error> for fallible operations
  * - Uses std::optional<path> for operations that may not return a value
- * - No exceptions thrown directly (may propagate from std::filesystem)
+ * - No exceptions thrown directly, but std::filesystem ones propagate:
+ *   exists(), expand() on a ~ path, and the default constructor all call
+ *   throwing std::filesystem functions
  * 
  * Performance characteristics:
  * - Thin wrapper over std::filesystem with minimal overhead
@@ -70,8 +72,9 @@ public:
      * 
      * Creates the specified directory and any necessary parent directories.
      * Succeeds only when a directory is actually created: if dir_path is
-     * already present the call reports failure, and that error carries no
-     * diagnostic code.
+     * already present the call reports failure. That case is still
+     * recognisable — the reported error's code() is zero, whereas a real
+     * filesystem failure carries a nonzero code.
      *
      * @code
      * if (auto result = path::mkdir("/tmp/myapp/data")) {
@@ -90,9 +93,9 @@ public:
      * 
      * Creates the specified directory and any necessary parent directories.
      * Succeeds only when a directory is actually created: if dir_path is
-     * already present the call reports failure, and that error carries no
-     * diagnostic code. This overload holds the logic; the std::string one
-     * forwards to it.
+     * already present the call reports failure, with an error whose code()
+     * is zero; a real filesystem failure carries a nonzero code. This
+     * overload holds the logic; the std::string one forwards to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);
     

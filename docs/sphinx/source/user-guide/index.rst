@@ -19,7 +19,8 @@ The dross library is designed around several core principles:
 
 1. **Zero Dependencies**: Only requires the standard C++ library
 2. **Value Semantics**: All types are copyable and follow value semantics
-3. **Error Handling**: No exceptions - uses ``std::optional`` and ``std::expected``
+3. **Error Handling**: Errors are returned, not thrown - ``std::optional``
+   and ``std::expected`` - apart from the bounds-checked accessors
 4. **Modern C++**: Leverages C++23 features throughout
 5. **ABI Stability**: Uses Pimpl idiom to maintain stable ABI
 
@@ -153,7 +154,8 @@ Platform Utilities
     const std::string app_data = app.data_home().value_or(config_path.string());
 
     // Create the directory. mkdir() succeeds only when it actually creates
-    // one, so an already-present directory is reported as an error too.
-    if (auto result = path::mkdir(app_data); !result) {
+    // one, so an already-present directory comes back as an error too --
+    // but with a zero code(), unlike a real failure.
+    if (auto result = path::mkdir(app_data); !result && result.error().code()) {
         std::cerr << "mkdir: " << result.error().what() << std::endl;
     }

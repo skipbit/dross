@@ -46,7 +46,7 @@
  * - Type system: Polymorphic value types with arbitrary precision
  * - Platform layer: Cross-platform environment and filesystem utilities
  * - Format layer: Type-safe TOML parsing returning dictionary directly
- * - Modern C++23: Concepts, ranges, and error handling without exceptions
+ * - Modern C++23: Concepts, ranges, and errors reported in the return type
  * 
  * @namespace dross
  */

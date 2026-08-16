@@ -39,7 +39,8 @@ designed to be a general-purpose library similar to Boost with a focus on:
 
 - **Zero external dependencies** - Only requires the standard library
 - **Modern C++ design** - Leveraging C++23 features throughout
-- **Error handling without exceptions** - Using ``std::optional`` and ``std::expected``
+- **Errors in the return type** - ``std::optional`` and ``std::expected``
+  rather than exceptions, apart from the bounds-checked accessors
 - **ABI stability** - Through careful use of the Pimpl idiom
 - **Comprehensive type system** - Dynamic types with value semantics
 

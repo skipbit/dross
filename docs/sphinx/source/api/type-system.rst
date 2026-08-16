@@ -1,8 +1,9 @@
 Type System
 ===========
 
-The dross type system provides dynamic typing with strong value semantics. All types
-use the Pimpl idiom for ABI stability and provide consistent interfaces.
+The dross type system provides dynamic typing with strong value semantics. The
+core types use the Pimpl idiom for ABI stability and provide consistent
+interfaces; ``error`` wraps a ``std::error_code`` directly.
 
 Core Types
 ----------
@@ -36,8 +37,8 @@ The ``value`` class is the central polymorphic type that can hold any supported 
     // A bare `true` would select the arithmetic constructor and end up as a
     // number, so the boolean above is wrapped explicitly.
 
-    // Always ask is<T>() first: as<T>() has no defined result when the
-    // value is holding some other type
+    // Ask is<T>() first: when the value holds another type, as<T>() hands
+    // back a default-constructed T instead of the contained object
     if (v1.is<dross::number>()) {
         auto num = v1.as<dross::number>();
         std::cout << num << std::endl;  // number has operator<<
@@ -444,8 +445,9 @@ printing it.
 ``value`` is inspected and unwrapped with member templates:
 
 - ``is<T>()`` - Check whether the value currently holds type ``T``
-- ``as<T>()`` - Retrieve the value as type ``T``. The result is unspecified
-  unless ``is<T>()`` is true, so always check first. It does not throw
+- ``as<T>()`` - Retrieve the value as type ``T``. When the value holds
+  another type it returns a default-constructed ``T`` rather than the
+  contained object, so check ``is<T>()`` first. It does not throw
 
 Example:
 
