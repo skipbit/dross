@@ -26,7 +26,7 @@
  * // Filesystem operations
  * path config_dir = path::home().value_or(path{"/tmp"}) / "myapp";
  * if (auto result = path::mkdir(config_dir.string()); result) {
- *     // Directory created successfully
+ *     // Directory created, or already there
  * }
  * 
  * // XDG directories
@@ -40,8 +40,8 @@
  * - Uses std::optional for operations that may not return a value
  * - Uses std::expected for operations that may fail with detailed error info
  * - The platform layer throws nothing of its own, but std::filesystem
- * exceptions do propagate: see path::exists(), path::expand() and the
- * default path constructor
+ * exceptions do propagate: see path::exists() and the default path
+ * constructor
  * 
  * Platform support:
  * - Unix-like systems (Linux, macOS, BSD)

@@ -19,10 +19,13 @@ add_executable(${TEST_NAME})
 
 target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/test_environment.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/test_path.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/platform/test_xdg.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_array.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_boolean.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_data.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_dictionary.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/test_error.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_number.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_string.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp.cpp

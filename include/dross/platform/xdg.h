@@ -99,7 +99,8 @@ public:
      *     // Typically returns something like "/home/user/.config/myapp"
      *     path config_path{*config_dir};
      *     if (auto result = path::mkdir(config_path.string())) {
-     *         // Directory created and ready for config files
+     *         // Directory ready for config files, whether just created or
+     *         // already there
      *     }
      * }
      * @endcode
