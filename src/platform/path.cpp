@@ -14,13 +14,10 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::st
 
 std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::filesystem::path& absolute_path)
 {
-    try {
-        std::error_code err;
-        if (! std::filesystem::create_directories(absolute_path, err)) {
-            return std::unexpected(std::filesystem::filesystem_error("failed", absolute_path, err));
-        }
-    } catch (const std::filesystem::filesystem_error& e) {
-        return std::unexpected(e);
+    std::error_code err;
+    std::filesystem::create_directories(absolute_path, err);
+    if (err) {
+        return std::unexpected(std::filesystem::filesystem_error("failed", absolute_path, err));
     }
 
     return path{absolute_path};
@@ -97,7 +94,11 @@ std::expected<path, std::filesystem::filesystem_error> path::expand() const
             return std::make_optional(p.append(_path.string().replace(0, 1, "")).string());
         });
         if (expanded) {
-            return path { std::filesystem::canonical(std::filesystem::path{expanded.value()}) };
+            try {
+                return path { std::filesystem::canonical(std::filesystem::path{expanded.value()}) };
+            } catch (const std::filesystem::filesystem_error& e) {
+                return std::unexpected(e);
+            }
         } else {
             return std::unexpected(std::filesystem::filesystem_error("fail to expand tilde", _path, std::make_error_code(std::errc::no_such_file_or_directory)));
         }
