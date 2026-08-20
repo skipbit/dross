@@ -91,19 +91,24 @@ public:
      * @param dir_path The directory path to create as a filesystem::path
      * @return Expected containing the created path on success, or filesystem_error on failure
      * 
-     * Creates the specified directory and any necessary parent directories.
-     * Succeeds both when it creates the directory and when dir_path is
-     * already a directory — the call is idempotent, closer to "ensure this
-     * directory exists" than a strict create. It fails only when
-     * std::filesystem::create_directories reports an actual error, for
-     * example when a path component exists and is not a directory. Because
-     * an already-present directory is accepted without inspection, a
-     * directory, or a symbolic link that resolves to one, left there by
-     * another party is accepted too. Checking beforehand does not close
-     * that gap — the check and the use are separate operations, and the
-     * entry can be replaced in between; create the directory under a
-     * parent only you can write to instead. This overload holds the
-     * logic; the std::string one forwards to it.
+     * Creates the specified directory and any necessary parent
+     * directories. Succeeds both when it creates the directory and
+     * when dir_path is already a directory — the call is idempotent,
+     * closer to "ensure this directory exists" than a strict create. It
+     * fails only when std::filesystem::create_directories reports an
+     * actual error, for example when a path component exists and is not
+     * a directory. The operation is not atomic — directories created
+     * before the failure may remain. Some failures are rejected before
+     * anything is created at all. Because an already-present directory
+     * is accepted without inspection, a directory, or a symbolic link
+     * that resolves to one, left there by another party is accepted
+     * too. Checking beforehand does not close that gap — the check and
+     * the use are separate operations, and the entry can be replaced in
+     * between. What closes it is a location where no other party can
+     * write to any ancestor of the directory: a writable ancestor can
+     * be renamed or replaced, so securing only the immediate parent is
+     * not enough. This overload holds the logic; the std::string one
+     * forwards to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);
     
@@ -221,8 +226,8 @@ public:
      * if (auto expanded = user_config.expand()) {
      *     // expanded contains something like "/home/user/.config/myapp"
      * } else {
-     *     // The expanded path does not exist yet: create it first, e.g.
-     *     // with path::mkdir(), before calling expand() again.
+     *     // The expanded path typically does not exist yet: create it
+     *     // first, e.g. with path::mkdir(), before calling expand() again.
      * }
      * @endcode
      */

@@ -124,16 +124,19 @@ Operations that consult the filesystem:
 
 Some caveats apply to the current implementation:
 
-- ``mkdir()`` is idempotent: it succeeds whether it creates the directory
-  or finds it already there. It fails only when
+- ``mkdir()`` is idempotent: it succeeds whether it creates
+  the directory or finds it already there. It fails only when
   ``std::filesystem::create_directories`` reports an actual error, such as
-  a path component that exists and is not a directory. Because an
+  a path component that exists and is not a directory. The operation is
+  not atomic — directories created before the failure may remain. Some
+  failures are rejected before anything is created at all. Because an
   already-present directory is accepted without inspection, a directory,
-  or a symbolic link that resolves to one, left there by another party is
-  accepted too. Checking beforehand does not close that gap — the check
-  and the use are separate operations, and the entry can be replaced in
-  between; create the directory under a parent only you can write to
-  instead.
+  or a symbolic link that resolves to one, left there by another party
+  is accepted too. Checking beforehand does not close that gap — the
+  check and the use are separate operations, and the entry can be replaced
+  in between. What closes it is a location where no other party can write
+  to any ancestor of the directory: a writable ancestor can be renamed or
+  replaced, so securing only the immediate parent is not enough.
 - ``expand()`` routes canonicalisation failures through its return type.
   For a path beginning with ``~`` it canonicalises and converts any error
   the standard library reports as a ``std::filesystem::filesystem_error``
