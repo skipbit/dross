@@ -74,7 +74,8 @@ public:
      * Succeeds both when it creates the directory and when dir_path is
      * already a directory — the call is idempotent. It fails only when the
      * underlying std::filesystem::create_directories call reports an
-     * actual error.
+     * actual error. See the std::filesystem::path overload for the
+     * failure and safety notes.
      *
      * @code
      * if (auto result = path::mkdir("/tmp/myapp/data")) {
@@ -104,11 +105,15 @@ public:
      * that resolves to one, left there by another party is accepted
      * too. Checking beforehand does not close that gap — the check and
      * the use are separate operations, and the entry can be replaced in
-     * between. What closes it is a location where no other party can
-     * write to any ancestor of the directory: a writable ancestor can
-     * be renamed or replaced, so securing only the immediate parent is
-     * not enough. This overload holds the logic; the std::string one
-     * forwards to it.
+     * between. Placing the directory where no other party can write to
+     * any ancestor removes the opportunity to insert or replace an
+     * entry along the way; a writable ancestor can be renamed or
+     * replaced, so securing only the immediate parent is not enough.
+     * That does not vouch for a directory that is already there:
+     * whether its owner, its permissions and any links beneath it can
+     * be trusted is a separate question, and this call does not ask
+     * it. This overload holds the logic; the std::string one forwards
+     * to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);
     
@@ -222,7 +227,7 @@ public:
      * and always succeeds.
      *
      * @code
-     * path user_config{"~/.config/myapp"};
+     * path user_config{std::string{"~/.config/myapp"}};
      * if (auto expanded = user_config.expand()) {
      *     // expanded contains something like "/home/user/.config/myapp"
      * } else {

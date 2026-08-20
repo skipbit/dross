@@ -181,6 +181,22 @@ TEST(path_test, mkdir_with_an_empty_path)
     EXPECT_NE(result.error().code().value(), 0);
 }
 
+TEST(path_test, mkdir_on_a_symlink_that_resolves_to_a_directory_succeeds)
+{
+    // Documented behavior: an already-present directory is accepted
+    // without inspection, and that includes a symbolic link that
+    // resolves to one.
+    const scoped_temp_dir base;
+    const auto real_dir = base.path() / "real_dir";
+    std::filesystem::create_directories(real_dir);
+    const auto link = base.path() / "link_to_dir";
+    std::filesystem::create_directory_symlink(real_dir, link);
+
+    const auto result = dross::path::mkdir(link.string());
+
+    ASSERT_TRUE(result.has_value());
+}
+
 // --- path::expand --------------------------------------------------------
 
 TEST(path_test, expand_of_a_tilde_path_matches_a_freshly_computed_canonical_path)

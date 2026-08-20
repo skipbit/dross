@@ -134,9 +134,13 @@ Some caveats apply to the current implementation:
   or a symbolic link that resolves to one, left there by another party
   is accepted too. Checking beforehand does not close that gap — the
   check and the use are separate operations, and the entry can be replaced
-  in between. What closes it is a location where no other party can write
-  to any ancestor of the directory: a writable ancestor can be renamed or
-  replaced, so securing only the immediate parent is not enough.
+  in between. Placing the directory where no other party can write to any
+  ancestor removes the opportunity to insert or replace an entry along the
+  way; a writable ancestor can be renamed or replaced, so securing only
+  the immediate parent is not enough. That does not vouch for a directory
+  that is already there: whether its owner, its permissions and any links
+  beneath it can be trusted is a separate question, and this call does
+  not ask it.
 - ``expand()`` routes canonicalisation failures through its return type.
   For a path beginning with ``~`` it canonicalises and converts any error
   the standard library reports as a ``std::filesystem::filesystem_error``
