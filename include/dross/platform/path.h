@@ -229,8 +229,9 @@ public:
      * if (auto expanded = user_config.expand()) {
      *     // expanded contains something like "/home/user/.config/myapp"
      * } else {
-     *     // The target does not exist yet. mkdir() does not expand ~,
-     *     // so build the path from path::home() before creating it.
+     *     // Suppose the target does not exist yet. mkdir() does not
+     *     // expand ~, so build the path from path::home() before
+     *     // creating it.
      * }
      * @endcode
      */
