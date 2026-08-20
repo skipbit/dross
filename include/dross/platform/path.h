@@ -100,20 +100,18 @@ public:
      * actual error, for example when a path component exists and is not
      * a directory. The operation is not atomic — directories created
      * before the failure may remain. Some failures are rejected before
-     * anything is created at all. Because an already-present directory
-     * is accepted without inspection, a directory, or a symbolic link
-     * that resolves to one, left there by another party is accepted
-     * too. Checking beforehand does not close that gap — the check and
-     * the use are separate operations, and the entry can be replaced in
-     * between. Placing the directory where no other party can write to
-     * any ancestor removes the opportunity to insert or replace an
-     * entry along the way; a writable ancestor can be renamed or
-     * replaced, so securing only the immediate parent is not enough.
-     * That does not vouch for a directory that is already there:
-     * whether its owner, its permissions and any links beneath it can
-     * be trusted is a separate question, and this call does not ask
-     * it. This overload holds the logic; the std::string one forwards
-     * to it.
+     * anything is created at all. Because an already-present directory is
+     * accepted without inspection, a directory, or a symbolic link that
+     * resolves to one, left there by another party is accepted too.
+     * Checking beforehand does not close that gap — the check and the use
+     * are separate operations, and the entry can be replaced in between.
+     * This call does not check who owns the directories along the path,
+     * what their permissions are, or where any links beneath them point,
+     * and it does not set the permissions of the directories it creates:
+     * those are left to the platform's default for new directories, which
+     * can be group- or world-writable. A caller who needs any of that has
+     * to arrange it separately. This overload holds the logic; the
+     * std::string one forwards to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);
     
