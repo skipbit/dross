@@ -6,7 +6,9 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <stdlib.h>
 #include <string>
+#include <system_error>
 #include <unistd.h>
 
 namespace {
@@ -69,6 +71,11 @@ public:
     void set(const std::string& value) const
     {
         setenv(_name.c_str(), value.c_str(), 1);
+    }
+
+    void unset() const
+    {
+        unsetenv(_name.c_str());
     }
 
 private:
@@ -212,7 +219,11 @@ TEST(path_test, expand_of_a_tilde_path_to_a_nonexistent_target_does_not_terminat
     // Regression test: std::filesystem::canonical() throws on a missing
     // path. expand() must report that as std::unexpected instead of
     // letting the exception escape, which previously terminated the
-    // process.
+    // process. Guard that the regression path is actually exercised: if
+    // home() were nullopt, expand() would fail through the other branch
+    // and this test would pass without ever reaching canonical().
+    ASSERT_TRUE(dross::path::home().has_value());
+
     const std::string tilde_path = "~/dross_test_nonexistent_" + std::to_string(::getpid());
     const dross::path p{tilde_path};
 

@@ -85,7 +85,8 @@ The ``path`` class provides filesystem path operations:
     }
 
     // Expand a leading ~ to the home directory. For a ~ path, expand()
-    // canonicalises and turns any failure -- a missing target, a
+    // canonicalises and turns any failure the standard library reports as
+    // a std::filesystem::filesystem_error -- a missing target, a
     // permission problem, a symlink loop -- into the returned
     // std::expected instead of letting it escape. A path that does not
     // begin with ~ is returned unchanged.
@@ -127,15 +128,19 @@ Some caveats apply to the current implementation:
   or finds it already there. It fails only when
   ``std::filesystem::create_directories`` reports an actual error, such as
   a path component that exists and is not a directory. Because an
-  already-present directory is accepted without inspection, a directory or
-  symbolic link left there by another party is accepted too — verify
-  ownership or the link target first if that matters to your use.
+  already-present directory is accepted without inspection, a directory,
+  or a symbolic link that resolves to one, left there by another party is
+  accepted too. Checking beforehand does not close that gap — the check
+  and the use are separate operations, and the entry can be replaced in
+  between; create the directory under a parent only you can write to
+  instead.
 - ``expand()`` routes canonicalisation failures through its return type.
-  For a path beginning with ``~`` it canonicalises and converts any
-  failure — a missing target, a permission problem, a symlink loop, an
-  invalid component — into the returned ``std::expected`` rather than
-  letting it escape. A path that does not begin with ``~`` is returned
-  unchanged. Home directory resolution failing (``path::home()`` returning
+  For a path beginning with ``~`` it canonicalises and converts any error
+  the standard library reports as a ``std::filesystem::filesystem_error``
+  — a missing target, a permission problem, a symlink loop, an invalid
+  component — into the returned ``std::expected`` rather than letting it
+  escape. A path that does not begin with ``~`` is returned unchanged.
+  Home directory resolution failing (``path::home()`` returning
   ``std::nullopt``) is reported the same way.
 - ``exists()`` calls the throwing form of ``std::filesystem::exists``. An
   absent path is simply ``false``, but an error while querying it — an

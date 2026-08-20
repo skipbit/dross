@@ -72,7 +72,7 @@ public:
      * 
      * Creates the specified directory and any necessary parent directories.
      * Succeeds both when it creates the directory and when dir_path is
-     * already present — the call is idempotent. It fails only when the
+     * already a directory — the call is idempotent. It fails only when the
      * underlying std::filesystem::create_directories call reports an
      * actual error.
      *
@@ -92,15 +92,18 @@ public:
      * @return Expected containing the created path on success, or filesystem_error on failure
      * 
      * Creates the specified directory and any necessary parent directories.
-     * Succeeds both when it creates the directory and when dir_path already
-     * exists — the call is idempotent, closer to "ensure this directory
-     * exists" than a strict create. It fails only when
+     * Succeeds both when it creates the directory and when dir_path is
+     * already a directory — the call is idempotent, closer to "ensure this
+     * directory exists" than a strict create. It fails only when
      * std::filesystem::create_directories reports an actual error, for
      * example when a path component exists and is not a directory. Because
      * an already-present directory is accepted without inspection, a
-     * directory or symbolic link left there by another party is accepted
-     * too; verify ownership or the link target first if that matters. This
-     * overload holds the logic; the std::string one forwards to it.
+     * directory, or a symbolic link that resolves to one, left there by
+     * another party is accepted too. Checking beforehand does not close
+     * that gap — the check and the use are separate operations, and the
+     * entry can be replaced in between; create the directory under a
+     * parent only you can write to instead. This overload holds the
+     * logic; the std::string one forwards to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);
     
@@ -205,14 +208,21 @@ public:
     /**
      * @brief Expand user home directory (~) in the path.
      * @return Expected containing the expanded path on success, or filesystem_error on failure
-     * 
-     * Expands tilde (~) notation to the actual home directory path.
-     * Only processes paths that start with "~" or "~/".
-     * 
+     *
+     * Expands tilde (~) notation to the actual home directory path, then
+     * canonicalises the result — the returned path has symbolic links
+     * resolved. Because canonicalisation requires the target to exist,
+     * expand() returns unexpected when the expanded path does not (yet)
+     * exist. A path that does not start with "~" is returned unchanged
+     * and always succeeds.
+     *
      * @code
      * path user_config{"~/.config/myapp"};
      * if (auto expanded = user_config.expand()) {
      *     // expanded contains something like "/home/user/.config/myapp"
+     * } else {
+     *     // The expanded path does not exist yet: create it first, e.g.
+     *     // with path::mkdir(), before calling expand() again.
      * }
      * @endcode
      */

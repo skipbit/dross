@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <optional>
+#include <stdlib.h>
 #include <string>
 
 namespace {
