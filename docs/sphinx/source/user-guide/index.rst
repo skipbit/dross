@@ -155,9 +155,8 @@ Platform Utilities
     xdg app{"myapp"};
     const std::string app_data = app.data_home().value_or(config_path.string());
 
-    // Create the directory. mkdir() succeeds only when it actually creates
-    // one, so an already-present directory comes back as an error too --
-    // but with a zero code(), unlike a real failure.
-    if (auto result = path::mkdir(app_data); !result && result.error().code()) {
+    // Create the directory. mkdir() is idempotent: it succeeds whether it
+    // creates the directory or finds it already there.
+    if (auto result = path::mkdir(app_data); !result) {
         std::cerr << "mkdir: " << result.error().what() << std::endl;
     }

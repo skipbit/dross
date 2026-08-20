@@ -58,12 +58,12 @@ The ``path`` class provides filesystem path operations:
         dross::path config_path = home->append(".config").append("app");
         std::cout << "Config path: " << config_path.string() << std::endl;
 
-        // Create the directory, including any missing parents. mkdir()
-        // reports failure when the directory is already there, so tell that
-        // case apart by its code(): zero means it was already present.
+        // Create the directory, including any missing parents. mkdir() is
+        // idempotent: it succeeds whether it creates the directory or
+        // finds it already there.
         if (auto created = dross::path::mkdir(config_path.string())) {
             std::cout << "Created: " << created->string() << std::endl;
-        } else if (created.error().code()) {
+        } else {
             std::cerr << "mkdir: " << created.error().what() << std::endl;
         }
     }
@@ -85,12 +85,15 @@ The ``path`` class provides filesystem path operations:
     }
 
     // Expand a leading ~ to the home directory. For a ~ path, expand()
-    // canonicalises without catching, so any canonicalisation failure --
-    // a missing target, a permission problem, a symlink loop -- escapes as
-    // a filesystem_error instead of being returned. resolve() catches it.
+    // canonicalises and turns any failure -- a missing target, a
+    // permission problem, a symlink loop -- into the returned
+    // std::expected instead of letting it escape. A path that does not
+    // begin with ~ is returned unchanged.
     dross::path user_config{std::string{"~/.config/app"}};
     if (auto expanded = user_config.expand()) {
         std::cout << "Expanded: " << expanded->string() << std::endl;
+    } else {
+        std::cerr << "Expand failed: " << expanded.error().what() << std::endl;
     }
 
 Path Operations
@@ -120,20 +123,20 @@ Operations that consult the filesystem:
 
 Some caveats apply to the current implementation:
 
-- ``mkdir()`` succeeds only when it actually creates the directory. If the
-  path already exists it returns an error, but one whose ``code()`` is zero,
-  so a caller can tell it apart from a real filesystem failure, which
-  carries a nonzero code. Testing with ``exists()`` beforehand is not a
-  better answer — see below, and it races with other processes anyway.
-- ``expand()`` does not route every failure through its return type. For a
-  path beginning with ``~`` it canonicalises without catching, so *any*
-  canonicalisation failure — a missing target, a permission problem, a
-  symlink loop, an invalid component — escapes as a
-  ``std::filesystem::filesystem_error`` instead of being returned, which
-  terminates a program that is not catching it. A path that does not begin
-  with ``~`` is returned unchanged and never throws. ``resolve()`` catches
-  the same failures and returns them, so prefer it when the target may not
-  be reachable.
+- ``mkdir()`` is idempotent: it succeeds whether it creates the directory
+  or finds it already there. It fails only when
+  ``std::filesystem::create_directories`` reports an actual error, such as
+  a path component that exists and is not a directory. Because an
+  already-present directory is accepted without inspection, a directory or
+  symbolic link left there by another party is accepted too — verify
+  ownership or the link target first if that matters to your use.
+- ``expand()`` routes canonicalisation failures through its return type.
+  For a path beginning with ``~`` it canonicalises and converts any
+  failure — a missing target, a permission problem, a symlink loop, an
+  invalid component — into the returned ``std::expected`` rather than
+  letting it escape. A path that does not begin with ``~`` is returned
+  unchanged. Home directory resolution failing (``path::home()`` returning
+  ``std::nullopt``) is reported the same way.
 - ``exists()`` calls the throwing form of ``std::filesystem::exists``. An
   absent path is simply ``false``, but an error while querying it — an
   over-long name, or a directory the process may not traverse — escapes as a
@@ -197,9 +200,8 @@ the application name passed to the constructor:
 
 Every accessor returns ``std::optional<std::string>`` and yields
 ``std::nullopt`` when the home directory cannot be determined. The directory
-itself is not created for you — pass the result to ``path::mkdir()``, keeping
-in mind that ``mkdir()`` reports an already-present directory as an error,
-recognisable by its zero ``code()``.
+itself is not created for you — pass the result to ``path::mkdir()``, which
+accepts an already-present directory as success.
 
 Example Usage
 ~~~~~~~~~~~~~
@@ -216,12 +218,11 @@ Creating application directories:
     dross::xdg app{"myapp"};
 
     // Create the config directory, then name a file inside it. mkdir()
-    // reports an already-present directory as a failure too, but with a
-    // zero code(), so only a nonzero one is a real problem.
+    // accepts an already-present directory as success, so any failure
+    // here is a real problem.
     if (auto config_home = app.config_home()) {
         const dross::path config_dir{*config_home};
-        if (auto created = dross::path::mkdir(*config_home);
-            !created && created.error().code()) {
+        if (auto created = dross::path::mkdir(*config_home); !created) {
             std::cerr << "mkdir: " << created.error().what() << std::endl;
         }
         dross::path config_file = config_dir.append("settings.toml");

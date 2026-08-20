@@ -29,6 +29,12 @@ Changed
 - Enhanced error handling: ``timezone::from_string()`` returns ``std::optional<timezone>``
 - Simplified API: removed redundant timezone methods (``is_local()``, ``has_offset()``)
 - Updated documentation to reflect timestamp and timezone APIs
+- ``path::mkdir()`` now succeeds when the target directory already exists
+  instead of reporting it as a failure with a zero ``code()``; it fails
+  only when the underlying filesystem operation reports an actual error
+- ``path::expand()`` now reports canonicalisation failures on a ``~`` path
+  through its ``std::expected`` return value instead of letting a
+  ``std::filesystem::filesystem_error`` escape
 
 v0.1.0 - 2024-01-20
 -------------------

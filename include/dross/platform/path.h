@@ -26,8 +26,8 @@ namespace dross {
  * - Uses std::expected<path, std::filesystem::filesystem_error> for fallible operations
  * - Uses std::optional<path> for operations that may not return a value
  * - No exceptions thrown directly, but std::filesystem ones propagate:
- *   exists(), expand() on a ~ path, and the default constructor all call
- *   throwing std::filesystem functions
+ *   exists() and the default constructor call throwing std::filesystem
+ *   functions
  * 
  * Performance characteristics:
  * - Thin wrapper over std::filesystem with minimal overhead
@@ -71,10 +71,10 @@ public:
      * @return Expected containing the created path on success, or filesystem_error on failure
      * 
      * Creates the specified directory and any necessary parent directories.
-     * Succeeds only when a directory is actually created: if dir_path is
-     * already present the call reports failure. That case is still
-     * recognisable — the reported error's code() is zero, whereas a real
-     * filesystem failure carries a nonzero code.
+     * Succeeds both when it creates the directory and when dir_path is
+     * already present — the call is idempotent. It fails only when the
+     * underlying std::filesystem::create_directories call reports an
+     * actual error.
      *
      * @code
      * if (auto result = path::mkdir("/tmp/myapp/data")) {
@@ -92,9 +92,14 @@ public:
      * @return Expected containing the created path on success, or filesystem_error on failure
      * 
      * Creates the specified directory and any necessary parent directories.
-     * Succeeds only when a directory is actually created: if dir_path is
-     * already present the call reports failure, with an error whose code()
-     * is zero; a real filesystem failure carries a nonzero code. This
+     * Succeeds both when it creates the directory and when dir_path already
+     * exists — the call is idempotent, closer to "ensure this directory
+     * exists" than a strict create. It fails only when
+     * std::filesystem::create_directories reports an actual error, for
+     * example when a path component exists and is not a directory. Because
+     * an already-present directory is accepted without inspection, a
+     * directory or symbolic link left there by another party is accepted
+     * too; verify ownership or the link target first if that matters. This
      * overload holds the logic; the std::string one forwards to it.
      */
     static std::expected<path, std::filesystem::filesystem_error> mkdir(const std::filesystem::path& dir_path);

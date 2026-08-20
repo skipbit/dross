@@ -53,10 +53,6 @@ Some operations are exceptions to that rule:
   ``array::operator[]`` and ``array::value_at()`` — throw
   ``std::out_of_range`` when the key or index is not present. Ask
   ``dictionary::contains()`` or ``array::length()`` before indexing.
-- ``path::expand()``, despite returning ``std::expected``, lets a
-  ``std::filesystem::filesystem_error`` escape for any canonicalisation
-  failure on a ``~`` path. ``path::resolve()`` catches those and returns
-  them.
 - ``path``'s ``exists()`` calls the throwing form of
   ``std::filesystem::exists``, so an error while querying the path — as
   opposed to the path simply being absent — escapes as a
