@@ -34,3 +34,6 @@
 # Language server files
 .cache/
 compile_commands.json
+
+# Build output
+build/
