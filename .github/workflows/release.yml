@@ -1,71 +1,65 @@
+# Publishes a GitHub release for a version tag.
+#
+# The tag is where the version comes from (see cmake/ProjectVersion.cmake), so
+# a release is cut by pushing one. The build and the tests run again here
+# rather than trusting the branch checks: a tag can point at any commit, and
+# the version baked into the library only exists once the tag does.
+
 name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]*'
+
+permissions:
+  contents: read
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    
-    steps:
-    - uses: actions/checkout@v7
-    
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # creating the release
 
-  build-artifacts:
-    name: Build Release Artifacts
-    needs: create-release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: dross-linux-x64
-            compiler: gcc
-          - os: ubuntu-latest  
-            artifact_name: dross-linux-x64-clang
-            compiler: clang
-    
     steps:
-    - uses: actions/checkout@v7
-    
-    - name: Configure and Build
-      run: |
-        if [ "${{ matrix.compiler }}" = "clang" ]; then
-          export CC=clang
-          export CXX=clang++
-        fi
-        
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX=install
-        cmake --build build -j$(nproc)
-        cmake --install build --prefix install
-    
-    - name: Create Archive
-      run: |
-        tar -czf ${{ matrix.artifact_name }}.tar.gz -C install .
-    
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./${{ matrix.artifact_name }}.tar.gz
-        asset_name: ${{ matrix.artifact_name }}.tar.gz
-        asset_content_type: application/gzip
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The version is derived from git tags, which a shallow checkout
+          # does not carry: without the history the build reports 0.0.0.
+          fetch-depth: 0
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      # --no-tests=error: an empty test set exits 0 by default, so without it
+      # a build that registered nothing would pass this step in silence.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+
+      # A tag that does not reach the build is the failure this guards: a
+      # shallow checkout, a tag that does not match the pattern, or a rename
+      # would all leave the library claiming 0.0.0 while the release says
+      # otherwise.
+      - name: Check the built version against the tag
+        run: |
+          expected="${GITHUB_REF_NAME#v}"
+          expected="${expected%%-*}"
+          actual="$(sed -n 's/^Version: //p' build/dross.pc)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::the build reports $actual, the tag says $expected"
+            exit 1
+          fi
+          echo "version $actual matches $GITHUB_REF_NAME"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          flags=(--generate-notes)
+          case "$GITHUB_REF_NAME" in
+            *-*) flags+=(--prerelease) ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" "${flags[@]}"

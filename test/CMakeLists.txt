@@ -1,6 +1,4 @@
 
-enable_testing()
-
 # Use FetchContent to get GoogleTest if not found in system
 find_package(GTest QUIET)
 if(NOT GTest_FOUND)
@@ -52,3 +50,11 @@ target_link_libraries(${TEST_NAME}
 )
 
 gtest_discover_tests(${TEST_NAME})
+
+# --- CMake module tests (run in script mode) ---
+#
+# The version is resolved at configure time, so the logic behind it cannot be
+# reached from a C++ test.
+add_test(NAME ProjectVersionTest
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ProjectVersionTest.cmake
+)

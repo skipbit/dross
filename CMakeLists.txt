@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.20)
-project(dross VERSION 0.0.1 LANGUAGES CXX)
+
+# Git tags are the source of truth for the version, so it is resolved here
+# rather than written down. See cmake/ProjectVersion.cmake.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ProjectVersion.cmake)
+project_version_detect(DROSS_VERSION DROSS_GIT_DESCRIBE)
+
+project(dross VERSION ${DROSS_VERSION} LANGUAGES CXX)
+
+message(STATUS "Version: ${PROJECT_VERSION} (${DROSS_GIT_DESCRIBE})")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -7,6 +15,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(CMakePackageConfigHelpers)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
+
+# enable_testing() registers the test tree with ctest only when it runs at the
+# top level, so it lives here rather than in test/CMakeLists.txt.
+enable_testing()
 add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 
 # Generate and install package config files
