@@ -38,7 +38,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j"$(sysctl -n hw.ncpu)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(sysctl -n hw.ncpu)"
 
   build-static-library:
     name: macOS Static Library Build
@@ -57,7 +57,7 @@ jobs:
       run: cmake --build build -j"$(sysctl -n hw.ncpu)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(sysctl -n hw.ncpu)"
 
   install-test:
     name: macOS Installation Test

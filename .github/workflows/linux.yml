@@ -45,7 +45,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   build-ubuntu-clang:
     name: Ubuntu Clang ${{ matrix.toolchain.clang }} (${{ matrix.build_type }})
@@ -101,7 +101,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   # The jobs above cover only the libstdc++ that comes with the runner image
   # (15 on ubuntu-26.04), but the declared range promises the older releases a
@@ -234,7 +234,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   # The requirements say either standard library works across the whole Clang
   # range, so libc++ is verified at both ends rather than left to best effort.
@@ -280,7 +280,7 @@ jobs:
       run: cmake --build build --config ${{ matrix.build_type }} -j"$(nproc)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   build-static-library:
     name: Static Library Build
@@ -299,7 +299,7 @@ jobs:
       run: cmake --build build -j"$(nproc)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   install-test:
     name: Installation Test

@@ -57,7 +57,7 @@ jobs:
       run: cmake --build build -j"$(nproc)"
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   newest-clang:
     name: Next Clang
@@ -270,7 +270,7 @@ jobs:
 
     - name: Test
       if: steps.watch.outputs.available == 'true'
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   floating-runners:
     name: Floating Runner (${{ matrix.os }})
@@ -296,4 +296,4 @@ jobs:
       run: cmake --build build --parallel
 
     - name: Test
-      run: ./build/test/dross_test --gtest_color=yes
+      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
