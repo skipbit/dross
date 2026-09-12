@@ -10,7 +10,10 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]*'
+      # Matches the glob the version logic uses. Shapes it admits but the
+      # release pattern rejects (v1.2.3.4) still reach the version check
+      # below, which is what fails them.
+      - 'v[0-9]*.[0-9]*.[0-9]*'
 
 permissions:
   contents: read
@@ -42,13 +45,18 @@ jobs:
         run: ctest --test-dir build --output-on-failure --no-tests=error -j"$(nproc)"
 
       # A tag that does not reach the build is the failure this guards: a
-      # shallow checkout, a tag that does not match the pattern, or a rename
-      # would all leave the library claiming 0.0.0 while the release says
+      # shallow checkout, a tag the release pattern rejects, or a rename would
+      # each leave the library claiming 0.0.0 while the release says
       # otherwise.
+      #
+      # Only the numeric triple can be checked. A library's version is that
+      # triple -- it is what SOVERSION, dross.pc and drossConfigVersion.cmake
+      # carry -- so two pre-releases of the same release are indistinguishable
+      # here by construction, not by oversight.
       - name: Check the built version against the tag
         run: |
           expected="${GITHUB_REF_NAME#v}"
-          expected="${expected%%-*}"
+          expected="${expected%%[-+]*}"
           actual="$(sed -n 's/^Version: //p' build/dross.pc)"
           if [ "$actual" != "$expected" ]; then
             echo "::error::the build reports $actual, the tag says $expected"
@@ -56,11 +64,19 @@ jobs:
           fi
           echo "version $actual matches $GITHUB_REF_NAME"
 
+      # --verify-tag: without it gh creates the tag when it is missing, at the
+      # default branch's head, publishing a release for a commit that was
+      # never built here.
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          flags=(--generate-notes)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME already exists, leaving it alone"
+            exit 0
+          fi
+
+          flags=(--generate-notes --verify-tag)
           case "$GITHUB_REF_NAME" in
             *-*) flags+=(--prerelease) ;;
           esac
