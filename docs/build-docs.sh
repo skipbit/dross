@@ -31,7 +31,7 @@ if [ -z "${DROSS_VERSION:-}" ]; then
     version_file="$(mktemp)"
     if cmake -D "SOURCE_DIR=$(cd .. && pwd)" -D "OUTPUT=$version_file" \
              -P ../cmake/PrintVersion.cmake > /dev/null 2>&1; then
-        DROSS_VERSION="$(cat "$version_file")"
+        DROSS_VERSION="$(sed -n 1p "$version_file")"
     else
         DROSS_VERSION="unknown"
     fi

@@ -39,7 +39,7 @@ jobs:
       - name: Resolve the documented version
         run: |
           cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
-          resolved="$(cat "$RUNNER_TEMP/version")"
+          resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
           echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
           echo "Version: $resolved"
 
@@ -129,7 +129,7 @@ jobs:
       - name: Resolve the documented version
         run: |
           cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
-          resolved="$(cat "$RUNNER_TEMP/version")"
+          resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
           echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
           echo "Version: $resolved"
 
