@@ -27,6 +27,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The documented version comes from git tags, which a shallow
+          # checkout does not carry.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -46,6 +50,7 @@ jobs:
 
       - name: Generate Doxygen documentation
         run: |
+          export DROSS_VERSION="$(git describe --tags --always --dirty)"
           mkdir -p docs/build/doxygen
           cd docs/doxygen
           doxygen Doxyfile
@@ -102,6 +107,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The documented version comes from git tags, which a shallow
+          # checkout does not carry.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -121,6 +130,7 @@ jobs:
 
       - name: Generate Doxygen documentation
         run: |
+          export DROSS_VERSION="$(git describe --tags --always --dirty)"
           mkdir -p docs/build/doxygen
           cd docs/doxygen
           doxygen Doxyfile
