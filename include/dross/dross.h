@@ -24,7 +24,6 @@
  * - Configuration: Structured data format support
  * 
  * @author Yuma Endo
- * @version 0.0.1
  * @date 2025
  * @copyright MIT License
  */

@@ -24,6 +24,12 @@ if ! command -v sphinx-build &> /dev/null; then
     exit 1
 fi
 
+# The version comes from git tags, the same source the build reads
+# (see cmake/ProjectVersion.cmake).
+DROSS_VERSION="${DROSS_VERSION:-$(git -C .. describe --tags --always --dirty --match='v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo unknown)}"
+export DROSS_VERSION
+echo "📌 Version: ${DROSS_VERSION}"
+
 # Build documentation
 echo "📖 Building Doxygen documentation..."
 cd doxygen && doxygen Doxyfile && cd ..

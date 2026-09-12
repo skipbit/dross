@@ -27,6 +27,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The documented version comes from git tags, which a shallow
+          # checkout does not carry.
+          fetch-depth: 0
+
+      # $GITHUB_ENV rather than an export: each run block is its own shell,
+      # so the Sphinx step would not see a variable the Doxygen step set.
+      - name: Resolve the documented version
+        run: |
+          resolved="$(git describe --tags --always --dirty --match='v[0-9]*.[0-9]*.[0-9]*')"
+          echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
+          echo "Version: $resolved"
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -102,6 +114,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The documented version comes from git tags, which a shallow
+          # checkout does not carry.
+          fetch-depth: 0
+
+      # $GITHUB_ENV rather than an export: each run block is its own shell,
+      # so the Sphinx step would not see a variable the Doxygen step set.
+      - name: Resolve the documented version
+        run: |
+          resolved="$(git describe --tags --always --dirty --match='v[0-9]*.[0-9]*.[0-9]*')"
+          echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
+          echo "Version: $resolved"
 
       - name: Set up Python
         uses: actions/setup-python@v7

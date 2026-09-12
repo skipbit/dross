@@ -2,7 +2,10 @@
 
 # Project settings
 PROJECT_NAME           = "dross"
-PROJECT_NUMBER         = "1.0.0"
+# Set from git tags by the caller (docs/build-docs.sh and the documentation
+# workflow), the same source the build reads. Empty when it is not set,
+# which reads as "no version" rather than a wrong one.
+PROJECT_NUMBER         = "$(DROSS_VERSION)"
 PROJECT_BRIEF          = "Modern C++23 library providing fundamental building blocks"
 
 # Input settings
