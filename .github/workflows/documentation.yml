@@ -50,7 +50,8 @@ jobs:
 
       - name: Generate Doxygen documentation
         run: |
-          export DROSS_VERSION="$(git describe --tags --always --dirty)"
+          DROSS_VERSION="$(git describe --tags --always --dirty)"
+          export DROSS_VERSION
           mkdir -p docs/build/doxygen
           cd docs/doxygen
           doxygen Doxyfile
@@ -130,7 +131,8 @@ jobs:
 
       - name: Generate Doxygen documentation
         run: |
-          export DROSS_VERSION="$(git describe --tags --always --dirty)"
+          DROSS_VERSION="$(git describe --tags --always --dirty)"
+          export DROSS_VERSION
           mkdir -p docs/build/doxygen
           cd docs/doxygen
           doxygen Doxyfile
