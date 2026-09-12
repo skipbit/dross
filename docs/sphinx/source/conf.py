@@ -18,9 +18,11 @@ author = 'dross contributors'
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-# Read version from CMakeLists.txt or version file
-version = '0.1.0'
-release = '0.1.0'
+# It comes from git tags, the same source the build reads; the documentation
+# workflow and docs/build-docs.sh set DROSS_VERSION. Unset, the documentation
+# says the version is unknown rather than naming one that may not exist.
+release = os.environ.get('DROSS_VERSION') or 'unknown'
+version = release
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

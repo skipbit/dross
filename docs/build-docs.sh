@@ -26,7 +26,7 @@ fi
 
 # The version comes from git tags, the same source the build reads
 # (see cmake/ProjectVersion.cmake).
-DROSS_VERSION="${DROSS_VERSION:-$(git -C .. describe --tags --always --dirty 2>/dev/null || echo unknown)}"
+DROSS_VERSION="${DROSS_VERSION:-$(git -C .. describe --tags --always --dirty --match='v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo unknown)}"
 export DROSS_VERSION
 echo "📌 Version: ${DROSS_VERSION}"
 
