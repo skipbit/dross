@@ -2,22 +2,35 @@
 #
 # The tag is where the version comes from (see cmake/ProjectVersion.cmake), so
 # a release is cut by pushing one. The build and the tests run again here
-# rather than trusting the branch checks: a tag can point at any commit, and
-# the version baked into the library only exists once the tag does.
+# because the version is resolved at configure time and only exists once the
+# tag does -- the run that passed on the branch built a different version of
+# the same code.
 
 name: Release
 
 on:
   push:
     tags:
+      # Deliberately broader than a release tag. A mistyped tag (v1.0, v2)
+      # has to fail somewhere visible: narrowing this to the release shape
+      # would start no run at all, and the only evidence of the mistake would
+      # be a release that never appeared.
       - 'v[0-9]*'
 
 permissions:
   contents: read
 
+# Tags pushed together would otherwise race and collide at the release step,
+# the loser failing after a full run. They are not cancelled: each one is a
+# release someone asked for.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     permissions:
       contents: write  # creating the release
 
@@ -25,42 +38,89 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # By commit rather than by tag: a tag force-pushed while this runs
+          # would otherwise move the ground under the later steps.
+          ref: ${{ github.sha }}
           # The version is derived from git tags, which a shallow checkout
           # does not carry: without the history the build reports 0.0.0.
           fetch-depth: 0
 
-      - name: Build
+      # Before anything is built, because this needs no compiler and a tag
+      # that cannot produce a version should not spend one.
+      #
+      # The build has to describe itself by the tag being released. It will
+      # not when the tag is outside the release pattern, when the history is
+      # too shallow to carry it, or when the commit holds a second release
+      # tag that git prefers -- and in that last case there is no answer to
+      # give, so saying so beats publishing one of them at random.
+      - name: Check the tag the build describes itself by
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j"$(nproc)"
+          cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" \
+                -P cmake/PrintVersion.cmake
+          described="$(sed -n 1p "$RUNNER_TEMP/version")"
+          if [ "$described" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::the build describes itself as '$described', not $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "the build describes itself as $described"
 
-      # gtest_discover_tests registers a placeholder that fails when the test
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      # That the version reached what consumers read. The expected value comes
+      # from the module too, so nothing here re-derives it.
+      - name: Check the configured version against it
+        run: |
+          expected="$(sed -n 2p "$RUNNER_TEMP/version")"
+          actual="$(sed -n 's/^Version: //p' build/dross.pc)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::dross.pc reports $actual, expected $expected"
+            exit 1
+          fi
+          echo "dross.pc reports $actual"
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      # gtest_discover_tests leaves a placeholder that fails when the test
       # binary is missing, so an unbuilt test tree surfaces as a failing test.
       # --no-tests=error covers the remaining case, a tree that registered
       # nothing at all, which exits 0 by default.
       - name: Test
         run: ctest --test-dir build --output-on-failure --no-tests=error -j"$(nproc)"
 
-      # A tag that does not reach the build is the failure this guards: a
-      # shallow checkout, a tag that does not match the pattern, or a rename
-      # would all leave the library claiming 0.0.0 while the release says
-      # otherwise.
-      - name: Check the built version against the tag
+      # Everything above was built from github.sha. If the tag has since been
+      # moved, publishing it would ship a commit nothing here tested.
+      - name: Check the tag still points at what was built
         run: |
-          expected="${GITHUB_REF_NAME#v}"
-          expected="${expected%%-*}"
-          actual="$(sed -n 's/^Version: //p' build/dross.pc)"
-          if [ "$actual" != "$expected" ]; then
-            echo "::error::the build reports $actual, the tag says $expected"
+          tagged="$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")"
+          if [ "$tagged" != "$GITHUB_SHA" ]; then
+            echo "::error::$GITHUB_REF_NAME now points at $tagged, not the commit that was built ($GITHUB_SHA)"
             exit 1
           fi
-          echo "version $actual matches $GITHUB_REF_NAME"
 
+      # An existing release is an error rather than a no-op: a tag that was
+      # moved and re-pushed would otherwise pass every check above and leave
+      # the stale release in place, reported as success. A lookup that fails
+      # for any other reason is an error too -- treating it as "no release
+      # exists" would disable the guard exactly when the API is unreliable.
+      #
+      # --verify-tag: without it gh creates the tag when it is missing, at the
+      # default branch's head, publishing a release for a commit that was
+      # never built here.
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          flags=(--generate-notes)
+          if lookup="$(gh release view "$GITHUB_REF_NAME" 2>&1)"; then
+            echo "::error::a release for $GITHUB_REF_NAME already exists; delete it before re-running"
+            exit 1
+          elif ! printf '%s' "$lookup" | grep -qi "release not found"; then
+            echo "::error::could not determine whether $GITHUB_REF_NAME is released: $lookup"
+            exit 1
+          fi
+
+          flags=(--generate-notes --verify-tag)
           case "$GITHUB_REF_NAME" in
             *-*) flags+=(--prerelease) ;;
           esac
