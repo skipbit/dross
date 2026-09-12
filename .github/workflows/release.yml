@@ -2,18 +2,20 @@
 #
 # The tag is where the version comes from (see cmake/ProjectVersion.cmake), so
 # a release is cut by pushing one. The build and the tests run again here
-# rather than trusting the branch checks: a tag can point at any commit, and
-# the version baked into the library only exists once the tag does.
+# because the version is resolved at configure time and only exists once the
+# tag does -- the run that passed on the branch built a different version of
+# the same code.
 
 name: Release
 
 on:
   push:
     tags:
-      # Matches the glob the version logic uses. Shapes it admits but the
-      # release pattern rejects (v1.2.3.4) still reach the version check
-      # below, which is what fails them.
-      - 'v[0-9]*.[0-9]*.[0-9]*'
+      # Deliberately broader than a release tag. A mistyped tag (v1.0, v2)
+      # has to fail somewhere visible: narrowing this to the release shape
+      # would start no run at all, and the only evidence of the mistake would
+      # be a release that never appeared.
+      - 'v[0-9]*'
 
 permissions:
   contents: read
@@ -32,31 +34,24 @@ jobs:
           # does not carry: without the history the build reports 0.0.0.
           fetch-depth: 0
 
-      - name: Build
-        run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j"$(nproc)"
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-      # gtest_discover_tests registers a placeholder that fails when the test
-      # binary is missing, so an unbuilt test tree surfaces as a failing test.
-      # --no-tests=error covers the remaining case, a tree that registered
-      # nothing at all, which exits 0 by default.
-      - name: Test
-        run: ctest --test-dir build --output-on-failure --no-tests=error -j"$(nproc)"
-
-      # A tag that does not reach the build is the failure this guards: a
-      # shallow checkout, a tag the release pattern rejects, or a rename would
-      # each leave the library claiming 0.0.0 while the release says
-      # otherwise.
+      # Before the build, because dross.pc is written at configure time and a
+      # tag that cannot produce a version should not spend the test suite.
+      #
+      # A tag that does not reach the build is what this guards: a shallow
+      # checkout, a tag the release pattern rejects, or a rename would each
+      # leave the library claiming 0.0.0 while the release says otherwise.
       #
       # Only the numeric triple can be checked. A library's version is that
       # triple -- it is what SOVERSION, dross.pc and drossConfigVersion.cmake
       # carry -- so two pre-releases of the same release are indistinguishable
       # here by construction, not by oversight.
-      - name: Check the built version against the tag
+      - name: Check the configured version against the tag
         run: |
           expected="${GITHUB_REF_NAME#v}"
-          expected="${expected%%[-+]*}"
+          expected="${expected%%-*}"
           actual="$(sed -n 's/^Version: //p' build/dross.pc)"
           if [ "$actual" != "$expected" ]; then
             echo "::error::the build reports $actual, the tag says $expected"
@@ -64,6 +59,20 @@ jobs:
           fi
           echo "version $actual matches $GITHUB_REF_NAME"
 
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      # gtest_discover_tests leaves a placeholder that fails when the test
+      # binary is missing, so an unbuilt test tree surfaces as a failing test.
+      # --no-tests=error covers the remaining case, a tree that registered
+      # nothing at all, which exits 0 by default.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --no-tests=error -j"$(nproc)"
+
+      # An existing release is an error rather than a no-op: a tag that was
+      # moved and re-pushed would otherwise pass every check above and leave
+      # the stale release in place, reported as success.
+      #
       # --verify-tag: without it gh creates the tag when it is missing, at the
       # default branch's head, publishing a release for a commit that was
       # never built here.
@@ -72,8 +81,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            echo "release $GITHUB_REF_NAME already exists, leaving it alone"
-            exit 0
+            echo "::error::a release for $GITHUB_REF_NAME already exists; delete it before re-running"
+            exit 1
           fi
 
           flags=(--generate-notes --verify-tag)
