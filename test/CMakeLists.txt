@@ -56,5 +56,7 @@ gtest_discover_tests(${TEST_NAME})
 # The version is resolved at configure time, so the logic behind it cannot be
 # reached from a C++ test.
 add_test(NAME ProjectVersionTest
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ProjectVersionTest.cmake
+    COMMAND ${CMAKE_COMMAND}
+        -D "SCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/version-test"
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ProjectVersionTest.cmake
 )
