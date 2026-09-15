@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   newest-gcc:
-    name: Newest GCC
+    name: watch (newest gcc)
     runs-on: ubuntu-latest
 
     steps:
@@ -63,7 +63,7 @@ jobs:
       run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   newest-clang:
-    name: Next Clang
+    name: watch (next clang)
     runs-on: ubuntu-latest
 
     # Watches the smallest "-N" apt.llvm.org suite above the declared Clang
@@ -276,7 +276,7 @@ jobs:
       run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
   floating-runners:
-    name: Floating Runner (${{ matrix.os }})
+    name: watch (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
