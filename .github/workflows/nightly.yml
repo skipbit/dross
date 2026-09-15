@@ -310,18 +310,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+    # The version the documentation names reaches no link, so it is left
+    # unresolved and the history it comes from is not fetched.
     - uses: actions/checkout@v7
-      with:
-        # The documented version comes from git tags, which a shallow
-        # checkout does not carry.
-        fetch-depth: 0
-
-    - name: Resolve the documented version
-      run: |
-        cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
-        resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
-        echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
-        echo "Version: $resolved"
 
     - name: Set up Python
       uses: actions/setup-python@v7
