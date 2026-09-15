@@ -19,6 +19,10 @@ permissions:
 # available once the toolchain PPA is in place, which is normally above
 # that range too but is never checked against it. They never gate a pull
 # request and must not be added to required status checks.
+#
+# The documentation's links are checked here too. A link breaks with an
+# external site rather than with a change, so it does not hold up a pull
+# request.
 
 jobs:
   newest-gcc:
@@ -300,3 +304,44 @@ jobs:
 
     - name: Test
       run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+
+  docs-links:
+    name: docs (links)
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        # The documented version comes from git tags, which a shallow
+        # checkout does not carry.
+        fetch-depth: 0
+
+    - name: Resolve the documented version
+      run: |
+        cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
+        resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
+        echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
+        echo "Version: $resolved"
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+        pip install -r docs/sphinx/requirements.txt
+
+    - name: Generate Doxygen documentation
+      run: |
+        mkdir -p docs/build/doxygen
+        cd docs/doxygen
+        doxygen Doxyfile
+
+    - name: Check for broken links
+      run: |
+        cd docs/sphinx
+        make linkcheck
