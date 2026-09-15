@@ -198,11 +198,11 @@ dross can be built using CMake:
     # Clone the repository
     git clone https://github.com/skipbit/dross.git
     cd dross
-    
+
     # Configure and build
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build
-    
+
     # Run tests
     cd build && ctest
 

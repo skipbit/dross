@@ -3,7 +3,7 @@ Examples
 
 .. toctree::
    :maxdepth: 2
-   
+
    basic-types
    configuration
    data-structures
