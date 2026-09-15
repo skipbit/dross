@@ -37,6 +37,9 @@
       "name": "sanitize-address",
       "description": "Debug build with AddressSanitizer and UndefinedBehaviorSanitizer",
       "inherits": "debug",
+      "environment": {
+        "UBSAN_OPTIONS": "print_stacktrace=1:$penv{UBSAN_OPTIONS}"
+      },
       "cacheVariables": {
         "CMAKE_CXX_FLAGS_INIT": "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
         "CMAKE_EXE_LINKER_FLAGS_INIT": "-fsanitize=address,undefined",
@@ -75,14 +78,7 @@
     { "name": "debug", "inherits": "base", "configurePreset": "debug" },
     { "name": "release", "inherits": "base", "configurePreset": "release" },
     { "name": "static", "inherits": "base", "configurePreset": "static" },
-    {
-      "name": "sanitize-address",
-      "inherits": "base",
-      "configurePreset": "sanitize-address",
-      "environment": {
-        "UBSAN_OPTIONS": "print_stacktrace=1"
-      }
-    },
+    { "name": "sanitize-address", "inherits": "base", "configurePreset": "sanitize-address" },
     { "name": "sanitize-thread", "inherits": "base", "configurePreset": "sanitize-thread" }
   ],
   "workflowPresets": [
