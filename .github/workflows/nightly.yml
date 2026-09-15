@@ -308,6 +308,9 @@ jobs:
   docs-links:
     name: docs (links)
     runs-on: ubuntu-24.04
+    # A host that stalls or rate-limits the runner would otherwise hold it for
+    # the six hours GitHub allows.
+    timeout-minutes: 30
 
     steps:
     # The version the documentation names reaches no link, so it is left
