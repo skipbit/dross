@@ -1,40 +1,32 @@
-# Derive the project version from git tags.
+# Derives the project version from git tags.
 #
-# Usage:
 #   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ProjectVersion.cmake)
 #   dross_version_detect(<version-var> <describe-var> <source-dir>)
 #   project(<name> VERSION ${<version-var>} ...)
 #
-# A release tag is v<major>.<minor>.<patch>, optionally followed by a
-# pre-release suffix (v1.0.0-rc1) or build metadata (v1.0.0+build7).
-# Components carry no leading zeros, and nothing may follow the triple but
-# those: v0.2, v1.2.3.4, v01.2.3 and nightly-2026 are not releases, and do not
-# become releases by sitting closer to HEAD than one.
+# A release tag is v<major>.<minor>.<patch> without leading zeros, optionally
+# followed by -<pre-release> or +<build>. Other tags are ignored.
 #
-# The tags git is asked about are chosen by this pattern, not by a glob. A
-# glob cannot express "digits only", so anything narrow enough to run inside
-# git would still admit shapes the pattern rejects -- and `describe` returns
-# the nearest match, so one such tag would hide every release behind it.
-# Listing the tags, filtering them here, and naming the survivors gives both
-# describe calls the same set by construction.
+# In the project's own repository, the version comes from the nearest release
+# tag. Tags are filtered by the pattern above rather than by a glob, so a
+# malformed tag cannot hide a release.
 #
-# A tree with no release tag reports 0.0.0, which is what an unreleased
-# checkout is. So does a tree that is not this project's own repository --
-# git searches upwards, so sources vendored inside another project would
-# otherwise report that project's version as ours.
+# Any other tree is read from cmake/ArchiveVersion.txt, which git archive fills
+# in with the commit and its description. The file keeps an archive's bytes
+# fixed as branches move; they change when a release tag is later added to the
+# archived commit or to one of its ancestors. The description is selected by
+# a glob that also admits malformed tags such as v1.2.3.4, and when git picks
+# one the archive reports 0.0.0.
 #
-# The version reaches consumers through SOVERSION, dross.pc and
-# drossConfigVersion.cmake. It is read at configure time, which is where
-# project(VERSION) takes it: a tag pushed after configuring needs
-# `cmake -S . -B build` again before it reaches the installed files. The
-# release workflow builds from scratch and checks the result against the tag.
+# A tree with neither reports 0.0.0 and "unknown".
 #
-# The names are prefixed because CMake functions are global and this project
-# is meant to be added as a subdirectory.
+# Commit ids are abbreviated to 12 characters. Both values are read at
+# configure time and reach SOVERSION, dross.pc and drossConfigVersion.cmake.
+# Functions carry a prefix because this project is added as a subdirectory.
+# Strings are compared with STREQUAL because CMake treats a value ending in
+# -NOTFOUND as false.
 
-# Normalise a release tag to the major.minor.patch triple that
-# project(VERSION) accepts. A pre-release suffix is dropped here and stays
-# visible in the description. Anything else is 0.0.0.
+# Returns the major.minor.patch of a release tag, or 0.0.0.
 function(dross_version_from_tag OUT_VERSION TAG)
     set(component "(0|[1-9][0-9]*)")
     if(TAG MATCHES "^v${component}\\.${component}\\.${component}($|[-+])")
@@ -44,22 +36,20 @@ function(dross_version_from_tag OUT_VERSION TAG)
     endif()
 endfunction()
 
-# Describe a tree that has no release tag: the short commit id, marked when
-# the working tree carries uncommitted changes. This is what `describe
-# --always --dirty` reports for such a tree, without asking it to consider
-# tags that are not releases.
+# Describes a commit without a release tag: its id, with -dirty for
+# uncommitted changes.
 function(dross_describe_commit SOURCE_DIR OUT_DESCRIPTION)
     set(${OUT_DESCRIPTION} "" PARENT_SCOPE)
 
     execute_process(
-        COMMAND ${DROSS_GIT_EXECUTABLE} rev-parse --short HEAD
+        COMMAND ${DROSS_GIT_EXECUTABLE} rev-parse --short=12 HEAD
         WORKING_DIRECTORY ${SOURCE_DIR}
         OUTPUT_VARIABLE commit
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
         RESULT_VARIABLE commit_result
     )
-    if(NOT commit_result EQUAL 0 OR NOT commit)
+    if(NOT commit_result EQUAL 0 OR commit STREQUAL "")
         return()
     endif()
 
@@ -71,29 +61,26 @@ function(dross_describe_commit SOURCE_DIR OUT_DESCRIPTION)
         ERROR_QUIET
         RESULT_VARIABLE status_result
     )
-    if(status_result EQUAL 0 AND changes)
+    if(status_result EQUAL 0 AND NOT changes STREQUAL "")
         set(commit "${commit}-dirty")
     endif()
 
     set(${OUT_DESCRIPTION} "${commit}" PARENT_SCOPE)
 endfunction()
 
-# Resolve the numeric version and the full git description of SOURCE_DIR.
-function(dross_version_detect OUT_VERSION OUT_DESCRIBE SOURCE_DIR)
-    set(${OUT_VERSION} "0.0.0" PARENT_SCOPE)
-    set(${OUT_DESCRIBE} "unknown" PARENT_SCOPE)
+# Reads the repository whose root is SOURCE_DIR. OUT_FOUND is TRUE when there
+# is one.
+function(dross_version_from_repository SOURCE_DIR OUT_FOUND OUT_VERSION OUT_DESCRIBE)
+    set(${OUT_FOUND} FALSE PARENT_SCOPE)
 
-    # find_program rather than find_package(Git): this runs before project(),
-    # where the toolchain file and the find-root settings are not in effect
-    # yet, and a plain program lookup is all that is needed.
+    # A plain program lookup: find_package(Git) before project() would run
+    # without the toolchain's search settings.
     find_program(DROSS_GIT_EXECUTABLE NAMES git)
     if(NOT DROSS_GIT_EXECUTABLE)
         return()
     endif()
 
-    # The repository has to be this project's own. git walks up the directory
-    # tree, so without this a copy vendored inside another checkout would
-    # inherit that checkout's tags.
+    # git searches upwards; only a repository rooted here belongs to this tree.
     execute_process(
         COMMAND ${DROSS_GIT_EXECUTABLE} rev-parse --show-toplevel
         WORKING_DIRECTORY ${SOURCE_DIR}
@@ -111,7 +98,10 @@ function(dross_version_detect OUT_VERSION OUT_DESCRIBE SOURCE_DIR)
         return()
     endif()
 
-    # Every tag, filtered by the pattern.
+    set(${OUT_FOUND} TRUE PARENT_SCOPE)
+    set(${OUT_VERSION} "0.0.0" PARENT_SCOPE)
+    set(${OUT_DESCRIBE} "unknown" PARENT_SCOPE)
+
     execute_process(
         COMMAND ${DROSS_GIT_EXECUTABLE} tag --list
         WORKING_DIRECTORY ${SOURCE_DIR}
@@ -124,35 +114,25 @@ function(dross_version_detect OUT_VERSION OUT_DESCRIBE SOURCE_DIR)
         return()
     endif()
 
-    # git separates names by newline, but a name may itself contain the CMake
-    # list separator. Escaping it first keeps such a name in one piece: split
-    # naively, v1.0.0-a;b becomes v1.0.0-a, which the pattern accepts and
-    # which names no tag at all -- the release would vanish behind a selector
-    # matching nothing.
-    string(REPLACE ";" "\\;" all_tags "${all_tags}")
+    # Escaping keeps a name containing ';' whole, so it can be skipped: git
+    # cannot receive it as one argument.
+    string(REPLACE ";" "\;" all_tags "${all_tags}")
     string(REPLACE "\n" ";" all_tags "${all_tags}")
     set(selectors "")
     foreach(tag IN LISTS all_tags)
-        # A name carrying the CMake list separator cannot be handed to git as
-        # one argument, so it cannot be selected. git permits the character;
-        # a release tag has no reason to use it, and passing such a name
-        # through would split into a selector naming no tag at all.
         if(tag MATCHES ";")
             continue()
         endif()
-
         dross_version_from_tag(candidate "${tag}")
         if(NOT candidate STREQUAL "0.0.0")
             list(APPEND selectors "--match=${tag}")
         endif()
     endforeach()
 
-    if(NOT selectors)
-        # No release tag: the commit id is all there is to report. Asking
-        # describe with no selector would let an unrelated tag answer, and an
-        # empty --match is not documented behaviour to lean on.
+    list(LENGTH selectors selector_count)
+    if(selector_count EQUAL 0)
         dross_describe_commit("${SOURCE_DIR}" commit_description)
-        if(commit_description)
+        if(NOT commit_description STREQUAL "")
             set(${OUT_DESCRIBE} "${commit_description}" PARENT_SCOPE)
         endif()
         return()
@@ -171,21 +151,82 @@ function(dross_version_detect OUT_VERSION OUT_DESCRIBE SOURCE_DIR)
         set(${OUT_VERSION} "${version}" PARENT_SCOPE)
     endif()
 
-    # The same set of tags, so both halves describe the same one.
     execute_process(
-        COMMAND ${DROSS_GIT_EXECUTABLE} describe --tags --always --dirty ${selectors}
+        COMMAND ${DROSS_GIT_EXECUTABLE} describe --tags --always --dirty --abbrev=12 ${selectors}
         WORKING_DIRECTORY ${SOURCE_DIR}
         OUTPUT_VARIABLE describe
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET
         RESULT_VARIABLE describe_result
     )
-    if(describe_result EQUAL 0 AND describe)
+    if(describe_result EQUAL 0 AND NOT describe STREQUAL "")
         set(${OUT_DESCRIBE} "${describe}" PARENT_SCOPE)
     else()
         dross_describe_commit("${SOURCE_DIR}" commit_description)
-        if(commit_description)
+        if(NOT commit_description STREQUAL "")
             set(${OUT_DESCRIBE} "${commit_description}" PARENT_SCOPE)
         endif()
     endif()
+endfunction()
+
+# Reads cmake/ArchiveVersion.txt under SOURCE_DIR. OUT_FOUND is TRUE when git
+# archive filled it in.
+function(dross_version_from_archive SOURCE_DIR OUT_FOUND OUT_VERSION OUT_DESCRIBE)
+    set(${OUT_FOUND} FALSE PARENT_SCOPE)
+
+    set(archive_file "${SOURCE_DIR}/cmake/ArchiveVersion.txt")
+    if(NOT EXISTS "${archive_file}")
+        return()
+    endif()
+    file(READ "${archive_file}" content)
+    if(NOT content MATCHES "(^|\n)commit=([0-9a-f]+)(\r|\n|$)")
+        return()
+    endif()
+    set(commit "${CMAKE_MATCH_2}")
+    string(LENGTH "${commit}" commit_length)
+    if(commit_length LESS 12)
+        return()
+    endif()
+    string(SUBSTRING "${commit}" 0 12 commit)
+
+    set(description "")
+    if(content MATCHES "(^|\n)describe=([^\n]*)")
+        string(STRIP "${CMAKE_MATCH_2}" description)
+    endif()
+
+    set(${OUT_FOUND} TRUE PARENT_SCOPE)
+    set(${OUT_VERSION} "0.0.0" PARENT_SCOPE)
+    set(${OUT_DESCRIBE} "${commit}" PARENT_SCOPE)
+
+    # The release pattern accepts a description such as v0.1.0-3-g..., and
+    # rejects an empty value, an unexpanded placeholder and a malformed tag.
+    # Names containing ';' are rejected as in a repository.
+    if(description MATCHES ";")
+        return()
+    endif()
+    dross_version_from_tag(version "${description}")
+    if(version STREQUAL "0.0.0")
+        return()
+    endif()
+
+    set(${OUT_VERSION} "${version}" PARENT_SCOPE)
+    set(${OUT_DESCRIBE} "${description}" PARENT_SCOPE)
+endfunction()
+
+# Resolves the version and description of SOURCE_DIR.
+function(dross_version_detect OUT_VERSION OUT_DESCRIBE SOURCE_DIR)
+    set(detected_version "0.0.0")
+    set(detected_describe "unknown")
+
+    dross_version_from_repository("${SOURCE_DIR}" found found_version found_describe)
+    if(NOT found)
+        dross_version_from_archive("${SOURCE_DIR}" found found_version found_describe)
+    endif()
+    if(found)
+        set(detected_version "${found_version}")
+        set(detected_describe "${found_describe}")
+    endif()
+
+    set(${OUT_VERSION} "${detected_version}" PARENT_SCOPE)
+    set(${OUT_DESCRIBE} "${detected_describe}" PARENT_SCOPE)
 endfunction()
