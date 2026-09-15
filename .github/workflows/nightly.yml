@@ -20,10 +20,9 @@ permissions:
 # that range too but is never checked against it. They never gate a pull
 # request and must not be added to required status checks.
 #
-# The documentation's links and formatting are checked here too, where
-# neither holds up a pull request: a link breaks with an external site rather
-# than with a change, and the formatting check follows sphinx-lint releases,
-# which are not pinned.
+# The documentation's links and formatting are checked here too, for the same
+# reason: a link breaks with an external site rather than with a change, and
+# the formatting check follows sphinx-lint releases, which are not pinned.
 
 jobs:
   newest-gcc:
