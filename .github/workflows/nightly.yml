@@ -20,9 +20,10 @@ permissions:
 # that range too but is never checked against it. They never gate a pull
 # request and must not be added to required status checks.
 #
-# The documentation's links are checked here too. A link breaks with an
-# external site rather than with a change, so it does not hold up a pull
-# request.
+# The documentation's links and formatting are checked here too, where
+# neither holds up a pull request: a link breaks with an external site rather
+# than with a change, and the formatting check follows sphinx-lint releases,
+# which are not pinned.
 
 jobs:
   newest-gcc:
@@ -345,3 +346,23 @@ jobs:
       run: |
         cd docs/sphinx
         make linkcheck
+
+  docs-lint:
+    name: docs (lint)
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.11'
+
+    # Only sphinx-lint, within the versions requirements.txt allows: checking
+    # the formatting does not need the documentation built.
+    - name: Install sphinx-lint
+      run: pip install "$(grep '^sphinx-lint' docs/sphinx/requirements.txt)"
+
+    - name: Check the formatting
+      run: sphinx-lint docs/sphinx/source/
