@@ -361,7 +361,7 @@ jobs:
     # Only sphinx-lint, within the versions requirements.txt allows: checking
     # the formatting does not need the documentation built.
     - name: Install sphinx-lint
-      run: pip install "$(grep '^sphinx-lint' docs/sphinx/requirements.txt)"
+      run: pip install -c docs/sphinx/requirements.txt sphinx-lint
 
     - name: Check the formatting
       run: sphinx-lint docs/sphinx/source/
