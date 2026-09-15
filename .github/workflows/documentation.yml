@@ -16,6 +16,9 @@ on:
       - 'src/**'
       - '.github/workflows/documentation.yml'
 
+permissions:
+  contents: read
+
 # Allow only one concurrent deployment
 concurrency:
   group: "pages"
