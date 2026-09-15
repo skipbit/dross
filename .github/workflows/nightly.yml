@@ -6,6 +6,9 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # Early warning for environments outside the verified range: the newest GCC,
 # the Clang release next in line to enter the declared range, and the
 # floating runner labels. These jobs deliberately use wiring the required
