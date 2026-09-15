@@ -74,13 +74,13 @@ Clone the repository and build with CMake:
 
     # Create build directory
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-    
+
     # Build the library
     cmake --build build
-    
+
     # Run tests (optional)
     cd build && ctest
-    
+
     # Install (optional)
     sudo cmake --install build
 
@@ -93,10 +93,10 @@ You can customize the build with these CMake options:
 
     # Build as static library (default is shared)
     cmake -S . -B build -DBUILD_SHARED_LIBS=OFF
-    
+
     # Enable debug build
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-    
+
     # Specify installation prefix
     cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr/local
 
@@ -111,7 +111,7 @@ Add dross to your CMake project:
 .. code-block:: cmake
 
     find_package(dross REQUIRED)
-    
+
     add_executable(myapp main.cpp)
     target_link_libraries(myapp PRIVATE dross::dross)
 
@@ -126,7 +126,7 @@ Or using FetchContent:
         GIT_TAG        main
     )
     FetchContent_MakeAvailable(dross)
-    
+
     add_executable(myapp main.cpp)
     target_link_libraries(myapp PRIVATE dross::dross)
 
@@ -139,7 +139,7 @@ If not using CMake, compile with:
 
     # Compile with shared library
     g++ -std=c++23 -I/path/to/dross/include main.cpp -L/path/to/dross/lib -ldross
-    
+
     # Compile with static library
     g++ -std=c++23 -I/path/to/dross/include main.cpp /path/to/dross/lib/libdross.a
 

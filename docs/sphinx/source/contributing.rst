@@ -186,7 +186,7 @@ Use Doxygen-style comments for all public APIs:
 
     /**
      * @brief Converts the value to a string representation.
-     * 
+     *
      * @return String representation of the value
      * @note Never throws
      */
