@@ -48,7 +48,7 @@
     },
     {
       "name": "sanitize-thread",
-      "description": "Debug build with ThreadSanitizer",
+      "description": "Debug build with ThreadSanitizer. Use Clang: GCC 13's ThreadSanitizer does not start on recent Linux kernels.",
       "inherits": "debug",
       "cacheVariables": {
         "CMAKE_CXX_FLAGS_INIT": "-fsanitize=thread -fno-omit-frame-pointer",
