@@ -193,6 +193,31 @@ jobs:
           cmake --build --preset release --parallel "$(getconf _NPROCESSORS_ONLN)"
           sudo cmake --install build/release
 
+      # A prefix of its own, because only this install writes there: what
+      # lands in it is exactly what a user receives.
+      - name: Check what the install writes
+        if: matrix.kind == 'install'
+        run: |
+          prefix="$RUNNER_TEMP/install-check"
+          sudo rm -rf "$prefix"
+          sudo cmake --install build/release --prefix "$prefix" > /dev/null
+          targets="$prefix/lib/cmake/dross/drossTargets.cmake"
+          if grep -q INTERFACE_COMPILE_OPTIONS "$targets"; then
+            echo "::error::the exported target carries this project's own compile options"
+            grep -n INTERFACE_COMPILE_OPTIONS "$targets"
+            exit 1
+          fi
+          # Relative paths, so the prefix's own name cannot answer for the
+          # files under it.
+          installed="$RUNNER_TEMP/installed.txt"
+          (cd "$prefix" && find . -type f) > "$installed"
+          if grep -iqE 'gtest|gmock' "$installed"; then
+            echo "::error::the install carries GoogleTest"
+            grep -iE 'gtest|gmock' "$installed"
+            exit 1
+          fi
+          echo "the install wrote $(wc -l < "$installed") files, none of them GoogleTest's"
+
       - name: Build a consumer through find_package
         if: matrix.kind == 'install'
         run: |
