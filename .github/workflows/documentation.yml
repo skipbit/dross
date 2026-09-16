@@ -7,6 +7,8 @@ on:
       - 'docs/**'
       - 'include/**'
       - 'src/**'
+      # The documented version is resolved from here.
+      - 'cmake/**'
       - '.github/workflows/documentation.yml'
 
 permissions:
@@ -18,8 +20,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The same image the documentation check uses, so what passes there is what
+  # publishes here.
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -74,9 +78,8 @@ jobs:
           retention-days: 30
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
