@@ -7,3 +7,11 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
+
+  - package-ecosystem: "pip"
+    directory: "/docs/sphinx"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "docs"
+      include: "scope"
