@@ -1,7 +1,8 @@
 # Checks a commit against the Requirements in the README: every supported
 # compiler and standard library pairing, in both build types, the two ways the
-# library is packaged, and what the sanitizers find. `required` waits for all
-# of them, so one name stands for the whole list.
+# library is packaged, what the sanitizers find, and that the documentation
+# still builds. `required` waits for all of them, so one name stands for the
+# whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -295,10 +296,60 @@ jobs:
             done
           done
 
+  # The documentation is built from the same sources the library is, so a
+  # change that breaks it is caught here rather than when it is published.
+  # Its links and formatting are checked nightly instead: both follow
+  # releases and sites this repository does not control.
+  docs:
+    name: docs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          # The documented version comes from git tags, which a shallow
+          # checkout does not carry.
+          fetch-depth: 0
+
+      # Through the same implementation the library build uses, so the
+      # documented version cannot describe a different tag.
+      - name: Resolve the documented version
+        run: |
+          cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
+          resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
+          echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
+          echo "Version: $resolved"
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+          pip install -r docs/sphinx/requirements.txt
+
+      - name: Generate Doxygen documentation
+        run: |
+          mkdir -p docs/build/doxygen
+          cd docs/doxygen
+          doxygen Doxyfile
+
+      - name: Build Sphinx documentation
+        run: |
+          cd docs/sphinx
+          make html
+
   required:
     name: required
     if: always()
-    needs: [build-and-test, packaging, sanitize]
+    needs: [build-and-test, packaging, sanitize, docs]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 
