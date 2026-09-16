@@ -77,7 +77,7 @@ jobs:
     # taking the largest would skip past the release most likely to enter the
     # declared range next, leaving it with no CI evidence at the moment the
     # decision is made. The unsuffixed suite (a rolling development snapshot)
-    # is never watched either, because -Werror is a PUBLIC compile option
+    # is never watched either, because this project builds itself with -Werror
     # (src/CMakeLists.txt) and a diagnostic newly added upstream would turn a
     # healthy build red for reasons unrelated to this project. The pinned
     # version below is bumped together with the declared range so both move

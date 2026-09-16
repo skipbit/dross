@@ -27,8 +27,10 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
 )
 
+# PRIVATE keeps these out of the exported target: a consumer decides its own
+# warning policy and optimization level.
 target_compile_options(${PROJECT_NAME}
-    PUBLIC -Wall -Wextra -Werror
+    PRIVATE -Wall -Wextra -Werror
     $<$<CONFIG:Debug>:-O0 -g3>
     $<$<CONFIG:Release>:-O3>
 )
