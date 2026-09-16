@@ -333,7 +333,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.11'
+          # Sphinx asks for 3.12 or newer as of its 9.1 releases.
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Install dependencies
