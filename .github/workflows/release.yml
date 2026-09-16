@@ -1,10 +1,9 @@
 # Publishes a GitHub release for a version tag.
 #
 # The tag is where the version comes from (see cmake/ProjectVersion.cmake), so
-# a release is cut by pushing one. The build and the tests run again here
-# because the version is resolved at configure time and only exists once the
-# tag does -- the run that passed on the branch built a different version of
-# the same code.
+# a release is cut by pushing one. Every check a pull request runs is run
+# again on the tagged commit: a tag can point at a commit no pull request
+# checked, and the version it names only exists once the tag does.
 
 name: Release
 
@@ -28,26 +27,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  # Ahead of the checks, because this needs no compiler and a tag that cannot
+  # produce a version should not spend a full run.
+  check-version:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    permissions:
-      contents: write  # creating the release
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           # By commit rather than by tag: a tag force-pushed while this runs
-          # would otherwise move the ground under the later steps.
+          # would otherwise move the ground under the later jobs.
           ref: ${{ github.sha }}
           # The version is derived from git tags, which a shallow checkout
           # does not carry: without the history the build reports 0.0.0.
           fetch-depth: 0
 
-      # Before anything is built, because this needs no compiler and a tag
-      # that cannot produce a version should not spend one.
-      #
       # The build has to describe itself by the tag being released. It will
       # not when the tag is outside the release pattern, when the history is
       # too shallow to carry it, or when the commit holds a second release
@@ -83,37 +79,47 @@ jobs:
           echo "a source archive describes itself as $described"
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake --preset release
 
       # That the version reached what consumers read. The expected value comes
       # from the module too, so nothing here re-derives it.
       - name: Check the configured version against it
         run: |
           expected="$(sed -n 2p "$RUNNER_TEMP/version")"
-          actual="$(sed -n 's/^Version: //p' build/dross.pc)"
+          actual="$(sed -n 's/^Version: //p' build/release/dross.pc)"
           if [ "$actual" != "$expected" ]; then
             echo "::error::dross.pc reports $actual, expected $expected"
             exit 1
           fi
           echo "dross.pc reports $actual"
 
-      - name: Build
-        run: cmake --build build -j"$(nproc)"
+  check:
+    needs: check-version
+    uses: ./.github/workflows/check.yml
+    with:
+      ref: ${{ github.sha }}
 
-      # gtest_discover_tests leaves a placeholder that fails when the test
-      # binary is missing, so an unbuilt test tree surfaces as a failing test.
-      # --no-tests=error covers the remaining case, a tree that registered
-      # nothing at all, which exits 0 by default.
-      - name: Test
-        run: ctest --test-dir build --output-on-failure --no-tests=error -j"$(nproc)"
+  release:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write  # creating the release
 
-      # Everything above was built from github.sha. If the tag has since been
-      # moved, publishing it would ship a commit nothing here tested.
-      - name: Check the tag still points at what was built
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      # Everything above was checked at github.sha. If the tag has since been
+      # moved, publishing it would ship a commit nothing here checked.
+      - name: Check the tag still points at what was checked
         run: |
           tagged="$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")"
           if [ "$tagged" != "$GITHUB_SHA" ]; then
-            echo "::error::$GITHUB_REF_NAME now points at $tagged, not the commit that was built ($GITHUB_SHA)"
+            echo "::error::$GITHUB_REF_NAME now points at $tagged, not the commit that was checked ($GITHUB_SHA)"
             exit 1
           fi
 
@@ -125,7 +131,7 @@ jobs:
       #
       # --verify-tag: without it gh creates the tag when it is missing, at the
       # default branch's head, publishing a release for a commit that was
-      # never built here.
+      # never checked here.
       - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
