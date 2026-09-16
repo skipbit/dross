@@ -173,8 +173,8 @@ jobs:
       - name: Report toolchain versions
         run: |
           c++ --version
+          if [ "$RUNNER_OS" = macOS ]; then xcrun --show-sdk-version; fi
           cmake --version
-          pkg-config --version
 
       - name: Build and test the static library
         if: matrix.kind == 'static'
@@ -228,6 +228,7 @@ jobs:
       - name: Query pkg-config
         if: matrix.kind == 'install'
         run: |
+          pkg-config --version
           pkg-config --exists dross
           cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
           expected=$(sed -n 2p "$RUNNER_TEMP/version")
