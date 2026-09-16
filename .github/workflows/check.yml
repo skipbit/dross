@@ -82,6 +82,9 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
+          # The version comes from the tags, and a shallow checkout fetches
+          # none of them: a tagged commit would otherwise be built as 0.0.0.
+          fetch-tags: true
 
       - name: Install the standard library
         if: matrix.toolchain.packages
@@ -264,6 +267,8 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
+          # As above: without the tags the build calls itself 0.0.0.
+          fetch-tags: true
 
       - name: Report toolchain versions
         run: |
