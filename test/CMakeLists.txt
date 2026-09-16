@@ -8,6 +8,9 @@ if(NOT GTest_FOUND)
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG        v1.15.2
     )
+    # GoogleTest is fetched for this project's own tests. Installing dross
+    # must not carry it into the user's prefix.
+    set(INSTALL_GTEST OFF)
     FetchContent_MakeAvailable(googletest)
 endif()
 
