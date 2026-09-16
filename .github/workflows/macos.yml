@@ -6,40 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
-# macOS users build with the Apple Clang that ships with the OS, so the OS
-# generation is the axis worth varying: pinning to the two current releases
-# covers two Apple Clang generations without a separate compiler axis.
+# What is left here builds the library the two ways it is distributed on
+# macOS: as a static library, and installed for a consumer to find. The Apple
+# Clang generations are checked in check.yml.
 
 jobs:
-  build-macos-clang:
-    name: macOS Clang (${{ matrix.os }}, ${{ matrix.build_type }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15, macos-26]
-        build_type: [Debug, Release]
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Report toolchain versions
-      run: |
-        clang --version
-        xcrun --show-sdk-version
-        cmake --version
-
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
-    - name: Build
-      run: cmake --build build --config ${{ matrix.build_type }} -j"$(sysctl -n hw.ncpu)"
-
-    - name: Test
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(sysctl -n hw.ncpu)"
-
   build-static-library:
     name: macOS Static Library Build
     runs-on: macos-15
