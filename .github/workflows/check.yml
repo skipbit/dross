@@ -1,6 +1,7 @@
 # Checks a commit against the Requirements in the README: every supported
-# compiler and standard library pairing, in both build types. `required` waits
-# for all of them, so one name stands for the whole list.
+# compiler and standard library pairing, in both build types, and the two ways
+# the library is packaged. `required` waits for all of them, so one name stands
+# for the whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -144,10 +145,106 @@ jobs:
           carries CMAKE_EXE_LINKER_FLAGS "$LDFLAGS"
           carries CMAKE_SHARED_LINKER_FLAGS "$LDFLAGS"
 
+  # The two ways the library reaches a consumer: built as a static library,
+  # and installed for find_package and pkg-config to describe. Both are the
+  # same on either platform, so one job covers them with the runner's own
+  # compiler.
+  packaging:
+    name: packaging (${{ matrix.platform.name }}, ${{ matrix.kind }})
+    runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { name: linux, os: ubuntu-24.04 }
+          - { name: macos, os: macos-15 }
+        kind: [static, install]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          # What is installed carries the version, which comes from git tags:
+          # a shallow checkout would package 0.0.0.
+          fetch-depth: 0
+
+      - name: Report toolchain versions
+        run: |
+          c++ --version
+          if [ "$RUNNER_OS" = macOS ]; then xcrun --show-sdk-version; fi
+          cmake --version
+
+      - name: Build and test the static library
+        if: matrix.kind == 'static'
+        run: |
+          jobs=$(getconf _NPROCESSORS_ONLN)
+          CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset static
+
+      - name: Build and install
+        if: matrix.kind == 'install'
+        run: |
+          cmake --preset release
+          cmake --build --preset release --parallel "$(getconf _NPROCESSORS_ONLN)"
+          sudo cmake --install build/release
+
+      - name: Build a consumer through find_package
+        if: matrix.kind == 'install'
+        run: |
+          mkdir consumer && cd consumer
+          cat > CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(consumer CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(dross REQUIRED)
+          add_executable(consumer main.cpp)
+          target_link_libraries(consumer PRIVATE dross::dross)
+          EOF
+
+          cat > main.cpp << 'EOF'
+          #include <dross/dross.h>
+          #include <iostream>
+
+          int main() {
+              dross::number n{"42"};
+              std::cout << "Test passed: " << static_cast<std::string>(n) << std::endl;
+              return 0;
+          }
+          EOF
+
+          cmake -S . -B build
+          cmake --build build
+          printed=$(./build/consumer)
+          if [ "$printed" != "Test passed: 42" ]; then
+            echo "::error::the consumer printed '$printed'"
+            exit 1
+          fi
+          echo "the consumer printed $printed"
+
+      # What was installed has to describe the version the build describes,
+      # which comes from the tags through the one implementation of it.
+      - name: Query pkg-config
+        if: matrix.kind == 'install'
+        run: |
+          pkg-config --version
+          pkg-config --exists dross
+          cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
+          expected=$(sed -n 2p "$RUNNER_TEMP/version")
+          reported=$(pkg-config --modversion dross)
+          if [ "$reported" != "$expected" ]; then
+            echo "::error::pkg-config reports $reported, expected $expected"
+            exit 1
+          fi
+          echo "pkg-config reports $reported"
+          pkg-config --cflags dross
+          pkg-config --libs dross
+
   required:
     name: required
     if: always()
-    needs: [build-and-test]
+    needs: [build-and-test, packaging]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 

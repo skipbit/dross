@@ -18,8 +18,8 @@ Welcome to dross
         <a href="https://github.com/skipbit/dross/blob/main/LICENSE">
             <img src="https://img.shields.io/github/license/skipbit/dross" alt="License">
         </a>
-        <a href="https://github.com/skipbit/dross/actions">
-            <img src="https://img.shields.io/github/actions/workflow/status/skipbit/dross/ci.yml?branch=main" alt="Build Status">
+        <a href="https://github.com/skipbit/dross/actions/workflows/check.yml">
+            <img src="https://img.shields.io/github/actions/workflow/status/skipbit/dross/check.yml?branch=main" alt="Build Status">
         </a>
     </div>
 
