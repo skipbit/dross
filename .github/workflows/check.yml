@@ -314,8 +314,10 @@ jobs:
           # checkout does not carry.
           fetch-depth: 0
 
-      # Through the same implementation the library build uses, so the
-      # documented version cannot describe a different tag.
+      # $GITHUB_ENV rather than an export: each run block is its own shell, so
+      # the Sphinx step would not see a variable the Doxygen step set. Through
+      # the same implementation the library build uses, so the documented
+      # version cannot describe a different tag.
       - name: Resolve the documented version
         run: |
           cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
@@ -345,6 +347,15 @@ jobs:
         run: |
           cd docs/sphinx
           make html
+
+      # Sphinx reports a missing reference as a warning and still exits 0, so
+      # what the build produced is checked rather than its exit status alone.
+      - name: Check the documentation was produced
+        run: |
+          test -s docs/build/doxygen/xml/index.xml
+          test -s docs/build/sphinx/html/index.html
+          echo "$(find docs/build/doxygen/xml -name '*.xml' | wc -l) Doxygen files"
+          echo "$(find docs/build/sphinx/html -name '*.html' | wc -l) HTML pages"
 
   required:
     name: required
