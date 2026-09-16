@@ -106,6 +106,19 @@ jobs:
           jobs=$(getconf _NPROCESSORS_ONLN)
           CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset ${{ matrix.preset }}
 
+      # The name says which compiler, and CMake's own record of the one it
+      # chose is the evidence. The macOS jobs name an OS release and take the
+      # compiler that comes with it, so they have nothing to compare.
+      - name: Check the compiler the build used
+        if: matrix.toolchain.cxx
+        run: |
+          used=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' build/${{ matrix.preset }}/CMakeCache.txt)
+          if [ "${used##*/}" != "$CXX" ]; then
+            echo "::error::the build used $used, not $CXX"
+            exit 1
+          fi
+          echo "the build used $used"
+
       # CMake ignores CXXFLAGS and LDFLAGS once the cache sets what they
       # initialise, and the build is green either way, so what the cache holds
       # is read back.
