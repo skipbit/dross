@@ -216,13 +216,27 @@ jobs:
 
           cmake -S . -B build
           cmake --build build
-          ./build/consumer
+          printed=$(./build/consumer)
+          if [ "$printed" != "Test passed: 42" ]; then
+            echo "::error::the consumer printed '$printed'"
+            exit 1
+          fi
+          echo "the consumer printed $printed"
 
+      # What was installed has to describe the version the build describes,
+      # which comes from the tags through the one implementation of it.
       - name: Query pkg-config
         if: matrix.kind == 'install'
         run: |
           pkg-config --exists dross
-          pkg-config --modversion dross
+          cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
+          expected=$(sed -n 2p "$RUNNER_TEMP/version")
+          reported=$(pkg-config --modversion dross)
+          if [ "$reported" != "$expected" ]; then
+            echo "::error::pkg-config reports $reported, expected $expected"
+            exit 1
+          fi
+          echo "pkg-config reports $reported"
           pkg-config --cflags dross
           pkg-config --libs dross
 
