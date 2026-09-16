@@ -106,9 +106,16 @@ jobs:
           jobs=$(getconf _NPROCESSORS_ONLN)
           CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset ${{ matrix.preset }}
 
+      # CMake ignores CXXFLAGS and LDFLAGS once the cache sets what they
+      # initialise, and the build is green either way, so what the cache holds
+      # is read back.
       - name: Check the flags reached the build
         if: matrix.toolchain.flags
-        run: .github/scripts/check-build-flags.sh build/${{ matrix.preset }} "$CXXFLAGS"
+        run: |
+          cache=build/${{ matrix.preset }}/CMakeCache.txt
+          sed -n 's/^CMAKE_CXX_FLAGS:STRING=//p' "$cache" | grep -qF -- "$CXXFLAGS"
+          sed -n 's/^CMAKE_EXE_LINKER_FLAGS:STRING=//p' "$cache" | grep -qF -- "$LDFLAGS"
+          sed -n 's/^CMAKE_SHARED_LINKER_FLAGS:STRING=//p' "$cache" | grep -qF -- "$LDFLAGS"
 
   required:
     name: required
