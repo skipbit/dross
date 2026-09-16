@@ -20,11 +20,11 @@ permissions:
 # that range too but is never checked against it. They never gate a pull
 # request and must not be added to required status checks.
 #
-# The documentation's links and formatting are checked here as well. A link
-# breaks with an external site rather than with a change, and neither the
-# documentation's toolchain nor sphinx-lint is pinned, so a failure here can
-# come from a release instead of from this repository. Pull requests run
-# these two checks as well, through documentation.yml.
+# The documentation's links and formatting are checked here rather than in
+# front of a pull request. A link breaks with an external site rather than with
+# a change, and the formatting check follows whatever sphinx-lint enforces once
+# its pin is raised. The documentation build itself is a pull request check,
+# in check.yml.
 
 jobs:
   newest-gcc:
