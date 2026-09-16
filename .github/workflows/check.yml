@@ -1,5 +1,6 @@
 # Checks a commit against the Requirements in the README: every supported
-# compiler and standard library pairing, in both build types.
+# compiler and standard library pairing, in both build types. `required` waits
+# for all of them, so one name stands for the whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -97,3 +98,20 @@ jobs:
       - name: Check the flags reached the build
         if: matrix.toolchain.flags
         run: .github/scripts/check-build-flags.sh build/${{ matrix.preset }} "$CXXFLAGS"
+
+  required:
+    name: required
+    if: always()
+    needs: [build-and-test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      # A job that failed, was cancelled or was skipped all fail this one, so
+      # a check that never ran cannot pass as success.
+      - name: Require every check to succeed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<< "$NEEDS" > /dev/null
