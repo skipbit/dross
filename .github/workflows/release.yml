@@ -148,8 +148,10 @@ jobs:
             exit 1
           fi
 
+          # A pre-release is the part after the first hyphen, and build
+          # metadata after a plus is not one: v1.2.3+build-1 is a release.
           flags=(--generate-notes --verify-tag)
-          case "$GITHUB_REF_NAME" in
+          case "${GITHUB_REF_NAME%%+*}" in
             *-*) flags+=(--prerelease) ;;
           esac
           gh release create "$GITHUB_REF_NAME" "${flags[@]}"
