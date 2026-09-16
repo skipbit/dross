@@ -42,24 +42,29 @@ jobs:
           # GCC starts at 13 on ubuntu-24.04. Clang starts at 20 on ubuntu-26.04:
           # older releases cannot build this library against the libstdc++
           # ubuntu-24.04 pairs them with.
-          - { name: 'linux, gcc-13', os: ubuntu-24.04, cc: gcc-13, cxx: g++-13 }
-          - { name: 'linux, gcc-15', os: ubuntu-26.04, cc: gcc-15, cxx: g++-15 }
+          #
+          # stdlib is the macro the standard library defines about itself,
+          # with the release where a job pins one.
+          - { name: 'linux, gcc-13', os: ubuntu-24.04, cc: gcc-13, cxx: g++-13, stdlib: '_GLIBCXX_RELEASE 13' }
+          - { name: 'linux, gcc-15', os: ubuntu-26.04, cc: gcc-15, cxx: g++-15, stdlib: '_GLIBCXX_RELEASE 15' }
           # The runner's default libstdc++, which most Clang users on Linux
-          # build against.
-          - { name: 'linux, clang-20', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: libstdc++ }
-          - { name: 'linux, clang-22', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: libstdc++ }
+          # build against. Its release is reported, not asserted on: a change
+          # of image is news, not a failure.
+          - { name: 'linux, clang-20', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: _GLIBCXX_RELEASE }
+          - { name: 'linux, clang-22', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: _GLIBCXX_RELEASE }
           # The rest of the libstdc++ range. Which release Clang uses does not
           # follow from its version, so each one is pinned.
-          - { name: 'linux, clang-20, libstdc++-13', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: libstdc++, packages: libstdc++-13-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13' }
-          - { name: 'linux, clang-20, libstdc++-14', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: libstdc++, packages: libstdc++-14-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14' }
-          - { name: 'linux, clang-22, libstdc++-13', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: libstdc++, packages: libstdc++-13-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13' }
-          - { name: 'linux, clang-22, libstdc++-14', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: libstdc++, packages: libstdc++-14-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14' }
+          - { name: 'linux, clang-20, libstdc++-13', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: '_GLIBCXX_RELEASE 13', packages: libstdc++-13-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13' }
+          - { name: 'linux, clang-20, libstdc++-14', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: '_GLIBCXX_RELEASE 14', packages: libstdc++-14-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14' }
+          - { name: 'linux, clang-22, libstdc++-13', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: '_GLIBCXX_RELEASE 13', packages: libstdc++-13-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13' }
+          - { name: 'linux, clang-22, libstdc++-14', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: '_GLIBCXX_RELEASE 14', packages: libstdc++-14-dev, flags: '--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14' }
           # libc++ at both ends of the Clang range.
-          - { name: 'linux, clang-20, libc++', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, packages: 'libc++-20-dev libc++abi-20-dev', flags: '-stdlib=libc++' }
-          - { name: 'linux, clang-22, libc++', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, packages: 'libc++-22-dev libc++abi-22-dev', flags: '-stdlib=libc++' }
-          # The Apple Clang that ships with each OS release.
-          - { name: 'macos-15', os: macos-15 }
-          - { name: 'macos-26', os: macos-26 }
+          - { name: 'linux, clang-20, libc++', os: ubuntu-26.04, cc: clang-20, cxx: clang++-20, stdlib: _LIBCPP_VERSION, packages: 'libc++-20-dev libc++abi-20-dev', flags: '-stdlib=libc++' }
+          - { name: 'linux, clang-22, libc++', os: ubuntu-26.04, cc: clang-22, cxx: clang++-22, stdlib: _LIBCPP_VERSION, packages: 'libc++-22-dev libc++abi-22-dev', flags: '-stdlib=libc++' }
+          # The Apple Clang that ships with each OS release, against the libc++
+          # that comes with it.
+          - { name: 'macos-15', os: macos-15, stdlib: _LIBCPP_VERSION }
+          - { name: 'macos-26', os: macos-26, stdlib: _LIBCPP_VERSION }
     # The toolchain goes through the environment so that the presets stay free
     # of CMAKE_CXX_FLAGS: CMake ignores CXXFLAGS once the cache sets it.
     env:
@@ -86,9 +91,15 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then xcrun --show-sdk-version; fi
           cmake --version
 
-      - name: Check the libstdc++ Clang selects
-        if: matrix.toolchain.stdlib == 'libstdc++'
-        run: .github/scripts/check-libstdcxx.sh
+      # The preprocessor's own answer, rather than the include search path:
+      # this is the release the build compiles against, with the flags the
+      # build uses. A job that names a release fails unless it gets that one.
+      - name: Check the standard library the compiler sees
+        run: |
+          read -r -a flags <<< "${CXXFLAGS:-}"
+          macros=$(echo '#include <version>' | "${CXX:-c++}" -std=c++23 "${flags[@]}" -x c++ -dM -E -)
+          grep -E '^#define (_GLIBCXX_RELEASE|_LIBCPP_VERSION) ' <<< "$macros"
+          grep -Eq '^#define ${{ matrix.toolchain.stdlib }}( |$)' <<< "$macros"
 
       - name: Build and test
         run: |
