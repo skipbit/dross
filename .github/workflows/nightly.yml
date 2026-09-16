@@ -345,6 +345,8 @@ jobs:
   docs-lint:
     name: docs (lint)
     runs-on: ubuntu-24.04
+    # The package index can stall this job's install the same way.
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v7
