@@ -354,8 +354,9 @@ jobs:
       with:
         python-version: '3.11'
 
-    # Only sphinx-lint, within the versions requirements.txt allows: checking
-    # the formatting does not need the documentation built.
+    # Only sphinx-lint: checking the formatting does not need the
+    # documentation built. The requirements file goes in as constraints, so
+    # this installs the release that build would install.
     - name: Install sphinx-lint
       run: pip install -c docs/sphinx/requirements.txt sphinx-lint
 
