@@ -27,8 +27,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Ahead of the checks, because this needs no compiler and a tag that cannot
-  # produce a version should not spend a full run.
+  # Ahead of the checks: a tag that cannot produce a version should not spend
+  # the whole matrix. Configuring the project to read the version back needs a
+  # compiler, but nothing is built here.
   check-version:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -110,7 +111,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # By commit, so the check below compares the tag against what was
+          # checked rather than against itself.
           ref: ${{ github.sha }}
+          # The tag this reads is only in the clone with the history.
           fetch-depth: 0
 
       # Everything above was checked at github.sha. If the tag has since been
