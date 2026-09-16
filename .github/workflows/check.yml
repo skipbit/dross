@@ -98,8 +98,12 @@ jobs:
         run: |
           read -r -a flags <<< "${CXXFLAGS:-}"
           macros=$(echo '#include <version>' | "${CXX:-c++}" -std=c++23 "${flags[@]}" -x c++ -dM -E -)
-          grep -E '^#define (_GLIBCXX_RELEASE|_LIBCPP_VERSION) ' <<< "$macros"
-          grep -Eq '^#define ${{ matrix.toolchain.stdlib }}( |$)' <<< "$macros"
+          seen=$(grep -E '^#define (_GLIBCXX_RELEASE|_LIBCPP_VERSION) ' <<< "$macros" | tr '\n' ' ')
+          if ! grep -Eq '^#define ${{ matrix.toolchain.stdlib }}( |$)' <<< "$macros"; then
+            echo "::error::expected ${{ matrix.toolchain.stdlib }}, the compiler defines $seen"
+            exit 1
+          fi
+          echo "the compiler defines $seen"
 
       - name: Build and test
         run: |
@@ -126,9 +130,17 @@ jobs:
         if: matrix.toolchain.flags
         run: |
           cache=build/${{ matrix.preset }}/CMakeCache.txt
-          sed -n 's/^CMAKE_CXX_FLAGS:STRING=//p' "$cache" | grep -qF -- "$CXXFLAGS"
-          sed -n 's/^CMAKE_EXE_LINKER_FLAGS:STRING=//p' "$cache" | grep -qF -- "$LDFLAGS"
-          sed -n 's/^CMAKE_SHARED_LINKER_FLAGS:STRING=//p' "$cache" | grep -qF -- "$LDFLAGS"
+          carries() {
+            value=$(sed -n "s/^$1:STRING=//p" "$cache")
+            if ! grep -qF -- "$2" <<< "$value"; then
+              echo "::error::$1 is '$value', without '$2'"
+              exit 1
+            fi
+            echo "$1 carries $2"
+          }
+          carries CMAKE_CXX_FLAGS "$CXXFLAGS"
+          carries CMAKE_EXE_LINKER_FLAGS "$LDFLAGS"
+          carries CMAKE_SHARED_LINKER_FLAGS "$LDFLAGS"
 
   required:
     name: required
