@@ -1,7 +1,7 @@
 # Checks a commit against the Requirements in the README: every supported
-# compiler and standard library pairing, in both build types, and the two ways
-# the library is packaged. `required` waits for all of them, so one name stands
-# for the whole list.
+# compiler and standard library pairing, in both build types, the two ways the
+# library is packaged, and what the sanitizers find. `required` waits for all
+# of them, so one name stands for the whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -241,10 +241,64 @@ jobs:
           pkg-config --cflags dross
           pkg-config --libs dross
 
+  # One pairing carries the sanitizers: the newest Clang against the runner's
+  # own libstdc++, in a debug build. What they report is the point, so the
+  # flags and the runtime they pull in are checked as well.
+  sanitize:
+    name: sanitize (${{ matrix.sanitizer.name }})
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer:
+          - { name: address, flag: '-fsanitize=address,undefined', symbols: '__asan_init __ubsan_handle_' }
+          - { name: thread, flag: '-fsanitize=thread', symbols: '__tsan_init' }
+    env:
+      CC: clang-22
+      CXX: clang++-22
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Report toolchain versions
+        run: |
+          "$CXX" --version
+          cmake --version
+
+      - name: Build and test
+        run: |
+          jobs=$(getconf _NPROCESSORS_ONLN)
+          CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset sanitize-${{ matrix.sanitizer.name }}
+
+      # Tests that pass say nothing about a sanitizer that was never built in.
+      - name: Check the sanitizer is built in
+        run: |
+          build=build/sanitize-${{ matrix.sanitizer.name }}
+          flags=$(sed -n 's/^CMAKE_CXX_FLAGS:STRING=//p' "$build/CMakeCache.txt")
+          if ! grep -qF -- '${{ matrix.sanitizer.flag }}' <<< "$flags"; then
+            echo "::error::CMAKE_CXX_FLAGS is '$flags', without '${{ matrix.sanitizer.flag }}'"
+            exit 1
+          fi
+          echo "CMAKE_CXX_FLAGS carries ${{ matrix.sanitizer.flag }}"
+          for binary in "$build/src/libdross.so" "$build/test/dross_test"; do
+            for symbol in ${{ matrix.sanitizer.symbols }}; do
+              count=$(nm -D "$binary" | grep -c "$symbol" || true)
+              if [ "$count" -eq 0 ]; then
+                echo "::error::$binary references no $symbol"
+                exit 1
+              fi
+              echo "$binary references $count $symbol symbols"
+            done
+          done
+
   required:
     name: required
     if: always()
-    needs: [build-and-test, packaging]
+    needs: [build-and-test, packaging, sanitize]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 
