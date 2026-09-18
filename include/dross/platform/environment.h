@@ -8,14 +8,14 @@ namespace dross {
 /**
  * @brief Utility class for safe environment variable access.
  * 
- * The environment class provides safe, cross-platform access to environment
- * variables using std::optional to handle cases where variables may not exist.
+ * The environment class provides safe access to environment variables
+ * using std::optional to handle cases where variables may not exist.
  * This approach avoids the security risks and undefined behavior associated
  * with direct getenv() usage.
  * 
  * Key features:
  * - Safe environment variable access with std::optional
- * - Cross-platform compatibility (Unix, Windows)
+ * - POSIX environment access
  * - No undefined behavior for missing variables
  * - Thread-safe read operations
  * 
@@ -62,9 +62,8 @@ public:
      * - Environment modifications during execution may not be visible
      * 
      * Platform notes:
-     * - On Unix-like systems, uses getenv() internally
-     * - On Windows, uses GetEnvironmentVariable() internally
-     * - Variable names are case-sensitive on Unix, case-insensitive on Windows
+     * - Uses getenv() internally
+     * - Variable names are case-sensitive
      * 
      * @code
      * // Check if variable exists
