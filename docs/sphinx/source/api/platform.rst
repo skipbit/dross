@@ -256,23 +256,10 @@ Creating application directories:
 Platform Considerations
 -----------------------
 
-Windows Support
-~~~~~~~~~~~~~~~
-
-On Windows systems:
-
-- XDG directories map to appropriate Windows locations
-- Path separators are handled automatically
-- Environment variables use Windows conventions
-
-macOS Support
-~~~~~~~~~~~~~
-
-On macOS:
-
-- XDG directories follow macOS conventions where appropriate
-- ``~/Library`` paths are used for some directories
-- Full POSIX compatibility is maintained
+The platform layer is POSIX-only. ``path::separator()`` returns ``"/"``, and
+``xdg`` builds the Unix dot-directories (``.config``, ``.local/share``,
+``.cache``, ``.local/state``) on every platform it builds on, macOS included,
+where the system's own conventions differ.
 
 Error Handling
 --------------

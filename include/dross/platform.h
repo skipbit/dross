@@ -44,9 +44,8 @@
  * constructor
  * 
  * Platform support:
- * - Unix-like systems (Linux, macOS, BSD)
- * - Windows (with appropriate path separator handling)
- * - XDG specification support on Unix-like systems
+ * - POSIX systems; Linux and macOS are the ones tested
+ * - XDG specification support on those systems
  */
 
 #pragma once

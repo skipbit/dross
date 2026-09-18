@@ -8,15 +8,15 @@
 namespace dross {
 
 /**
- * @brief Cross-platform filesystem path operations with error handling.
- * 
- * The path class provides a safe, cross-platform wrapper around filesystem
- * operations using std::filesystem as the underlying implementation. It uses
+ * @brief Filesystem path operations with error handling.
+ *
+ * The path class provides a safe wrapper around filesystem operations
+ * using std::filesystem as the underlying implementation. It uses
  * std::expected for operations that may fail and std::optional for operations
  * that may not return a value.
  * 
  * Key features:
- * - Cross-platform path handling (Windows, Unix-like systems)
+ * - POSIX path handling with "/" as the separator
  * - Safe error handling with std::expected and std::optional
  * - Path expansion and resolution
  * - Directory creation with proper error reporting
@@ -119,9 +119,8 @@ public:
      * @brief Get the user's home directory.
      * @return Optional containing the home directory path, or std::nullopt if not determinable
      * 
-     * Attempts to determine the user's home directory using platform-appropriate methods:
-     * - Unix-like systems: $HOME environment variable
-     * - Windows: %USERPROFILE% or %HOMEDRIVE%%HOMEPATH%
+     * Reads the $HOME environment variable, and falls back to the password
+     * database entry of the current user when it is not set.
      * 
      * @code
      * if (auto home = path::home()) {
@@ -134,10 +133,9 @@ public:
     static std::optional<path> home();
     
     /**
-     * @brief Get the platform-appropriate path separator.
-     * @return String containing the path separator ("/" on Unix, "\\" on Windows)
-     * 
-     * Returns the native path separator for the current platform.
+     * @brief Get the path separator.
+     * @return String containing the path separator, always "/"
+     *
      * Useful for building paths manually or for display purposes.
      */
     static std::string separator();
@@ -206,10 +204,9 @@ public:
     
     /**
      * @brief Get the string representation of the path.
-     * @return String representation using native path format
-     * 
-     * Returns the path as a string using the native format for the current platform.
-     * On Unix-like systems, uses forward slashes. On Windows, uses backslashes.
+     * @return String representation of the path
+     *
+     * Returns the path as a string, with "/" between the components.
      */
     std::string string() const;
 

@@ -68,7 +68,7 @@ vcpkg install dross
 conan install dross/0.0.1@
 
 # CPM (CMake Package Manager)
-CPMAddPackage("gh:skipbit/dross@0.0.1")
+CPMAddPackage("gh:skipbit/dross#main")
 ```
 
 #### From Source
@@ -115,7 +115,7 @@ target_link_libraries(your_target PRIVATE dross::dross)
 include(FetchContent)
 FetchContent_Declare(dross
     GIT_REPOSITORY https://github.com/skipbit/dross.git
-    GIT_TAG v0.0.1
+    GIT_TAG main
 )
 FetchContent_MakeAvailable(dross)
 target_link_libraries(your_target PRIVATE dross::dross)

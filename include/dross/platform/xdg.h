@@ -55,9 +55,9 @@ namespace dross {
  * @endcode
  * 
  * Platform compatibility:
- * - Full support on Linux and other Unix-like systems
- * - Limited support on macOS (uses similar directory structure)
- * - Not applicable on Windows (consider using appropriate Windows APIs)
+ * - The specification targets Linux and other Unix-like systems
+ * - The same dot-directories are built on macOS, whose own conventions
+ *   place application data elsewhere
  */
 class xdg {
 public:
