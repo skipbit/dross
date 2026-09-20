@@ -3,11 +3,11 @@
 #include "dross/thread/runloop.h"
 #include "thread/native.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
 #include <optional>
-#include <stop_token>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -88,7 +88,11 @@ private:
     bool _finished{false};
     std::optional<std::uint64_t> _native_id;
     std::optional<runloop> _loop;
-    std::stop_source _stop;
+
+    // A plain flag rather than std::stop_source: <stop_token> is not in the
+    // standard library Apple Clang ships, and nothing here needs more than
+    // setting a flag and reading it.
+    std::atomic<bool> _stop_requested{false};
 };
 
 thread::storage::current_holder::~current_holder()
@@ -147,12 +151,16 @@ void thread::storage::deregister()
 
 void thread::storage::finish()
 {
+    // Out of the registry before anyone can see the thread as finished. The
+    // other order lets a caller return from join_for() and still find the
+    // thread in all_threads(), which is the opposite of what both promise.
+    deregister();
+
     {
         const std::lock_guard<std::mutex> guard{_mutex};
         _finished = true;
     }
     _done_cv.notify_all();
-    deregister();
 }
 
 std::shared_ptr<thread::storage> thread::storage::start(std::function<void()> body, bool run_loop)
@@ -287,12 +295,12 @@ void thread::storage::quit()
 
 void thread::storage::cancel()
 {
-    _stop.request_stop();
+    _stop_requested.store(true);
 }
 
 bool thread::storage::stop_requested() const
 {
-    return _stop.get_token().stop_requested();
+    return _stop_requested.load();
 }
 
 bool thread::storage::running() const

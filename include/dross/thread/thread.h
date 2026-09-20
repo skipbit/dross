@@ -40,7 +40,7 @@ namespace dross {
  *   it, and nothing happens to the thread automatically at process exit
  *
  * Cancellation:
- * - cancel() only requests a stop, through a std::stop_source; it does not
+ * - cancel() only raises a stop request that a body polls; it does not
  *   touch the thread's run loop. A body observes it by polling
  *   current_thread().stop_requested() and returning on its own
  * - quit() stops the thread's run loop, if it has one, keeping its queued
