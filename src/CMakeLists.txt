@@ -33,6 +33,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/runloop.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/thread.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads)
@@ -72,6 +73,7 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread/runloop.h
+    ${PROJECT_SOURCE_DIR}/include/dross/thread/thread.h
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

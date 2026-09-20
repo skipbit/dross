@@ -32,4 +32,18 @@ bool is_main_thread()
 #endif
 }
 
+std::optional<std::uint64_t> main_thread_id()
+{
+#if defined(__linux__)
+    // The process id is the kernel id of its thread group leader, which is
+    // the thread the process started on; unlike gettid(), this holds no
+    // matter which thread asks.
+    return static_cast<std::uint64_t>(getpid());
+#else
+    // No API answers this for a thread other than the one asking, so this
+    // is only ever known once the main thread has used the module itself.
+    return is_main_thread() ? std::optional{thread_id()} : std::nullopt;
+#endif
+}
+
 }

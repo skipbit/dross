@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace dross::native {
 
-// The two places this library asks the operating system about a thread.
+// The three places this library asks the operating system about a thread.
 // Every platform difference in the thread module lives in native.cpp; nothing
 // else branches on the platform.
 
@@ -17,5 +18,10 @@ std::uint64_t thread_id();
 // system rather than recorded at load time, so it stays right for a library
 // loaded by a worker and for a thread that reuses an ended thread's identity.
 bool is_main_thread();
+
+// The kernel id of the thread the process started on, asked from any thread.
+// Empty when the platform cannot answer this from a thread other than the
+// main one.
+std::optional<std::uint64_t> main_thread_id();
 
 }
