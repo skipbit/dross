@@ -76,7 +76,93 @@ TEST(data_test, move_construction) {
     data moved{std::move(original)};
     EXPECT_EQ(moved.size(), 5u);
     EXPECT_EQ(to_string(moved), "Hello");
-    // original should be in valid but unspecified state
+    EXPECT_TRUE(original.empty());
+}
+
+// Moved-from state: every operation with no precondition has to work on a
+// moved-from data.
+TEST(data_test, moved_from_has_a_size) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+    EXPECT_EQ(original.size(), 0u);
+}
+
+TEST(data_test, moved_from_is_empty) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+    EXPECT_TRUE(original.empty());
+}
+
+TEST(data_test, moved_from_can_be_copied) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+    data copy{original};
+    EXPECT_TRUE(copy.empty());
+    EXPECT_EQ(copy, original);
+}
+
+TEST(data_test, moved_from_can_be_copy_assigned_from) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+    data target{"World"};
+    target = original;
+    EXPECT_TRUE(target.empty());
+}
+
+TEST(data_test, moved_from_can_be_move_assigned_from) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+    data target{"World"};
+    target = std::move(original);
+    EXPECT_TRUE(target.empty());
+}
+
+TEST(data_test, moved_from_can_be_assigned_a_new_value) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+    original = data{"World"};
+    EXPECT_EQ(to_string(original), "World");
+}
+
+TEST(data_test, moved_from_is_destructible) {
+    data survivor{"Hello"};
+    {
+        data original{"Hello"};
+        data taken{std::move(original)};
+        EXPECT_EQ(taken.size(), 5u);
+        EXPECT_TRUE(original.empty());
+    }
+    EXPECT_EQ(survivor.size(), 5u);
+}
+
+TEST(data_test, moved_from_survives_every_accessor) {
+    data original{"Hello"};
+    data moved{std::move(original)};
+
+    EXPECT_EQ(original.size(), 0u);
+    EXPECT_TRUE(original.empty());
+    EXPECT_GT(original.max_size(), 0u);
+    EXPECT_FALSE(original.bytes().has_value());
+    EXPECT_FALSE(original.at(0).has_value());
+    EXPECT_EQ(to_string(original), "");
+    EXPECT_EQ(original.begin(), original.end());
+
+    size_t visited = 0;
+    for (const auto byte : original) {
+        (void)byte;
+        ++visited;
+    }
+    EXPECT_EQ(visited, 0u);
+
+    EXPECT_EQ(original <=> data{}, std::strong_ordering::equal);
+
+    original.reserve(16);
+    original.append({0x01, 0x02});
+    EXPECT_EQ(original.size(), 2u);
+    original.resize(4, 0xFF);
+    EXPECT_EQ(original.size(), 4u);
+    original.clear();
+    EXPECT_TRUE(original.empty());
 }
 
 // Access Tests
@@ -254,9 +340,28 @@ TEST(data_test, move_assignment) {
     data d1{"Hello"};
     data d2{"World"};
     d2 = std::move(d1);
-    
+
     EXPECT_EQ(to_string(d2), "Hello");
-    // d1 is in valid but unspecified state
+    EXPECT_TRUE(d1.empty());
+    EXPECT_EQ(d1.size(), 0u);
+}
+
+TEST(data_test, self_move_assignment) {
+    data d{"Hello"};
+    #if defined(__clang__)
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wself-move"
+    #elif defined(__GNUC__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wself-move"
+    #endif
+    d = std::move(d); // Should leave the value alone
+    #if defined(__clang__)
+    #pragma clang diagnostic pop
+    #elif defined(__GNUC__)
+    #pragma GCC diagnostic pop
+    #endif
+    EXPECT_EQ(to_string(d), "Hello");
 }
 
 TEST(data_test, self_assignment) {
