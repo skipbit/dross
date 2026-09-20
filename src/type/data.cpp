@@ -30,10 +30,10 @@ data::data() : _store(std::make_unique<storage>()) {}
 
 data::data(const data& other) : _store(std::make_unique<storage>(*other._store)) {}
 
+// The accessors dereference _store without checking, so a moved-from data
+// keeps an empty storage rather than a null one.
 data::data(data&& other) noexcept : _store(std::move(other._store)) {
-    if (!_store) {
-        _store = std::make_unique<storage>();
-    }
+    other._store = std::make_unique<storage>();
 }
 
 data::data(const std::initializer_list<uint8_t>& bytes)
@@ -143,10 +143,11 @@ data& data::operator=(const data& other) {
 
 data& data::operator=(data&& other) noexcept {
     if (this != &other) {
-        _store = std::move(other._store);
-        if (!_store) {
-            _store = std::make_unique<storage>();
-        }
+        // Handing our storage to the source keeps both usable without
+        // allocating. Assigning an empty vector releases the buffer that
+        // storage was carrying, which clear() would leave held.
+        _store.swap(other._store);
+        other._store->bytes = std::vector<uint8_t>{};
     }
     return *this;
 }
