@@ -103,7 +103,10 @@ public:
 
     /**
      * @brief Run one task, waiting for one if the queue is empty.
-     * @return true when a task ran, false when quit() ended the wait
+     * @return true when a task ran, false when quit() is seen
+     *
+     * A pending quit() ends this at once, even with a task already queued,
+     * and clears the request; that task stays queued for next time.
      */
     bool run_one();
 
@@ -122,7 +125,7 @@ public:
      * @param timeout How long to keep running
      * @return The number of tasks that ran
      *
-     * A timeout of zero runs what is queued and returns without waiting.
+     * A timeout of zero runs nothing and returns at once.
      */
     std::size_t run_for(std::chrono::milliseconds timeout);
 

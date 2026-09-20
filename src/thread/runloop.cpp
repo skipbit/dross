@@ -10,8 +10,9 @@ namespace dross {
 
 namespace {
 
-// Waiting without a deadline. A time point rather than a separate flag, so
-// the waiting logic has one shape.
+// Marks "wait with no deadline". It is a time point, rather than a separate
+// flag, so the same parameter carries both cases; the branch that checks for
+// it exists to avoid handing time_point::max() to wait_until().
 constexpr auto kNoDeadline = std::chrono::steady_clock::time_point::max();
 
 }
@@ -64,6 +65,12 @@ private:
     // passed with nothing to run.
     bool next(std::unique_lock<std::mutex>& lock, std::function<void()>& out,
               std::chrono::steady_clock::time_point deadline);
+
+    // Runs one task with the lock released, and takes the lock back after.
+    // The captures go too, so their own code runs outside the lock as well.
+    // If the task throws, the lock stays released.
+    void run_released(std::unique_lock<std::mutex>& lock,
+                      std::function<void()>& task);
 
     std::size_t run_until(std::chrono::steady_clock::time_point deadline);
 
@@ -138,35 +145,31 @@ bool runloop::storage::enqueue(std::function<void()>&& task)
 bool runloop::storage::next(std::unique_lock<std::mutex>& lock, std::function<void()>& out,
                             std::chrono::steady_clock::time_point deadline)
 {
-    while (true) {
-        if (_quit) {
-            _quit = false;
-            return false;
-        }
+    const auto ready = [this]() { return _quit || !_pending.empty(); };
 
-        if (!_pending.empty()) {
-            out = std::move(_pending.front());
-            _pending.pop_front();
-            return true;
-        }
-
-        if (deadline == kNoDeadline) {
-            _wake.wait(lock);
-            continue;
-        }
-
-        if (_wake.wait_until(lock, deadline) == std::cv_status::timeout) {
-            // One last look: the deadline and a task can land together.
-            if (_quit) {
-                _quit = false;
-            } else if (!_pending.empty()) {
-                out = std::move(_pending.front());
-                _pending.pop_front();
-                return true;
-            }
-            return false;
-        }
+    if (deadline == kNoDeadline) {
+        _wake.wait(lock, ready);
+    } else if (!_wake.wait_until(lock, deadline, ready)) {
+        return false;
     }
+
+    if (_quit) {
+        _quit = false;
+        return false;
+    }
+
+    out = std::move(_pending.front());
+    _pending.pop_front();
+    return true;
+}
+
+void runloop::storage::run_released(std::unique_lock<std::mutex>& lock,
+                                    std::function<void()>& task)
+{
+    lock.unlock();
+    task();
+    task = nullptr;  // release the captures outside the lock
+    lock.lock();
 }
 
 std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point deadline)
@@ -177,12 +180,13 @@ std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point de
     std::unique_lock<std::mutex> lock{_mutex};
     std::function<void()> task;
 
-    while (next(lock, task, deadline)) {
-        lock.unlock();
-        task();
-        task = nullptr;  // release the captures outside the lock
+    while (deadline == kNoDeadline || std::chrono::steady_clock::now() < deadline) {
+        if (!next(lock, task, deadline)) {
+            break;
+        }
+
+        run_released(lock, task);
         ++ran;
-        lock.lock();
     }
 
     return ran;
@@ -208,8 +212,7 @@ bool runloop::storage::run_one()
         return false;
     }
 
-    lock.unlock();
-    task();
+    run_released(lock, task);
     return true;
 }
 
@@ -227,11 +230,8 @@ std::size_t runloop::storage::run_pending()
         std::function<void()> task = std::move(_pending.front());
         _pending.pop_front();
 
-        lock.unlock();
-        task();
-        task = nullptr;  // release the captures outside the lock
+        run_released(lock, task);
         ++ran;
-        lock.lock();
     }
 
     return ran;
@@ -258,11 +258,8 @@ void runloop::storage::clear()
 
 void runloop::storage::finish()
 {
-    {
-        const std::lock_guard<std::mutex> guard{_mutex};
-        _finished = true;
-    }
-    _wake.notify_all();
+    const std::lock_guard<std::mutex> guard{_mutex};
+    _finished = true;
 }
 
 std::size_t runloop::storage::pending_count() const

@@ -18,7 +18,7 @@ void reset_main_runloop()
 {
     dross::runloop loop = dross::main_runloop();
     loop.clear();
-    loop.run_for(std::chrono::milliseconds{0});
+    loop.run_for(std::chrono::milliseconds{1});
 }
 
 }
@@ -152,6 +152,17 @@ TEST(runloop_test, quit_ends_run_and_keeps_the_queue)
     loop.clear();
 }
 
+TEST(runloop_test, run_pending_does_not_consume_a_pending_quit)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.quit();
+
+    EXPECT_EQ(loop.run_pending(), 0U);
+    EXPECT_EQ(loop.run(), 0U);
+}
+
 TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
 {
     reset_main_runloop();
@@ -166,20 +177,47 @@ TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
     worker.join();
 }
 
+TEST(runloop_test, run_returns_the_number_of_tasks_it_ran)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.perform([]() {});
+    loop.perform([]() {});
+    loop.perform([loop]() mutable { loop.quit(); });
+
+    EXPECT_EQ(loop.run(), 3U);
+}
+
+TEST(runloop_test, run_one_returns_false_when_quit_is_pending)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.perform([]() {});
+    loop.quit();
+
+    EXPECT_FALSE(loop.run_one());
+
+    loop.clear();
+}
+
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
 {
     reset_main_runloop();
     dross::runloop loop = dross::main_runloop();
 
     std::atomic<std::thread::id> ran_on{};
-    std::thread worker{[loop, &ran_on]() mutable {
-        loop.perform([&ran_on]() { ran_on.store(std::this_thread::get_id()); });
+    std::atomic<bool> queued{false};
+    std::thread worker{[loop, &ran_on, &queued]() mutable {
+        queued.store(loop.perform([&ran_on]() { ran_on.store(std::this_thread::get_id()); }));
     }};
 
     EXPECT_TRUE(loop.run_one());
     EXPECT_EQ(ran_on.load(), std::this_thread::get_id());
 
     worker.join();
+    EXPECT_TRUE(queued.load());
 }
 
 TEST(runloop_test, tasks_from_many_threads_all_arrive)
@@ -191,12 +229,15 @@ TEST(runloop_test, tasks_from_many_threads_all_arrive)
     constexpr int kPerPoster = 50;
 
     std::atomic<int> ran{0};
+    std::atomic<int> queued{0};
     std::vector<std::thread> posters;
     posters.reserve(kPosters);
     for (int poster = 0; poster < kPosters; ++poster) {
-        posters.emplace_back([loop, &ran]() mutable {
+        posters.emplace_back([loop, &ran, &queued]() mutable {
             for (int n = 0; n < kPerPoster; ++n) {
-                loop.perform([&ran]() { ran.fetch_add(1); });
+                if (loop.perform([&ran]() { ran.fetch_add(1); })) {
+                    queued.fetch_add(1);
+                }
             }
         });
     }
@@ -209,6 +250,7 @@ TEST(runloop_test, tasks_from_many_threads_all_arrive)
         poster.join();
     }
 
+    EXPECT_EQ(queued.load(), kPosters * kPerPoster);
     EXPECT_EQ(ran.load(), kPosters * kPerPoster);
     EXPECT_TRUE(loop.empty());
 }
@@ -234,6 +276,19 @@ TEST(runloop_test, run_for_runs_what_is_queued)
     EXPECT_EQ(loop.run_for(std::chrono::milliseconds{20}), 2U);
 }
 
+TEST(runloop_test, run_for_zero_runs_nothing)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.perform([]() {});
+
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds{0}), 0U);
+    EXPECT_EQ(loop.pending_count(), 1U);
+
+    loop.clear();
+}
+
 TEST(runloop_test, is_running_is_true_inside_a_task)
 {
     reset_main_runloop();
@@ -246,6 +301,28 @@ TEST(runloop_test, is_running_is_true_inside_a_task)
     loop.run_pending();
 
     EXPECT_TRUE(seen);
+    EXPECT_FALSE(loop.is_running());
+}
+
+TEST(runloop_test, run_pending_from_inside_a_task_restores_the_outer_running_state)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    bool seen_inside_inner_task = false;
+    bool seen_after_inner_run = false;
+    loop.perform([loop, &seen_inside_inner_task, &seen_after_inner_run]() mutable {
+        loop.perform([loop, &seen_inside_inner_task]() mutable {
+            seen_inside_inner_task = loop.is_running();
+        });
+        loop.run_pending();
+        seen_after_inner_run = loop.is_running();
+    });
+
+    loop.run_pending();
+
+    EXPECT_TRUE(seen_inside_inner_task);
+    EXPECT_TRUE(seen_after_inner_run);
     EXPECT_FALSE(loop.is_running());
 }
 
@@ -262,4 +339,20 @@ TEST(runloop_test, an_exception_from_a_task_propagates)
     EXPECT_FALSE(loop.is_running());
 
     loop.clear();
+}
+
+TEST(runloop_test, an_exception_from_a_task_propagates_out_of_run)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.perform([]() { throw std::runtime_error{"from a task"}; });
+
+    EXPECT_THROW(loop.run(), std::runtime_error);
+    EXPECT_FALSE(loop.is_running());
+
+    bool ran = false;
+    loop.perform([&ran]() { ran = true; });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_TRUE(ran);
 }

@@ -189,6 +189,9 @@ if (auto config_dir = app.config_home()) {
 - **`path`** - Filesystem operations with error handling
 - **`xdg`** - XDG Base Directory specification support
 
+### Thread Layer
+- **`runloop`** - Per-thread task queue, so work can be handed to a specific thread
+
 
 ## 📖 Documentation
 
@@ -231,6 +234,7 @@ ctest -V
 ### Current Modules
 - ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
+- ✅ Thread utilities (runloop)
 
 ### Planned Features
 - **Configuration** - TOML, JSON, XML, YAML parsers

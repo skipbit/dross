@@ -3,8 +3,8 @@
 include(GNUInstallDirs)
 
 # The thread module runs on std::thread, which needs the platform's threading
-# support linked in. PUBLIC, because the headers a consumer includes declare
-# types that carry it.
+# support linked in. PUBLIC, because a consumer linking libdross statically has
+# to link the thread library itself; see drossConfig.cmake.in and dross.pc.in.
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
