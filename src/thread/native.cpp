@@ -18,8 +18,13 @@ std::uint64_t thread_id()
     return static_cast<std::uint64_t>(gettid());
 #else
     std::uint64_t id = 0;
-    pthread_threadid_np(nullptr, &id);
-    return id;
+    if (pthread_threadid_np(nullptr, &id) == 0) {
+        return id;
+    }
+    // pthread_threadid_np() documents no cause for failure, but its output
+    // is left at 0 on one; the Mach port name is the fallback rather than
+    // returning that, which would otherwise look like a valid, if wrong, id.
+    return static_cast<std::uint64_t>(pthread_mach_thread_np(pthread_self()));
 #endif
 }
 
@@ -44,6 +49,12 @@ std::optional<std::uint64_t> main_thread_id()
     // is only ever known once the main thread has used the module itself.
     return is_main_thread() ? std::optional{thread_id()} : std::nullopt;
 #endif
+}
+
+bool on_main_thread()
+{
+    static const thread_local bool is_main = is_main_thread();
+    return is_main;
 }
 
 }

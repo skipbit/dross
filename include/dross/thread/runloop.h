@@ -194,6 +194,11 @@ private:
  *
  * The main thread is the one the process started on, as the system reports
  * it, so which thread loaded the library does not come into it.
+ *
+ * Marking this loop finished happens through the main thread's own
+ * bookkeeping, which only the main thread can install for itself. A process
+ * whose main thread never calls current_runloop() or main_runloop() leaves
+ * this loop never marked finished, even after the process has exited.
  */
 runloop main_runloop();
 

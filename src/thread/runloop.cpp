@@ -17,14 +17,6 @@ namespace {
 // it exists to avoid handing time_point::max() to wait_until().
 constexpr auto kNoDeadline = std::chrono::steady_clock::time_point::max();
 
-// Asked of the system once per thread, because the answer cannot change and
-// the question costs a system call.
-bool on_main_thread()
-{
-    static const thread_local bool is_main = native::is_main_thread();
-    return is_main;
-}
-
 }
 
 class runloop::storage final {
@@ -133,7 +125,7 @@ std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
     };
 
     static thread_local const holder current{
-        on_main_thread() ? main_loop() : std::make_shared<storage>()};
+        native::on_main_thread() ? main_loop() : std::make_shared<storage>()};
 
     return current.loop;
 }
@@ -370,7 +362,7 @@ runloop main_runloop()
     // holder is put in place: that holder is what marks the loop finished
     // when the main thread ends, and a program that only ever says
     // main_runloop() would otherwise never install one.
-    if (on_main_thread()) {
+    if (native::on_main_thread()) {
         return current_runloop();
     }
 

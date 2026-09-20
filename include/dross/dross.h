@@ -21,7 +21,7 @@
  * - Type System: boolean, number, string, array, dictionary, value
  * - Platform Layer: environment, path, xdg utilities
  * - Format Layer: TOML parsing with type-safe dictionary API (dross::toml)
- * - Thread Layer: per-thread run loops that other threads can hand work to
+ * - Thread Layer: per-thread run loops that other threads can hand work to, and thread, a handle to an OS thread
  * - Configuration: Structured data format support
  * 
  * @author Yuma Endo
@@ -47,7 +47,7 @@
  * - Type system: Polymorphic value types with arbitrary precision
  * - Platform layer: Cross-platform environment and filesystem utilities
  * - Format layer: Type-safe TOML parsing returning dictionary directly
- * - Thread layer: Run loops a thread owns and other threads can post to
+ * - Thread layer: Run loops a thread owns and other threads can post to, and thread, a handle to an OS thread
  * - Modern C++23: Concepts, ranges, and errors reported in the return type
  * 
  * @namespace dross

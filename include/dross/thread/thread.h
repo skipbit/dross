@@ -15,16 +15,16 @@ namespace dross {
  *
  * dross::thread starts a detached OS thread and gives back a handle to it.
  * Two kinds of thread can be started:
- * - thread() starts a thread that runs its own run loop (see runloop), and
- *   so accepts tasks through perform() for as long as it runs
- * - thread(body) starts a thread that runs body once and then ends; it does
- *   not run a loop, so perform() on it always returns false, since a task
- *   posted there would never run
+ * - thread() starts a thread that runs its own run loop (see runloop), which
+ *   this library drives by calling run() on it, and so accepts tasks
+ *   through perform() for as long as it runs
+ * - thread(body) starts a thread that runs body once and then ends; nothing
+ *   drives a loop for it, so perform() on it always returns false
  *
  * A thread the library did not start can still be named: main_thread() names
  * the process's initial thread, and current_thread() adopts whichever thread
- * calls it. Both kinds accept tasks, because their owner may drive their
- * loop itself.
+ * calls it. Both get a loop too, and so accept tasks, because their owner
+ * may choose to drive it themselves.
  *
  * Both constructors block until the new thread has published its run loop
  * (if any) and its native id, so perform() and native_id() work on the
@@ -54,6 +54,10 @@ namespace dross {
  *
  * Thread safety:
  * - Every operation is free of data races when called from any thread
+ *
+ * Exceptions:
+ * - Both constructors propagate std::system_error when the system will not
+ *   start the new thread. It is not caught, stored or translated
  *
  * @code
  * dross::thread worker;
@@ -214,6 +218,12 @@ private:
  * Callable from any thread. The main thread is the one the process started
  * on, as the system reports it, so which thread loaded the library does not
  * come into it.
+ *
+ * Marking this record finished, and dropping it from all_threads(), happens
+ * through the main thread's own bookkeeping, which only the main thread can
+ * install for itself. A process whose main thread never calls
+ * current_thread() or main_thread() leaves this record never marked
+ * finished, even after the process has exited.
  */
 thread main_thread();
 

@@ -16,13 +16,9 @@ namespace dross {
 
 namespace {
 
-// Asked of the system once per thread, because the answer cannot change and
-// the question costs a system call.
-bool on_main_thread()
-{
-    static const thread_local bool is_main = native::is_main_thread();
-    return is_main;
-}
+// Marks "wait with no deadline" for join_for(), the same way
+// runloop::storage's own kNoDeadline does for run_for().
+constexpr auto kNoDeadline = std::chrono::steady_clock::time_point::max();
 
 }
 
@@ -86,6 +82,13 @@ private:
     std::condition_variable _done_cv;
     bool _published{false};
     bool _finished{false};
+
+    // Set only on the record main_thread_storage() builds. is_current()
+    // branches on it instead of on whether the calling thread has been
+    // adopted, since a thread can reach this record through all_threads()
+    // without ever going through current_thread_storage() itself.
+    bool _is_main{false};
+
     std::optional<std::uint64_t> _native_id;
     std::optional<runloop> _loop;
 
@@ -241,6 +244,7 @@ std::shared_ptr<thread::storage> thread::storage::main_thread_storage()
     // never.
     static const std::shared_ptr<storage>* const the_main = new std::shared_ptr<storage>{[]() {
         auto self = std::make_shared<storage>();
+        self->_is_main = true;
         if (const auto id = native::main_thread_id()) {
             self->set_native_id(*id);
         }
@@ -259,7 +263,7 @@ std::shared_ptr<thread::storage> thread::storage::current_thread_storage()
     }
 
     std::shared_ptr<storage> self;
-    if (on_main_thread()) {
+    if (native::on_main_thread()) {
         self = main_thread_storage();
         // Fills in what main_thread_storage() could not, on a platform
         // where the id can only be read from the main thread itself.
@@ -280,6 +284,18 @@ std::vector<std::shared_ptr<thread::storage>> thread::storage::all()
 
 bool thread::storage::perform(std::function<void()> task)
 {
+    {
+        // Checked first and on its own: destruction order between this
+        // storage's holder and the run loop's is not guaranteed, so a
+        // thread this module already considers finished may still have a
+        // loop willing to queue the task. This thread's own promise not to
+        // run it must hold regardless of what the loop still thinks.
+        const std::lock_guard<std::mutex> guard{_mutex};
+        if (_finished) {
+            return false;
+        }
+    }
+
     if (!_loop) {
         return false;
     }
@@ -317,7 +333,16 @@ bool thread::storage::finished() const
 
 bool thread::storage::is_current() const
 {
-    return this_thread_holder().peek().get() == this;
+    // Does not go through current_thread_storage(): asking whether the
+    // caller is this thread must not register the caller or build it a run
+    // loop as a side effect, and a thread can reach its own record here
+    // through all_threads() without ever having been adopted.
+    if (_is_main) {
+        return native::is_main_thread();
+    }
+
+    const std::lock_guard<std::mutex> guard{_mutex};
+    return _native_id && *_native_id == native::thread_id();
 }
 
 void thread::storage::set_native_id(std::uint64_t id)
@@ -358,11 +383,23 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
         return finished();
     }
 
-    std::unique_lock<std::mutex> lock{_mutex};
     if (timeout <= std::chrono::milliseconds::zero()) {
+        const std::lock_guard<std::mutex> guard{_mutex};
         return _finished;
     }
-    return _done_cv.wait_for(lock, timeout, [this]() { return _finished; });
+
+    // wait_for() would hand steady_clock::now() + timeout to the clock
+    // unclamped; for a timeout as large as milliseconds::max() that
+    // overflows. Clamped the same way runloop::storage::run_for() clamps
+    // its own deadline, computing the headroom as a duration so nothing
+    // overflows either.
+    const auto now = std::chrono::steady_clock::now();
+    const auto limit = kNoDeadline - std::chrono::steady_clock::duration{1};
+    const auto room = std::chrono::duration_cast<std::chrono::milliseconds>(limit - now);
+    const auto deadline = timeout < room ? now + timeout : limit;
+
+    std::unique_lock<std::mutex> lock{_mutex};
+    return _done_cv.wait_until(lock, deadline, [this]() { return _finished; });
 }
 
 thread::thread(std::shared_ptr<storage> store) noexcept
@@ -445,7 +482,7 @@ thread main_thread()
 {
     // Asked on the main thread, this goes the long way round so the
     // thread's holder is put in place, the same reason main_runloop() does.
-    if (on_main_thread()) {
+    if (native::on_main_thread()) {
         return current_thread();
     }
 

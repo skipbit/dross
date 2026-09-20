@@ -46,7 +46,7 @@
  *   was running it. It is not caught, stored or translated
  *
  * Platform support:
- * - POSIX systems; Linux and macOS are the ones tested
+ * - Linux and macOS; native.cpp does not compile for anything else
  */
 
 #pragma once

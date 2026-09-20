@@ -2,10 +2,13 @@
 
 #include "dross/thread/thread.h"
 
+#include "dross/thread/runloop.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -50,9 +53,7 @@ TEST(thread_test, two_different_threads_are_not_equal)
 
 TEST(thread_test, a_worker_is_not_the_main_thread)
 {
-    // Established from the main thread first: main_thread() lazily adopts
-    // whichever thread first asks about it, so a worker must not be the one
-    // to ask first.
+    // A handle to the main thread, captured here and compared against below.
     const dross::thread main_handle = dross::main_thread();
 
     dross::thread worker;
@@ -275,4 +276,148 @@ TEST(thread_test, many_threads_drive_the_registry_and_the_loop_concurrently)
     }
 
     EXPECT_EQ(ran.load(), kWorkers * kTasksPerWorker);
+}
+
+TEST(thread_test, join_blocks_until_another_thread_ends)
+{
+    dross::thread worker;
+    std::atomic<bool> join_returned{false};
+
+    // The watcher's own join_for() below is what keeps this bounded even if
+    // worker.join() itself never returns: a bare join() has no timeout by
+    // design, so it is only ever called from a thread we can separately
+    // bound our wait on.
+    dross::thread watcher{[worker, &join_returned]() mutable {
+        worker.join();
+        join_returned.store(true);
+    }};
+
+    std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    EXPECT_FALSE(join_returned.load());
+
+    ASSERT_TRUE(worker.perform([]() { dross::current_thread().quit(); }));
+
+    ASSERT_TRUE(watcher.join_for(kTimeout));
+    EXPECT_TRUE(join_returned.load());
+}
+
+TEST(thread_test, join_on_the_calling_threads_own_handle_returns_at_once)
+{
+    dross::thread worker;
+    std::atomic<bool> returned_before_quit{false};
+
+    ASSERT_TRUE(worker.perform([&returned_before_quit]() {
+        dross::current_thread().join();
+        returned_before_quit.store(true);
+        dross::current_thread().quit();
+    }));
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(returned_before_quit.load());
+}
+
+TEST(thread_test, is_current_thread_and_join_work_on_a_record_reached_via_all_threads_without_adoption)
+{
+    // A worker asks about the main thread first, so the main thread's own
+    // record gets registered without the main thread itself ever going
+    // through current_thread_storage(). This is exactly how defect 1 arose:
+    // a thread reaching its own record through all_threads() without ever
+    // having been adopted.
+    dross::thread finder{[]() { static_cast<void>(dross::main_thread()); }};
+    ASSERT_TRUE(finder.join_for(kTimeout));
+
+    std::vector<dross::thread> threads = dross::all_threads();
+    const auto it = std::find_if(threads.begin(), threads.end(),
+                                  [](const dross::thread& candidate) { return candidate.is_current_thread(); });
+
+    // Gated behind this assertion rather than calling join() unconditionally
+    // below: before the fix, is_current_thread() returned false here, and
+    // join() would then have waited forever instead of returning at once.
+    ASSERT_NE(it, threads.end());
+
+    it->join();
+}
+
+TEST(thread_test, quit_can_be_called_from_a_different_thread)
+{
+    dross::thread worker;
+
+    worker.quit();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+}
+
+TEST(thread_test, copy_assignment_names_the_same_thread)
+{
+    dross::thread first;
+    dross::thread second;
+    ASSERT_FALSE(first == second);
+
+    second = first;
+    EXPECT_TRUE(second == first);
+
+    ASSERT_TRUE(first.perform([]() { dross::current_thread().quit(); }));
+    ASSERT_TRUE(first.join_for(kTimeout));
+}
+
+TEST(thread_test, an_adopted_thread_that_touched_the_loop_first_reports_perform_false_once_finished)
+{
+    std::optional<dross::thread> adopted;
+
+    dross::thread worker{[&adopted]() {
+        // Touches the run loop module before this one, so the run loop's
+        // own thread-local holder is constructed first and destroyed last
+        // on this thread. This is exactly how defect 2 arose.
+        static_cast<void>(dross::current_runloop());
+        adopted = dross::current_thread();
+    }};
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    ASSERT_TRUE(adopted.has_value());
+
+    EXPECT_TRUE(adopted->finished());
+    EXPECT_FALSE(adopted->perform([]() {}));
+}
+
+TEST(thread_test, a_worker_asking_for_main_thread_first_still_reaches_the_real_main_loop)
+{
+    // The main thread has not used the module yet in this process; a worker
+    // is the first to ask for main_thread(). native::main_thread_id() and
+    // main_runloop() are both defined to answer correctly regardless of
+    // which thread asks, so the task below must still land on the real main
+    // thread's loop, not on whichever thread happens to build the record.
+    std::atomic<bool> queued{false};
+    dross::thread finder{[&queued]() {
+        dross::thread main_handle = dross::main_thread();
+        queued.store(main_handle.perform([]() { dross::main_runloop().quit(); }));
+    }};
+    ASSERT_TRUE(finder.join_for(kTimeout));
+    ASSERT_TRUE(queued.load());
+
+    // Run on the real main thread. If the task above had landed on the
+    // wrong loop, nothing would ever call quit() here, and this would run
+    // out its whole timeout instead of returning early with one task run.
+    EXPECT_EQ(dross::main_runloop().run_for(kTimeout), 1U);
+}
+
+TEST(thread_test, join_for_with_a_huge_timeout_does_not_overflow)
+{
+    dross::thread worker;
+
+    std::thread delayed_quit{[worker]() mutable {
+        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        worker.quit();
+    }};
+
+    // Definitely still running when this is called, since the quit above is
+    // delayed: an overflowed deadline would make this return false at once
+    // instead of waiting the short while for that quit() to land.
+    const auto started = std::chrono::steady_clock::now();
+    EXPECT_TRUE(worker.join_for(std::chrono::milliseconds::max()));
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+
+    EXPECT_GE(elapsed, std::chrono::milliseconds{40});
+    EXPECT_LT(elapsed, kTimeout);
+
+    delayed_quit.join();
 }
