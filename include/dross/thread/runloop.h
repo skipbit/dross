@@ -192,9 +192,8 @@ private:
  * Callable from any thread, which is what makes it the way back: a worker
  * posts to this loop and the main thread runs the task.
  *
- * The main thread is the one that loaded the library, recorded before main()
- * runs. A library loaded by a worker thread would record that thread
- * instead.
+ * The main thread is the one the process started on, as the system reports
+ * it, so which thread loaded the library does not come into it.
  */
 runloop main_runloop();
 
