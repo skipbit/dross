@@ -42,7 +42,9 @@ designed to be a general-purpose library similar to Boost with a focus on:
 - **Errors in the return type** - ``std::optional`` and ``std::expected``
   rather than exceptions, apart from the bounds-checked accessors and the
   ``path`` calls that let ``std::filesystem`` exceptions through
-- **ABI stability** - Through careful use of the Pimpl idiom
+- **Pimpl idiom** - Types keep their representation behind an opaque pointer,
+  apart from ``error``, ``path``, ``xdg`` and the ``data`` iterators, which
+  hold theirs directly; the ABI can change in any 0.x release
 - **Comprehensive type system** - Dynamic types with value semantics
 
 .. grid:: 2

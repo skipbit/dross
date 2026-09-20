@@ -24,7 +24,9 @@ The dross library is designed around several core principles:
    and ``std::expected`` - apart from the bounds-checked accessors and the
    ``path`` calls that let ``std::filesystem`` exceptions through
 4. **Modern C++**: Leverages C++23 features throughout
-5. **ABI Stability**: Uses Pimpl idiom to maintain stable ABI
+5. **Pimpl Idiom**: Types keep their representation behind an opaque pointer,
+   apart from ``error``, ``path``, ``xdg`` and the ``data`` iterators, which
+   hold theirs directly; the ABI can change in any 0.x release
 
 Topics Covered
 --------------
