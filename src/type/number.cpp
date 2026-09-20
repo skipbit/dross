@@ -643,12 +643,16 @@ namespace {
         NumberParts pa(a);
         NumberParts pb(b);
 
+        // Scaling both operands by the same power of ten leaves the quotient
+        // unchanged, so padding the shorter fraction removes the need to move
+        // the point afterwards.
+        const size_t scale = std::max(pa.fractional.length(), pb.fractional.length());
+        pa.fractional.resize(scale, '0');
+        pb.fractional.resize(scale, '0');
+
         // Convert to pure integers for division algorithm
         std::string dividend = pa.integer + pa.fractional;
         std::string divisor = pb.integer + pb.fractional;
-
-        // Calculate decimal place adjustment
-        int decimal_adjustment = pb.fractional.length() - pa.fractional.length();
 
         // Remove leading zeros from divisor
         while (divisor.length() > 1 && divisor[0] == '0') {
@@ -716,34 +720,6 @@ namespace {
             }
             if (!decimal_part.empty()) {
                 result = result + "." + decimal_part;
-            }
-        }
-
-        // Apply decimal adjustment
-        if (decimal_adjustment != 0) {
-            NumberParts result_parts(result);
-            int new_decimal_places = static_cast<int>(result_parts.fractional.length()) + decimal_adjustment;
-
-            if (new_decimal_places < 0) {
-                // Move decimal point left (multiply by power of 10)
-                std::string zeros(-new_decimal_places, '0');
-                result = result_parts.integer + result_parts.fractional + zeros;
-            } else if (new_decimal_places > static_cast<int>(result_parts.fractional.length())) {
-                // Add zeros to the right
-                std::string additional_zeros(new_decimal_places - result_parts.fractional.length(), '0');
-                result = result_parts.integer + "." + result_parts.fractional + additional_zeros;
-            } else if (new_decimal_places > 0) {
-                // Insert decimal point
-                std::string all_digits = result_parts.integer + result_parts.fractional;
-                size_t decimal_pos = all_digits.length() - new_decimal_places;
-                if (decimal_pos == 0) {
-                    result = "0." + all_digits;
-                } else {
-                    result = all_digits.substr(0, decimal_pos) + "." + all_digits.substr(decimal_pos);
-                }
-            } else {
-                // new_decimal_places == 0, no decimal point needed
-                result = result_parts.integer + result_parts.fractional;
             }
         }
 

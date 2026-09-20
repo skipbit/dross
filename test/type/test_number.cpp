@@ -284,9 +284,57 @@ TEST(number_test, decimal_division_precision)
     const dross::number n2{ "3.14" };
     const dross::number result = n1 / n2;
 
-    // Should get approximately 7.229299363
-    std::string result_str = std::string(result);
-    EXPECT_TRUE(result_str.substr(0, 4) == "7.22" || result_str.substr(0, 4) == "0.72");
+    EXPECT_EQ(std::string(result), "7.229299363");
+}
+
+TEST(number_test, division_with_equal_decimal_places)
+{
+    const dross::number result = dross::number{ "7.5" } / dross::number{ "2.5" };
+
+    EXPECT_EQ(std::string(result), "3");
+}
+
+TEST(number_test, division_with_more_decimal_places_in_the_divisor)
+{
+    const dross::number result = dross::number{ "1.5" } / dross::number{ "0.25" };
+
+    EXPECT_EQ(std::string(result), "6");
+}
+
+TEST(number_test, division_with_more_decimal_places_in_the_dividend)
+{
+    const dross::number result = dross::number{ "3.14" } / dross::number{ "22.7" };
+
+    EXPECT_EQ(std::string(result), "0.1383259911");
+}
+
+TEST(number_test, division_that_moves_the_result_below_one)
+{
+    const dross::number result = dross::number{ "0.25" } / dross::number{ "0.5" };
+
+    EXPECT_EQ(std::string(result), "0.5");
+}
+
+TEST(number_test, division_by_a_small_fraction)
+{
+    EXPECT_EQ(std::string(dross::number{ "1" } / dross::number{ "0.001" }), "1000");
+    EXPECT_EQ(std::string(dross::number{ "100" } / dross::number{ "2.5" }), "40");
+}
+
+TEST(number_test, division_producing_leading_zeros)
+{
+    EXPECT_EQ(std::string(dross::number{ "0.03" } / dross::number{ "3" }), "0.01");
+}
+
+TEST(number_test, exact_division_drops_the_decimal_point)
+{
+    EXPECT_EQ(std::string(dross::number{ "20.0" } / dross::number{ "5" }), "4");
+    EXPECT_EQ(std::string(dross::number{ "0.0" } / dross::number{ "5" }), "0");
+}
+
+TEST(number_test, division_keeps_its_digits_when_the_divisor_is_near_one)
+{
+    EXPECT_EQ(std::string(dross::number{ "5" } / dross::number{ "1.0000000001" }), "4.9999999995");
 }
 
 TEST(number_test, one_third_precision)
