@@ -30,10 +30,10 @@ namespace dross {
  *   moved-from handle is still a usable handle
  *
  * Thread safety:
- * - Every operation is safe to call from any thread
- * - The running operations (run, run_one, run_pending, run_for) are meant
- *   for the owning thread. Running a loop from a thread it does not belong
- *   to runs the tasks on the wrong thread, which defeats the purpose
+ * - Every operation is free of data races when called from any thread
+ * - The running operations (run, run_one, run_pending, run_for) are for the
+ *   thread the loop belongs to; a run already in progress on a loop whose
+ *   owning thread has ended is not woken and keeps waiting
  *
  * Exceptions:
  * - An exception thrown by a task propagates out of the running call that
@@ -96,8 +96,10 @@ public:
      * @brief Run tasks until quit() is requested.
      * @return The number of tasks that ran
      *
-     * Waits when no task is queued. Returns once quit() is seen, which
-     * clears that request; tasks still queued stay queued.
+     * Waits when no task is queued. Returns once quit() is seen; tasks
+     * still queued stay queued. The request is cleared by the outermost
+     * running call, so a run started from inside a task stops but leaves
+     * the request standing for the run it was started from.
      */
     std::size_t run();
 
@@ -105,8 +107,9 @@ public:
      * @brief Run one task, waiting for one if the queue is empty.
      * @return true when a task ran, false when quit() is seen
      *
-     * A pending quit() ends this at once, even with a task already queued,
-     * and clears the request; that task stays queued for next time.
+     * A pending quit() ends this at once, even with a task already queued;
+     * that task stays queued for next time. Clearing the request follows
+     * the same rule as run().
      */
     bool run_one();
 
@@ -133,9 +136,9 @@ public:
      * @brief Ask the running call to return.
      *
      * Stops the loop; it does not discard the queue. The request stays until
-     * a running call sees it, so quitting a loop that is not running yet
-     * ends its next run() rather than being lost. Use clear() to drop the
-     * tasks.
+     * the outermost running call sees it, so quitting a loop that is not
+     * running yet ends its next run() rather than being lost. Use clear()
+     * to drop the tasks.
      */
     void quit();
 

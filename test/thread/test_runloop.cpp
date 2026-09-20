@@ -125,6 +125,25 @@ TEST(runloop_test, run_pending_leaves_a_task_that_a_task_added)
     loop.clear();
 }
 
+TEST(runloop_test, run_pending_does_not_run_a_task_added_by_a_task_that_cleared)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    bool c_ran = false;
+    loop.perform([loop, &c_ran]() mutable {
+        loop.clear();
+        loop.perform([&c_ran]() { c_ran = true; });
+    });
+    loop.perform([]() {});
+
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_FALSE(c_ran);
+    EXPECT_EQ(loop.pending_count(), 1U);
+
+    loop.clear();
+}
+
 TEST(runloop_test, clear_discards_the_queue)
 {
     reset_main_runloop();
@@ -160,7 +179,12 @@ TEST(runloop_test, run_pending_does_not_consume_a_pending_quit)
     loop.quit();
 
     EXPECT_EQ(loop.run_pending(), 0U);
-    EXPECT_EQ(loop.run(), 0U);
+
+    // A surviving quit makes run_for return at once; a consumed one makes it
+    // wait out the full timeout.
+    const auto started = std::chrono::steady_clock::now();
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds{200}), 0U);
+    EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{100});
 }
 
 TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
@@ -202,6 +226,37 @@ TEST(runloop_test, run_one_returns_false_when_quit_is_pending)
     loop.clear();
 }
 
+TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.perform([loop]() mutable {
+        loop.quit();
+        loop.run_one();
+    });
+
+    // A watchdog in case of a regression: without the fix, the outer run()
+    // below hangs because the nested run_one() above already consumed the
+    // quit it was not meant to see.
+    std::atomic<bool> outer_done{false};
+    std::thread watchdog{[loop, &outer_done]() mutable {
+        std::this_thread::sleep_for(std::chrono::seconds{2});
+        if (!outer_done.load()) {
+            loop.quit();
+        }
+    }};
+
+    const auto started = std::chrono::steady_clock::now();
+    loop.run();
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+    outer_done.store(true);
+
+    watchdog.join();
+
+    EXPECT_LT(elapsed, std::chrono::milliseconds{500});
+}
+
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
 {
     reset_main_runloop();
@@ -210,10 +265,13 @@ TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
     std::atomic<std::thread::id> ran_on{};
     std::atomic<bool> queued{false};
     std::thread worker{[loop, &ran_on, &queued]() mutable {
-        queued.store(loop.perform([&ran_on]() { ran_on.store(std::this_thread::get_id()); }));
+        queued.store(loop.perform([loop, &ran_on]() mutable {
+            ran_on.store(std::this_thread::get_id());
+            loop.quit();
+        }));
     }};
 
-    EXPECT_TRUE(loop.run_one());
+    EXPECT_EQ(loop.run_for(std::chrono::seconds{5}), 1U);
     EXPECT_EQ(ran_on.load(), std::this_thread::get_id());
 
     worker.join();
@@ -242,8 +300,11 @@ TEST(runloop_test, tasks_from_many_threads_all_arrive)
         });
     }
 
-    for (int seen = 0; seen < kPosters * kPerPoster; ++seen) {
-        ASSERT_TRUE(loop.run_one());
+    std::size_t seen = 0;
+    while (seen < static_cast<std::size_t>(kPosters * kPerPoster)) {
+        const std::size_t n = loop.run_for(std::chrono::milliseconds{100});
+        ASSERT_GT(n, 0U);
+        seen += n;
     }
 
     for (auto& poster : posters) {
@@ -287,6 +348,18 @@ TEST(runloop_test, run_for_zero_runs_nothing)
     EXPECT_EQ(loop.pending_count(), 1U);
 
     loop.clear();
+}
+
+TEST(runloop_test, run_for_with_a_huge_timeout_does_not_overflow)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    loop.perform([loop]() mutable { loop.quit(); });
+
+    const auto started = std::chrono::steady_clock::now();
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds::max()), 1U);
+    EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{500});
 }
 
 TEST(runloop_test, is_running_is_true_inside_a_task)
