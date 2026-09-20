@@ -189,6 +189,9 @@ if (auto config_dir = app.config_home()) {
 - **`path`** - Filesystem operations with error handling
 - **`xdg`** - XDG Base Directory specification support
 
+### Thread Layer
+- **`runloop`** - Per-thread task queue, so work can be handed to a specific thread
+
 
 ## 📖 Documentation
 
@@ -206,7 +209,7 @@ Dross follows modern C++ best practices:
 
 - **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg` and the `data` iterators, which hold theirs directly; the ABI can change in any 0.x release
 - **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
-- **Error Handling** - `std::expected` and `std::optional` for failures, apart from the bounds-checked accessors and the `path` calls that let `std::filesystem` exceptions through
+- **Error Handling** - `std::expected` and `std::optional` for failures, apart from the bounds-checked accessors and the `path` calls that let `std::filesystem` exceptions through, `runloop::perform()`, which reports failure as a `bool`, and the runloop running calls, which let an exception thrown by a task propagate out
 - **Type Safety** - Concepts for compile-time constraints
 - **Zero-Cost Abstractions** - Performance without compromise
 
@@ -231,6 +234,7 @@ ctest -V
 ### Current Modules
 - ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
+- ✅ Thread utilities (runloop)
 
 ### Planned Features
 - **Configuration** - TOML, JSON, XML, YAML parsers

@@ -3,7 +3,11 @@
 include(CMakeFindDependencyMacro)
 
 # Find required dependencies
-# (Currently none, but this is where you'd add find_dependency calls)
+#
+# The exported target links Threads::Threads, so that imported target has to
+# exist before drossTargets.cmake is read.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_dependency(Threads)
 
 # Include the exported targets
 include("${CMAKE_CURRENT_LIST_DIR}/drossTargets.cmake")

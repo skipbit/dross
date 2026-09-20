@@ -2,6 +2,12 @@
 # Include necessary modules
 include(GNUInstallDirs)
 
+# The thread module runs on std::thread, which needs the platform's threading
+# support linked in. PUBLIC, because a consumer linking libdross statically has
+# to link the thread library itself; see drossConfig.cmake.in and dross.pc.in.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 option(BUILD_SHARED_LIBS "build dross as a shared library" ON)
 if (BUILD_SHARED_LIBS)
     add_library(${PROJECT_NAME} SHARED)
@@ -25,7 +31,10 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timezone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/runloop.cpp
 )
+
+target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads)
 
 # PRIVATE keeps these out of the exported target: a consumer decides its own
 # warning policy and optimization level.
@@ -60,6 +69,8 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/type/value.h
     ${PROJECT_SOURCE_DIR}/include/dross/format.h
     ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
+    ${PROJECT_SOURCE_DIR}/include/dross/thread.h
+    ${PROJECT_SOURCE_DIR}/include/dross/thread/runloop.h
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
