@@ -10,4 +10,5 @@ URL: https://github.com/skipbit/dross
 
 Requires:
 Libs: -L${libdir} -ldross
+Libs.private: -pthread
 Cflags: -I${includedir}

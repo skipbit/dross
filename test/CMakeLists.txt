@@ -35,6 +35,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_value.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_type.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_toml.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_runloop.cpp
 )
 
 target_compile_options(${TEST_NAME}
