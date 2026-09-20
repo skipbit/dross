@@ -35,3 +35,9 @@ Changed
 - ``path::expand()`` now reports canonicalisation failures on a ``~`` path
   through its ``std::expected`` return value instead of letting a
   ``std::filesystem::filesystem_error`` escape
+- ``find_package(dross <version>)`` now requires the same minor version
+  while the major version is 0, where it previously accepted any 0.x. A
+  consumer asking for ``0.1``, or for ``0``, no longer matches an installed
+  ``0.9``; it has to ask for the minor it was built against. The soname is
+  unchanged, so this is what a build refuses, not what the runtime linker
+  refuses

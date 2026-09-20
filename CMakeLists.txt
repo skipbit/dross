@@ -36,7 +36,10 @@ configure_package_config_file(
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/drossConfigVersion.cmake"
     VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
+    # While the major version is 0, a minor bump can change the ABI, and
+    # SameMajorVersion would let an installed 0.9 answer a request for 0.1.
+    # Restore SameMajorVersion once 1.0 is out.
+    COMPATIBILITY SameMinorVersion
 )
 
 install(FILES
