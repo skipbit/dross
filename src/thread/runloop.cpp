@@ -1,10 +1,11 @@
 #include "dross/thread/runloop.h"
 
+#include "thread/native.h"
+
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
 #include <mutex>
-#include <thread>
 #include <utility>
 
 namespace dross {
@@ -20,15 +21,7 @@ constexpr auto kNoDeadline = std::chrono::steady_clock::time_point::max();
 
 class runloop::storage final {
 public:
-    // What the main thread is, decided once. The loop is held here so that
-    // main_runloop() can hand it out to a thread that has no other way to
-    // reach it.
-    struct record final {
-        std::thread::id id;
-        std::shared_ptr<storage> loop;
-    };
-
-    static record& main_record();
+    static std::shared_ptr<storage> main_loop();
     static std::shared_ptr<storage> for_current_thread();
 
     bool enqueue(std::function<void()>&& task);
@@ -106,15 +99,18 @@ bool runloop::storage::running_mark::outermost() const noexcept
     return _outermost;
 }
 
-runloop::storage::record& runloop::storage::main_record()
+std::shared_ptr<runloop::storage> runloop::storage::main_loop()
 {
     // Never destroyed. A thread still running when the program ends would
     // otherwise reach a destroyed loop, and thread storage is destroyed
     // before anything with static storage duration. The static pointer keeps
     // it reachable, so a leak checker does not report it.
-    static record* const the_record =
-        new record{std::this_thread::get_id(), std::make_shared<storage>()};
-    return *the_record;
+    //
+    // Built on first use rather than at load time, so a program that links
+    // this library without touching a run loop allocates nothing.
+    static const std::shared_ptr<storage>* const the_loop =
+        new std::shared_ptr<storage>{std::make_shared<storage>()};
+    return *the_loop;
 }
 
 std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
@@ -129,8 +125,7 @@ std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
     };
 
     static thread_local const holder current{
-        std::this_thread::get_id() == main_record().id ? main_record().loop
-                                                       : std::make_shared<storage>()};
+        native::on_main_thread() ? main_loop() : std::make_shared<storage>()};
 
     return current.loop;
 }
@@ -363,23 +358,20 @@ bool runloop::operator==(const runloop& other) const noexcept
 
 runloop main_runloop()
 {
-    return runloop{runloop::storage::main_record().loop};
+    // Asked on the main thread, this goes the long way round so the thread's
+    // holder is put in place: that holder is what marks the loop finished
+    // when the main thread ends, and a program that only ever says
+    // main_runloop() would otherwise never install one.
+    if (native::on_main_thread()) {
+        return current_runloop();
+    }
+
+    return runloop{runloop::storage::main_loop()};
 }
 
 runloop current_runloop()
 {
     return runloop{runloop::storage::for_current_thread()};
-}
-
-namespace {
-
-// Decides which thread is the main one, on the thread that loads the
-// library and before main() runs. Leaving it to the first caller would let
-// whichever thread asked first claim the role. It also puts the main
-// thread's holder in place, so that loop is marked finished when the main
-// thread ends.
-[[maybe_unused]] const bool kMainThreadRecorded = (current_runloop(), true);
-
 }
 
 }

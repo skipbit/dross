@@ -35,6 +35,9 @@
  * - One thread has one loop. It is reached through current_runloop(), or
  *   through main_runloop() for the main thread's, and is never constructed
  *   directly
+ * - dross::thread starts and names a thread, with the same handle
+ *   semantics; a thread dross did not start, such as the process's own, is
+ *   named through main_thread() and current_thread()
  *
  * Errors:
  * - perform() returns false when the task cannot be queued, which the
@@ -43,16 +46,18 @@
  *   was running it. It is not caught, stored or translated
  *
  * Platform support:
- * - POSIX systems; Linux and macOS are the ones tested
+ * - Linux and macOS; native.cpp does not compile for anything else
  */
 
 #pragma once
 
 #include <dross/thread/runloop.h>
+#include <dross/thread/thread.h>
 
 /**
  * @brief Threading namespace members live directly in dross.
  *
- * The thread module adds runloop to the dross namespace, alongside the type
- * and platform layers, rather than a namespace of its own.
+ * The thread module adds runloop and thread to the dross namespace,
+ * alongside the type and platform layers, rather than a namespace of its
+ * own.
  */
