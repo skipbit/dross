@@ -7,6 +7,8 @@
 
 namespace dross {
 
+class timer;
+
 /**
  * @brief A queue of tasks belonging to one thread, which that thread runs.
  *
@@ -18,6 +20,12 @@ namespace dross {
  * Every thread has one run loop, reached through current_runloop(). The main
  * thread's is also reachable from anywhere through main_runloop(), so a
  * worker can post to it without being handed a copy first.
+ *
+ * Timers (see dross::timer) install onto a loop the same way tasks are
+ * queued onto it, and are the loop's other source of work: waiting stops at
+ * whichever comes first, a queued task, an installed timer becoming due, or
+ * quit(). A timer that is due fires before a queued task; see run()'s own
+ * doc comment.
  *
  * Handle semantics:
  * - A runloop is a handle to a loop, not the loop itself. Copying gives
@@ -35,10 +43,19 @@ namespace dross {
  *   thread the loop belongs to; a run already in progress on a loop whose
  *   owning thread has ended is not woken and keeps waiting
  *
+ * Cleanup:
+ * - When the thread that installed this loop's own bookkeeping ends, its
+ *   queued tasks and installed timers are dropped, so captures held by
+ *   either are released on that same thread. This happens only for a thread
+ *   that installed its own bookkeeping, which for the main thread means one
+ *   that has called current_runloop() or main_runloop() itself; see
+ *   main_runloop()'s own doc comment for what that leaves unhandled
+ *
  * Exceptions:
- * - An exception thrown by a task propagates out of the running call that
- *   was executing it. It is not caught, stored or translated, and the tasks
- *   behind it stay queued
+ * - An exception thrown by a task or a timer's callback propagates out of
+ *   the running call that was executing it. It is not caught, stored or
+ *   translated; the tasks behind it stay queued and a timer that threw
+ *   stays installed
  *
  * @code
  * // On a worker, handing a result back to the main thread.
@@ -93,10 +110,13 @@ public:
     bool perform(std::function<void()> task);
 
     /**
-     * @brief Run tasks until quit() is requested.
-     * @return The number of tasks that ran
+     * @brief Run tasks and due timers until quit() is requested.
+     * @return The number of tasks run plus timer fires
      *
-     * Waits when no task is queued. Returns once quit() is seen; tasks
+     * Waits when nothing is ready: no task is queued and no installed timer
+     * has reached its deadline. The wait ends at whichever comes first, a
+     * task being queued, a timer becoming due, or quit(). A timer that is
+     * due fires before a queued task. Returns once quit() is seen; tasks
      * still queued stay queued. The request is cleared by the outermost
      * running call, so a run started from inside a task stops but leaves
      * the request standing for the run it was started from.
@@ -104,31 +124,37 @@ public:
     std::size_t run();
 
     /**
-     * @brief Run one task, waiting for one if the queue is empty.
-     * @return true when a task ran, false when quit() is seen
+     * @brief Run one task or due timer, waiting for one if neither is ready.
+     * @return true when a task ran or a timer fired, false when quit() is
+     * seen
      *
-     * A pending quit() ends this at once, even with a task already queued;
-     * that task stays queued for next time. Clearing the request follows
-     * the same rule as run().
+     * A pending quit() ends this at once, even with a task already queued
+     * or a timer already due; that task or timer stays for next time.
+     * Clearing the request follows the same rule as run().
      */
     bool run_one();
 
     /**
-     * @brief Run the tasks already queued, without waiting.
-     * @return The number of tasks that ran
+     * @brief Run the tasks queued and the timers due, without waiting.
+     * @return The number of tasks run plus timer fires
      *
-     * Only the tasks queued when the call started are run, so a task that
-     * adds another does not keep this call going. A pending quit() request
-     * neither stops this call nor is consumed by it.
+     * Only what was already queued or already due when the call started is
+     * run, so a task that adds another, or a timer whose fire reschedules
+     * it, does not keep this call going. This is the timer analogue of "the
+     * tasks already queued": a due timer fires once here, a repeating one
+     * is not chased through every interval it missed while nothing ran it.
+     * A pending quit() request neither stops this call nor is consumed by
+     * it.
      */
     std::size_t run_pending();
 
     /**
-     * @brief Run tasks until the timeout passes or quit() is requested.
+     * @brief Run tasks and due timers until the timeout passes or quit() is
+     * requested.
      * @param timeout How long to keep running
-     * @return The number of tasks that ran
+     * @return The number of tasks run plus timer fires
      *
-     * A timeout of zero runs nothing and returns at once.
+     * A timeout of zero runs nothing already due and returns at once.
      */
     std::size_t run_for(std::chrono::milliseconds timeout);
 
@@ -162,6 +188,15 @@ public:
     bool empty() const;
 
     /**
+     * @brief Count the installed timers that are still valid.
+     * @return The number of timers installed on this loop
+     *
+     * This is the public way to observe that a timer::repeating() or
+     * timer::once() call reached this loop.
+     */
+    std::size_t timer_count() const;
+
+    /**
      * @brief Test whether a running call is active on this loop.
      * @return true from inside a task, and while run() waits for one
      */
@@ -183,6 +218,7 @@ private:
 
     friend runloop main_runloop();
     friend runloop current_runloop();
+    friend class timer;
 };
 
 /**
@@ -195,10 +231,14 @@ private:
  * The main thread is the one the process started on, as the system reports
  * it, so which thread loaded the library does not come into it.
  *
- * Marking this loop finished happens through the main thread's own
- * bookkeeping, which only the main thread can install for itself. A process
- * whose main thread never calls current_runloop() or main_runloop() leaves
- * this loop never marked finished, even after the process has exited.
+ * Marking this loop finished, and releasing its queued tasks and installed
+ * timers, happens through the main thread's own bookkeeping, which only the
+ * main thread can install for itself. A process whose main thread never
+ * calls current_runloop() or main_runloop() leaves this loop never marked
+ * finished, its queued tasks never released, and any timer installed on it
+ * from elsewhere sitting uncleaned, even after the process has exited; see
+ * runloop's own "Cleanup" doc note. Nothing here fires such a timer either,
+ * since that still requires something to run the loop.
  */
 runloop main_runloop();
 
@@ -209,6 +249,12 @@ runloop main_runloop();
  * The loop is created on first use and belongs to the thread for as long as
  * the thread runs, whether or not dross started that thread. When the thread
  * ends, perform() on a handle to its loop reports false.
+ *
+ * Defined even when called from a thread-local destructor that runs after
+ * this thread's own bookkeeping has already been torn down, such as a
+ * user's own thread-local destructor running after this library's when the
+ * user's was constructed first: it then returns a handle to a fresh,
+ * already-finished loop rather than reaching into the destroyed one.
  */
 runloop current_runloop();
 

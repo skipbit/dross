@@ -38,12 +38,16 @@
  * - dross::thread starts and names a thread, with the same handle
  *   semantics; a thread dross did not start, such as the process's own, is
  *   named through main_thread() and current_thread()
+ * - dross::timer installs a callback on a loop, firing it once or on an
+ *   interval; it is the same kind of handle again, but the loop is what
+ *   keeps it alive once installed, not the handle
  *
  * Errors:
  * - perform() returns false when the task cannot be queued, which the
  *   caller can act on. Nothing else here reports a failure
- * - An exception thrown by a task propagates out of the run() call that
- *   was running it. It is not caught, stored or translated
+ * - An exception thrown by a task or a timer's callback propagates out of
+ *   the run() call that was running it. It is not caught, stored or
+ *   translated
  *
  * Platform support:
  * - Linux and macOS; native.cpp does not compile for anything else
@@ -53,6 +57,7 @@
 
 #include <dross/thread/runloop.h>
 #include <dross/thread/thread.h>
+#include <dross/thread/timer.h>
 
 /**
  * @brief Threading namespace members live directly in dross.

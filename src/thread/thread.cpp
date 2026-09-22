@@ -67,6 +67,8 @@ private:
                                   std::function<void()> body, bool run_loop);
 
     static current_holder& this_thread_holder();
+    static bool& torn_down_flag();
+    static std::shared_ptr<storage> finished_placeholder();
     static std::mutex& registry_mutex();
     static std::vector<std::shared_ptr<storage>>& registry();
     static void register_self(const std::shared_ptr<storage>& self);
@@ -103,6 +105,7 @@ thread::storage::current_holder::~current_holder()
     if (_store) {
         _store->finish();
     }
+    torn_down_flag() = true;
 }
 
 void thread::storage::current_holder::install(std::shared_ptr<storage> store)
@@ -119,6 +122,30 @@ thread::storage::current_holder& thread::storage::this_thread_holder()
 {
     thread_local current_holder holder;
     return holder;
+}
+
+bool& thread::storage::torn_down_flag()
+{
+    // Trivially destructible, so it has no destructor of its own and stays
+    // readable no matter what order thread-locals on this thread are torn
+    // down in; see runloop::storage::for_current_thread() for the same
+    // technique and current_thread()'s doc comment for what it is for.
+    thread_local bool torn_down = false;
+    return torn_down;
+}
+
+std::shared_ptr<thread::storage> thread::storage::finished_placeholder()
+{
+    // Shared by every thread that reaches it, rather than kept thread_local:
+    // nothing is ever installed on it, so nothing needs it to be distinct
+    // per thread. Never destroyed, for the same reason as
+    // main_thread_storage().
+    static const std::shared_ptr<storage>* const the_thread = []() {
+        auto self = std::make_shared<storage>();
+        self->finish();
+        return new std::shared_ptr<storage>{std::move(self)};
+    }();
+    return *the_thread;
 }
 
 std::mutex& thread::storage::registry_mutex()
@@ -257,6 +284,10 @@ std::shared_ptr<thread::storage> thread::storage::main_thread_storage()
 
 std::shared_ptr<thread::storage> thread::storage::current_thread_storage()
 {
+    if (torn_down_flag()) {
+        return finished_placeholder();
+    }
+
     auto& holder = this_thread_holder();
     if (auto existing = holder.peek()) {
         return existing;
@@ -496,10 +527,14 @@ thread current_thread()
 
 std::vector<thread> all_threads()
 {
+    auto stores = thread::storage::all();
+
     std::vector<thread> result;
-    for (auto& store : thread::storage::all()) {
+    result.reserve(stores.size());
+    for (auto& store : stores) {
         result.emplace_back(thread{std::move(store)});
     }
+
     return result;
 }
 

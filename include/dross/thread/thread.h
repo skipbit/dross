@@ -234,6 +234,12 @@ thread main_thread();
  * Adopts the calling thread on first use, whether or not dross started it.
  * The handle belongs to the thread for as long as it runs; once the thread
  * ends, perform() on a handle to it reports false.
+ *
+ * Defined even when called from a thread-local destructor that runs after
+ * this thread's own bookkeeping has already been torn down, such as a
+ * user's own thread-local destructor running after this library's when the
+ * user's was constructed first: it then returns a handle to a fresh,
+ * already-finished record rather than reaching into the destroyed one.
  */
 thread current_thread();
 
