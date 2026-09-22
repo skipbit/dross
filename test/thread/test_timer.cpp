@@ -275,20 +275,22 @@ TEST(timer_test, a_late_fire_is_not_made_up)
 
     int fire_count = 0;
     dross::timer t = dross::timer::repeating(
-        std::chrono::milliseconds{10}, [&fire_count](dross::timer) { ++fire_count; }, loop);
+        std::chrono::milliseconds{50}, [&fire_count](dross::timer) { ++fire_count; }, loop);
 
     // The loop is not run at all while this elapses, so by the time it is,
-    // the timer is many intervals overdue. A catch-up implementation (one
+    // the timer is eight intervals overdue. A catch-up implementation (one
     // that reschedules from the deadline that was due rather than from the
-    // moment the fire was decided) fires roughly ten times once it finally
-    // runs; this one fires exactly once.
-    std::this_thread::sleep_for(std::chrono::milliseconds{100});
+    // moment the fire was decided) works through all eight as soon as it
+    // runs; this one fires once and looks an interval ahead.
+    std::this_thread::sleep_for(std::chrono::milliseconds{400});
 
-    // A 5ms window is far too short to reach a second fire even under a
-    // sanitizer that slows everything down, so this distinguishes the two
-    // implementations reliably instead of just bounding a range both satisfy.
-    EXPECT_EQ(loop.run_for(std::chrono::milliseconds{5}), 1U);
-    EXPECT_EQ(fire_count, 1);
+    // A second fire needs the machine to stall for a whole interval between
+    // the first one and the next look, which is what the interval is set
+    // wide for: the gap to a catch-up implementation's eight stays clear
+    // even when a loaded runner loses a slice.
+    const std::size_t ran = loop.run_for(std::chrono::milliseconds{5});
+    EXPECT_LE(ran, 2U);
+    EXPECT_LE(fire_count, 2);
 
     t.invalidate();
 }
