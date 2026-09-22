@@ -415,7 +415,7 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     // wait_for() would hand steady_clock::now() + timeout to the clock
     // unclamped; for a timeout as large as milliseconds::max() that
     // overflows.
-    const auto deadline = deadline_after(std::chrono::steady_clock::now(), timeout);
+    const auto deadline = deadline::after(std::chrono::steady_clock::now(), timeout);
 
     std::unique_lock<std::mutex> lock{_mutex};
     return _done_cv.wait_until(lock, deadline, [this]() { return _finished; });

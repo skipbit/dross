@@ -448,6 +448,44 @@ TEST(runloop_test, a_due_timer_fires_before_a_queued_task)
     EXPECT_FALSE(t.valid());
 }
 
+TEST(runloop_test, run_pending_does_not_run_a_task_a_timer_posts_in_the_same_call)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    int timer_fired = 0;
+    int task_ran = 0;
+    dross::timer t = dross::timer::once(
+        std::chrono::milliseconds{0},
+        [&loop, &timer_fired, &task_ran](dross::timer) {
+            ++timer_fired;
+            loop.perform([&task_ran]() { ++task_ran; });
+        },
+        loop);
+
+    // The cutoff for this call's own task drain must be read before the
+    // timer above runs, not after: otherwise the task it posts falls inside
+    // this call's own cutoff and runs in the same call that queued it.
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_EQ(timer_fired, 1);
+    EXPECT_EQ(task_ran, 0);
+    EXPECT_EQ(loop.pending_count(), 1U);
+
+    loop.clear();
+    EXPECT_FALSE(t.valid());
+}
+
+TEST(runloop_test, run_for_with_the_most_negative_timeout_does_not_overflow)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    // Exercises deadline::after() with the most negative value a caller can
+    // give; this is what the address-and-undefined sanitizer job installs
+    // to catch a regression of the signed-overflow bug on this conversion.
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds::min()), 0U);
+}
+
 TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_thread)
 {
     // A shared_ptr with a custom deleter, rather than a counting member with

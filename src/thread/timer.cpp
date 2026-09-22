@@ -4,17 +4,30 @@
 #include "thread/runloop_storage.h"
 #include "thread/timer_storage.h"
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <utility>
 
 namespace dross {
 
+namespace {
+
+std::uint64_t next_timer_id()
+{
+    static std::atomic<std::uint64_t> next{0};
+    return next.fetch_add(1);
+}
+
+}
+
 timer::storage::storage(std::chrono::milliseconds interval, bool repeats,
                         std::function<void(timer)> callback,
                         std::weak_ptr<runloop::storage> loop)
-    : _interval{interval}, _repeats{repeats}, _callback{std::move(callback)}, _loop{std::move(loop)}
+    : _interval{interval}, _repeats{repeats}, _callback{std::move(callback)}, _loop{std::move(loop)},
+      _id{next_timer_id()}
 {
 }
 
@@ -39,6 +52,11 @@ bool timer::storage::repeats() const
 std::chrono::milliseconds timer::storage::interval() const
 {
     return _interval;
+}
+
+std::uint64_t timer::storage::id() const noexcept
+{
+    return _id;
 }
 
 void timer::storage::fire()
@@ -102,7 +120,7 @@ timer timer::make(std::chrono::milliseconds interval, bool repeats,
     if (!has_callback) {
         store->mark_invalid();
     } else {
-        const auto first_deadline = deadline_after(std::chrono::steady_clock::now(), interval);
+        const auto first_deadline = deadline::after(std::chrono::steady_clock::now(), interval);
         if (!loop._store->install_timer(store, first_deadline)) {
             // The loop is already finished; it will never fire.
             store->mark_invalid();

@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -27,6 +28,12 @@ public:
     bool repeats() const;
     std::chrono::milliseconds interval() const;
 
+    // A process-wide, monotonically increasing id, distinct for every timer
+    // ever constructed. Used in place of this object's address to identify
+    // it within a pass: an address can be reused once a one-shot's storage
+    // is released, an id never is.
+    std::uint64_t id() const noexcept;
+
     // Runs the callback with a handle to this timer. Called by the loop
     // with its own lock released, the same as a task.
     void fire();
@@ -45,6 +52,8 @@ private:
     // Set once, at construction, and never reassigned, so concurrent calls
     // to invalidate() from any thread can read it without their own lock.
     const std::weak_ptr<runloop::storage> _loop;
+
+    const std::uint64_t _id;
 
     std::atomic<bool> _valid{true};
 };

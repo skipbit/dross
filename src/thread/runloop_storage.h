@@ -85,7 +85,7 @@ private:
     // task queue: see next()'s own comment.
     struct pass {
         std::chrono::steady_clock::time_point boundary{std::chrono::steady_clock::now()};
-        std::vector<const timer::storage*> handled;
+        std::vector<std::uint64_t> handled;
     };
 
     // Takes the next task or due timer for current_pass, waiting until the
@@ -116,12 +116,15 @@ private:
     std::chrono::steady_clock::time_point earliest_timer_deadline() const;
 
     // Finds the timer with the earliest deadline that is due at or before
-    // boundary and not already in handled, advances (repeating) or removes
-    // (one-shot) its entry, records it in handled, and returns a work item
-    // that fires it with the lock released. Empty when none remain. Must
-    // hold _mutex.
+    // boundary and whose id is not already in handled, advances (repeating)
+    // or removes (one-shot) its entry, records its id in handled, and
+    // returns a work item that fires it with the lock released. Empty when
+    // none remain. Must hold _mutex.
+    //
+    // Matched by id, not by address: a one-shot's storage can be released
+    // between passes, and a later allocation could reuse its address.
     std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary,
-                                         std::vector<const timer::storage*>& handled);
+                                         std::vector<std::uint64_t>& handled);
 
     // A loop that is already finished, shared by every call made after this
     // thread's own bookkeeping has been torn down; see for_current_thread().

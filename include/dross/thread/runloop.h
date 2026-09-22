@@ -195,15 +195,22 @@ public:
     /**
      * @brief Test whether any task is queued.
      * @return true when nothing is waiting to run
+     *
+     * Speaks only of the task queue: a loop with no queued tasks can still
+     * have work ahead of it in the form of installed timers; see
+     * timer_count().
      */
     bool empty() const;
 
     /**
-     * @brief Count the installed timers that are still valid.
-     * @return The number of timers installed on this loop
+     * @brief Count the timers currently installed on this loop.
+     * @return The number of timers in this loop's own bookkeeping
      *
      * This is the public way to observe that a timer::repeating() or
-     * timer::once() call reached this loop.
+     * timer::once() call reached this loop. Can differ from a timer's own
+     * valid(): a one-shot is dropped from this count before its callback
+     * runs, while its valid() does not become false until after that
+     * callback returns.
      */
     std::size_t timer_count() const;
 
@@ -264,8 +271,9 @@ runloop main_runloop();
  * Defined even when called from a thread-local destructor that runs after
  * this thread's own bookkeeping has already been torn down, such as a
  * user's own thread-local destructor running after this library's when the
- * user's was constructed first: it then returns a handle to a fresh,
- * already-finished loop rather than reaching into the destroyed one.
+ * user's was constructed first: it then returns a handle to a shared,
+ * already-finished loop, the same one every such call gets, rather than
+ * reaching into the destroyed one.
  */
 runloop current_runloop();
 

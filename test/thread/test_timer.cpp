@@ -295,6 +295,38 @@ TEST(timer_test, a_late_fire_is_not_made_up)
     t.invalidate();
 }
 
+TEST(timer_test, a_slow_fire_does_not_shorten_another_timers_next_interval)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    // Both overdue by the time the loop is ever run, so the pass that opens
+    // below claims both: slow first (its delay is shorter), then fast,
+    // which is where a reschedule keyed to the pass boundary rather than to
+    // the moment fast is claimed would land its next deadline in the past,
+    // since slow's callback has by then run long past that boundary.
+    dross::timer slow = dross::timer::once(
+        std::chrono::milliseconds{0},
+        [](dross::timer) { std::this_thread::sleep_for(std::chrono::milliseconds{200}); }, loop);
+
+    std::vector<std::chrono::steady_clock::time_point> fires;
+    dross::timer fast = dross::timer::repeating(
+        std::chrono::milliseconds{50},
+        [&fires](dross::timer) { fires.push_back(std::chrono::steady_clock::now()); }, loop);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds{60});
+
+    loop.run_for(std::chrono::milliseconds{350});
+    fast.invalidate();
+    slow.invalidate();
+
+    ASSERT_GE(fires.size(), 2U);
+    for (std::size_t i = 1; i < fires.size(); ++i) {
+        EXPECT_GE(fires[i] - fires[i - 1], std::chrono::milliseconds{40})
+            << "gap before fire " << i << " was too short";
+    }
+}
+
 TEST(timer_test, an_exception_from_the_callback_propagates_and_the_timer_stays_installed)
 {
     reset_main_runloop();
@@ -369,7 +401,7 @@ TEST(timer_test, a_huge_delay_does_not_overflow)
     reset_main_runloop();
     dross::runloop loop = dross::main_runloop();
 
-    // Exercises deadline_after() with the largest value a caller can give;
+    // Exercises deadline::after() with the largest value a caller can give;
     // this is what the address-and-undefined sanitizer job installs to
     // catch a regression of the signed-overflow bug on this addition.
     dross::timer t = dross::timer::once(std::chrono::milliseconds::max(), [](dross::timer) {}, loop);

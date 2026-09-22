@@ -238,8 +238,9 @@ thread main_thread();
  * Defined even when called from a thread-local destructor that runs after
  * this thread's own bookkeeping has already been torn down, such as a
  * user's own thread-local destructor running after this library's when the
- * user's was constructed first: it then returns a handle to a fresh,
- * already-finished record rather than reaching into the destroyed one.
+ * user's was constructed first: it then returns a handle to a shared,
+ * already-finished record, the same one every such call gets, rather than
+ * reaching into the destroyed one.
  */
 thread current_thread();
 
