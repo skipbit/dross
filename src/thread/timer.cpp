@@ -1,5 +1,6 @@
 #include "dross/thread/timer.h"
 
+#include "thread/deadline.h"
 #include "thread/runloop_storage.h"
 #include "thread/timer_storage.h"
 
@@ -91,12 +92,21 @@ bool timer::operator==(const timer& other) const noexcept
 timer timer::make(std::chrono::milliseconds interval, bool repeats,
                   std::function<void(timer)> callback, runloop loop)
 {
+    // Checked before the move below, the same as runloop::perform() checks
+    // its own task: an empty callback is never installed, the same as one
+    // given to a loop that has already finished.
+    const bool has_callback = static_cast<bool>(callback);
+
     auto store = std::make_shared<storage>(interval, repeats, std::move(callback), loop._store);
 
-    const auto first_deadline = std::chrono::steady_clock::now() + interval;
-    if (!loop._store->install_timer(store, first_deadline)) {
-        // The loop is already finished; it will never fire.
+    if (!has_callback) {
         store->mark_invalid();
+    } else {
+        const auto first_deadline = deadline_after(std::chrono::steady_clock::now(), interval);
+        if (!loop._store->install_timer(store, first_deadline)) {
+            // The loop is already finished; it will never fire.
+            store->mark_invalid();
+        }
     }
 
     return timer{std::move(store)};

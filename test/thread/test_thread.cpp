@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <thread>
 #include <vector>
@@ -377,6 +378,41 @@ TEST(thread_test, an_adopted_thread_that_touched_the_loop_first_reports_perform_
 
     EXPECT_TRUE(adopted->finished());
     EXPECT_FALSE(adopted->perform([]() {}));
+}
+
+TEST(thread_test, current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
+{
+    struct destructor_probe final {
+        std::function<void()> on_destroy;
+        ~destructor_probe() { on_destroy(); }
+    };
+
+    std::optional<bool> performed;
+    std::optional<bool> was_finished;
+
+    // A plain std::thread, not dross::thread: starting one of those installs
+    // this module's own thread-local holder before the body ever runs,
+    // which would construct it before probe below rather than after.
+    std::thread worker{[&performed, &was_finished]() {
+        // Constructed before this thread ever calls current_thread(), so it
+        // is destroyed after that thread's own holder: the same ordering
+        // that makes a user's own thread-local destructor run after this
+        // library's when the user's was constructed first.
+        thread_local destructor_probe probe{[&performed, &was_finished]() {
+            dross::thread self = dross::current_thread();
+            performed = self.perform([]() {});
+            was_finished = self.finished();
+        }};
+        static_cast<void>(probe);
+
+        static_cast<void>(dross::current_thread());
+    }};
+    worker.join();
+
+    ASSERT_TRUE(performed.has_value());
+    ASSERT_TRUE(was_finished.has_value());
+    EXPECT_FALSE(*performed);
+    EXPECT_TRUE(*was_finished);
 }
 
 TEST(thread_test, a_worker_asking_for_main_thread_first_still_reaches_the_real_main_loop)

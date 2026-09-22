@@ -115,11 +115,20 @@ public:
      *
      * Waits when nothing is ready: no task is queued and no installed timer
      * has reached its deadline. The wait ends at whichever comes first, a
-     * task being queued, a timer becoming due, or quit(). A timer that is
-     * due fires before a queued task. Returns once quit() is seen; tasks
-     * still queued stay queued. The request is cleared by the outermost
-     * running call, so a run started from inside a task stops but leaves
-     * the request standing for the run it was started from.
+     * task being queued, a timer becoming due, or quit().
+     *
+     * Work is taken in passes. Within one pass, every timer already due
+     * when the pass began fires once, earliest deadline first, before a
+     * queued task runs; a timer that becomes due again before the pass
+     * ends, such as one with a zero interval, does not get a second turn
+     * until the next pass. Taking a task ends the pass; the next one starts
+     * fresh. This is what stops a timer that is always due from starving
+     * both the other timers and the queue.
+     *
+     * Returns once quit() is seen; tasks still queued stay queued. The
+     * request is cleared by the outermost running call, so a run started
+     * from inside a task stops but leaves the request standing for the run
+     * it was started from.
      */
     std::size_t run();
 
@@ -154,7 +163,9 @@ public:
      * @param timeout How long to keep running
      * @return The number of tasks run plus timer fires
      *
-     * A timeout of zero runs nothing already due and returns at once.
+     * Work is taken in passes the same way run() takes it; see its own doc
+     * comment. A timeout of zero runs nothing already due and returns at
+     * once.
      */
     std::size_t run_for(std::chrono::milliseconds timeout);
 

@@ -30,6 +30,9 @@ namespace dross {
  *   valid() false at once. The loop drops its own reference to an
  *   invalidated timer
  * - A one-shot timer invalidates itself once it has fired
+ * - A factory call with an empty callback, or a loop that has already
+ *   finished, does not install anything: it returns a handle that is
+ *   already invalid, the same as one invalidate() has already been called on
  *
  * Firing:
  * - repeating() installs a timer that fires every interval until
@@ -39,7 +42,9 @@ namespace dross {
  * - The two-argument overloads install on current_runloop(); the
  *   three-argument overloads install on the loop given
  * - An interval of zero is allowed and means "due immediately"; a repeating
- *   timer with a zero interval then fires once per loop iteration
+ *   timer with a zero interval then fires once per pass the loop makes over
+ *   what is due, not once per unit of work it runs; see runloop::run()'s own
+ *   doc comment for what a pass is
  * - After a repeating timer fires, its next fire is scheduled interval after
  *   the moment it fired, not stacked onto the fire that was due: a callback
  *   that runs long, or a loop that is not run for a while, does not make up
@@ -49,8 +54,9 @@ namespace dross {
  *
  * Exceptions:
  * - An exception thrown by the callback propagates out of the running call
- *   that was executing it, the same way a task's does, and the timer stays
- *   installed
+ *   that was executing it, the same way a task's does. A repeating timer
+ *   stays installed; a one-shot does not, since it is removed before it
+ *   fires regardless of whether the callback throws
  *
  * @code
  * dross::timer heartbeat = dross::timer::repeating(
@@ -69,7 +75,8 @@ public:
      * @param interval How long to wait between fires; zero means "every
      * iteration"
      * @param callback Called with the timer itself each time it fires
-     * @return A handle to the installed timer
+     * @return A handle to the installed timer, or a handle that is already
+     * invalid when callback is empty
      */
     static timer repeating(std::chrono::milliseconds interval,
                             std::function<void(timer)> callback);
@@ -80,7 +87,8 @@ public:
      * iteration"
      * @param callback Called with the timer itself each time it fires
      * @param loop The loop to install on
-     * @return A handle to the installed timer
+     * @return A handle to the installed timer, or a handle that is already
+     * invalid when callback is empty or loop has already finished
      */
     static timer repeating(std::chrono::milliseconds interval,
                             std::function<void(timer)> callback, runloop loop);
@@ -89,7 +97,8 @@ public:
      * @brief Install a timer that fires once on current_runloop().
      * @param delay How long to wait before firing; zero means "immediately"
      * @param callback Called with the timer itself when it fires
-     * @return A handle to the installed timer
+     * @return A handle to the installed timer, or a handle that is already
+     * invalid when callback is empty
      */
     static timer once(std::chrono::milliseconds delay,
                        std::function<void(timer)> callback);
@@ -99,7 +108,8 @@ public:
      * @param delay How long to wait before firing; zero means "immediately"
      * @param callback Called with the timer itself when it fires
      * @param loop The loop to install on
-     * @return A handle to the installed timer
+     * @return A handle to the installed timer, or a handle that is already
+     * invalid when callback is empty or loop has already finished
      */
     static timer once(std::chrono::milliseconds delay,
                        std::function<void(timer)> callback, runloop loop);
@@ -127,9 +137,10 @@ public:
     /**
      * @brief Stop this timer and drop it from its loop.
      *
-     * Callable from any thread and idempotent. Makes valid() false at once;
-     * a fire already in progress is not interrupted, but no fire after this
-     * call happens.
+     * Callable from any thread and idempotent. Makes valid() false at once.
+     * A fire the loop has already taken, whether about to run or already
+     * running, is not interrupted and runs to completion; what this
+     * guarantees is that no new fire is taken after it returns.
      */
     void invalidate();
 

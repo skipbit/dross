@@ -1,6 +1,7 @@
 #include "dross/thread/thread.h"
 
 #include "dross/thread/runloop.h"
+#include "thread/deadline.h"
 #include "thread/native.h"
 
 #include <atomic>
@@ -13,14 +14,6 @@
 #include <vector>
 
 namespace dross {
-
-namespace {
-
-// Marks "wait with no deadline" for join_for(), the same way
-// runloop::storage's own kNoDeadline does for run_for().
-constexpr auto kNoDeadline = std::chrono::steady_clock::time_point::max();
-
-}
 
 class thread::storage final {
 public:
@@ -421,13 +414,8 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
 
     // wait_for() would hand steady_clock::now() + timeout to the clock
     // unclamped; for a timeout as large as milliseconds::max() that
-    // overflows. Clamped the same way runloop::storage::run_for() clamps
-    // its own deadline, computing the headroom as a duration so nothing
-    // overflows either.
-    const auto now = std::chrono::steady_clock::now();
-    const auto limit = kNoDeadline - std::chrono::steady_clock::duration{1};
-    const auto room = std::chrono::duration_cast<std::chrono::milliseconds>(limit - now);
-    const auto deadline = timeout < room ? now + timeout : limit;
+    // overflows.
+    const auto deadline = deadline_after(std::chrono::steady_clock::now(), timeout);
 
     std::unique_lock<std::mutex> lock{_mutex};
     return _done_cv.wait_until(lock, deadline, [this]() { return _finished; });

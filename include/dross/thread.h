@@ -44,7 +44,10 @@
  *
  * Errors:
  * - perform() returns false when the task cannot be queued, which the
- *   caller can act on. Nothing else here reports a failure
+ *   caller can act on
+ * - A timer factory call that cannot install, because callback is empty or
+ *   loop has already finished, returns a handle that is already invalid
+ *   rather than failing outright
  * - An exception thrown by a task or a timer's callback propagates out of
  *   the run() call that was running it. It is not caught, stored or
  *   translated
@@ -62,7 +65,7 @@
 /**
  * @brief Threading namespace members live directly in dross.
  *
- * The thread module adds runloop and thread to the dross namespace,
+ * The thread module adds runloop, thread and timer to the dross namespace,
  * alongside the type and platform layers, rather than a namespace of its
  * own.
  */

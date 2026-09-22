@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <thread>
@@ -272,22 +273,22 @@ TEST(timer_test, a_late_fire_is_not_made_up)
     reset_main_runloop();
     dross::runloop loop = dross::main_runloop();
 
-    std::atomic<int> fire_count{0};
+    int fire_count = 0;
     dross::timer t = dross::timer::repeating(
-        std::chrono::milliseconds{10},
-        [&fire_count](dross::timer) {
-            fire_count.fetch_add(1);
-            // Blocks well past several intervals, so a naive implementation
-            // that queued up every missed deadline would fire many times in
-            // a row once this returns.
-            std::this_thread::sleep_for(std::chrono::milliseconds{100});
-        },
-        loop);
+        std::chrono::milliseconds{10}, [&fire_count](dross::timer) { ++fire_count; }, loop);
 
-    loop.run_for(std::chrono::milliseconds{150});
+    // The loop is not run at all while this elapses, so by the time it is,
+    // the timer is many intervals overdue. A catch-up implementation (one
+    // that reschedules from the deadline that was due rather than from the
+    // moment the fire was decided) fires roughly ten times once it finally
+    // runs; this one fires exactly once.
+    std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
-    EXPECT_GE(fire_count.load(), 1);
-    EXPECT_LE(fire_count.load(), 2);
+    // A 5ms window is far too short to reach a second fire even under a
+    // sanitizer that slows everything down, so this distinguishes the two
+    // implementations reliably instead of just bounding a range both satisfy.
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds{5}), 1U);
+    EXPECT_EQ(fire_count, 1);
 
     t.invalidate();
 }
@@ -318,7 +319,66 @@ TEST(timer_test, an_exception_from_the_callback_propagates_and_the_timer_stays_i
     t.invalidate();
 }
 
-TEST(timer_test, invalidate_wakes_a_loop_blocked_in_its_wait)
+TEST(timer_test, an_exception_from_a_one_shot_callback_propagates_and_the_timer_is_gone)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    // Unlike a repeating timer, a one-shot is removed before it fires
+    // regardless of whether the callback throws, so it does not stay
+    // installed the way the repeating case above does.
+    dross::timer t = dross::timer::once(
+        std::chrono::milliseconds{0},
+        [](dross::timer) { throw std::runtime_error{"from a timer"}; }, loop);
+
+    EXPECT_THROW(loop.run_pending(), std::runtime_error);
+    EXPECT_FALSE(t.valid());
+    EXPECT_EQ(loop.timer_count(), 0U);
+}
+
+TEST(timer_test, an_empty_callback_is_not_installed)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    dross::timer t = dross::timer::once(std::chrono::milliseconds{0},
+                                        std::function<void(dross::timer)>{}, loop);
+
+    EXPECT_FALSE(t.valid());
+    EXPECT_EQ(loop.timer_count(), 0U);
+}
+
+TEST(timer_test, installing_on_a_finished_loop_returns_an_invalid_handle)
+{
+    std::optional<dross::runloop> ended_loop;
+    std::thread worker{[&ended_loop]() { ended_loop = dross::current_runloop(); }};
+    worker.join();
+    // The worker thread has ended; its loop is finished.
+
+    ASSERT_TRUE(ended_loop.has_value());
+    dross::timer t = dross::timer::once(std::chrono::milliseconds{0}, [](dross::timer) {}, *ended_loop);
+
+    EXPECT_FALSE(t.valid());
+    EXPECT_EQ(ended_loop->timer_count(), 0U);
+}
+
+TEST(timer_test, a_huge_delay_does_not_overflow)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    // Exercises deadline_after() with the largest value a caller can give;
+    // this is what the address-and-undefined sanitizer job installs to
+    // catch a regression of the signed-overflow bug on this addition.
+    dross::timer t = dross::timer::once(std::chrono::milliseconds::max(), [](dross::timer) {}, loop);
+
+    EXPECT_TRUE(t.valid());
+    EXPECT_EQ(loop.timer_count(), 1U);
+
+    t.invalidate();
+}
+
+TEST(timer_test, installing_a_sooner_timer_cuts_short_a_wait_on_a_later_one)
 {
     dross::thread worker;
     std::optional<dross::runloop> worker_loop;
@@ -336,27 +396,33 @@ TEST(timer_test, invalidate_wakes_a_loop_blocked_in_its_wait)
 
     // Far enough out that the worker's already-running run() loop, with
     // nothing else queued, parks its wait on this deadline.
-    dross::timer far =
-        dross::timer::once(std::chrono::seconds{10}, [](dross::timer) {}, *worker_loop);
+    dross::timer far = dross::timer::once(std::chrono::seconds{10}, [](dross::timer) {}, *worker_loop);
     std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
+    // install_timer() notifies the condition variable the parked wait is
+    // blocked on. A black-box test cannot isolate that one call by itself,
+    // the way it isolates most behaviour here: a notify from anywhere on
+    // this loop wakes the same wait regardless of which deadline it was
+    // given, so the only way to observe a wake at all is by way of its
+    // effect, which is what this checks: a sooner deadline installed while
+    // parked on a later one is not missed until the later one's own stale
+    // timeout.
     std::atomic<bool> soon_fired{false};
-    far.invalidate();
     dross::timer soon = dross::timer::once(
         std::chrono::milliseconds{100}, [&soon_fired](dross::timer) { soon_fired.store(true); },
         *worker_loop);
 
-    // Bounded well under far's original 10-second deadline: if invalidating
-    // far had not woken the parked loop, this would only settle once that
-    // stale deadline finally timed out on its own.
+    // Bounded well under far's 10-second deadline: if installing soon had
+    // not woken the parked loop, this would only settle once that stale
+    // deadline finally timed out on its own.
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
     while (!soon_fired.load() && std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{5});
     }
 
     EXPECT_TRUE(soon_fired.load());
-    EXPECT_FALSE(far.valid());
 
+    far.invalidate();
     ASSERT_TRUE(worker.perform([]() { dross::current_thread().quit(); }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 }
@@ -393,6 +459,11 @@ TEST(timer_test, invalidate_from_another_thread_while_the_loop_is_running_it)
     t->invalidate();
     EXPECT_FALSE(t->valid());
 
+    // A fire the loop had already taken when invalidate() ran still finishes,
+    // so the count is read after that one has landed. What invalidate()
+    // promises is that no further fire is taken, which is what the second
+    // reading checks.
+    std::this_thread::sleep_for(std::chrono::milliseconds{50});
     const int settled = fire_count.load();
     std::this_thread::sleep_for(std::chrono::milliseconds{50});
     EXPECT_EQ(fire_count.load(), settled);

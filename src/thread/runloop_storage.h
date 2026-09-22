@@ -75,12 +75,33 @@ private:
         std::chrono::steady_clock::time_point deadline;
     };
 
-    // Takes the next task or due timer, waiting until the deadline. Returns
-    // false when quit() was seen, which consumes the request only when
-    // consume_quit is true, or when the deadline passed with nothing to run.
-    // A due timer takes priority over a queued task.
+    // One pass of a running call over what is due: a boundary snapshot and
+    // the timers already taken since it was taken. run_until() and
+    // run_one() each own one and pass it into next() by reference across
+    // however many calls the pass lasts, so a timer already taken in this
+    // pass is not taken again until the next one, even if it reschedules
+    // itself immediately due again (a zero interval, say). That is what
+    // stops one always-due timer from starving every other timer and the
+    // task queue: see next()'s own comment.
+    struct pass {
+        std::chrono::steady_clock::time_point boundary{std::chrono::steady_clock::now()};
+        std::vector<const timer::storage*> handled;
+    };
+
+    // Takes the next task or due timer for current_pass, waiting until the
+    // deadline. Returns false when quit() was seen, which consumes the
+    // request only when consume_quit is true, or when the deadline passed
+    // with nothing to run.
+    //
+    // Within current_pass, a due timer takes priority over a queued task,
+    // and the earliest-due timer not yet taken this pass wins over any
+    // other due timer, so an overdue one is not starved by one that keeps
+    // rescheduling itself sooner. Taking a task ends the pass: the caller's
+    // next call starts a fresh one. Finding nothing due or queued also ends
+    // it, since a fresh boundary may find what a stale one would miss.
     bool next(std::unique_lock<std::mutex>& lock, std::function<void()>& out,
-              std::chrono::steady_clock::time_point deadline, bool consume_quit);
+              std::chrono::steady_clock::time_point deadline, bool consume_quit,
+              pass& current_pass);
 
     // Runs one task or timer fire with the lock released, and takes the
     // lock back after. The captures go too, so their own code runs outside
@@ -94,10 +115,11 @@ private:
     // are installed. Must hold _mutex.
     std::chrono::steady_clock::time_point earliest_timer_deadline() const;
 
-    // Finds one timer due at or before boundary whose identity is not
-    // already in handled, advances (repeating) or removes (one-shot) its
-    // entry, records it in handled, and returns a work item that fires it
-    // with the lock released. Empty when none remain. Must hold _mutex.
+    // Finds the timer with the earliest deadline that is due at or before
+    // boundary and not already in handled, advances (repeating) or removes
+    // (one-shot) its entry, records it in handled, and returns a work item
+    // that fires it with the lock released. Empty when none remain. Must
+    // hold _mutex.
     std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary,
                                          std::vector<const timer::storage*>& handled);
 

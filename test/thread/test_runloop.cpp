@@ -495,9 +495,11 @@ TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_tha
 
     std::thread worker{[&performed]() {
         // Constructed before this thread ever touches its own run loop, so
-        // it is destroyed after that loop's own holder: this is exactly how
-        // defect 2 arose. See test_thread.cpp for the equivalent for
-        // current_thread().
+        // it is destroyed after that loop's own holder, the same ordering
+        // that makes a user's own thread-local destructor run after this
+        // library's when the user's was constructed first. See
+        // current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder
+        // in test_thread.cpp for the equivalent covering current_thread().
         thread_local destructor_probe probe{[&performed]() {
             dross::runloop loop = dross::current_runloop();
             performed = loop.perform([]() {});
