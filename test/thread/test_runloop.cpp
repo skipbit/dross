@@ -2,9 +2,12 @@
 
 #include "dross/thread/runloop.h"
 
+#include "dross/thread/timer.h"
+
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <thread>
@@ -428,4 +431,123 @@ TEST(runloop_test, an_exception_from_a_task_propagates_out_of_run)
     loop.perform([&ran]() { ran = true; });
     EXPECT_EQ(loop.run_pending(), 1U);
     EXPECT_TRUE(ran);
+}
+
+TEST(runloop_test, a_due_timer_fires_before_a_queued_task)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    std::vector<int> order;
+    loop.perform([&order]() { order.push_back(2); });
+    dross::timer t = dross::timer::once(
+        std::chrono::milliseconds{0}, [&order](dross::timer) { order.push_back(1); }, loop);
+
+    EXPECT_EQ(loop.run_pending(), 2U);
+    EXPECT_EQ(order, (std::vector<int>{1, 2}));
+    EXPECT_FALSE(t.valid());
+}
+
+TEST(runloop_test, run_pending_does_not_run_a_task_a_timer_posts_in_the_same_call)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    int timer_fired = 0;
+    int task_ran = 0;
+    dross::timer t = dross::timer::once(
+        std::chrono::milliseconds{0},
+        [&loop, &timer_fired, &task_ran](dross::timer) {
+            ++timer_fired;
+            loop.perform([&task_ran]() { ++task_ran; });
+        },
+        loop);
+
+    // The cutoff for this call's own task drain must be read before the
+    // timer above runs, not after: otherwise the task it posts falls inside
+    // this call's own cutoff and runs in the same call that queued it.
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_EQ(timer_fired, 1);
+    EXPECT_EQ(task_ran, 0);
+    EXPECT_EQ(loop.pending_count(), 1U);
+
+    loop.clear();
+    EXPECT_FALSE(t.valid());
+}
+
+TEST(runloop_test, run_for_with_the_most_negative_timeout_does_not_overflow)
+{
+    reset_main_runloop();
+    dross::runloop loop = dross::main_runloop();
+
+    // Exercises deadline::after() with the most negative value a caller can
+    // give; this is what the address-and-undefined sanitizer job installs
+    // to catch a regression of the signed-overflow bug on this conversion.
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds::min()), 0U);
+}
+
+TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_thread)
+{
+    // A shared_ptr with a custom deleter, rather than a counting member with
+    // its own destructor, so incidental copies made while the task or timer
+    // travels through std::function and this loop's own containers do not
+    // themselves count as a release: only the very last reference does.
+    auto released = std::make_shared<std::atomic<int>>(0);
+    auto released_on_owner = std::make_shared<std::atomic<int>>(0);
+
+    std::thread worker{[released, released_on_owner]() {
+        const auto owner = std::this_thread::get_id();
+        dross::runloop loop = dross::current_runloop();
+
+        const auto make_resource = [released, released_on_owner, owner]() {
+            return std::shared_ptr<int>(new int{0}, [released, released_on_owner, owner](int* p) {
+                delete p;
+                released->fetch_add(1);
+                if (std::this_thread::get_id() == owner) {
+                    released_on_owner->fetch_add(1);
+                }
+            });
+        };
+
+        loop.perform([resource = make_resource()]() {});
+        static_cast<void>(dross::timer::once(
+            std::chrono::hours{1}, [resource = make_resource()](dross::timer) {}, loop));
+
+        // The thread ends here without ever calling run(): neither the task
+        // nor the timer above ever fires.
+    }};
+    worker.join();
+
+    EXPECT_EQ(released->load(), 2);
+    EXPECT_EQ(released_on_owner->load(), 2);
+}
+
+TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
+{
+    struct destructor_probe final {
+        std::function<void()> on_destroy;
+        ~destructor_probe() { on_destroy(); }
+    };
+
+    std::optional<bool> performed;
+
+    std::thread worker{[&performed]() {
+        // Constructed before this thread ever touches its own run loop, so
+        // it is destroyed after that loop's own holder, the same ordering
+        // that makes a user's own thread-local destructor run after this
+        // library's when the user's was constructed first. See
+        // current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder
+        // in test_thread.cpp for the equivalent covering current_thread().
+        thread_local destructor_probe probe{[&performed]() {
+            dross::runloop loop = dross::current_runloop();
+            performed = loop.perform([]() {});
+        }};
+        static_cast<void>(probe);
+
+        static_cast<void>(dross::current_runloop());
+    }};
+    worker.join();
+
+    ASSERT_TRUE(performed.has_value());
+    EXPECT_FALSE(*performed);
 }
