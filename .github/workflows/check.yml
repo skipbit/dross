@@ -1,8 +1,8 @@
 # Checks a commit against the Requirements in the README: every supported
 # compiler and standard library pairing, in both build types, the two ways the
-# library is packaged, what the sanitizers find, and that the documentation
-# still builds. `required` waits for all of them, so one name stands for the
-# whole list.
+# library is packaged, what the sanitizers find, that the documentation still
+# builds, and that the sources match the formatting configuration. `required`
+# waits for all of them, so one name stands for the whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -387,10 +387,44 @@ jobs:
           echo "$(find docs/build/doxygen/xml -name '*.xml' | wc -l) Doxygen files"
           echo "$(find docs/build/sphinx/html -name '*.html' | wc -l) HTML pages"
 
+  # The layout is defined by .clang-format alone, so the check runs the release
+  # that configuration was written against. clang-format changes what it
+  # produces between releases, and an unpinned one would rewrite files the
+  # pinned one accepts.
+  format-check:
+    name: format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install clang-format
+        run: pip install clang-format==18.1.3
+
+      # The file list is asserted to be non-empty: a pattern that stopped
+      # matching would otherwise check nothing and report success.
+      - name: Check formatting
+        run: |
+          clang-format --version
+          git ls-files 'src/**' 'include/**' 'test/**' | grep -E '\.(h|cpp)$' > "$RUNNER_TEMP/files"
+          test -s "$RUNNER_TEMP/files"
+          echo "$(wc -l < "$RUNNER_TEMP/files") files"
+          xargs clang-format --dry-run -Werror --style=file < "$RUNNER_TEMP/files"
+
   required:
     name: required
     if: always()
-    needs: [build-and-test, packaging, sanitize, docs]
+    needs: [build-and-test, packaging, sanitize, docs, format-check]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 
