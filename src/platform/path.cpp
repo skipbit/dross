@@ -8,23 +8,23 @@
 
 namespace dross {
 
-std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::string& absolute_path)
+std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::string& dir_path)
 {
-    return path::mkdir(std::filesystem::path{ absolute_path });
+    return path::mkdir(std::filesystem::path{ dir_path });
 }
 
-std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::filesystem::path& absolute_path)
+std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::filesystem::path& dir_path)
 {
     std::error_code err;
     // create_directories() returns false both when the directory already
     // existed and when it failed to create one, so the return value alone
     // cannot tell success from failure; check err instead.
-    std::filesystem::create_directories(absolute_path, err);
+    std::filesystem::create_directories(dir_path, err);
     if (err) {
-        return std::unexpected(std::filesystem::filesystem_error("failed", absolute_path, err));
+        return std::unexpected(std::filesystem::filesystem_error("failed", dir_path, err));
     }
 
-    return path{ absolute_path };
+    return path{ dir_path };
 }
 
 std::optional<path> path::home()
