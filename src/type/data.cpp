@@ -203,7 +203,7 @@ bool data::operator==(const data& other) const noexcept
 
 bool data::operator!=(const data& other) const noexcept
 {
-    return ! equals(other);
+    return (! equals(other));
 }
 
 std::strong_ordering data::operator<=>(const data& other) const noexcept
@@ -352,37 +352,37 @@ data::iterator data::iterator::operator-(std::ptrdiff_t n) const
 
 std::ptrdiff_t data::iterator::operator-(const iterator& other) const
 {
-    return _ptr - other._ptr;
+    return (_ptr - other._ptr);
 }
 
 bool data::iterator::operator==(const iterator& other) const noexcept
 {
-    return _ptr == other._ptr;
+    return (_ptr == other._ptr);
 }
 
 bool data::iterator::operator!=(const iterator& other) const noexcept
 {
-    return _ptr != other._ptr;
+    return (_ptr != other._ptr);
 }
 
 bool data::iterator::operator<(const iterator& other) const noexcept
 {
-    return _ptr < other._ptr;
+    return (_ptr < other._ptr);
 }
 
 bool data::iterator::operator<=(const iterator& other) const noexcept
 {
-    return _ptr <= other._ptr;
+    return (_ptr <= other._ptr);
 }
 
 bool data::iterator::operator>(const iterator& other) const noexcept
 {
-    return _ptr > other._ptr;
+    return (_ptr > other._ptr);
 }
 
 bool data::iterator::operator>=(const iterator& other) const noexcept
 {
-    return _ptr >= other._ptr;
+    return (_ptr >= other._ptr);
 }
 
 // data::const_iterator
@@ -467,36 +467,36 @@ data::const_iterator data::const_iterator::operator-(std::ptrdiff_t n) const
 
 std::ptrdiff_t data::const_iterator::operator-(const const_iterator& other) const
 {
-    return _ptr - other._ptr;
+    return (_ptr - other._ptr);
 }
 
 bool data::const_iterator::operator==(const const_iterator& other) const noexcept
 {
-    return _ptr == other._ptr;
+    return (_ptr == other._ptr);
 }
 
 bool data::const_iterator::operator!=(const const_iterator& other) const noexcept
 {
-    return _ptr != other._ptr;
+    return (_ptr != other._ptr);
 }
 
 bool data::const_iterator::operator<(const const_iterator& other) const noexcept
 {
-    return _ptr < other._ptr;
+    return (_ptr < other._ptr);
 }
 
 bool data::const_iterator::operator<=(const const_iterator& other) const noexcept
 {
-    return _ptr <= other._ptr;
+    return (_ptr <= other._ptr);
 }
 
 bool data::const_iterator::operator>(const const_iterator& other) const noexcept
 {
-    return _ptr > other._ptr;
+    return (_ptr > other._ptr);
 }
 
 bool data::const_iterator::operator>=(const const_iterator& other) const noexcept
 {
-    return _ptr >= other._ptr;
+    return (_ptr >= other._ptr);
 }
 }  // namespace dross

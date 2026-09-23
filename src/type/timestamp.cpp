@@ -350,7 +350,7 @@ timestamp::timestamp(const std::string& iso8601_str)
                 } else if (match[9].matched) {  // +/- offset
                     int tz_hour = std::stoi(match[10].str());
                     int tz_minute = std::stoi(match[11].str());
-                    int offset = tz_hour * 60 + tz_minute;
+                    int offset = (tz_hour * 60 + tz_minute);
                     if (match[9].str() == "-") {
                         offset = -offset;
                     }
@@ -544,9 +544,9 @@ std::string timestamp::format_iso8601() const
     std::ostringstream oss;
 
     // Check if time is midnight (00:00:00) to decide format
-    bool is_midnight = (_store->time_value.hour() == 0 && _store->time_value.minute() == 0 && _store->time_value.second() == 0);
+    bool is_midnight = ((_store->time_value.hour() == 0) && (_store->time_value.minute() == 0) && (_store->time_value.second() == 0));
 
-    if (! is_midnight || _store->tz.offset().count() != 0) {
+    if ((! is_midnight) || (_store->tz.offset().count() != 0)) {
         // Full timestamp (if time is not midnight or timezone is specified)
         oss << std::setfill('0') << std::setw(4) << _store->date_value.year() << "-" << std::setw(2) << _store->date_value.month() << "-"
             << std::setw(2) << _store->date_value.day() << "T" << std::setw(2) << _store->time_value.hour() << ":" << std::setw(2)

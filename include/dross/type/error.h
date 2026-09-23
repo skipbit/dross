@@ -35,13 +35,13 @@ public:
     template <error_enum_type E>
     bool operator==(const E e) const noexcept
     {
-        return _code.default_error_condition() == e;
+        return (_code.default_error_condition() == e);
     }
 
     template <error_enum_type E>
     bool operator!=(const E e) const noexcept
     {
-        return _code.default_error_condition() != e;
+        return (_code.default_error_condition() != e);
     }
 
     bool operator==(const std::error_category&) const noexcept;

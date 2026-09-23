@@ -58,7 +58,7 @@
     }
     ```
 *   **Declaration and Implementation:** Separate header files and source files. As a principle, header files should contain only declarations whenever possible, with all implementations (including `= default;`, `= delete;`, and function bodies) written in .cpp files. Exceptions are made only for special cases such as templates and iterator definitions required for range-based for loops. Header files should contain only class and function declarations.
-*   **Line Length:** Target 80 characters, but be flexible within reasonable limits to maintain readability.
+*   **Line Length:** Aim for 140 characters. There is no hard limit: `.clang-format` sets no `ColumnLimit`, so clang-format never rewraps a line to fit a width and most breaks placed on purpose are kept. Go past 140 where breaking would hurt readability.
 *   **Reference and Pointer Positioning:** Position reference (`&`) and pointer (`*`) symbols close to the variable name, with a space after the type.
     ```cpp
     // Correct

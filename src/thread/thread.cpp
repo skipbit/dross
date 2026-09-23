@@ -166,7 +166,7 @@ void thread::storage::deregister()
 {
     const std::lock_guard<std::mutex> guard{ registry_mutex() };
     std::erase_if(registry(), [this](const std::shared_ptr<storage>& entry) {
-        return entry.get() == this;
+        return (entry.get() == this);
     });
 }
 
@@ -345,7 +345,7 @@ bool thread::storage::stop_requested() const
 bool thread::storage::running() const
 {
     const std::lock_guard<std::mutex> guard{ _mutex };
-    return ! _finished;
+    return (! _finished);
 }
 
 bool thread::storage::finished() const
@@ -365,7 +365,7 @@ bool thread::storage::is_current() const
     }
 
     const std::lock_guard<std::mutex> guard{ _mutex };
-    return _native_id && *_native_id == native::thread_id();
+    return (_native_id && (*_native_id == native::thread_id()));
 }
 
 void thread::storage::set_native_id(std::uint64_t id)

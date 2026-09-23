@@ -37,15 +37,15 @@ timezone timezone::utc()
 timezone timezone::offset(int hours, int minutes)
 {
     // Validate input ranges
-    if (hours < -12 || hours > 14) {
+    if ((hours < -12) || (hours > 14)) {
         return timezone::utc();  // Invalid hours, fallback to UTC
     }
-    if (minutes < 0 || minutes > 59) {
+    if ((minutes < 0) || (minutes > 59)) {
         return timezone::utc();  // Invalid minutes, fallback to UTC
     }
 
     // Calculate total offset in minutes
-    int total_minutes = std::abs(hours) * 60 + minutes;
+    int total_minutes = (std::abs(hours) * 60 + minutes);
     if (hours < 0) {
         total_minutes = -total_minutes;
     }
@@ -83,12 +83,12 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
         int minutes = std::stoi(match[3].str());
 
         // Validate ranges
-        if (hours > 14 || minutes > 59) {
+        if ((hours > 14) || (minutes > 59)) {
             return std::nullopt;  // Invalid format
         }
 
         // Calculate offset
-        int total_minutes = hours * 60 + minutes;
+        int total_minutes = (hours * 60 + minutes);
         if (sign == '-') {
             total_minutes = -total_minutes;
         }
@@ -127,7 +127,7 @@ timezone& timezone::operator=(const timezone& other)
 
 bool timezone::is_utc() const noexcept
 {
-    return _store->offset_minutes == 0;
+    return (_store->offset_minutes == 0);
 }
 
 std::chrono::minutes timezone::offset() const noexcept
@@ -145,8 +145,8 @@ std::string timezone::format() const
     // Format as [+-]HH:MM
     char sign = offset >= 0 ? '+' : '-';
     int abs_offset = std::abs(offset);
-    int hours = abs_offset / 60;
-    int minutes = abs_offset % 60;
+    int hours = (abs_offset / 60);
+    int minutes = (abs_offset % 60);
 
     std::ostringstream oss;
     oss << sign << std::setfill('0') << std::setw(2) << hours << ":" << std::setw(2) << minutes;
@@ -161,7 +161,7 @@ timezone::operator std::string() const
 
 bool timezone::operator==(const timezone& other) const noexcept
 {
-    return _store->offset_minutes == other._store->offset_minutes;
+    return (_store->offset_minutes == other._store->offset_minutes);
 }
 
 std::strong_ordering timezone::operator<=>(const timezone& other) const noexcept
