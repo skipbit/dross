@@ -2,6 +2,7 @@
 
 #include "thread/deadline.h"
 #include "thread/native.h"
+#include "thread/runloop_access.h"
 #include "thread/runloop_storage.h"
 #include "thread/timer_storage.h"
 
@@ -40,6 +41,21 @@ runloop::storage::running_mark::~running_mark()
 bool runloop::storage::running_mark::outermost() const noexcept
 {
     return _outermost;
+}
+
+runloop::storage::storage(std::shared_ptr<const time_source> source)
+    : _source{ std::move(source) }
+{
+}
+
+runloop::storage::pass runloop::storage::fresh_pass() const
+{
+    return pass{ now(), {} };
+}
+
+time_source::time_point runloop::storage::now() const
+{
+    return _source->now();
 }
 
 std::shared_ptr<runloop::storage> runloop::storage::main_loop()
@@ -163,7 +179,7 @@ void runloop::storage::remove_timer(const timer::storage* which)
 
 std::function<void()> runloop::storage::take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled)
 {
-    auto which = _timers.take_due(boundary, std::chrono::steady_clock::now(), handled);
+    auto which = _timers.take_due(boundary, now(), handled);
     if (! which) {
         return nullptr;
     }
@@ -207,7 +223,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
             return false;
         }
 
-        // Every pass operation below costs a steady_clock::now(); skipped
+        // Every pass operation below costs a now(); skipped
         // entirely on a loop with no installed timers, so a loop that only
         // ever queues tasks pays nothing for a feature it does not use.
         const bool has_timers = (! _timers.empty());
@@ -223,7 +239,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
             out = std::move(_pending.front().second);
             _pending.pop_front();
             if (has_timers) {
-                current_pass = pass{};
+                current_pass = fresh_pass();
             }
             return true;
         }
@@ -232,18 +248,18 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
             // Nothing left in this pass. A fresh boundary may find what a
             // stale one would miss, so try once more before deciding there
             // is truly nothing to do right now.
-            current_pass = pass{};
+            current_pass = fresh_pass();
             refreshed_this_call = true;
             continue;
         }
 
-        const auto now = std::chrono::steady_clock::now();
+        const auto current = now();
 
         // The earlier of the caller's own deadline and the next timer due,
         // so a timer installed after this call started still wakes it: see
         // install_timer()'s notify below.
         const auto wait_deadline = std::min(deadline, _timers.earliest());
-        if (wait_deadline <= now) {
+        if (wait_deadline <= current) {
             return false;
         }
 
@@ -254,7 +270,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
         if (wait_deadline == kNoDeadline) {
             _wake.wait(lock);
         } else {
-            _wake.wait_until(lock, wait_deadline);
+            _source->wait_until(lock, _wake, wait_deadline);
         }
 
         // Give the pass another chance to refresh against the time that
@@ -278,9 +294,9 @@ std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point de
     std::size_t ran = 0;
     std::unique_lock<std::mutex> lock{ _mutex };
     std::function<void()> work;
-    pass current_pass;
+    pass current_pass = fresh_pass();
 
-    while (deadline == kNoDeadline || std::chrono::steady_clock::now() < deadline) {
+    while (deadline == kNoDeadline || now() < deadline) {
         if (! next(lock, work, deadline, mark.outermost(), current_pass)) {
             break;
         }
@@ -299,7 +315,7 @@ std::size_t runloop::storage::run()
 
 std::size_t runloop::storage::run_for(std::chrono::milliseconds timeout)
 {
-    return run_until(deadline::after(std::chrono::steady_clock::now(), timeout));
+    return run_until(deadline::after(now(), timeout));
 }
 
 bool runloop::storage::run_one()
@@ -308,7 +324,7 @@ bool runloop::storage::run_one()
 
     std::unique_lock<std::mutex> lock{ _mutex };
     std::function<void()> work;
-    pass current_pass;
+    pass current_pass = fresh_pass();
     if (! next(lock, work, kNoDeadline, mark.outermost(), current_pass)) {
         return false;
     }
@@ -328,7 +344,7 @@ std::size_t runloop::storage::run_pending()
     // below can post a task of its own, and that task's sequence number
     // must not be under this call's own cutoff, or it would run inside the
     // same call that queued it.
-    const auto boundary = std::chrono::steady_clock::now();
+    const auto boundary = now();
     const std::uint64_t limit = _next_sequence;
 
     // Only timers already due, and only once each, even a repeating one
@@ -498,6 +514,11 @@ runloop main_runloop()
 runloop current_runloop()
 {
     return runloop{ runloop::storage::for_current_thread() };
+}
+
+runloop runloop_access::standalone(std::shared_ptr<const time_source> source)
+{
+    return runloop{ std::make_shared<runloop::storage>(std::move(source)) };
 }
 
 }  // namespace dross

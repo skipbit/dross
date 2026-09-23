@@ -237,6 +237,7 @@ private:
     friend runloop main_runloop();
     friend runloop current_runloop();
     friend class timer;
+    friend class runloop_access;
 };
 
 /**

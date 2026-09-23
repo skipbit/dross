@@ -2,6 +2,7 @@
 
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
+#include "thread/time_source.h"
 #include "thread/timer_schedule.h"
 
 #include <chrono>
@@ -22,6 +23,8 @@ namespace dross {
 
 class runloop::storage final {
 public:
+    explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
+
     static std::shared_ptr<storage> main_loop();
     static std::shared_ptr<storage> for_current_thread();
 
@@ -49,6 +52,9 @@ public:
     void remove_timer(const timer::storage* which);
 
     std::size_t timer_count() const;
+
+    // The time as this loop's time_source counts it. Does not take _mutex.
+    time_source::time_point now() const;
 
 private:
     // Tracks how many running calls are nested on this loop, so a quit() is
@@ -78,9 +84,12 @@ private:
     // stops one always-due timer from starving every other timer and the
     // task queue: see next()'s own comment.
     struct pass {
-        std::chrono::steady_clock::time_point boundary{ std::chrono::steady_clock::now() };
+        std::chrono::steady_clock::time_point boundary;
         std::vector<std::uint64_t> handled;
     };
+
+    // A pass whose boundary is now.
+    pass fresh_pass() const;
 
     // Takes the next task or due timer for current_pass, waiting until the
     // deadline. Returns false when quit() was seen, which consumes the
@@ -115,6 +124,10 @@ private:
     // A loop that is already finished, shared by every call made after this
     // thread's own bookkeeping has been torn down; see for_current_thread().
     static std::shared_ptr<storage> finished_placeholder();
+
+    // Set once, at construction, and never reassigned, so it is read without
+    // _mutex.
+    const std::shared_ptr<const time_source> _source;
 
     mutable std::mutex _mutex;
     std::condition_variable _wake;
