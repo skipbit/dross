@@ -83,12 +83,12 @@ bool boolean::value() const
 
 bool boolean::equals(const boolean& other) const
 {
-    return _store->value == other._store->value;
+    return (_store->value == other._store->value);
 }
 
 bool boolean::equals(bool value) const
 {
-    return _store->value == value;
+    return (_store->value == value);
 }
 
 bool boolean::operator==(const boolean& other) const
@@ -98,7 +98,7 @@ bool boolean::operator==(const boolean& other) const
 
 bool boolean::operator!=(const boolean& other) const
 {
-    return ! equals(other);
+    return (! equals(other));
 }
 
 bool boolean::operator==(bool value) const
@@ -108,7 +108,7 @@ bool boolean::operator==(bool value) const
 
 bool boolean::operator!=(bool value) const
 {
-    return ! equals(value);
+    return (! equals(value));
 }
 
 std::strong_ordering boolean::operator<=>(const boolean& other) const noexcept

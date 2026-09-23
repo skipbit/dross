@@ -71,7 +71,7 @@ private:
 
     char peek_char(size_t offset = 1) const
     {
-        size_t peek_pos = _pos + offset;
+        size_t peek_pos = (_pos + offset);
         return peek_pos < _input.size() ? _input[peek_pos] : '\0';
     }
 
@@ -90,7 +90,7 @@ private:
 
     void skip_whitespace()
     {
-        while (_pos < _input.size() && std::isspace(current_char()) && current_char() != '\n') {
+        while ((_pos < _input.size()) && std::isspace(current_char()) && (current_char() != '\n')) {
             advance();
         }
     }
@@ -101,7 +101,7 @@ private:
             skip_whitespace();
             if (current_char() == '#') {
                 // Skip comment to end of line
-                while (_pos < _input.size() && current_char() != '\n') {
+                while ((_pos < _input.size()) && (current_char() != '\n')) {
                     advance();
                 }
             }
@@ -202,7 +202,7 @@ private:
 
         while (_pos < _input.size()) {
             skip_whitespace_and_comments();
-            if (_pos >= _input.size() || current_char() == '[') {
+            if ((_pos >= _input.size()) || (current_char() == '[')) {
                 break;
             }
 
@@ -248,7 +248,7 @@ private:
     {
         if (current_char() == '"') {
             return parse_quoted_key();
-        } else if (std::isalpha(current_char()) || current_char() == '_') {
+        } else if (std::isalpha(current_char()) || (current_char() == '_')) {
             return parse_bare_key();
         } else {
             return std::unexpected(create_error("Invalid key format"));
@@ -258,7 +258,7 @@ private:
     std::expected<std::string, error> parse_bare_key()
     {
         std::string result;
-        while (_pos < _input.size() && (std::isalnum(current_char()) || current_char() == '_' || current_char() == '-')) {
+        while ((_pos < _input.size()) && (std::isalnum(current_char()) || (current_char() == '_') || (current_char() == '-'))) {
             result += current_char();
             advance();
         }
@@ -278,7 +278,7 @@ private:
         advance();  // skip opening quote
 
         std::string result;
-        while (_pos < _input.size() && current_char() != '"') {
+        while ((_pos < _input.size()) && (current_char() != '"')) {
             if (current_char() == '\\') {
                 advance();
                 if (_pos >= _input.size()) {
@@ -330,9 +330,9 @@ private:
             return parse_array();
         } else if (ch == '{') {
             return parse_inline_table();
-        } else if (ch == 't' || ch == 'f') {
+        } else if ((ch == 't') || (ch == 'f')) {
             return parse_boolean();
-        } else if (std::isdigit(ch) || ch == '-' || ch == '+') {
+        } else if (std::isdigit(ch) || (ch == '-') || (ch == '+')) {
             return parse_number();
         } else {
             return std::unexpected(create_error("Invalid value format"));
@@ -347,7 +347,7 @@ private:
         advance();  // skip opening quote
 
         std::string result;
-        while (_pos < _input.size() && current_char() != '"') {
+        while ((_pos < _input.size()) && (current_char() != '"')) {
             if (current_char() == '\\') {
                 advance();
                 if (_pos >= _input.size()) {
@@ -474,11 +474,11 @@ private:
 
     std::expected<value, error> parse_boolean()
     {
-        if (_pos + 4 <= _input.size() && _input.substr(_pos, 4) == "true") {
+        if (((_pos + 4) <= _input.size()) && _input.substr(_pos, 4) == "true") {
             _pos += 4;
             _column += 4;
             return value(boolean{ true });
-        } else if (_pos + 5 <= _input.size() && _input.substr(_pos, 5) == "false") {
+        } else if (((_pos + 5) <= _input.size()) && _input.substr(_pos, 5) == "false") {
             _pos += 5;
             _column += 5;
             return value(boolean{ false });
@@ -492,14 +492,14 @@ private:
         std::string num_str;
 
         // Handle sign
-        if (current_char() == '+' || current_char() == '-') {
+        if ((current_char() == '+') || (current_char() == '-')) {
             num_str += current_char();
             advance();
         }
 
         // Parse digits and decimal point
         bool has_dot = false;
-        while (_pos < _input.size() && (std::isdigit(current_char()) || current_char() == '.')) {
+        while ((_pos < _input.size()) && (std::isdigit(current_char()) || (current_char() == '.'))) {
             if (current_char() == '.') {
                 if (has_dot) {
                     break;  // Only one decimal point allowed
@@ -524,13 +524,13 @@ private:
 
     void set_nested_value_recursive(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const value& val)
     {
-        if (key_path.empty() || index >= key_path.size()) {
+        if (key_path.empty() || (index >= key_path.size())) {
             return;
         }
 
         const std::string& current_key = key_path[index];
 
-        if (index == key_path.size() - 1) {
+        if (index == (key_path.size() - 1)) {
             // This is the final key, set the value
             current_dict[current_key] = val;
             return;
@@ -657,7 +657,7 @@ private:
         // Check if key needs quoting
         bool needs_quotes = false;
         for (char ch : key) {
-            if (! std::isalnum(ch) && ch != '_' && ch != '-') {
+            if ((! std::isalnum(ch)) && (ch != '_') && (ch != '-')) {
                 needs_quotes = true;
                 break;
             }

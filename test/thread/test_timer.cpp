@@ -35,7 +35,7 @@ template <typename Predicate>
 void spin_until(dross::runloop& loop, Predicate&& predicate, std::chrono::milliseconds bound = kTimeout)
 {
     const auto deadline = std::chrono::steady_clock::now() + bound;
-    while (! predicate() && std::chrono::steady_clock::now() < deadline) {
+    while ((! predicate()) && std::chrono::steady_clock::now() < deadline) {
         loop.run_for(std::chrono::milliseconds{ 10 });
     }
 }
@@ -53,7 +53,7 @@ TEST(timer_test, a_one_shot_fires_once_and_then_invalidates_itself)
     }, loop);
 
     spin_until(loop, [&fire_count]() {
-        return fire_count > 0;
+        return (fire_count > 0);
     });
 
     EXPECT_EQ(fire_count, 1);
@@ -76,7 +76,7 @@ TEST(timer_test, a_repeating_timer_fires_more_than_once_and_stays_valid)
     }, loop);
 
     spin_until(loop, [&fire_count]() {
-        return fire_count.load() >= 3;
+        return (fire_count.load() >= 3);
     });
 
     EXPECT_GE(fire_count.load(), 3);
@@ -100,7 +100,7 @@ TEST(timer_test, the_callback_receives_the_timer_and_can_invalidate_itself_from_
     }, loop);
 
     spin_until(loop, [&t]() {
-        return ! t.valid();
+        return (! t.valid());
     });
 
     EXPECT_EQ(fire_count, 3);
@@ -137,7 +137,7 @@ TEST(timer_test, invalidate_is_idempotent_and_safe_after_the_timer_has_ended)
     }, loop);
 
     spin_until(loop, [&fire_count]() {
-        return fire_count > 0;
+        return (fire_count > 0);
     });
     ASSERT_FALSE(t.valid());
 
@@ -171,7 +171,7 @@ TEST(timer_test, a_dropped_handle_does_not_stop_the_timer)
     EXPECT_EQ(loop.timer_count(), 1U);
 
     spin_until(loop, [&fire_count]() {
-        return fire_count > 0;
+        return (fire_count > 0);
     });
     EXPECT_EQ(fire_count, 1);
     EXPECT_EQ(loop.timer_count(), 0U);
@@ -206,7 +206,7 @@ TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
     }));
 
     const auto capture_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while (! captured.load() && std::chrono::steady_clock::now() < capture_deadline) {
+    while ((! captured.load()) && std::chrono::steady_clock::now() < capture_deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
     }
     ASSERT_TRUE(worker_loop.has_value());
@@ -218,7 +218,7 @@ TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
     static_cast<void>(t);
 
     const auto fire_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while (ran_on.load() == 0 && std::chrono::steady_clock::now() < fire_deadline) {
+    while ((ran_on.load() == 0) && std::chrono::steady_clock::now() < fire_deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
     }
 
@@ -248,7 +248,7 @@ TEST(timer_test, timer_count_rises_on_install_and_falls_on_invalidate_and_after_
     EXPECT_EQ(loop.timer_count(), 2U);
 
     spin_until(loop, [&one_shot]() {
-        return ! one_shot.valid();
+        return (! one_shot.valid());
     });
     EXPECT_EQ(loop.timer_count(), 1U);
 
@@ -440,7 +440,7 @@ TEST(timer_test, installing_a_sooner_timer_cuts_short_a_wait_on_a_later_one)
         captured.store(true);
     }));
     const auto capture_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while (! captured.load() && std::chrono::steady_clock::now() < capture_deadline) {
+    while ((! captured.load()) && std::chrono::steady_clock::now() < capture_deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
     }
     ASSERT_TRUE(worker_loop.has_value());
@@ -468,7 +468,7 @@ TEST(timer_test, installing_a_sooner_timer_cuts_short_a_wait_on_a_later_one)
     // not woken the parked loop, this would only settle once that stale
     // deadline finally timed out on its own.
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 2 };
-    while (! soon_fired.load() && std::chrono::steady_clock::now() < deadline) {
+    while ((! soon_fired.load()) && std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 5 });
     }
 
@@ -497,13 +497,13 @@ TEST(timer_test, invalidate_from_another_thread_while_the_loop_is_running_it)
     }));
 
     const auto install_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while (! installed.load() && std::chrono::steady_clock::now() < install_deadline) {
+    while ((! installed.load()) && std::chrono::steady_clock::now() < install_deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
     }
     ASSERT_TRUE(installed.load());
 
     const auto fire_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while (fire_count.load() < 1 && std::chrono::steady_clock::now() < fire_deadline) {
+    while ((fire_count.load() < 1) && std::chrono::steady_clock::now() < fire_deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
     }
     ASSERT_GE(fire_count.load(), 1);

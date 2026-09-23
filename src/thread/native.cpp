@@ -31,9 +31,9 @@ std::uint64_t thread_id()
 bool is_main_thread()
 {
 #if defined(__linux__)
-    return getpid() == gettid();
+    return (getpid() == gettid());
 #else
-    return pthread_main_np() != 0;
+    return (pthread_main_np() != 0);
 #endif
 }
 

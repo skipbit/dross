@@ -368,7 +368,7 @@ TEST(string_test, repeated_operations)
     std::string converted = s;
     EXPECT_EQ(converted.length(), 1000);
     EXPECT_TRUE(std::all_of(converted.begin(), converted.end(), [](char c) {
-        return c == 'a';
+        return (c == 'a');
     }));
 }
 

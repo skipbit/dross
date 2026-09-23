@@ -14,7 +14,7 @@ namespace dross {
  * with string constructors.
  */
 template <typename T>
-concept number_type = std::is_arithmetic_v<T> && ! std::same_as<T, const char*>;
+concept number_type = std::is_arithmetic_v<T> && (! std::same_as<T, const char*>);
 
 /**
  * @brief Arbitrary precision number class with string-based storage.

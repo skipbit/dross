@@ -144,7 +144,7 @@ void runloop::storage::remove_timer(const timer::storage* which)
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
         const auto it = std::find_if(_timers.begin(), _timers.end(), [which](const timer_slot& slot) {
-            return slot.handle.get() == which;
+            return (slot.handle.get() == which);
         });
         if (it != _timers.end()) {
             removed = std::move(it->handle);
@@ -263,7 +263,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
         // Every pass operation below costs a steady_clock::now(); skipped
         // entirely on a loop with no installed timers, so a loop that only
         // ever queues tasks pays nothing for a feature it does not use.
-        const bool has_timers = ! _timers.empty();
+        const bool has_timers = (! _timers.empty());
 
         if (has_timers) {
             if (auto timer_work = take_due_timer(current_pass.boundary, current_pass.handled)) {
@@ -281,7 +281,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
             return true;
         }
 
-        if (has_timers && ! refreshed_this_call) {
+        if (has_timers && (! refreshed_this_call)) {
             // Nothing left in this pass. A fresh boundary may find what a
             // stale one would miss, so try once more before deciding there
             // is truly nothing to do right now.
@@ -397,7 +397,7 @@ std::size_t runloop::storage::run_pending()
     // posts another, even after emptying the queue with clear(), does not
     // keep this call going. A pending quit() is left alone: it belongs to
     // the next run(), not to this drain.
-    while (! _pending.empty() && _pending.front().first < limit) {
+    while ((! _pending.empty()) && (_pending.front().first < limit)) {
         std::function<void()> work = std::move(_pending.front().second);
         _pending.pop_front();
 
@@ -461,7 +461,7 @@ std::size_t runloop::storage::timer_count() const
 bool runloop::storage::is_running() const
 {
     const std::lock_guard<std::mutex> guard{ _mutex };
-    return _depth > 0;
+    return (_depth > 0);
 }
 
 runloop::runloop(std::shared_ptr<storage> store) noexcept
@@ -517,7 +517,7 @@ std::size_t runloop::pending_count() const
 
 bool runloop::empty() const
 {
-    return _store->pending_count() == 0;
+    return (_store->pending_count() == 0);
 }
 
 std::size_t runloop::timer_count() const

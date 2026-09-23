@@ -106,7 +106,7 @@ struct parsed_number {
      */
     bool is_integer() const
     {
-        return is_valid && ! fractional_part.has_value();
+        return (is_valid && (! fractional_part.has_value()));
     }
 };
 
@@ -190,7 +190,7 @@ parsed_number parse_number_unified(const std::string& str)
     // Validate integer part
     if (integer_str.empty()) {
         // Handle cases like ".5" or "-.5"
-        if (has_decimal && decimal_pos + 1 < work_str.length()) {
+        if (has_decimal && ((decimal_pos + 1) < work_str.length())) {
             integer_str = "0";
         } else {
             result.is_valid = false;
@@ -210,7 +210,7 @@ parsed_number parse_number_unified(const std::string& str)
 
     // Extract fractional part if present
     if (has_decimal) {
-        if (decimal_pos + 1 >= work_str.length()) {
+        if ((decimal_pos + 1) >= work_str.length()) {
             // Handle trailing decimal point like "5."
             result.fractional_part = std::nullopt;
         } else {
@@ -225,7 +225,7 @@ parsed_number parse_number_unified(const std::string& str)
             }
 
             // Remove trailing zeros from fractional part
-            while (! frac_str.empty() && frac_str.back() == '0') {
+            while ((! frac_str.empty()) && (frac_str.back() == '0')) {
                 frac_str.pop_back();
             }
 
@@ -236,12 +236,12 @@ parsed_number parse_number_unified(const std::string& str)
     }
 
     // Remove leading zeros from integer part (but keep at least one digit)
-    while (result.integer_part.length() > 1 && result.integer_part[0] == '0') {
+    while ((result.integer_part.length() > 1) && (result.integer_part[0] == '0')) {
         result.integer_part = result.integer_part.substr(1);
     }
 
     // Handle special case of zero
-    if (result.integer_part == "0" && ! result.fractional_part.has_value()) {
+    if (result.integer_part == "0" && (! result.fractional_part.has_value())) {
         result.is_negative = false;  // Zero is always positive
     }
 
@@ -265,7 +265,7 @@ bool is_valid_number(const std::string& str)
     bool has_dot = false;
 
     // Handle optional sign
-    if (str[0] == '-' || str[0] == '+') {
+    if ((str[0] == '-') || (str[0] == '+')) {
         if (str.length() == 1) {
             return false;
         }
@@ -280,7 +280,7 @@ bool is_valid_number(const std::string& str)
     size_t mantissa_end = has_exp ? exp_pos : str.length();
 
     // For scientific notation, mantissa cannot be empty
-    if (has_exp && mantissa_end <= start) {
+    if (has_exp && (mantissa_end <= start)) {
         return false;
     }
 
@@ -296,23 +296,23 @@ bool is_valid_number(const std::string& str)
     }
 
     // Don't allow trailing or leading dot in mantissa
-    if (has_dot && (str[start] == '.' || (mantissa_end > start && str[mantissa_end - 1] == '.'))) {
+    if (has_dot && ((str[start] == '.') || ((mantissa_end > start) && (str[mantissa_end - 1] == '.')))) {
         // Allow ".5" or "5." patterns
-        if (mantissa_end <= start + 1) {
+        if (mantissa_end <= (start + 1)) {
             return false;
         }
     }
 
     // Validate exponent part if present
     if (has_exp) {
-        if (exp_pos + 1 >= str.length()) {
+        if ((exp_pos + 1) >= str.length()) {
             return false;  // Nothing after 'e'
         }
 
-        size_t exp_start = exp_pos + 1;
+        size_t exp_start = (exp_pos + 1);
 
         // Handle optional sign in exponent
-        if (str[exp_start] == '-' || str[exp_start] == '+') {
+        if ((str[exp_start] == '-') || (str[exp_start] == '+')) {
             exp_start++;
             if (exp_start >= str.length()) {
                 return false;  // Nothing after sign
@@ -363,7 +363,7 @@ std::string normalize_to_decimal(const std::string& str)
 
             // Use scientific notation format for very small or very large numbers
             // to maintain precision
-            if (std::abs(value) < 1e-100 || std::abs(value) > 1e100) {
+            if ((std::abs(value) < 1e-100) || (std::abs(value) > 1e100)) {
                 std::ostringstream oss;
                 oss << std::scientific << std::setprecision(16) << value;
                 return oss.str();
@@ -411,7 +411,7 @@ std::string normalize_number(const std::string& str)
     if (has_decimal) {
         // Remove trailing zeros after decimal point
         size_t last_nonzero = s.find_last_not_of('0');
-        if (last_nonzero != std::string::npos && last_nonzero > dot_pos) {
+        if ((last_nonzero != std::string::npos) && (last_nonzero > dot_pos)) {
             s = s.substr(0, last_nonzero + 1);
         }
         // Remove decimal point if no fractional part
@@ -423,7 +423,7 @@ std::string normalize_number(const std::string& str)
 
     // Remove leading zeros
     size_t first_nonzero = 0;
-    while (first_nonzero < s.length() - 1 && s[first_nonzero] == '0' && s[first_nonzero + 1] != '.') {
+    while ((first_nonzero < (s.length() - 1)) && (s[first_nonzero] == '0') && (s[first_nonzero + 1] != '.')) {
         first_nonzero++;
     }
     s = s.substr(first_nonzero);
@@ -533,18 +533,18 @@ std::string add_positive_numbers(const std::string& a, const std::string& b)
     // Add fractional parts
     std::string result_frac;
     int carry = 0;
-    for (int i = max_frac - 1; i >= 0; i--) {
-        int sum = carry + (pa.fractional[i] - '0') + (pb.fractional[i] - '0');
+    for (int i = (max_frac - 1); i >= 0; i--) {
+        int sum = (carry + (pa.fractional[i] - '0') + (pb.fractional[i] - '0'));
         carry = sum / 10;
         result_frac = char('0' + sum % 10) + result_frac;
     }
 
     // Add integer parts
     std::string result_int;
-    int i = pa.integer.length() - 1;
-    int j = pb.integer.length() - 1;
+    int i = (pa.integer.length() - 1);
+    int j = (pb.integer.length() - 1);
 
-    while (i >= 0 || j >= 0 || carry > 0) {
+    while ((i >= 0) || (j >= 0) || (carry > 0)) {
         int sum = carry;
         if (i >= 0) {
             sum += pa.integer[i--] - '0';
@@ -561,7 +561,7 @@ std::string add_positive_numbers(const std::string& a, const std::string& b)
     std::string result = result_int;
     if (! result_frac.empty()) {
         // Remove trailing zeros from fractional part
-        while (! result_frac.empty() && result_frac.back() == '0') {
+        while ((! result_frac.empty()) && (result_frac.back() == '0')) {
             result_frac.pop_back();
         }
         if (! result_frac.empty()) {
@@ -586,8 +586,8 @@ std::string subtract_positive_numbers(const std::string& a, const std::string& b
     // Subtract fractional parts
     std::string result_frac;
     int borrow = 0;
-    for (int i = max_frac - 1; i >= 0; i--) {
-        int diff = (pa.fractional[i] - '0') - (pb.fractional[i] - '0') - borrow;
+    for (int i = (max_frac - 1); i >= 0; i--) {
+        int diff = ((pa.fractional[i] - '0') - (pb.fractional[i] - '0') - borrow);
         if (diff < 0) {
             diff += 10;
             borrow = 1;
@@ -599,11 +599,11 @@ std::string subtract_positive_numbers(const std::string& a, const std::string& b
 
     // Subtract integer parts
     std::string result_int;
-    int i = pa.integer.length() - 1;
-    int j = pb.integer.length() - 1;
+    int i = (pa.integer.length() - 1);
+    int j = (pb.integer.length() - 1);
 
     while (i >= 0) {
-        int diff = (pa.integer[i] - '0') - borrow;
+        int diff = ((pa.integer[i] - '0') - borrow);
         if (j >= 0) {
             diff -= (pb.integer[j--] - '0');
         }
@@ -623,7 +623,7 @@ std::string subtract_positive_numbers(const std::string& a, const std::string& b
     std::string result = result_int;
     if (! result_frac.empty()) {
         // Remove trailing zeros from fractional part
-        while (! result_frac.empty() && result_frac.back() == '0') {
+        while ((! result_frac.empty()) && (result_frac.back() == '0')) {
             result_frac.pop_back();
         }
         if (! result_frac.empty()) {
@@ -643,7 +643,7 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
     // Convert to pure integers by combining integer and fractional parts
     std::string num_a = pa.integer + pa.fractional;
     std::string num_b = pb.integer + pb.fractional;
-    int total_decimal_places = pa.fractional.length() + pb.fractional.length();
+    int total_decimal_places = (pa.fractional.length() + pb.fractional.length());
 
     // Multiply as integers
     if (num_a == "0" || num_b == "0") {
@@ -652,11 +652,11 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
 
     std::string result(num_a.length() + num_b.length(), '0');
 
-    for (int i = num_a.length() - 1; i >= 0; i--) {
-        for (int j = num_b.length() - 1; j >= 0; j--) {
-            int mul = (num_a[i] - '0') * (num_b[j] - '0');
-            int p1 = i + j, p2 = i + j + 1;
-            int sum = mul + (result[p2] - '0');
+    for (int i = (num_a.length() - 1); i >= 0; i--) {
+        for (int j = (num_b.length() - 1); j >= 0; j--) {
+            int mul = ((num_a[i] - '0') * (num_b[j] - '0'));
+            int p1 = (i + j), p2 = (i + j + 1);
+            int sum = (mul + (result[p2] - '0'));
 
             result[p2] = char('0' + sum % 10);
             result[p1] += sum / 10;
@@ -665,7 +665,7 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
 
     // Remove leading zeros
     size_t start = 0;
-    while (start < result.length() - 1 && result[start] == '0') {
+    while ((start < (result.length() - 1)) && (result[start] == '0')) {
         start++;
     }
     result = result.substr(start);
@@ -677,7 +677,7 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
             result = std::string(static_cast<size_t>(total_decimal_places) - result.length() + 1, '0') + result;
         }
 
-        size_t decimal_pos = result.length() - static_cast<size_t>(total_decimal_places);
+        size_t decimal_pos = (result.length() - static_cast<size_t>(total_decimal_places));
         if (decimal_pos == 0) {
             result = "0." + result;
         } else {
@@ -710,7 +710,7 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
     std::string divisor = pb.integer + pb.fractional;
 
     // Remove leading zeros from divisor
-    while (divisor.length() > 1 && divisor[0] == '0') {
+    while ((divisor.length() > 1) && (divisor[0] == '0')) {
         divisor = divisor.substr(1);
     }
 
@@ -727,7 +727,7 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
         remainder = remainder + digit;
 
         // Remove leading zeros from remainder
-        while (remainder.length() > 1 && remainder[0] == '0') {
+        while ((remainder.length() > 1) && (remainder[0] == '0')) {
             remainder = remainder.substr(1);
         }
 
@@ -745,14 +745,14 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
     }
 
     // Remove leading zeros from quotient
-    while (quotient.length() > 1 && quotient[0] == '0') {
+    while ((quotient.length() > 1) && (quotient[0] == '0')) {
         quotient = quotient.substr(1);
     }
 
     // Handle decimal places if needed
     std::string decimal_part = "";
-    if (remainder != "0" && max_decimal_places > 0) {
-        for (int i = 0; i < max_decimal_places && remainder != "0"; i++) {
+    if (remainder != "0" && (max_decimal_places > 0)) {
+        for (int i = 0; (i < max_decimal_places) && remainder != "0"; i++) {
             remainder = remainder + "0";  // Add a zero for next decimal place
 
             int count = 0;
@@ -772,7 +772,7 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
     std::string result = quotient;
     if (! decimal_part.empty()) {
         // Remove trailing zeros from decimal part
-        while (! decimal_part.empty() && decimal_part.back() == '0') {
+        while ((! decimal_part.empty()) && (decimal_part.back() == '0')) {
             decimal_part.pop_back();
         }
         if (! decimal_part.empty()) {
@@ -811,7 +811,7 @@ std::string modulo_positive_numbers(const std::string& a, const std::string& b)
 // Perform string-based arithmetic
 std::string perform_arithmetic(const std::string& a, const std::string& b, char operation)
 {
-    if (! is_valid_number(a) || ! is_valid_number(b)) {
+    if ((! is_valid_number(a)) || (! is_valid_number(b))) {
         return NAN_VALUE;
     }
 
@@ -946,7 +946,7 @@ number::~number() = default;
 
 bool number::is_nan() const
 {
-    return ! is_valid_number(_store->number);
+    return (! is_valid_number(_store->number));
 }
 
 bool number::is_integer() const
@@ -958,15 +958,15 @@ bool number::is_integer() const
 bool number::equals(const number& n) const
 {
     // Both must be valid numbers
-    if (! is_valid_number(_store->number) || ! is_valid_number(n._store->number)) {
+    if ((! is_valid_number(_store->number)) || (! is_valid_number(n._store->number))) {
         // If both are invalid, they're equal if strings match
-        if (! is_valid_number(_store->number) && ! is_valid_number(n._store->number)) {
+        if ((! is_valid_number(_store->number)) && (! is_valid_number(n._store->number))) {
             return _store->number == n._store->number;
         }
         return false;
     }
 
-    return compare_numbers(_store->number, n._store->number) == 0;
+    return (compare_numbers(_store->number, n._store->number) == 0);
 }
 
 std::strong_ordering number::compare(const number& n) const noexcept
@@ -975,8 +975,8 @@ std::strong_ordering number::compare(const number& n) const noexcept
     const bool valid1 = is_valid_number(_store->number);
     const bool valid2 = is_valid_number(n._store->number);
 
-    if (! valid1 || ! valid2) {
-        if (! valid1 && ! valid2) {
+    if ((! valid1) || (! valid2)) {
+        if ((! valid1) && (! valid2)) {
             // Both invalid - compare as strings
             return _store->number <=> n._store->number;
         }
