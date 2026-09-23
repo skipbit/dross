@@ -131,7 +131,7 @@ bool runloop::storage::install_timer(std::shared_ptr<timer::storage> which, std:
         if (_finished) {
             return false;
         }
-        _timers.push_back({ std::move(which), first_deadline });
+        _timers.install(std::move(which), first_deadline);
     }
 
     _wake.notify_one();
@@ -143,13 +143,7 @@ void runloop::storage::remove_timer(const timer::storage* which)
     std::shared_ptr<timer::storage> removed;
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
-        const auto it = std::find_if(_timers.begin(), _timers.end(), [which](const timer_slot& slot) {
-            return (slot.handle.get() == which);
-        });
-        if (it != _timers.end()) {
-            removed = std::move(it->handle);
-            _timers.erase(it);
-        }
+        removed = _timers.remove(which);
     }
 
     // removed is destroyed here, outside the lock: if this was the last
@@ -167,66 +161,19 @@ void runloop::storage::remove_timer(const timer::storage* which)
     _wake.notify_one();
 }
 
-std::chrono::steady_clock::time_point runloop::storage::earliest_timer_deadline() const
-{
-    auto earliest = kNoDeadline;
-    for (const auto& slot : _timers) {
-        earliest = std::min(earliest, slot.deadline);
-    }
-    return earliest;
-}
-
 std::function<void()> runloop::storage::take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled)
 {
-    // The earliest-due candidate wins, not just any due one: taking the
-    // first match in _timers order let whichever timer happened to be
-    // installed first starve every other timer that was also due, since a
-    // repeating one reschedules itself back into contention before the
-    // scan ever reaches the others.
-    //
-    // Matched by id, not by the handle's address: a one-shot's storage can
-    // be released, and its address reused by an unrelated allocation,
-    // between one pass and the next, and an address match would then skip
-    // the wrong timer.
-    auto earliest = _timers.end();
-    for (auto it = _timers.begin(); it != _timers.end(); ++it) {
-        if (it->deadline > boundary) {
-            continue;
-        }
-        if (std::find(handled.begin(), handled.end(), it->handle->id()) != handled.end()) {
-            continue;
-        }
-        if (earliest == _timers.end() || it->deadline < earliest->deadline) {
-            earliest = it;
-        }
-    }
-
-    if (earliest == _timers.end()) {
+    auto which = _timers.take_due(boundary, std::chrono::steady_clock::now(), handled);
+    if (! which) {
         return nullptr;
     }
 
-    auto which = earliest->handle;
-    handled.push_back(which->id());
-
     if (which->repeats()) {
-        // Scheduled from now, the moment this fire is claimed, not from
-        // the deadline that was due, and not from the pass boundary
-        // either: the boundary is stale once anything else in the pass has
-        // taken a while, such as an earlier fire's callback blocking, and
-        // rescheduling from it would make this one due again immediately
-        // instead of waiting a genuine interval. A callback that blocks,
-        // or a loop that is not run for a while, does not make up the
-        // fires it missed by catching up all at once.
-        earliest->deadline = deadline::after(std::chrono::steady_clock::now(), which->interval());
         return [which]() {
             which->fire();
         };
     }
 
-    // A one-shot is uninstalled before it fires, not after: nothing that
-    // runs while the lock is released below can find it in _timers and
-    // fire it again.
-    _timers.erase(earliest);
     return [which]() {
         const struct invalidate_after final {
             const std::shared_ptr<timer::storage>& target;
@@ -295,7 +242,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
         // The earlier of the caller's own deadline and the next timer due,
         // so a timer installed after this call started still wakes it: see
         // install_timer()'s notify below.
-        const auto wait_deadline = std::min(deadline, earliest_timer_deadline());
+        const auto wait_deadline = std::min(deadline, _timers.earliest());
         if (wait_deadline <= now) {
             return false;
         }
@@ -430,16 +377,16 @@ void runloop::storage::clear()
 void runloop::storage::finish()
 {
     std::deque<std::pair<std::uint64_t, std::function<void()>>> discarded_tasks;
-    std::vector<timer_slot> discarded_timers;
+    std::vector<std::shared_ptr<timer::storage>> discarded_timers;
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
         _finished = true;
         discarded_tasks.swap(_pending);
-        discarded_timers.swap(_timers);
+        discarded_timers = _timers.remove_all();
     }
 
-    for (auto& slot : discarded_timers) {
-        slot.handle->mark_invalid();
+    for (auto& which : discarded_timers) {
+        which->mark_invalid();
     }
     // discarded_tasks and discarded_timers are destroyed here, outside the
     // lock, on this thread: their captures run their own destructors here,

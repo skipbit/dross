@@ -2,6 +2,7 @@
 
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
+#include "thread/timer_schedule.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -68,12 +69,6 @@ private:
         bool _outermost;
     };
 
-    // A timer installed on this loop, and the deadline it is next due at.
-    struct timer_slot {
-        std::shared_ptr<timer::storage> handle;
-        std::chrono::steady_clock::time_point deadline;
-    };
-
     // One pass of a running call over what is due: a boundary snapshot and
     // the timers already taken since it was taken. run_until() and
     // run_one() each own one and pass it into next() by reference across
@@ -111,18 +106,10 @@ private:
 
     std::size_t run_until(std::chrono::steady_clock::time_point deadline);
 
-    // The earliest deadline among installed timers, or kNoDeadline when none
-    // are installed. Must hold _mutex.
-    std::chrono::steady_clock::time_point earliest_timer_deadline() const;
-
-    // Finds the timer with the earliest deadline that is due at or before
-    // boundary and whose id is not already in handled, advances (repeating)
-    // or removes (one-shot) its entry, records its id in handled, and
-    // returns a work item that fires it with the lock released. Empty when
-    // none remain. Must hold _mutex.
-    //
-    // Matched by id, not by address: a one-shot's storage can be released
-    // between passes, and a later allocation could reuse its address.
+    // Claims the next timer due at or before boundary and not yet in
+    // handled, as timer_schedule::take_due() does, and returns a work item
+    // that fires it with the lock released. Empty when none remain. Must
+    // hold _mutex.
     std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled);
 
     // A loop that is already finished, shared by every call made after this
@@ -132,7 +119,7 @@ private:
     mutable std::mutex _mutex;
     std::condition_variable _wake;
     std::deque<std::pair<std::uint64_t, std::function<void()>>> _pending;
-    std::vector<timer_slot> _timers;
+    timer_schedule<std::shared_ptr<timer::storage>> _timers;
     std::uint64_t _next_sequence{ 0 };
     std::size_t _depth{ 0 };
     bool _quit{ false };
