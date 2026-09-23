@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cmath>
 #include <iomanip>
+#include <locale>
 #include <memory>
 #include <regex>
 #include <sstream>
@@ -149,6 +150,7 @@ std::string timezone::format() const
     int minutes = (abs_offset % 60);
 
     std::ostringstream oss;
+    oss.imbue(std::locale::classic());
     oss << sign << std::setfill('0') << std::setw(2) << hours << ":" << std::setw(2) << minutes;
 
     return oss.str();
