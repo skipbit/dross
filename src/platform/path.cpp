@@ -103,8 +103,7 @@ std::expected<path, std::filesystem::filesystem_error> path::expand() const
                 return std::unexpected(e);
             }
         } else {
-            return std::unexpected(std::filesystem::filesystem_error(
-                "fail to expand tilde", _path, std::make_error_code(std::errc::no_such_file_or_directory)));
+            return std::unexpected(std::filesystem::filesystem_error("fail to expand tilde", _path, std::make_error_code(std::errc::no_such_file_or_directory)));
         }
     }
 

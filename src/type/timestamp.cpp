@@ -279,8 +279,7 @@ public:
         auto days_since_epoch = std::chrono::sys_days{ ymd }.time_since_epoch();
         auto time_of_day = time_value.to_hh_mm_ss().to_duration();
         auto total_duration = days_since_epoch + time_of_day;
-        return std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-            std::chrono::sys_time<std::chrono::nanoseconds>{ total_duration });
+        return std::chrono::time_point_cast<std::chrono::system_clock::duration>(std::chrono::sys_time<std::chrono::nanoseconds>{ total_duration });
     }
 };
 
@@ -328,8 +327,7 @@ timestamp::timestamp(const std::string& iso8601_str)
     // - 2024-01-21T15:30:00 (local timestamp)
     // - 2024-01-21 (local date)
 
-    std::regex timestamp_regex(
-        R"(^(?:(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:(Z)|([+-])(\d{2}):(\d{2}))?)?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)$)");
+    std::regex timestamp_regex(R"(^(?:(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:(Z)|([+-])(\d{2}):(\d{2}))?)?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)$)");
 
     std::smatch match;
     if (std::regex_match(iso8601_str, match, timestamp_regex)) {

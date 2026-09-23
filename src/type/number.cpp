@@ -97,8 +97,7 @@ struct parsed_number {
         double rounded = std::round(*double_val);
 
         // Clamp to int range to prevent overflow
-        return static_cast<int>(std::clamp(
-            rounded, static_cast<double>(std::numeric_limits<int>::min()), static_cast<double>(std::numeric_limits<int>::max())));
+        return static_cast<int>(std::clamp(rounded, static_cast<double>(std::numeric_limits<int>::min()), static_cast<double>(std::numeric_limits<int>::max())));
     }
 
     /**
