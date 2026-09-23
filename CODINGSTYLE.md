@@ -21,6 +21,8 @@
 
 ## 3. Formatting
 
+`.clang-format` holds the layout. `scripts/tools.sh format` applies it with the clang-format release the pull request checks use, and `scripts/tools.sh format-check` runs that check; both need Docker.
+
 *   **Indentation:** Use 4 spaces.
     *  Do not indent class or function definitions within namespaces.
 *   **Empty Lines:** Empty lines must not contain any whitespace or indentation characters. Keep them completely empty.
