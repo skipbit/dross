@@ -1,6 +1,7 @@
 #include "dross/type/array.h"
 
 #include "dross/type/value.h"
+
 #include <algorithm>
 #include <vector>
 
@@ -11,7 +12,10 @@ public:
     std::vector<value> contents;
 
     storage() = default;
-    storage(const std::initializer_list<value>& list) : contents(list.begin(), list.end()) {}
+    storage(const std::initializer_list<value>& list)
+        : contents(list.begin(), list.end())
+    {
+    }
 };
 
 array::array()
@@ -139,7 +143,10 @@ value& array::operator[](const size_t i) &
 
 class array::iterator::impl {
 public:
-    impl(std::vector<value>::iterator i) : cursor(i) {}
+    impl(std::vector<value>::iterator i)
+        : cursor(i)
+    {
+    }
 
     std::vector<value>::iterator cursor;
 };
@@ -179,7 +186,10 @@ bool array::iterator::operator!=(const iterator& i) const
 
 class array::const_iterator::impl {
 public:
-    impl(std::vector<value>::const_iterator i) : cursor(i) {}
+    impl(std::vector<value>::const_iterator i)
+        : cursor(i)
+    {
+    }
 
     std::vector<value>::const_iterator cursor;
 };
@@ -217,4 +227,4 @@ bool array::const_iterator::operator!=(const const_iterator& i) const
     return (_impl->cursor != i._impl->cursor);
 }
 
-}
+}  // namespace dross

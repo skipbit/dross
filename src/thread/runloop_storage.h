@@ -40,8 +40,7 @@ public:
 
     // Adds which to this loop's installed timers, due at first_deadline.
     // Returns false, without installing it, once this loop is finished.
-    bool install_timer(std::shared_ptr<timer::storage> which,
-                        std::chrono::steady_clock::time_point first_deadline);
+    bool install_timer(std::shared_ptr<timer::storage> which, std::chrono::steady_clock::time_point first_deadline);
 
     // Drops which from this loop's installed timers, if it is still there.
     // A no-op, not an error, when it already fired (one-shot) or was
@@ -84,7 +83,7 @@ private:
     // stops one always-due timer from starving every other timer and the
     // task queue: see next()'s own comment.
     struct pass {
-        std::chrono::steady_clock::time_point boundary{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point boundary{ std::chrono::steady_clock::now() };
         std::vector<std::uint64_t> handled;
     };
 
@@ -99,15 +98,16 @@ private:
     // rescheduling itself sooner. Taking a task ends the pass: the caller's
     // next call starts a fresh one. Finding nothing due or queued also ends
     // it, since a fresh boundary may find what a stale one would miss.
-    bool next(std::unique_lock<std::mutex>& lock, std::function<void()>& out,
-              std::chrono::steady_clock::time_point deadline, bool consume_quit,
+    bool next(std::unique_lock<std::mutex>& lock,
+              std::function<void()>& out,
+              std::chrono::steady_clock::time_point deadline,
+              bool consume_quit,
               pass& current_pass);
 
     // Runs one task or timer fire with the lock released, and takes the
     // lock back after. The captures go too, so their own code runs outside
     // the lock as well. If the work throws, the lock stays released.
-    void run_released(std::unique_lock<std::mutex>& lock,
-                      std::function<void()>& work);
+    void run_released(std::unique_lock<std::mutex>& lock, std::function<void()>& work);
 
     std::size_t run_until(std::chrono::steady_clock::time_point deadline);
 
@@ -123,8 +123,7 @@ private:
     //
     // Matched by id, not by address: a one-shot's storage can be released
     // between passes, and a later allocation could reuse its address.
-    std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary,
-                                         std::vector<std::uint64_t>& handled);
+    std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled);
 
     // A loop that is already finished, shared by every call made after this
     // thread's own bookkeeping has been torn down; see for_current_thread().
@@ -134,10 +133,10 @@ private:
     std::condition_variable _wake;
     std::deque<std::pair<std::uint64_t, std::function<void()>>> _pending;
     std::vector<timer_slot> _timers;
-    std::uint64_t _next_sequence{0};
-    std::size_t _depth{0};
-    bool _quit{false};
-    bool _finished{false};
+    std::uint64_t _next_sequence{ 0 };
+    std::size_t _depth{ 0 };
+    bool _quit{ false };
+    bool _finished{ false };
 };
 
-}
+}  // namespace dross

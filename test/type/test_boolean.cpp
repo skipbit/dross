@@ -1,9 +1,10 @@
-#include <gtest/gtest.h>
-
 #include "dross/type.h"
 #include "dross/type/boolean.h"
-#include <string>
+
+#include <gtest/gtest.h>
+
 #include <sstream>
+#include <string>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -19,8 +20,8 @@ TEST(boolean_test, default_constructor)
 
 TEST(boolean_test, bool_constructor)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     EXPECT_TRUE(b_true.value());
     EXPECT_FALSE(b_false.value());
@@ -30,29 +31,29 @@ TEST(boolean_test, bool_constructor)
 
 TEST(boolean_test, int_constructor)
 {
-    dross::boolean b_zero{0};
-    dross::boolean b_one{1};
-    dross::boolean b_negative{-42};
-    dross::boolean b_large{999999};
+    dross::boolean b_zero{ 0 };
+    dross::boolean b_one{ 1 };
+    dross::boolean b_negative{ -42 };
+    dross::boolean b_large{ 999999 };
 
     EXPECT_FALSE(b_zero.value());
     EXPECT_TRUE(b_one.value());
     EXPECT_TRUE(b_negative.value());  // Non-zero is true
-    EXPECT_TRUE(b_large.value());      // Non-zero is true
+    EXPECT_TRUE(b_large.value());     // Non-zero is true
 }
 
 TEST(boolean_test, string_constructor)
 {
     // Case variations
-    dross::boolean b_true1{"true"};
-    dross::boolean b_true2{"TRUE"};
-    dross::boolean b_true3{"True"};
-    dross::boolean b_true4{"1"};
+    dross::boolean b_true1{ "true" };
+    dross::boolean b_true2{ "TRUE" };
+    dross::boolean b_true3{ "True" };
+    dross::boolean b_true4{ "1" };
 
-    dross::boolean b_false1{"false"};
-    dross::boolean b_false2{"FALSE"};
-    dross::boolean b_false3{"False"};
-    dross::boolean b_false4{"0"};
+    dross::boolean b_false1{ "false" };
+    dross::boolean b_false2{ "FALSE" };
+    dross::boolean b_false3{ "False" };
+    dross::boolean b_false4{ "0" };
 
     // All true variations
     EXPECT_TRUE(b_true1.value());
@@ -70,11 +71,11 @@ TEST(boolean_test, string_constructor)
 TEST(boolean_test, string_constructor_invalid)
 {
     // Invalid strings default to false
-    dross::boolean b1{"yes"};
-    dross::boolean b2{"no"};
-    dross::boolean b3{"invalid"};
-    dross::boolean b4{""};
-    dross::boolean b5{"2"};
+    dross::boolean b1{ "yes" };
+    dross::boolean b2{ "no" };
+    dross::boolean b3{ "invalid" };
+    dross::boolean b4{ "" };
+    dross::boolean b5{ "2" };
 
     EXPECT_FALSE(b1.value());
     EXPECT_FALSE(b2.value());
@@ -85,8 +86,8 @@ TEST(boolean_test, string_constructor_invalid)
 
 TEST(boolean_test, const_char_constructor)
 {
-    dross::boolean b_true{"true"};
-    dross::boolean b_false{"false"};
+    dross::boolean b_true{ "true" };
+    dross::boolean b_false{ "false" };
 
     EXPECT_TRUE(b_true.value());
     EXPECT_FALSE(b_false.value());
@@ -94,7 +95,7 @@ TEST(boolean_test, const_char_constructor)
 
 TEST(boolean_test, copy_constructor)
 {
-    dross::boolean original{true};
+    dross::boolean original{ true };
     dross::boolean copy(original);
 
     EXPECT_EQ(original, copy);
@@ -128,8 +129,8 @@ TEST(boolean_test, factory_methods)
 
 TEST(boolean_test, string_conversion)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     // Implicit string conversion
     std::string s_true = b_true;
@@ -148,9 +149,9 @@ TEST(boolean_test, string_conversion)
 
 TEST(boolean_test, equals_method)
 {
-    dross::boolean b1{true};
-    dross::boolean b2{true};
-    dross::boolean b3{false};
+    dross::boolean b1{ true };
+    dross::boolean b2{ true };
+    dross::boolean b3{ false };
 
     EXPECT_TRUE(b1.equals(b2));
     EXPECT_FALSE(b1.equals(b3));
@@ -162,8 +163,8 @@ TEST(boolean_test, equals_method)
 
 TEST(boolean_test, equality_operators)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     EXPECT_TRUE(b_true == b_true);
     EXPECT_TRUE(b_false == b_false);
@@ -178,8 +179,8 @@ TEST(boolean_test, equality_operators)
 
 TEST(boolean_test, equality_with_bool)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     EXPECT_TRUE(b_true == true);
     EXPECT_FALSE(b_true == false);
@@ -194,8 +195,8 @@ TEST(boolean_test, equality_with_bool)
 
 TEST(boolean_test, three_way_comparison)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     // false < true
     EXPECT_LT(b_false, b_true);
@@ -225,7 +226,7 @@ TEST(boolean_test, assignment_operators)
     dross::boolean b;
 
     // Assign from boolean
-    dross::boolean b_true{true};
+    dross::boolean b_true{ true };
     b = b_true;
     EXPECT_TRUE(b.value());
     EXPECT_EQ(b, b_true);
@@ -246,19 +247,19 @@ TEST(boolean_test, assignment_operators)
 
 TEST(boolean_test, logical_not)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
-    EXPECT_EQ(!b_true, false);
-    EXPECT_EQ(!b_false, true);
-    EXPECT_EQ(!!b_true, true);
-    EXPECT_EQ(!!b_false, false);
+    EXPECT_EQ(! b_true, false);
+    EXPECT_EQ(! b_false, true);
+    EXPECT_EQ(! ! b_true, true);
+    EXPECT_EQ(! ! b_false, false);
 }
 
 TEST(boolean_test, logical_and)
 {
-    dross::boolean t{true};
-    dross::boolean f{false};
+    dross::boolean t{ true };
+    dross::boolean f{ false };
 
     EXPECT_EQ(t && t, true);
     EXPECT_EQ(t && f, false);
@@ -268,8 +269,8 @@ TEST(boolean_test, logical_and)
 
 TEST(boolean_test, logical_or)
 {
-    dross::boolean t{true};
-    dross::boolean f{false};
+    dross::boolean t{ true };
+    dross::boolean f{ false };
 
     EXPECT_EQ(t || t, true);
     EXPECT_EQ(t || f, true);
@@ -279,9 +280,9 @@ TEST(boolean_test, logical_or)
 
 TEST(boolean_test, complex_logical_expressions)
 {
-    dross::boolean a{true};
-    dross::boolean b{false};
-    dross::boolean c{true};
+    dross::boolean a{ true };
+    dross::boolean b{ false };
+    dross::boolean c{ true };
 
     // (a && b) || c
     EXPECT_EQ((a && b) || c, true);
@@ -290,10 +291,10 @@ TEST(boolean_test, complex_logical_expressions)
     EXPECT_EQ(a && (b || c), true);
 
     // !(a && b)
-    EXPECT_EQ(!(a && b), true);
+    EXPECT_EQ(! (a && b), true);
 
     // !a || !b
-    EXPECT_EQ(!a || !b, true);
+    EXPECT_EQ(! a || ! b, true);
 }
 
 // =============================================================================
@@ -302,8 +303,8 @@ TEST(boolean_test, complex_logical_expressions)
 
 TEST(boolean_test, bool_conversion)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     // Implicit conversion in conditionals
     if (b_true) {
@@ -312,7 +313,7 @@ TEST(boolean_test, bool_conversion)
         FAIL() << "True boolean should evaluate to true in conditional";
     }
 
-    if (!b_false) {
+    if (! b_false) {
         SUCCEED();
     } else {
         FAIL() << "False boolean should evaluate to false in conditional";
@@ -332,7 +333,7 @@ TEST(boolean_test, bool_conversion)
 
 TEST(boolean_test, self_assignment)
 {
-    dross::boolean b{true};
+    dross::boolean b{ true };
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-assign-overloaded"
@@ -346,9 +347,9 @@ TEST(boolean_test, self_assignment)
 
 TEST(boolean_test, chain_operations)
 {
-    dross::boolean a{true};
-    dross::boolean b{false};
-    dross::boolean c{true};
+    dross::boolean a{ true };
+    dross::boolean b{ false };
+    dross::boolean c{ true };
 
     // Chain assignments
     a = b = c;
@@ -363,8 +364,8 @@ TEST(boolean_test, chain_operations)
 
 TEST(boolean_test, stream_output)
 {
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     std::ostringstream oss_true;
     oss_true << b_true;
@@ -388,8 +389,8 @@ TEST(boolean_test, stl_style_to_string)
 {
     using dross::to_string;  // ADL demonstration
 
-    dross::boolean b_true{true};
-    dross::boolean b_false{false};
+    dross::boolean b_true{ true };
+    dross::boolean b_false{ false };
 
     // STL-style conversion
     EXPECT_EQ(to_string(b_true), "true");

@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
-
 #include "dross/type.h"
 
-#include <list>
+#include <gtest/gtest.h>
+
 #include <deque>
+#include <list>
 
 TEST(string_split_test, colon_delimited)
 {
@@ -156,4 +156,3 @@ TEST(concat_test, two_number_list_concat)
     const auto c = dross::concat(a, b);
     ASSERT_EQ(c, std::list<int>({ 1, 2, 3, 4, 5, 6 }));
 }
-

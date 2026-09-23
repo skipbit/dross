@@ -1,11 +1,11 @@
-#include <gtest/gtest.h>
-
 #include "dross/type/array.h"
 #include "dross/type/boolean.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 #include "dross/type/value.h"
+
+#include <gtest/gtest.h>
 
 TEST(value_test, init_with_raw_int)
 {
@@ -323,12 +323,7 @@ TEST(value_test, bool_conversion)
 // Complex scenarios
 TEST(value_test, nested_array_with_mixed_types)
 {
-    dross::value v = {
-        42,
-        "hello",
-        dross::array({ 1, 2, 3 }),
-        dross::dictionary()
-    };
+    dross::value v = { 42, "hello", dross::array({ 1, 2, 3 }), dross::dictionary() };
 
     EXPECT_TRUE(v.is<dross::array>());
 
@@ -423,7 +418,9 @@ TEST(value_test, empty_containers)
 TEST(value_test, chain_assignments)
 {
     dross::value v1, v2, v3;
-    v3 = dross::number(42); v2 = v3; v1 = v2;
+    v3 = dross::number(42);
+    v2 = v3;
+    v1 = v2;
 
     EXPECT_EQ(v1, 42);
     EXPECT_EQ(v2, 42);

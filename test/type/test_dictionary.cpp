@@ -1,10 +1,10 @@
-#include <gtest/gtest.h>
-
+#include "dross/type/array.h"
 #include "dross/type/dictionary.h"
-#include "dross/type/value.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
-#include "dross/type/array.h"
+#include "dross/type/value.h"
+
+#include <gtest/gtest.h>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -239,10 +239,10 @@ TEST(dictionary_test, iterator_basic)
     d["a"] = dross::value(1);
     d["b"] = dross::value(2);
     d["c"] = dross::value(3);
-    
+
     auto it = d.begin();
     EXPECT_NE(it, d.end());
-    
+
     // Count elements through iteration
     size_t count = 0;
     for (auto iter = d.begin(); iter != d.end(); ++iter) {
@@ -256,12 +256,12 @@ TEST(dictionary_test, const_iterator_basic)
     dross::dictionary d;
     d["x"] = dross::value(10);
     d["y"] = dross::value(20);
-    
+
     const dross::dictionary& const_d = d;
-    
+
     auto it = const_d.begin();
     EXPECT_NE(it, const_d.end());
-    
+
     size_t count = 0;
     for (auto iter = const_d.begin(); iter != const_d.end(); ++iter) {
         count++;
@@ -274,10 +274,10 @@ TEST(dictionary_test, cbegin_cend)
     dross::dictionary d;
     d["key1"] = dross::value("value1");
     d["key2"] = dross::value("value2");
-    
+
     auto it = d.cbegin();
     EXPECT_NE(it, d.cend());
-    
+
     size_t count = 0;
     for (auto iter = d.cbegin(); iter != d.cend(); ++iter) {
         count++;
@@ -289,11 +289,11 @@ TEST(dictionary_test, iterator_comparison)
 {
     dross::dictionary d;
     d["test"] = dross::value(123);
-    
+
     auto it1 = d.begin();
     auto it2 = d.begin();
     auto it3 = d.end();
-    
+
     EXPECT_TRUE(it1 == it2);
     EXPECT_FALSE(it1 != it2);
     EXPECT_FALSE(it1 == it3);
@@ -305,7 +305,7 @@ TEST(dictionary_test, empty_dictionary_iterators)
     dross::dictionary d;
     EXPECT_EQ(d.begin(), d.end());
     EXPECT_EQ(d.cbegin(), d.cend());
-    
+
     const dross::dictionary& const_d = d;
     EXPECT_EQ(const_d.begin(), const_d.end());
 }
@@ -314,11 +314,11 @@ TEST(dictionary_test, iterator_dereference)
 {
     dross::dictionary d;
     d["key"] = dross::value(42);
-    
+
     auto it = d.begin();
     auto pair = *it;
     (void)pair;  // Suppress unused variable warning
-    
+
     // Test that dereferencing works and we can access key-value pairs
     EXPECT_NE(it, d.end());
 }
@@ -329,7 +329,7 @@ TEST(dictionary_test, range_based_for_loop)
     d["first"] = dross::value(1);
     d["second"] = dross::value(2);
     d["third"] = dross::value(3);
-    
+
     size_t count = 0;
     for (const auto& pair : d) {
         count++;
@@ -345,9 +345,9 @@ TEST(dictionary_test, const_range_based_for_loop)
     dross::dictionary d;
     d["alpha"] = dross::value("a");
     d["beta"] = dross::value("b");
-    
+
     const dross::dictionary& const_d = d;
-    
+
     size_t count = 0;
     for (const auto& pair : const_d) {
         count++;
@@ -367,7 +367,7 @@ TEST(dictionary_test, mixed_types)
     d["number"] = dross::value(42);
     d["string"] = dross::value(dross::string("hello"));
     d["double"] = dross::value(3.14);
-    d["array"] = dross::value(dross::array{1, 2, 3});
+    d["array"] = dross::value(dross::array{ 1, 2, 3 });
 
     EXPECT_EQ(d.size(), 4);
     EXPECT_TRUE(d["number"].is<dross::number>());
@@ -396,8 +396,8 @@ TEST(dictionary_test, nested_dictionaries)
 
 TEST(dictionary_test, dictionary_with_arrays)
 {
-    dross::array arr1{1, 2, 3};
-    dross::array arr2{"a", "b", "c"};
+    dross::array arr1{ 1, 2, 3 };
+    dross::array arr2{ "a", "b", "c" };
 
     dross::dictionary d;
     d["numbers"] = dross::value(arr1);
@@ -486,7 +486,7 @@ TEST(dictionary_test, overwrite_existing_key)
     EXPECT_EQ(d.size(), 1);
     EXPECT_EQ(dross::value_cast<dross::string>(d["key"]), dross::string("overwritten"));
 
-    d["key"] = dross::value(dross::array{1, 2, 3});
+    d["key"] = dross::value(dross::array{ 1, 2, 3 });
     EXPECT_EQ(d.size(), 1);
     EXPECT_TRUE(d["key"].is<dross::array>());
 }
@@ -607,7 +607,7 @@ TEST(dictionary_test, mixed_operations_stress)
     copy["additional"] = dross::value(42);
 
     d = copy;
-    d["more"] = dross::value(dross::array{1, 2, 3});
+    d["more"] = dross::value(dross::array{ 1, 2, 3 });
 
     dross::dictionary nested;
     nested["inner"] = dross::value("nested");

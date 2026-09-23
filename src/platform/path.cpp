@@ -1,4 +1,5 @@
 #include "dross/platform/path.h"
+
 #include "dross/platform/environment.h"
 
 #include <optional>
@@ -9,7 +10,7 @@ namespace dross {
 
 std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::string& absolute_path)
 {
-    return path::mkdir(std::filesystem::path{absolute_path});
+    return path::mkdir(std::filesystem::path{ absolute_path });
 }
 
 std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::filesystem::path& absolute_path)
@@ -23,23 +24,21 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::fi
         return std::unexpected(std::filesystem::filesystem_error("failed", absolute_path, err));
     }
 
-    return path{absolute_path};
+    return path{ absolute_path };
 }
 
 std::optional<path> path::home()
 {
-    const auto h = environment::value("HOME")
-        .and_then([](const std::string& home) {
-            return std::make_optional(path(home));
-        })
-        .or_else([]() {
-            struct passwd* pw = getpwuid(getuid());
-            if (pw && pw->pw_dir) {
-                const std::string p = pw->pw_dir;
-                return std::make_optional(path{p});
-            }
-            return std::optional<path>(std::nullopt);
-        });
+    const auto h = environment::value("HOME").and_then([](const std::string& home) {
+        return std::make_optional(path(home));
+    }).or_else([]() {
+        struct passwd* pw = getpwuid(getuid());
+        if (pw && pw->pw_dir) {
+            const std::string p = pw->pw_dir;
+            return std::make_optional(path{ p });
+        }
+        return std::optional<path>(std::nullopt);
+    });
 
     return h;
 }
@@ -50,7 +49,7 @@ std::string path::separator()
 }
 
 path::path()
-    : _path(std::filesystem::absolute(std::filesystem::path{"."}))
+    : _path(std::filesystem::absolute(std::filesystem::path{ "." }))
 {
 }
 
@@ -82,7 +81,7 @@ path path::append(const std::string& component) const
     } else {
         p.append(component);
     }
-    return path{p};
+    return path{ p };
 }
 
 std::string path::string() const
@@ -98,7 +97,7 @@ std::expected<path, std::filesystem::filesystem_error> path::expand() const
         });
         if (expanded) {
             try {
-                return path { std::filesystem::canonical(std::filesystem::path{expanded.value()}) };
+                return path{ std::filesystem::canonical(std::filesystem::path{ expanded.value() }) };
             } catch (const std::filesystem::filesystem_error& e) {
                 return std::unexpected(e);
             }
@@ -107,7 +106,7 @@ std::expected<path, std::filesystem::filesystem_error> path::expand() const
         }
     }
 
-    return path{_path};
+    return path{ _path };
 }
 
 std::expected<path, std::filesystem::filesystem_error> path::resolve() const
@@ -115,7 +114,7 @@ std::expected<path, std::filesystem::filesystem_error> path::resolve() const
     try {
         const auto expanded = expand();
         if (expanded) {
-            return path { std::filesystem::canonical(expanded.value()._path) };
+            return path{ std::filesystem::canonical(expanded.value()._path) };
         } else {
             return expanded;
         }
@@ -134,4 +133,4 @@ path::operator std::filesystem::path() const
     return _path;
 }
 
-}
+}  // namespace dross

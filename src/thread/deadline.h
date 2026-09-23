@@ -35,9 +35,9 @@ namespace dross::deadline {
  * base and the clock's own max, as a duration, so that comparison cannot
  * overflow either.
  */
-DROSS_DEADLINE_HIDDEN std::chrono::steady_clock::time_point after(
-    std::chrono::steady_clock::time_point base, std::chrono::milliseconds timeout);
+DROSS_DEADLINE_HIDDEN std::chrono::steady_clock::time_point after(std::chrono::steady_clock::time_point base,
+                                                                  std::chrono::milliseconds timeout);
 
 #undef DROSS_DEADLINE_HIDDEN
 
-}
+}  // namespace dross::deadline

@@ -1,11 +1,12 @@
 #pragma once
 
-#include <memory>
-#include <string>
+#include "timezone.h"
+
 #include <chrono>
 #include <compare>
+#include <memory>
 #include <optional>
-#include "timezone.h"
+#include <string>
 
 namespace dross {
 
@@ -80,8 +81,8 @@ public:
      * @brief Format options for timestamp string representation.
      */
     enum class format_type {
-        iso8601,    // ISO 8601 format: 2024-01-21T15:30:00+09:00
-        rfc3339     // RFC 3339 format (essentially same as ISO 8601)
+        iso8601,  // ISO 8601 format: 2024-01-21T15:30:00+09:00
+        rfc3339   // RFC 3339 format (essentially same as ISO 8601)
     };
 
     /**
@@ -93,6 +94,7 @@ public:
      */
     class date_part {
         friend class timestamp;
+
     private:
         class impl;
         std::unique_ptr<impl> _impl;
@@ -173,6 +175,7 @@ public:
      */
     class time_part {
         friend class timestamp;
+
     private:
         class impl;
         std::unique_ptr<impl> _impl;
@@ -181,7 +184,7 @@ public:
         time_part();
         time_part(int hour, int minute, int second);
         time_part(const std::string& iso8601_time);
-        template<typename Duration>
+        template <typename Duration>
         time_part(const std::chrono::hh_mm_ss<Duration>& hms);
 
     public:
@@ -309,8 +312,7 @@ public:
      * @param minute Minute (0-59, default 0)
      * @param second Second (0-59, default 0)
      */
-    timestamp(int year, int month, int day,
-             int hour = 0, int minute = 0, int second = 0);
+    timestamp(int year, int month, int day, int hour = 0, int minute = 0, int second = 0);
 
     /**
      * @brief Construct from individual date and time components with timezone.
@@ -322,9 +324,7 @@ public:
      * @param second Second (0-59)
      * @param tz Timezone information
      */
-    timestamp(int year, int month, int day,
-             int hour, int minute, int second,
-             const timezone& tz);
+    timestamp(int year, int month, int day, int hour, int minute, int second, const timezone& tz);
 
     /**
      * @brief Destructor.
@@ -453,7 +453,6 @@ private:
     std::string format_iso8601() const;
 };
 
-
 /**
  * @brief Stream output operator for timestamp.
  * @param os Output stream
@@ -464,4 +463,4 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const timestamp& ts);
 
-}
+}  // namespace dross

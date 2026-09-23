@@ -17,17 +17,21 @@ namespace {
 
 std::uint64_t next_timer_id()
 {
-    static std::atomic<std::uint64_t> next{0};
+    static std::atomic<std::uint64_t> next{ 0 };
     return next.fetch_add(1);
 }
 
-}
+}  // namespace
 
-timer::storage::storage(std::chrono::milliseconds interval, bool repeats,
+timer::storage::storage(std::chrono::milliseconds interval,
+                        bool repeats,
                         std::function<void(timer)> callback,
                         std::weak_ptr<runloop::storage> loop)
-    : _interval{interval}, _repeats{repeats}, _callback{std::move(callback)}, _loop{std::move(loop)},
-      _id{next_timer_id()}
+    : _interval{ interval }
+    , _repeats{ repeats }
+    , _callback{ std::move(callback) }
+    , _loop{ std::move(loop) }
+    , _id{ next_timer_id() }
 {
 }
 
@@ -62,7 +66,7 @@ std::uint64_t timer::storage::id() const noexcept
 void timer::storage::fire()
 {
     if (_callback) {
-        _callback(timer{shared_from_this()});
+        _callback(timer{ shared_from_this() });
     }
 }
 
@@ -72,7 +76,7 @@ void timer::storage::mark_invalid()
 }
 
 timer::timer(std::shared_ptr<storage> store) noexcept
-    : _store{std::move(store)}
+    : _store{ std::move(store) }
 {
 }
 
@@ -107,8 +111,7 @@ bool timer::operator==(const timer& other) const noexcept
     return _store == other._store;
 }
 
-timer timer::make(std::chrono::milliseconds interval, bool repeats,
-                  std::function<void(timer)> callback, runloop loop)
+timer timer::make(std::chrono::milliseconds interval, bool repeats, std::function<void(timer)> callback, runloop loop)
 {
     // Checked before the move below, the same as runloop::perform() checks
     // its own task: an empty callback is never installed, the same as one
@@ -117,17 +120,17 @@ timer timer::make(std::chrono::milliseconds interval, bool repeats,
 
     auto store = std::make_shared<storage>(interval, repeats, std::move(callback), loop._store);
 
-    if (!has_callback) {
+    if (! has_callback) {
         store->mark_invalid();
     } else {
         const auto first_deadline = deadline::after(std::chrono::steady_clock::now(), interval);
-        if (!loop._store->install_timer(store, first_deadline)) {
+        if (! loop._store->install_timer(store, first_deadline)) {
             // The loop is already finished; it will never fire.
             store->mark_invalid();
         }
     }
 
-    return timer{std::move(store)};
+    return timer{ std::move(store) };
 }
 
 timer timer::repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback)
@@ -135,8 +138,7 @@ timer timer::repeating(std::chrono::milliseconds interval, std::function<void(ti
     return repeating(interval, std::move(callback), current_runloop());
 }
 
-timer timer::repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback,
-                       runloop loop)
+timer timer::repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback, runloop loop)
 {
     return make(interval, true, std::move(callback), std::move(loop));
 }
@@ -151,4 +153,4 @@ timer timer::once(std::chrono::milliseconds delay, std::function<void(timer)> ca
     return make(delay, false, std::move(callback), std::move(loop));
 }
 
-}
+}  // namespace dross

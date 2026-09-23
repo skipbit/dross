@@ -18,7 +18,10 @@ public:
     virtual ~error();
 
     template <error_enum_type E>
-    error(const E e) : _code(std::make_error_code(e)) {};
+    error(const E e)
+        : _code(std::make_error_code(e))
+    {
+    }
 
     std::string domain() const;
     int code() const noexcept;
@@ -30,10 +33,16 @@ public:
     explicit operator bool() const noexcept;
 
     template <error_enum_type E>
-    bool operator==(const E e) const noexcept { return _code.default_error_condition() == e; }
+    bool operator==(const E e) const noexcept
+    {
+        return _code.default_error_condition() == e;
+    }
 
     template <error_enum_type E>
-    bool operator!=(const E e) const noexcept { return _code.default_error_condition() != e; }
+    bool operator!=(const E e) const noexcept
+    {
+        return _code.default_error_condition() != e;
+    }
 
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;
@@ -45,9 +54,10 @@ private:
 };
 
 template <class C, class T>
-std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& os, const error& e) {
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& os, const error& e)
+{
     os << e.domain() << ":" << e.code();
     return os;
 }
 
-}
+}  // namespace dross

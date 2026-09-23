@@ -254,4 +254,4 @@ thread current_thread();
  */
 std::vector<thread> all_threads();
 
-}
+}  // namespace dross

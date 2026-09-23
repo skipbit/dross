@@ -1,9 +1,9 @@
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <string>
 #include <type_traits>
-#include <iostream>
 
 namespace dross {
 
@@ -107,7 +107,10 @@ public:
      * The conversion preserves the full precision of the input type.
      */
     template <number_type T>
-    number(const T n) : number(std::to_string(n)) {}
+    number(const T n)
+        : number(std::to_string(n))
+    {
+    }
 
     /**
      * @brief Destructor.
@@ -146,7 +149,10 @@ public:
      * @return true if this number equals the arithmetic value, false otherwise
      */
     template <number_type T>
-    bool equals(const T n) const { return equals(number(n)); }
+    bool equals(const T n) const
+    {
+        return equals(number(n));
+    }
 
     /**
      * @brief Three-way comparison with another number.
@@ -163,7 +169,10 @@ public:
      * @return std::strong_ordering result (less, equal, greater, or unordered)
      */
     template <number_type T>
-    std::strong_ordering compare(const T n) const noexcept { return compare(number(n)); }
+    std::strong_ordering compare(const T n) const noexcept
+    {
+        return compare(number(n));
+    }
 
     /**
      * @brief Equality comparison operator.
@@ -192,7 +201,10 @@ public:
      * @return true if this number equals the arithmetic value
      */
     template <number_type T>
-    bool operator==(const T n) const { return equals(n); }
+    bool operator==(const T n) const
+    {
+        return equals(n);
+    }
 
     /**
      * @brief Inequality comparison with arithmetic types.
@@ -200,7 +212,10 @@ public:
      * @return true if this number does not equal the arithmetic value
      */
     template <number_type T>
-    bool operator!=(const T n) const { return (! equals(n)); }
+    bool operator!=(const T n) const
+    {
+        return (! equals(n));
+    }
 
     /**
      * @brief Three-way comparison with arithmetic types.
@@ -208,7 +223,10 @@ public:
      * @return std::strong_ordering result for use with comparison operators
      */
     template <number_type T>
-    std::strong_ordering operator<=>(const T n) const noexcept { return compare(n); }
+    std::strong_ordering operator<=>(const T n) const noexcept
+    {
+        return compare(n);
+    }
 
     /**
      * @brief Copy assignment operator.
@@ -237,7 +255,10 @@ public:
      * @return Reference to this number
      */
     template <number_type T>
-    number& operator=(const T n) { return operator=(number(n)); }
+    number& operator=(const T n)
+    {
+        return operator=(number(n));
+    }
 
     /**
      * @brief Convert to string representation.
@@ -382,4 +403,4 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const number& n);
 
-}
+}  // namespace dross

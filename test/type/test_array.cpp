@@ -1,9 +1,10 @@
-#include <gtest/gtest.h>
-
 #include "dross/type/array.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 #include "dross/type/value.h"
+
+#include <gtest/gtest.h>
+
 #include <stdexcept>
 
 // =============================================================================

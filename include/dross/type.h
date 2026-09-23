@@ -63,10 +63,10 @@
 #include <dross/type/array.h>
 #include <dross/type/boolean.h>
 #include <dross/type/data.h>
-#include <dross/type/timestamp.h>
 #include <dross/type/dictionary.h>
 #include <dross/type/number.h>
 #include <dross/type/string.h>
+#include <dross/type/timestamp.h>
 #include <dross/type/timezone.h>
 #include <dross/type/value.h>
 
@@ -224,7 +224,8 @@ std::string to_string(const timezone& tz);
  * Supported containers include std::vector, std::list, std::deque,
  * and other standard library containers that meet these requirements.
  */
-template <typename T> concept container_type = requires(T a) {
+template <typename T>
+concept container_type = requires(T a) {
     { a.begin() } -> std::same_as<typename T::iterator>;
     { a.end() } -> std::same_as<typename T::iterator>;
     requires std::is_same_v<decltype(a.insert(a.end(), *a.begin())), typename T::iterator>;
@@ -256,11 +257,12 @@ template <typename T> concept container_type = requires(T a) {
  * // Result: {"a", "b", "c", "d"}
  * @endcode
  */
-template<container_type T, typename... Ts>
-T concat(const T& first, const Ts&... rest) {
+template <container_type T, typename... Ts>
+T concat(const T& first, const Ts&... rest)
+{
     T result = first;
     (result.insert(result.end(), rest.begin(), rest.end()), ...);
     return result;
 }
 
-}
+}  // namespace dross

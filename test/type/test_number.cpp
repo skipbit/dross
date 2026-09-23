@@ -1,9 +1,10 @@
+#include "dross/type/number.h"
+
 #include <gtest/gtest.h>
 
-#include "dross/type/number.h"
-#include <sstream>
-#include <limits>
 #include <cmath>
+#include <limits>
+#include <sstream>
 
 TEST(number_test, default_constructor_is_zero)
 {
@@ -196,7 +197,7 @@ TEST(number_test, nan_comparison)
     const auto nan2 = dross::number::nan();
     const dross::number valid{ "10" };
 
-    EXPECT_EQ(nan1, nan2);  // NaN values are equal to each other
+    EXPECT_EQ(nan1, nan2);   // NaN values are equal to each other
     EXPECT_NE(nan1, valid);  // NaN is not equal to valid numbers
     EXPECT_GT(valid, nan1);  // Valid numbers are greater than NaN
 }
@@ -515,8 +516,8 @@ TEST(number_test, self_assignment)
 
 TEST(number_test, conversion_to_long_long)
 {
-    const dross::number n1{ "9223372036854775807" };  // LLONG_MAX
-    const dross::number n2{ "-9223372036854775808" }; // LLONG_MIN
+    const dross::number n1{ "9223372036854775807" };   // LLONG_MAX
+    const dross::number n2{ "-9223372036854775808" };  // LLONG_MIN
     const dross::number n3{ "12345" };
 
     EXPECT_EQ(static_cast<long long>(n1), std::numeric_limits<long long>::max());
@@ -646,12 +647,12 @@ TEST(number_test, scientific_notation)
 TEST(number_test, scientific_notation_edge_cases)
 {
     // Test various scientific notation formats
-    const dross::number n1{ "1E10" };          // Capital E
-    const dross::number n2{ "1e+10" };         // explicit positive exponent
-    const dross::number n3{ "1e-10" };         // negative exponent
-    const dross::number n4{ "123.456e-3" };    // decimal with exponent
-    const dross::number n5{ "0.1e1" };         // should equal 1.0
-    const dross::number n6{ "1000e-3" };       // should equal 1.0
+    const dross::number n1{ "1E10" };        // Capital E
+    const dross::number n2{ "1e+10" };       // explicit positive exponent
+    const dross::number n3{ "1e-10" };       // negative exponent
+    const dross::number n4{ "123.456e-3" };  // decimal with exponent
+    const dross::number n5{ "0.1e1" };       // should equal 1.0
+    const dross::number n6{ "1000e-3" };     // should equal 1.0
 
     EXPECT_FALSE(n1.is_nan());
     EXPECT_FALSE(n2.is_nan());
@@ -674,9 +675,9 @@ TEST(number_test, scientific_notation_edge_cases)
 TEST(number_test, scientific_notation_arithmetic)
 {
     // Test arithmetic with scientific notation
-    const dross::number n1{ "1e3" };    // 1000
-    const dross::number n2{ "2e2" };    // 200
-    const dross::number n3{ "1e-3" };   // 0.001
+    const dross::number n1{ "1e3" };   // 1000
+    const dross::number n2{ "2e2" };   // 200
+    const dross::number n3{ "1e-3" };  // 0.001
 
     // Addition
     auto result1 = n1 + n2;  // 1000 + 200 = 1200
@@ -694,10 +695,10 @@ TEST(number_test, scientific_notation_arithmetic)
 TEST(number_test, scientific_notation_comparison)
 {
     // Test comparison with scientific notation
-    const dross::number n1{ "1e3" };    // 1000
-    const dross::number n2{ "1000" };   // 1000
-    const dross::number n3{ "1e4" };    // 10000
-    const dross::number n4{ "1e-3" };   // 0.001
+    const dross::number n1{ "1e3" };   // 1000
+    const dross::number n2{ "1000" };  // 1000
+    const dross::number n3{ "1e4" };   // 10000
+    const dross::number n4{ "1e-3" };  // 0.001
 
     EXPECT_EQ(n1, n2);  // 1e3 == 1000
     EXPECT_LT(n1, n3);  // 1e3 < 1e4
@@ -725,13 +726,13 @@ TEST(number_test, scientific_notation_string_conversion)
 TEST(number_test, scientific_notation_invalid_formats)
 {
     // Test invalid scientific notation formats
-    const dross::number n1{ "1ee10" };      // double e
-    const dross::number n2{ "1e" };         // incomplete exponent
-    const dross::number n3{ "e10" };        // missing mantissa
-    const dross::number n4{ "1e10.5" };     // decimal in exponent
-    const dross::number n5{ "1e++" };       // invalid exponent
-    const dross::number n6{ "1e--5" };      // double minus
-    const dross::number n7{ "1.2.3e4" };    // multiple decimals
+    const dross::number n1{ "1ee10" };    // double e
+    const dross::number n2{ "1e" };       // incomplete exponent
+    const dross::number n3{ "e10" };      // missing mantissa
+    const dross::number n4{ "1e10.5" };   // decimal in exponent
+    const dross::number n5{ "1e++" };     // invalid exponent
+    const dross::number n6{ "1e--5" };    // double minus
+    const dross::number n7{ "1.2.3e4" };  // multiple decimals
 
     // These should all be NaN (invalid)
     EXPECT_TRUE(n1.is_nan());
@@ -746,9 +747,9 @@ TEST(number_test, scientific_notation_invalid_formats)
 TEST(number_test, scientific_notation_boundary_values)
 {
     // Test very large and very small scientific notation values
-    const dross::number very_large{ "1e308" };    // near double max
-    const dross::number very_small{ "1e-307" };   // near double min (within representable range)
-    const dross::number zero_exp{ "123e0" };      // exponent 0
+    const dross::number very_large{ "1e308" };   // near double max
+    const dross::number very_small{ "1e-307" };  // near double min (within representable range)
+    const dross::number zero_exp{ "123e0" };     // exponent 0
 
     EXPECT_FALSE(very_large.is_nan());
     EXPECT_FALSE(very_small.is_nan());
@@ -800,9 +801,7 @@ TEST(number_test, very_small_decimals)
 
     // Check that arithmetic preserves precision
     std::string sum_str = std::string(sum);
-    EXPECT_TRUE(sum_str == "0.000000000000000003" ||
-                sum_str == "3e-18" ||
-                sum.is_nan());  // Implementation-dependent
+    EXPECT_TRUE(sum_str == "0.000000000000000003" || sum_str == "3e-18" || sum.is_nan());  // Implementation-dependent
 }
 
 // =============================================================================
@@ -837,13 +836,13 @@ TEST(number_test, complex_arithmetic_sequence)
 {
     dross::number result{ "100" };
 
-    result = (result + dross::number{"50"}) * dross::number{"2"};
+    result = (result + dross::number{ "50" }) * dross::number{ "2" };
     EXPECT_EQ(std::string(result), "300");
 
-    result = result / dross::number{"3"} - dross::number{"25"};
+    result = result / dross::number{ "3" } - dross::number{ "25" };
     EXPECT_EQ(std::string(result), "75");
 
-    result = result % dross::number{"20"} + dross::number{"5"};
+    result = result % dross::number{ "20" } + dross::number{ "5" };
     EXPECT_EQ(std::string(result), "20");
 }
 
@@ -968,8 +967,8 @@ TEST(number_test, unified_parsing_int_conversion_clamping)
 
 TEST(number_test, unified_parsing_long_long_conversion)
 {
-    const dross::number max_ll{ "9223372036854775807" };  // LLONG_MAX
-    const dross::number min_ll{ "-9223372036854775808" }; // LLONG_MIN
+    const dross::number max_ll{ "9223372036854775807" };   // LLONG_MAX
+    const dross::number min_ll{ "-9223372036854775808" };  // LLONG_MIN
     const dross::number decimal_ll{ "123.456" };
 
     EXPECT_EQ(static_cast<long long>(max_ll), std::numeric_limits<long long>::max());
@@ -1035,13 +1034,10 @@ TEST(number_test, unified_parsing_fractional_precision)
 TEST(number_test, unified_parsing_consistency_with_legacy)
 {
     // Test that new parsing produces same results as legacy for valid inputs
-    std::vector<std::string> test_cases = {
-        "0", "123", "-456", "3.14", "-2.71", "0.5",
-        "999999999999999999", "-888888888888888888"
-    };
+    std::vector<std::string> test_cases = { "0", "123", "-456", "3.14", "-2.71", "0.5", "999999999999999999", "-888888888888888888" };
 
     for (const auto& test_case : test_cases) {
-        dross::number n{test_case};
+        dross::number n{ test_case };
 
         // Should not be NaN for valid inputs
         EXPECT_FALSE(n.is_nan()) << "Failed for input: " << test_case;
@@ -1051,20 +1047,19 @@ TEST(number_test, unified_parsing_consistency_with_legacy)
         volatile double d = static_cast<double>(n);
         volatile long long ll = static_cast<long long>(n);
 
-        (void)i; (void)d; (void)ll;
+        (void)i;
+        (void)d;
+        (void)ll;
     }
 }
 
 TEST(number_test, unified_parsing_error_handling)
 {
     // Test that invalid inputs are handled consistently
-    std::vector<std::string> invalid_cases = {
-        "", " ", "abc", "1.2.3", "1a2", "a1", "1a",
-        "+", "-", ".", "..", "1.", "..1"
-    };
+    std::vector<std::string> invalid_cases = { "", " ", "abc", "1.2.3", "1a2", "a1", "1a", "+", "-", ".", "..", "1.", "..1" };
 
     for (const auto& invalid_case : invalid_cases) {
-        dross::number n{invalid_case};
+        dross::number n{ invalid_case };
 
         // Most should be NaN, but some edge cases might be handled differently
         // Just ensure no crashes occur
@@ -1074,7 +1069,11 @@ TEST(number_test, unified_parsing_error_handling)
         volatile double d = static_cast<double>(n);
         volatile long long ll = static_cast<long long>(n);
 
-        (void)is_nan; (void)is_int; (void)i; (void)d; (void)ll;
+        (void)is_nan;
+        (void)is_int;
+        (void)i;
+        (void)d;
+        (void)ll;
     }
 }
 

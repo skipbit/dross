@@ -1,10 +1,11 @@
 #include <dross/type/timezone.h>
+
+#include <chrono>
+#include <cmath>
+#include <iomanip>
 #include <memory>
 #include <regex>
 #include <sstream>
-#include <iomanip>
-#include <cmath>
-#include <chrono>
 
 namespace dross {
 
@@ -12,11 +13,20 @@ class timezone::storage {
 public:
     int offset_minutes;
 
-    storage() : offset_minutes(0) {}  // Default UTC
+    storage()
+        : offset_minutes(0)
+    {
+    }  // Default UTC
 
-    storage(int offset) : offset_minutes(offset) {}
+    storage(int offset)
+        : offset_minutes(offset)
+    {
+    }
 
-    storage(const storage& other) : offset_minutes(other.offset_minutes) {}
+    storage(const storage& other)
+        : offset_minutes(other.offset_minutes)
+    {
+    }
 };
 
 timezone timezone::utc()
@@ -24,15 +34,14 @@ timezone timezone::utc()
     return timezone(std::chrono::minutes(0));
 }
 
-
 timezone timezone::offset(int hours, int minutes)
 {
     // Validate input ranges
     if (hours < -12 || hours > 14) {
-        return timezone::utc(); // Invalid hours, fallback to UTC
+        return timezone::utc();  // Invalid hours, fallback to UTC
     }
     if (minutes < 0 || minutes > 59) {
-        return timezone::utc(); // Invalid minutes, fallback to UTC
+        return timezone::utc();  // Invalid minutes, fallback to UTC
     }
 
     // Calculate total offset in minutes
@@ -51,7 +60,7 @@ timezone timezone::offset(std::chrono::minutes offset_duration)
     const auto max_offset = std::chrono::minutes(14 * 60);
 
     if (offset_duration < min_offset || offset_duration > max_offset) {
-        return timezone::utc(); // Invalid offset, fallback to UTC
+        return timezone::utc();  // Invalid offset, fallback to UTC
     }
 
     return timezone(offset_duration);
@@ -75,7 +84,7 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
 
         // Validate ranges
         if (hours > 14 || minutes > 59) {
-            return std::nullopt; // Invalid format
+            return std::nullopt;  // Invalid format
         }
 
         // Calculate offset
@@ -91,15 +100,18 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
     return std::nullopt;
 }
 
-timezone::timezone() : _store(std::make_unique<storage>())
+timezone::timezone()
+    : _store(std::make_unique<storage>())
 {
 }
 
-timezone::timezone(const timezone& other) : _store(std::make_unique<storage>(*other._store))
+timezone::timezone(const timezone& other)
+    : _store(std::make_unique<storage>(*other._store))
 {
 }
 
-timezone::timezone(std::chrono::minutes offset) : _store(std::make_unique<storage>(offset.count()))
+timezone::timezone(std::chrono::minutes offset)
+    : _store(std::make_unique<storage>(offset.count()))
 {
 }
 
@@ -127,7 +139,7 @@ std::string timezone::format() const
 {
     int offset = _store->offset_minutes;
     if (offset == 0) {
-        return "Z"; // UTC
+        return "Z";  // UTC
     }
 
     // Format as [+-]HH:MM
@@ -137,8 +149,7 @@ std::string timezone::format() const
     int minutes = abs_offset % 60;
 
     std::ostringstream oss;
-    oss << sign << std::setfill('0') << std::setw(2) << hours
-        << ":" << std::setw(2) << minutes;
+    oss << sign << std::setfill('0') << std::setw(2) << hours << ":" << std::setw(2) << minutes;
 
     return oss.str();
 }
@@ -164,4 +175,4 @@ std::ostream& operator<<(std::ostream& os, const timezone& tz)
     return os << tz.format();
 }
 
-}
+}  // namespace dross
