@@ -1,5 +1,6 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
+#include "manual_time_source.h"
 
 #include <gtest/gtest.h>
 
@@ -196,18 +197,18 @@ TEST(runloop_test, quit_ends_run_and_keeps_the_queue)
 
 TEST(runloop_test, run_pending_does_not_consume_a_pending_quit)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     loop.quit();
 
     EXPECT_EQ(loop.run_pending(), 0U);
 
     // A surviving quit makes run_for return at once; a consumed one makes it
-    // wait out the full timeout.
-    const auto started = std::chrono::steady_clock::now();
+    // wait out the full timeout, which would move this clock.
+    const auto started = manual.clock->now();
     EXPECT_EQ(loop.run_for(std::chrono::milliseconds{ 200 }), 0U);
-    EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{ 100 });
+    EXPECT_EQ(manual.clock->now(), started);
 }
 
 TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
@@ -348,18 +349,18 @@ TEST(runloop_test, tasks_from_many_threads_all_arrive)
 
 TEST(runloop_test, run_for_returns_when_the_timeout_passes)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
-    const auto started = std::chrono::steady_clock::now();
+    const auto started = manual.clock->now();
     EXPECT_EQ(loop.run_for(std::chrono::milliseconds{ 20 }), 0U);
-    EXPECT_GE(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{ 15 });
+    EXPECT_EQ(manual.clock->now() - started, std::chrono::milliseconds{ 20 });
 }
 
 TEST(runloop_test, run_for_runs_what_is_queued)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     loop.perform([]() {
     });
@@ -385,16 +386,17 @@ TEST(runloop_test, run_for_zero_runs_nothing)
 
 TEST(runloop_test, run_for_with_a_huge_timeout_does_not_overflow)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     loop.perform([loop]() mutable {
         loop.quit();
     });
 
-    const auto started = std::chrono::steady_clock::now();
+    // An overflowed deadline is already past, so run_for would run nothing.
+    const auto started = manual.clock->now();
     EXPECT_EQ(loop.run_for(std::chrono::milliseconds::max()), 1U);
-    EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{ 500 });
+    EXPECT_EQ(manual.clock->now(), started);
 }
 
 TEST(runloop_test, is_running_is_true_inside_a_task)
