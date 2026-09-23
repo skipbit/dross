@@ -38,6 +38,10 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_runloop.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_timer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_timer_schedule.cpp
+    # Hidden in the shared library, and used by the internal headers the
+    # tests include.
+    ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
 )
 
 target_compile_options(${TEST_NAME}
@@ -48,7 +52,7 @@ target_compile_options(${TEST_NAME}
 target_compile_features(${TEST_NAME} PUBLIC cxx_std_23)
 
 target_include_directories(${TEST_NAME}
-    PRIVATE ${PROJECT_SOURCE_DIR}/include
+    PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src
 )
 target_link_libraries(${TEST_NAME}
     dross

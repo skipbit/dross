@@ -123,7 +123,7 @@ timer timer::make(std::chrono::milliseconds interval, bool repeats, std::functio
     if (! has_callback) {
         store->mark_invalid();
     } else {
-        const auto first_deadline = deadline::after(std::chrono::steady_clock::now(), interval);
+        const auto first_deadline = deadline::after(loop._store->now(), interval);
         if (! loop._store->install_timer(store, first_deadline)) {
             // The loop is already finished; it will never fire.
             store->mark_invalid();

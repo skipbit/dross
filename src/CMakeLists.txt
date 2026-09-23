@@ -35,6 +35,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/runloop.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/thread.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/time_source.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/timer.cpp
 )
 

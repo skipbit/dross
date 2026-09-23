@@ -1,5 +1,6 @@
 #include "dross/thread/thread.h"
 #include "dross/thread/timer.h"
+#include "manual_time_source.h"
 
 #include <gtest/gtest.h>
 
@@ -44,43 +45,39 @@ void spin_until(dross::runloop& loop, Predicate&& predicate, std::chrono::millis
 
 TEST(timer_test, a_one_shot_fires_once_and_then_invalidates_itself)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     int fire_count = 0;
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer) {
         ++fire_count;
     }, loop);
 
-    spin_until(loop, [&fire_count]() {
-        return (fire_count > 0);
-    });
-
+    EXPECT_EQ(loop.run_pending(), 1U);
     EXPECT_EQ(fire_count, 1);
     EXPECT_FALSE(t.valid());
     EXPECT_EQ(loop.timer_count(), 0U);
 
-    // Bounded proof it really does not fire again.
-    loop.run_for(std::chrono::milliseconds{ 20 });
+    EXPECT_EQ(loop.run_for(std::chrono::hours{ 1 }), 0U);
     EXPECT_EQ(fire_count, 1);
 }
 
 TEST(timer_test, a_repeating_timer_fires_more_than_once_and_stays_valid)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
-    std::atomic<int> fire_count{ 0 };
-    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 1 }, [&fire_count](dross::timer) {
-        fire_count.fetch_add(1);
+    int fire_count = 0;
+    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [&fire_count](dross::timer) {
+        ++fire_count;
     }, loop);
 
-    spin_until(loop, [&fire_count]() {
-        return (fire_count.load() >= 3);
-    });
-
-    EXPECT_GE(fire_count.load(), 3);
-    EXPECT_TRUE(t.valid());
+    for (int expected = 1; expected <= 3; ++expected) {
+        manual.clock->advance(std::chrono::milliseconds{ 10 });
+        EXPECT_EQ(loop.run_pending(), 1U);
+        EXPECT_EQ(fire_count, expected);
+        EXPECT_TRUE(t.valid());
+    }
 
     t.invalidate();
     EXPECT_EQ(loop.timer_count(), 0U);
@@ -110,8 +107,8 @@ TEST(timer_test, the_callback_receives_the_timer_and_can_invalidate_itself_from_
 
 TEST(timer_test, invalidate_before_the_first_fire_means_it_never_fires)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     int fire_count = 0;
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 50 }, [&fire_count](dross::timer) {
@@ -122,7 +119,7 @@ TEST(timer_test, invalidate_before_the_first_fire_means_it_never_fires)
     EXPECT_FALSE(t.valid());
     EXPECT_EQ(loop.timer_count(), 0U);
 
-    loop.run_for(std::chrono::milliseconds{ 100 });
+    EXPECT_EQ(loop.run_for(std::chrono::milliseconds{ 100 }), 0U);
     EXPECT_EQ(fire_count, 0);
 }
 
@@ -258,8 +255,8 @@ TEST(timer_test, timer_count_rises_on_install_and_falls_on_invalidate_and_after_
 
 TEST(timer_test, run_pending_fires_a_timer_already_due_and_not_one_that_is_not)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     int due_fired = 0;
     int later_fired = 0;
@@ -270,80 +267,76 @@ TEST(timer_test, run_pending_fires_a_timer_already_due_and_not_one_that_is_not)
         ++later_fired;
     }, loop);
 
-    // due's deadline has certainly passed by the time run_pending() looks.
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 5 });
-
-    const auto started = std::chrono::steady_clock::now();
+    // run_pending() does not wait for later: waiting would move this clock.
+    const auto started = manual.clock->now();
     EXPECT_EQ(loop.run_pending(), 1U);
-    EXPECT_LT(std::chrono::steady_clock::now() - started, std::chrono::milliseconds{ 100 });
+    EXPECT_EQ(manual.clock->now(), started);
 
     EXPECT_EQ(due_fired, 1);
     EXPECT_EQ(later_fired, 0);
     EXPECT_FALSE(due.valid());
     EXPECT_TRUE(later.valid());
-
-    later.invalidate();
 }
 
 TEST(timer_test, a_late_fire_is_not_made_up)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     int fire_count = 0;
     dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 50 }, [&fire_count](dross::timer) {
         ++fire_count;
     }, loop);
 
-    // The loop is not run at all while this elapses, so by the time it is,
-    // the timer is eight intervals overdue. A catch-up implementation (one
-    // that reschedules from the deadline that was due rather than from the
-    // moment the fire was decided) works through all eight as soon as it
-    // runs; this one fires once and looks an interval ahead.
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 400 });
+    // Eight intervals overdue by the time the loop runs. A catch-up
+    // implementation, one that reschedules from the deadline that was due
+    // rather than from the moment the fire was claimed, works through all
+    // eight at once; this one fires once and looks an interval ahead.
+    manual.clock->advance(std::chrono::milliseconds{ 400 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_EQ(fire_count, 1);
 
-    // A second fire needs the machine to stall for a whole interval between
-    // the first one and the next look, which is what the interval is set
-    // wide for: the gap to a catch-up implementation's eight stays clear
-    // even when a loaded runner loses a slice.
-    const std::size_t ran = loop.run_for(std::chrono::milliseconds{ 5 });
-    EXPECT_LE(ran, 2U);
-    EXPECT_LE(fire_count, 2);
+    manual.clock->advance(std::chrono::milliseconds{ 49 });
+    EXPECT_EQ(loop.run_pending(), 0U);
+
+    manual.clock->advance(std::chrono::milliseconds{ 1 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_EQ(fire_count, 2);
 
     t.invalidate();
 }
 
 TEST(timer_test, a_slow_fire_does_not_shorten_another_timers_next_interval)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+    const auto started = manual.clock->now();
 
     // Both overdue by the time the loop is ever run, so the pass that opens
     // below claims both: slow first (its delay is shorter), then fast,
     // which is where a reschedule keyed to the pass boundary rather than to
     // the moment fast is claimed would land its next deadline in the past,
     // since slow's callback has by then run long past that boundary.
-    dross::timer slow = dross::timer::once(std::chrono::milliseconds{ 0 }, [](dross::timer) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 200 });
+    auto clock = manual.clock;
+    dross::timer slow = dross::timer::once(std::chrono::milliseconds{ 0 }, [clock](dross::timer) {
+        clock->advance(std::chrono::milliseconds{ 200 });
     }, loop);
 
     std::vector<std::chrono::steady_clock::time_point> fires;
-    dross::timer fast = dross::timer::repeating(std::chrono::milliseconds{ 50 }, [&fires](dross::timer) {
-        fires.push_back(std::chrono::steady_clock::now());
+    dross::timer fast = dross::timer::repeating(std::chrono::milliseconds{ 50 }, [clock, &fires](dross::timer) {
+        fires.push_back(clock->now());
     }, loop);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 60 });
-
-    // Wide enough that the 200ms callback has to overrun by 350ms before the
-    // second fire falls outside: on a loaded runner a 100ms margin was not
-    // enough and this failed twice.
-    loop.run_for(std::chrono::milliseconds{ 800 });
+    manual.clock->advance(std::chrono::milliseconds{ 60 });
+    loop.run_for(std::chrono::milliseconds{ 300 });
     fast.invalidate();
-    slow.invalidate();
 
+    // The first fire is claimed once slow's callback has returned, and
+    // every one after it a full interval later.
     ASSERT_GE(fires.size(), 2U);
+    EXPECT_EQ(fires[0] - started, std::chrono::milliseconds{ 260 });
     for (std::size_t i = 1; i < fires.size(); ++i) {
-        EXPECT_GE(fires[i] - fires[i - 1], std::chrono::milliseconds{ 40 }) << "gap before fire " << i << " was too short";
+        EXPECT_EQ(fires[i] - fires[i - 1], std::chrono::milliseconds{ 50 }) << "gap before fire " << i;
     }
 }
 
