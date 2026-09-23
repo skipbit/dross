@@ -5,6 +5,7 @@
 #include <compare>
 #include <iomanip>
 #include <limits>
+#include <locale>
 #include <optional>
 #include <ostream>
 #include <sstream>
@@ -144,6 +145,7 @@ parsed_number parse_number_unified(const std::string& str)
 
             // Use stringstream with high precision to preserve accuracy
             std::ostringstream oss;
+            oss.imbue(std::locale::classic());
             oss << std::fixed << std::setprecision(17) << value;
             work_str = oss.str();
 
@@ -365,12 +367,14 @@ std::string normalize_to_decimal(const std::string& str)
             // to maintain precision
             if ((std::abs(value) < 1e-100) || (std::abs(value) > 1e100)) {
                 std::ostringstream oss;
+                oss.imbue(std::locale::classic());
                 oss << std::scientific << std::setprecision(16) << value;
                 return oss.str();
             }
 
             // Use stringstream with high precision to preserve accuracy
             std::ostringstream oss;
+            oss.imbue(std::locale::classic());
             oss << std::fixed << std::setprecision(17) << value;
             std::string result = oss.str();
 

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iomanip>
+#include <locale>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -105,6 +106,7 @@ int timestamp::date_part::day() const noexcept
 timestamp::date_part::operator std::string() const
 {
     std::ostringstream oss;
+    oss.imbue(std::locale::classic());
     oss << std::setfill('0') << std::setw(4) << year() << "-" << std::setw(2) << month() << "-" << std::setw(2) << day();
     return oss.str();
 }
@@ -233,6 +235,7 @@ int timestamp::time_part::total_seconds() const noexcept
 timestamp::time_part::operator std::string() const
 {
     std::ostringstream oss;
+    oss.imbue(std::locale::classic());
     oss << std::setfill('0') << std::setw(2) << hour() << ":" << std::setw(2) << minute() << ":" << std::setw(2) << second();
     return oss.str();
 }
@@ -542,6 +545,7 @@ const dross::timezone& timestamp::timezone() const noexcept
 std::string timestamp::format_iso8601() const
 {
     std::ostringstream oss;
+    oss.imbue(std::locale::classic());
 
     // Check if time is midnight (00:00:00) to decide format
     bool is_midnight = ((_store->time_value.hour() == 0) && (_store->time_value.minute() == 0) && (_store->time_value.second() == 0));

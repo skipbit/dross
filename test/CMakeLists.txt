@@ -27,6 +27,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_data.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_dictionary.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_error.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/test_locale_independence.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_number.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_string.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp.cpp
