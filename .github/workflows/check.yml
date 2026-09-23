@@ -390,7 +390,9 @@ jobs:
   # The layout is defined by .clang-format alone, so the check runs the release
   # that configuration was written against. clang-format changes what it
   # produces between releases, and an unpinned one would rewrite files the
-  # pinned one accepts.
+  # pinned one accepts. It runs through scripts/tools.sh, in the container
+  # docker/Dockerfile describes, so the tool and the file list are the ones a
+  # developer runs.
   format-check:
     name: format
     runs-on: ubuntu-24.04
@@ -402,24 +404,8 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: Install clang-format
-        run: pip install clang-format==18.1.3
-
-      # The file list is asserted to be non-empty: a pattern that stopped
-      # matching would otherwise check nothing and report success.
       - name: Check formatting
-        run: |
-          clang-format --version
-          git ls-files 'src/**' 'include/**' 'test/**' | grep -E '\.(h|cpp)$' > "$RUNNER_TEMP/files"
-          test -s "$RUNNER_TEMP/files"
-          echo "$(wc -l < "$RUNNER_TEMP/files") files"
-          xargs clang-format --dry-run -Werror --style=file < "$RUNNER_TEMP/files"
+        run: scripts/tools.sh format-check
 
   required:
     name: required
