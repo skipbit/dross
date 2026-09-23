@@ -59,6 +59,16 @@ bool error::operator!=(const std::error_category& c) const noexcept
     return _code.category() != c;
 }
 
+bool error::operator==(const error& e) const noexcept
+{
+    return (_code == e._code);
+}
+
+bool error::operator!=(const error& e) const noexcept
+{
+    return (_code != e._code);
+}
+
 std::strong_ordering error::operator<=>(const error& e) const noexcept
 {
     return (_code <=> e._code);
