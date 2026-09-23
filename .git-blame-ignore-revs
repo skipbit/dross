@@ -19,3 +19,9 @@ e6fcfe3910d8e15e2184853e255d1ae14c65e2d6
 
 # style: move the data iterators' bodies out of the header
 fc74332e84a8ba5a528d1ca55db9d758c79355ce
+
+# style: parenthesise the binding order in conditions and values
+e4d760cdc5edaef932458c838f4080ad874a1656
+
+# docs: state the line width the sources are actually written to
+0e206fedfd53c83620b31e2e03849015be6937a0
