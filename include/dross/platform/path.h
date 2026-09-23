@@ -98,7 +98,8 @@ public:
      * closer to "ensure this directory exists" than a strict create. It
      * fails only when std::filesystem::create_directories reports an
      * actual error, for example when a path component exists and is not
-     * a directory. The operation is not atomic — directories created
+     * a directory. An empty dir_path is not taken as an existing
+     * directory: it fails. The operation is not atomic — directories created
      * before the failure may remain. Some failures are rejected before
      * anything is created at all. Because an already-present directory is
      * accepted without inspection, a directory, or a symbolic link that
