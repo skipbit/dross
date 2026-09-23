@@ -19,7 +19,9 @@ public:
 
     template <error_enum_type E>
     error(const E e)
-        : _code(std::make_error_code(e)){};
+        : _code(std::make_error_code(e))
+    {
+    }
 
     std::string domain() const;
     int code() const noexcept;
