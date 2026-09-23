@@ -63,9 +63,11 @@ timestamp::date_part::date_part(const std::string& iso8601_date)
         int month = std::stoi(match[2].str());
         int day = std::stoi(match[3].str());
 
-        _impl->ymd = std::chrono::year_month_day{ std::chrono::year{ year },
-                                                  std::chrono::month{ static_cast<unsigned>(month) },
-                                                  std::chrono::day{ static_cast<unsigned>(day) } };
+        _impl->ymd = std::chrono::year_month_day{
+            std::chrono::year{ year },
+            std::chrono::month{ static_cast<unsigned>(month) },
+            std::chrono::day{ static_cast<unsigned>(day) }
+        };
     }
     // If parsing fails, leave as epoch date
 }
