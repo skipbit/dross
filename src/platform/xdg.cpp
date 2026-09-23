@@ -12,8 +12,7 @@ xdg::xdg(const std::string& name)
 
 std::optional<std::string> xdg::config_home() const
 {
-    const auto directory = environment::value("XDG_CONFIG_HOME")
-                               .or_else([]() {
+    const auto directory = environment::value("XDG_CONFIG_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".config").string());
         });
@@ -26,8 +25,7 @@ std::optional<std::string> xdg::config_home() const
 
 std::optional<std::string> xdg::data_home() const
 {
-    const auto directory = environment::value("XDG_DATA_HOME")
-                               .or_else([]() {
+    const auto directory = environment::value("XDG_DATA_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".local").append("share").string());
         });
@@ -40,8 +38,7 @@ std::optional<std::string> xdg::data_home() const
 
 std::optional<std::string> xdg::cache_home() const
 {
-    const auto directory = environment::value("XDG_CACHE_HOME")
-                               .or_else([]() {
+    const auto directory = environment::value("XDG_CACHE_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".cache").string());
         });
@@ -54,8 +51,7 @@ std::optional<std::string> xdg::cache_home() const
 
 std::optional<std::string> xdg::state_home() const
 {
-    const auto directory = environment::value("XDG_STATE_HOME")
-                               .or_else([]() {
+    const auto directory = environment::value("XDG_STATE_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".local").append("state").string());
         });

@@ -29,8 +29,7 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::fi
 
 std::optional<path> path::home()
 {
-    const auto h = environment::value("HOME")
-                       .and_then([](const std::string& home) {
+    const auto h = environment::value("HOME").and_then([](const std::string& home) {
         return std::make_optional(path(home));
     }).or_else([]() {
         struct passwd* pw = getpwuid(getuid());
