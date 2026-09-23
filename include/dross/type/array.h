@@ -138,10 +138,11 @@ public:
     void append(const_iterator first, const_iterator last);
 
     /**
-     * @brief Remove the first occurrence of a value from the array.
+     * @brief Remove every occurrence of a value from the array.
      * @param val The value to remove
      *
-     * If the value is not found, the array remains unchanged.
+     * The remaining elements keep their order. If the value is not found,
+     * the array remains unchanged.
      */
     void remove(const value& val);
 
