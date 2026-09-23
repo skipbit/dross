@@ -40,4 +40,4 @@ DROSS_NATIVE_HIDDEN bool on_main_thread();
 
 #undef DROSS_NATIVE_HIDDEN
 
-}
+}  // namespace dross::native

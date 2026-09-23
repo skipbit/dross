@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "dross/type/error.h"
+
+#include <gtest/gtest.h>
 
 #include <compare>
 #include <ios>

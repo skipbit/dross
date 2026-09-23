@@ -1,4 +1,5 @@
 #include "dross/type/string.h"
+
 #include <memory>
 
 namespace dross {
@@ -8,7 +9,10 @@ public:
     std::string buffer;
 
     storage() = default;
-    storage(const std::string& s) : buffer(s) {}
+    storage(const std::string& s)
+        : buffer(s)
+    {
+    }
 };
 
 string::string()
@@ -129,4 +133,4 @@ string::operator std::string() const
     return _store->buffer;
 }
 
-}
+}  // namespace dross

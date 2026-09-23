@@ -1,4 +1,5 @@
 #include "dross/type/boolean.h"
+
 #include <algorithm>
 #include <cctype>
 
@@ -7,36 +8,37 @@ namespace dross {
 // Boolean type implementation using Pimpl idiom
 
 namespace {
-    // Helper function to parse string to boolean
-    bool parse_boolean_string(const std::string& str)
-    {
-        if (str.empty()) {
-            return false;
-        }
-
-        // Convert to lowercase for case-insensitive comparison
-        std::string lower_str = str;
-        std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(),
-                      [](unsigned char c) { return std::tolower(c); });
-
-        // Accept "true", "1" as true
-        if (lower_str == "true" || lower_str == "1") {
-            return true;
-        }
-
-        // Accept "false", "0" as false (explicitly, though default is false)
-        if (lower_str == "false" || lower_str == "0") {
-            return false;
-        }
-
-        // Any other string defaults to false
+// Helper function to parse string to boolean
+bool parse_boolean_string(const std::string& str)
+{
+    if (str.empty()) {
         return false;
     }
+
+    // Convert to lowercase for case-insensitive comparison
+    std::string lower_str = str;
+    std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(), [](unsigned char c) {
+        return std::tolower(c);
+    });
+
+    // Accept "true", "1" as true
+    if (lower_str == "true" || lower_str == "1") {
+        return true;
+    }
+
+    // Accept "false", "0" as false (explicitly, though default is false)
+    if (lower_str == "false" || lower_str == "0") {
+        return false;
+    }
+
+    // Any other string defaults to false
+    return false;
 }
+}  // namespace
 
 class boolean::storage {
 public:
-    bool value{false};
+    bool value{ false };
 };
 
 boolean::boolean()
@@ -96,7 +98,7 @@ bool boolean::operator==(const boolean& other) const
 
 bool boolean::operator!=(const boolean& other) const
 {
-    return !equals(other);
+    return ! equals(other);
 }
 
 bool boolean::operator==(bool value) const
@@ -106,7 +108,7 @@ bool boolean::operator==(bool value) const
 
 bool boolean::operator!=(bool value) const
 {
-    return !equals(value);
+    return ! equals(value);
 }
 
 std::strong_ordering boolean::operator<=>(const boolean& other) const noexcept
@@ -134,7 +136,7 @@ boolean& boolean::operator=(bool value)
 
 boolean boolean::operator!() const
 {
-    return boolean(!_store->value);
+    return boolean(! _store->value);
 }
 
 boolean boolean::operator&&(const boolean& other) const
@@ -172,4 +174,4 @@ std::ostream& operator<<(std::ostream& os, const boolean& b)
     return os << static_cast<std::string>(b);
 }
 
-}
+}  // namespace dross

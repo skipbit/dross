@@ -10,4 +10,4 @@ std::optional<std::string> environment::value(const std::string& key)
     return (value ? std::make_optional<std::string>(value) : std::nullopt);
 }
 
-}
+}  // namespace dross

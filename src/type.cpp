@@ -13,8 +13,8 @@ std::vector<std::string> split(const std::string& s, const std::string& delimite
     // Pipe over views rather than over the arguments themselves. On some of
     // the compiler and standard library pairings this project supports, a
     // const std::string is not accepted as the left operand of the pipe.
-    const std::string_view sv{s};
-    const std::string_view dv{delimiter};
+    const std::string_view sv{ s };
+    const std::string_view dv{ delimiter };
 
     auto range = sv | std::views::split(dv) | std::views::transform([](auto&& p) {
         return std::string(p.begin(), p.end());
@@ -68,4 +68,4 @@ std::string to_string(const timezone& tz)
     return static_cast<std::string>(tz);
 }
 
-}
+}  // namespace dross

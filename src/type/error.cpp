@@ -64,4 +64,4 @@ std::strong_ordering error::operator<=>(const error& e) const noexcept
     return (_code <=> e._code);
 }
 
-}
+}  // namespace dross

@@ -78,8 +78,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty
      */
-    static timer repeating(std::chrono::milliseconds interval,
-                            std::function<void(timer)> callback);
+    static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback);
 
     /**
      * @brief Install a timer that fires every interval on the given loop.
@@ -90,8 +89,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty or loop has already finished
      */
-    static timer repeating(std::chrono::milliseconds interval,
-                            std::function<void(timer)> callback, runloop loop);
+    static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback, runloop loop);
 
     /**
      * @brief Install a timer that fires once on current_runloop().
@@ -100,8 +98,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty
      */
-    static timer once(std::chrono::milliseconds delay,
-                       std::function<void(timer)> callback);
+    static timer once(std::chrono::milliseconds delay, std::function<void(timer)> callback);
 
     /**
      * @brief Install a timer that fires once on the given loop.
@@ -111,8 +108,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty or loop has already finished
      */
-    static timer once(std::chrono::milliseconds delay,
-                       std::function<void(timer)> callback, runloop loop);
+    static timer once(std::chrono::milliseconds delay, std::function<void(timer)> callback, runloop loop);
 
     /**
      * @brief Copy constructor, giving another handle to the same timer.
@@ -176,12 +172,11 @@ private:
 
     explicit timer(std::shared_ptr<storage> store) noexcept;
 
-    static timer make(std::chrono::milliseconds interval, bool repeats,
-                       std::function<void(timer)> callback, runloop loop);
+    static timer make(std::chrono::milliseconds interval, bool repeats, std::function<void(timer)> callback, runloop loop);
 
     std::shared_ptr<storage> _store;
 
     friend class runloop;
 };
 
-}
+}  // namespace dross

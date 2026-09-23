@@ -16,9 +16,7 @@ namespace dross {
 
 class timer::storage final : public std::enable_shared_from_this<storage> {
 public:
-    storage(std::chrono::milliseconds interval, bool repeats,
-            std::function<void(timer)> callback,
-            std::weak_ptr<runloop::storage> loop);
+    storage(std::chrono::milliseconds interval, bool repeats, std::function<void(timer)> callback, std::weak_ptr<runloop::storage> loop);
 
     // Marks this timer invalid and, if it is still installed, asks its loop
     // to drop it. Callable from any thread; idempotent.
@@ -55,7 +53,7 @@ private:
 
     const std::uint64_t _id;
 
-    std::atomic<bool> _valid{true};
+    std::atomic<bool> _valid{ true };
 };
 
-}
+}  // namespace dross

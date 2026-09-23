@@ -56,8 +56,7 @@ private:
 
     static std::shared_ptr<storage> start(std::function<void()> body, bool run_loop);
     static std::shared_ptr<storage> make_adopted();
-    static void run_on_new_thread(std::shared_ptr<storage> self,
-                                  std::function<void()> body, bool run_loop);
+    static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop);
 
     static current_holder& this_thread_holder();
     static bool& torn_down_flag();
@@ -75,14 +74,14 @@ private:
     mutable std::mutex _mutex;
     std::condition_variable _ready_cv;
     std::condition_variable _done_cv;
-    bool _published{false};
-    bool _finished{false};
+    bool _published{ false };
+    bool _finished{ false };
 
     // Set only on the record main_thread_storage() builds. is_current()
     // branches on it instead of on whether the calling thread has been
     // adopted, since a thread can reach this record through all_threads()
     // without ever going through current_thread_storage() itself.
-    bool _is_main{false};
+    bool _is_main{ false };
 
     std::optional<std::uint64_t> _native_id;
     std::optional<runloop> _loop;
@@ -90,7 +89,7 @@ private:
     // A plain flag rather than std::stop_source: <stop_token> is not in the
     // standard library Apple Clang ships, and nothing here needs more than
     // setting a flag and reading it.
-    std::atomic<bool> _stop_requested{false};
+    std::atomic<bool> _stop_requested{ false };
 };
 
 thread::storage::current_holder::~current_holder()
@@ -136,7 +135,7 @@ std::shared_ptr<thread::storage> thread::storage::finished_placeholder()
     static const std::shared_ptr<storage>* const the_thread = []() {
         auto self = std::make_shared<storage>();
         self->finish();
-        return new std::shared_ptr<storage>{std::move(self)};
+        return new std::shared_ptr<storage>{ std::move(self) };
     }();
     return *the_thread;
 }
@@ -153,20 +152,19 @@ std::vector<std::shared_ptr<thread::storage>>& thread::storage::registry()
     // Never destroyed. A thread still registered when the program ends
     // would otherwise reach a destroyed container, and thread storage is
     // torn down before anything with static storage duration.
-    static std::vector<std::shared_ptr<storage>>* const the_registry =
-        new std::vector<std::shared_ptr<storage>>();
+    static std::vector<std::shared_ptr<storage>>* const the_registry = new std::vector<std::shared_ptr<storage>>();
     return *the_registry;
 }
 
 void thread::storage::register_self(const std::shared_ptr<storage>& self)
 {
-    const std::lock_guard<std::mutex> guard{registry_mutex()};
+    const std::lock_guard<std::mutex> guard{ registry_mutex() };
     registry().push_back(self);
 }
 
 void thread::storage::deregister()
 {
-    const std::lock_guard<std::mutex> guard{registry_mutex()};
+    const std::lock_guard<std::mutex> guard{ registry_mutex() };
     std::erase_if(registry(), [this](const std::shared_ptr<storage>& entry) {
         return entry.get() == this;
     });
@@ -180,7 +178,7 @@ void thread::storage::finish()
     deregister();
 
     {
-        const std::lock_guard<std::mutex> guard{_mutex};
+        const std::lock_guard<std::mutex> guard{ _mutex };
         _finished = true;
     }
     _done_cv.notify_all();
@@ -190,19 +188,20 @@ std::shared_ptr<thread::storage> thread::storage::start(std::function<void()> bo
 {
     auto self = std::make_shared<storage>();
 
-    std::thread runner{[self, body = std::move(body), run_loop]() mutable {
+    std::thread runner{ [self, body = std::move(body), run_loop]() mutable {
         run_on_new_thread(std::move(self), std::move(body), run_loop);
-    }};
+    } };
     runner.detach();
 
-    std::unique_lock<std::mutex> lock{self->_mutex};
-    self->_ready_cv.wait(lock, [&self]() { return self->_published; });
+    std::unique_lock<std::mutex> lock{ self->_mutex };
+    self->_ready_cv.wait(lock, [&self]() {
+        return self->_published;
+    });
 
     return self;
 }
 
-void thread::storage::run_on_new_thread(std::shared_ptr<storage> self,
-                                        std::function<void()> body, bool run_loop)
+void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop)
 {
     // Installed before anything else, so a call to current_thread() from
     // inside body or the loop returns this exact storage rather than
@@ -215,7 +214,7 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self,
     register_self(self);
 
     {
-        const std::lock_guard<std::mutex> guard{self->_mutex};
+        const std::lock_guard<std::mutex> guard{ self->_mutex };
         self->_published = true;
     }
     self->_ready_cv.notify_all();
@@ -262,7 +261,7 @@ std::shared_ptr<thread::storage> thread::storage::main_thread_storage()
     // both defined to answer correctly regardless of the calling thread, the
     // former possibly empty (see native_id()'s doc comment), the latter
     // never.
-    static const std::shared_ptr<storage>* const the_main = new std::shared_ptr<storage>{[]() {
+    static const std::shared_ptr<storage>* const the_main = new std::shared_ptr<storage>{ []() {
         auto self = std::make_shared<storage>();
         self->_is_main = true;
         if (const auto id = native::main_thread_id()) {
@@ -271,7 +270,7 @@ std::shared_ptr<thread::storage> thread::storage::main_thread_storage()
         self->_loop = main_runloop();
         register_self(self);
         return self;
-    }()};
+    }() };
     return *the_main;
 }
 
@@ -302,7 +301,7 @@ std::shared_ptr<thread::storage> thread::storage::current_thread_storage()
 
 std::vector<std::shared_ptr<thread::storage>> thread::storage::all()
 {
-    const std::lock_guard<std::mutex> guard{registry_mutex()};
+    const std::lock_guard<std::mutex> guard{ registry_mutex() };
     return registry();
 }
 
@@ -314,13 +313,13 @@ bool thread::storage::perform(std::function<void()> task)
         // thread this module already considers finished may still have a
         // loop willing to queue the task. This thread's own promise not to
         // run it must hold regardless of what the loop still thinks.
-        const std::lock_guard<std::mutex> guard{_mutex};
+        const std::lock_guard<std::mutex> guard{ _mutex };
         if (_finished) {
             return false;
         }
     }
 
-    if (!_loop) {
+    if (! _loop) {
         return false;
     }
     return _loop->perform(std::move(task));
@@ -345,13 +344,13 @@ bool thread::storage::stop_requested() const
 
 bool thread::storage::running() const
 {
-    const std::lock_guard<std::mutex> guard{_mutex};
-    return !_finished;
+    const std::lock_guard<std::mutex> guard{ _mutex };
+    return ! _finished;
 }
 
 bool thread::storage::finished() const
 {
-    const std::lock_guard<std::mutex> guard{_mutex};
+    const std::lock_guard<std::mutex> guard{ _mutex };
     return _finished;
 }
 
@@ -365,27 +364,27 @@ bool thread::storage::is_current() const
         return native::is_main_thread();
     }
 
-    const std::lock_guard<std::mutex> guard{_mutex};
+    const std::lock_guard<std::mutex> guard{ _mutex };
     return _native_id && *_native_id == native::thread_id();
 }
 
 void thread::storage::set_native_id(std::uint64_t id)
 {
-    const std::lock_guard<std::mutex> guard{_mutex};
+    const std::lock_guard<std::mutex> guard{ _mutex };
     _native_id = id;
 }
 
 void thread::storage::ensure_native_id_known()
 {
-    const std::lock_guard<std::mutex> guard{_mutex};
-    if (!_native_id) {
+    const std::lock_guard<std::mutex> guard{ _mutex };
+    if (! _native_id) {
         _native_id = native::thread_id();
     }
 }
 
 std::optional<std::uint64_t> thread::storage::native_id() const
 {
-    const std::lock_guard<std::mutex> guard{_mutex};
+    const std::lock_guard<std::mutex> guard{ _mutex };
     return _native_id;
 }
 
@@ -397,8 +396,10 @@ void thread::storage::join()
         return;
     }
 
-    std::unique_lock<std::mutex> lock{_mutex};
-    _done_cv.wait(lock, [this]() { return _finished; });
+    std::unique_lock<std::mutex> lock{ _mutex };
+    _done_cv.wait(lock, [this]() {
+        return _finished;
+    });
 }
 
 bool thread::storage::join_for(std::chrono::milliseconds timeout)
@@ -408,7 +409,7 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     }
 
     if (timeout <= std::chrono::milliseconds::zero()) {
-        const std::lock_guard<std::mutex> guard{_mutex};
+        const std::lock_guard<std::mutex> guard{ _mutex };
         return _finished;
     }
 
@@ -417,22 +418,24 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     // overflows.
     const auto deadline = deadline::after(std::chrono::steady_clock::now(), timeout);
 
-    std::unique_lock<std::mutex> lock{_mutex};
-    return _done_cv.wait_until(lock, deadline, [this]() { return _finished; });
+    std::unique_lock<std::mutex> lock{ _mutex };
+    return _done_cv.wait_until(lock, deadline, [this]() {
+        return _finished;
+    });
 }
 
 thread::thread(std::shared_ptr<storage> store) noexcept
-    : _store{std::move(store)}
+    : _store{ std::move(store) }
 {
 }
 
 thread::thread()
-    : thread{storage::start_loop_thread()}
+    : thread{ storage::start_loop_thread() }
 {
 }
 
 thread::thread(std::function<void()> body)
-    : thread{storage::start_one_shot_thread(std::move(body))}
+    : thread{ storage::start_one_shot_thread(std::move(body)) }
 {
 }
 
@@ -505,12 +508,12 @@ thread main_thread()
         return current_thread();
     }
 
-    return thread{thread::storage::main_thread_storage()};
+    return thread{ thread::storage::main_thread_storage() };
 }
 
 thread current_thread()
 {
-    return thread{thread::storage::current_thread_storage()};
+    return thread{ thread::storage::current_thread_storage() };
 }
 
 std::vector<thread> all_threads()
@@ -520,10 +523,10 @@ std::vector<thread> all_threads()
     std::vector<thread> result;
     result.reserve(stores.size());
     for (auto& store : stores) {
-        result.emplace_back(thread{std::move(store)});
+        result.emplace_back(thread{ std::move(store) });
     }
 
     return result;
 }
 
-}
+}  // namespace dross

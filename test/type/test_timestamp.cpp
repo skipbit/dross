@@ -1,12 +1,15 @@
-#include <gtest/gtest.h>
 #include <dross/type/timestamp.h>
 #include <dross/type/timezone.h>
 #include <dross/type/value.h>
+
+#include <gtest/gtest.h>
+
 #include <chrono>
 #include <thread>
 
 // Test static factory method
-TEST(timestamp_test, now) {
+TEST(timestamp_test, now)
+{
     auto now1 = dross::timestamp::now();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     auto now2 = dross::timestamp::now();
@@ -16,21 +19,23 @@ TEST(timestamp_test, now) {
 }
 
 // Test default constructor (epoch)
-TEST(timestamp_test, default_constructor) {
+TEST(timestamp_test, default_constructor)
+{
     dross::timestamp epoch;
 
     EXPECT_EQ(epoch.date().year(), 1970);
     EXPECT_EQ(epoch.date().month(), 1);
     EXPECT_EQ(epoch.date().day(), 1);
-    EXPECT_EQ(epoch.time().hour(), 0); // Default 00:00:00
+    EXPECT_EQ(epoch.time().hour(), 0);  // Default 00:00:00
     EXPECT_EQ(epoch.time().minute(), 0);
     EXPECT_EQ(epoch.time().second(), 0);
-    EXPECT_TRUE(epoch.timezone().is_utc()); // Default UTC
+    EXPECT_TRUE(epoch.timezone().is_utc());  // Default UTC
 }
 
 // Test copy constructor
-TEST(timestamp_test, copy_constructor) {
-    dross::timestamp ts1(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)); // +09:00
+TEST(timestamp_test, copy_constructor)
+{
+    dross::timestamp ts1(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9));  // +09:00
     dross::timestamp ts2(ts1);
 
     EXPECT_EQ(ts1, ts2);
@@ -44,18 +49,20 @@ TEST(timestamp_test, copy_constructor) {
 }
 
 // Test time_point constructor
-TEST(timestamp_test, time_point_constructor) {
+TEST(timestamp_test, time_point_constructor)
+{
     auto tp = std::chrono::system_clock::now();
     dross::timestamp ts(tp);
 
     // Convert back and compare
     auto tp_back = static_cast<std::chrono::system_clock::time_point>(ts);
     EXPECT_EQ(tp, tp_back);
-    EXPECT_TRUE(ts.timezone().is_utc()); // Default UTC timezone
+    EXPECT_TRUE(ts.timezone().is_utc());  // Default UTC timezone
 }
 
 // Test component constructor without timezone
-TEST(timestamp_test, component_constructor_local) {
+TEST(timestamp_test, component_constructor_local)
+{
     dross::timestamp ts(2024, 12, 25, 10, 30, 45);
 
     EXPECT_EQ(ts.date().year(), 2024);
@@ -65,12 +72,13 @@ TEST(timestamp_test, component_constructor_local) {
     EXPECT_EQ(ts.time().hour(), 10);
     EXPECT_EQ(ts.time().minute(), 30);
     EXPECT_EQ(ts.time().second(), 45);
-    EXPECT_TRUE(ts.timezone().is_utc()); // Default UTC timezone
+    EXPECT_TRUE(ts.timezone().is_utc());  // Default UTC timezone
 }
 
 // Test component constructor with timezone
-TEST(timestamp_test, component_constructor_with_timezone) {
-    dross::timestamp ts(2024, 12, 25, 10, 30, 45, dross::timezone::offset(-5)); // -05:00
+TEST(timestamp_test, component_constructor_with_timezone)
+{
+    dross::timestamp ts(2024, 12, 25, 10, 30, 45, dross::timezone::offset(-5));  // -05:00
 
     EXPECT_EQ(ts.date().year(), 2024);
     EXPECT_EQ(ts.date().month(), 12);
@@ -83,7 +91,8 @@ TEST(timestamp_test, component_constructor_with_timezone) {
 }
 
 // Test string constructor - offset timestamp
-TEST(timestamp_test, string_constructor_offset_timestamp) {
+TEST(timestamp_test, string_constructor_offset_timestamp)
+{
     dross::timestamp ts("2024-01-21T15:30:00+09:00");
 
     EXPECT_EQ(ts.date().year(), 2024);
@@ -97,7 +106,8 @@ TEST(timestamp_test, string_constructor_offset_timestamp) {
 }
 
 // Test string constructor - UTC timestamp
-TEST(timestamp_test, string_constructor_utc_timestamp) {
+TEST(timestamp_test, string_constructor_utc_timestamp)
+{
     dross::timestamp ts("2024-01-21T15:30:00Z");
 
     EXPECT_EQ(ts.date().year(), 2024);
@@ -111,7 +121,8 @@ TEST(timestamp_test, string_constructor_utc_timestamp) {
 }
 
 // Test string constructor - local timestamp
-TEST(timestamp_test, string_constructor_local_timestamp) {
+TEST(timestamp_test, string_constructor_local_timestamp)
+{
     dross::timestamp ts("2024-01-21T15:30:00");
 
     EXPECT_EQ(ts.date().year(), 2024);
@@ -121,24 +132,26 @@ TEST(timestamp_test, string_constructor_local_timestamp) {
     EXPECT_EQ(ts.time().hour(), 15);
     EXPECT_EQ(ts.time().minute(), 30);
     EXPECT_EQ(ts.time().second(), 0);
-    EXPECT_TRUE(ts.timezone().is_utc()); // Default UTC timezone
+    EXPECT_TRUE(ts.timezone().is_utc());  // Default UTC timezone
 }
 
 // Test string constructor - date only
-TEST(timestamp_test, string_constructor_date_only) {
+TEST(timestamp_test, string_constructor_date_only)
+{
     dross::timestamp ts("2024-01-21");
 
     EXPECT_EQ(ts.date().year(), 2024);
     EXPECT_EQ(ts.date().month(), 1);
     EXPECT_EQ(ts.date().day(), 21);
-    EXPECT_EQ(ts.time().hour(), 0); // Date-only, defaults to 00:00:00
+    EXPECT_EQ(ts.time().hour(), 0);  // Date-only, defaults to 00:00:00
     EXPECT_EQ(ts.time().minute(), 0);
     EXPECT_EQ(ts.time().second(), 0);
-    EXPECT_TRUE(ts.timezone().is_utc()); // Default UTC timezone
+    EXPECT_TRUE(ts.timezone().is_utc());  // Default UTC timezone
 }
 
 // Test const char* constructor
-TEST(timestamp_test, cstring_constructor) {
+TEST(timestamp_test, cstring_constructor)
+{
     const char* iso_str = "2024-06-15T12:00:00+02:00";
     dross::timestamp ts(iso_str);
 
@@ -153,7 +166,8 @@ TEST(timestamp_test, cstring_constructor) {
 }
 
 // Test assignment operator
-TEST(timestamp_test, assignment_operator) {
+TEST(timestamp_test, assignment_operator)
+{
     dross::timestamp ts1(2024, 1, 21, 15, 30, 0);
     dross::timestamp ts2;
 
@@ -165,10 +179,11 @@ TEST(timestamp_test, assignment_operator) {
 }
 
 // Test comparison operators
-TEST(timestamp_test, comparison_operators) {
+TEST(timestamp_test, comparison_operators)
+{
     dross::timestamp ts1(2024, 1, 21, 15, 30, 0);
-    dross::timestamp ts2(2024, 1, 21, 15, 31, 0); // 1 minute later
-    dross::timestamp ts3(2024, 1, 21, 15, 30, 0); // Same as ts1
+    dross::timestamp ts2(2024, 1, 21, 15, 31, 0);  // 1 minute later
+    dross::timestamp ts3(2024, 1, 21, 15, 30, 0);  // Same as ts1
 
     // Test ordering
     EXPECT_LT(ts1, ts2);
@@ -184,7 +199,8 @@ TEST(timestamp_test, comparison_operators) {
 }
 
 // Test duration arithmetic
-TEST(timestamp_test, duration_arithmetic) {
+TEST(timestamp_test, duration_arithmetic)
+{
     dross::timestamp base(2024, 1, 21, 12, 0, 0);
 
     // Add durations
@@ -205,24 +221,26 @@ TEST(timestamp_test, duration_arithmetic) {
     EXPECT_EQ(minus_hour.time().hour(), 11);
 
     // Difference between timestamps
-    dross::timestamp later(2024, 1, 21, 14, 0, 0); // 2 hours later
+    dross::timestamp later(2024, 1, 21, 14, 0, 0);  // 2 hours later
     auto diff = later - base;
     auto hours_diff = std::chrono::duration_cast<std::chrono::hours>(diff);
     EXPECT_EQ(hours_diff.count(), 2);
 }
 
 // Test string conversion operator
-TEST(timestamp_test, string_conversion) {
-    dross::timestamp ts(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)); // +09:00
-    std::string iso_str = ts; // Implicit conversion
+TEST(timestamp_test, string_conversion)
+{
+    dross::timestamp ts(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9));  // +09:00
+    std::string iso_str = ts;                                                  // Implicit conversion
 
     // Should produce ISO 8601 format
     EXPECT_EQ(iso_str, "2024-01-21T15:30:45+09:00");
 }
 
 // Test formatting
-TEST(timestamp_test, formatting) {
-    dross::timestamp ts(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9)); // +09:00
+TEST(timestamp_test, formatting)
+{
+    dross::timestamp ts(2024, 1, 21, 15, 30, 45, dross::timezone::offset(9));  // +09:00
 
     // ISO 8601 format (default)
     EXPECT_EQ(ts.format(), "2024-01-21T15:30:45+09:00");
@@ -236,8 +254,9 @@ TEST(timestamp_test, formatting) {
 }
 
 // Test formatting without timezone
-TEST(timestamp_test, formatting_no_timezone) {
-    dross::timestamp ts(2024, 1, 21, 15, 30, 45); // No timezone
+TEST(timestamp_test, formatting_no_timezone)
+{
+    dross::timestamp ts(2024, 1, 21, 15, 30, 45);  // No timezone
 
     std::string iso_str = ts.format();
     // Default UTC timezone should show Z suffix
@@ -245,7 +264,8 @@ TEST(timestamp_test, formatting_no_timezone) {
 }
 
 // Test dross::value integration
-TEST(timestamp_test, value_integration) {
+TEST(timestamp_test, value_integration)
+{
     dross::timestamp ts(2024, 1, 21, 15, 30, 0);
     dross::value v(ts);
 
@@ -263,7 +283,8 @@ TEST(timestamp_test, value_integration) {
 }
 
 // Test dross::value assignment
-TEST(timestamp_test, value_assignment) {
+TEST(timestamp_test, value_assignment)
+{
     dross::timestamp ts(2024, 1, 21, 15, 30, 0);
     dross::value v;
 
@@ -273,7 +294,8 @@ TEST(timestamp_test, value_assignment) {
 }
 
 // Test edge cases
-TEST(timestamp_test, edge_cases) {
+TEST(timestamp_test, edge_cases)
+{
     // Invalid string should result in epoch
     dross::timestamp invalid("invalid-date-string");
     EXPECT_EQ(invalid.date().year(), 1970);
@@ -296,8 +318,9 @@ TEST(timestamp_test, edge_cases) {
 }
 
 // Test timezone preservation in arithmetic
-TEST(timestamp_test, timezone_preservation_in_arithmetic) {
-    dross::timestamp ts(2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)); // +09:00
+TEST(timestamp_test, timezone_preservation_in_arithmetic)
+{
+    dross::timestamp ts(2024, 1, 21, 15, 30, 0, dross::timezone::offset(9));  // +09:00
 
     auto plus_hour = ts + std::chrono::hours(1);
     EXPECT_EQ(plus_hour.timezone().offset().count(), 540);
@@ -309,33 +332,36 @@ TEST(timestamp_test, timezone_preservation_in_arithmetic) {
 }
 
 // Test date-only constructor
-TEST(timestamp_test, date_only_constructor) {
+TEST(timestamp_test, date_only_constructor)
+{
     auto birthday = dross::timestamp(1990, 12, 25);
 
     EXPECT_EQ(birthday.date().year(), 1990);
     EXPECT_EQ(birthday.date().month(), 12);
     EXPECT_EQ(birthday.date().day(), 25);
-    EXPECT_EQ(birthday.time().hour(), 0); // Date-only timestamps default to 00:00:00
+    EXPECT_EQ(birthday.time().hour(), 0);  // Date-only timestamps default to 00:00:00
     EXPECT_EQ(birthday.time().minute(), 0);
     EXPECT_EQ(birthday.time().second(), 0);
-    EXPECT_TRUE(birthday.timezone().is_utc()); // Default UTC timezone
+    EXPECT_TRUE(birthday.timezone().is_utc());  // Default UTC timezone
 }
 
 // Test date-only constructor with timezone
-TEST(timestamp_test, date_only_constructor_with_timezone) {
+TEST(timestamp_test, date_only_constructor_with_timezone)
+{
     auto event = dross::timestamp(2024, 7, 4, 0, 0, 0, dross::timezone::offset(-5));
 
     EXPECT_EQ(event.date().year(), 2024);
     EXPECT_EQ(event.date().month(), 7);
     EXPECT_EQ(event.date().day(), 4);
-    EXPECT_EQ(event.time().hour(), 0); // Date-only timestamps default to 00:00:00
+    EXPECT_EQ(event.time().hour(), 0);  // Date-only timestamps default to 00:00:00
     EXPECT_EQ(event.time().minute(), 0);
     EXPECT_EQ(event.time().second(), 0);
     EXPECT_EQ(event.timezone().offset().count(), -300);
 }
 
 // Test date component access
-TEST(timestamp_test, date_component_access) {
+TEST(timestamp_test, date_component_access)
+{
     dross::timestamp ts(2024, 1, 21, 15, 30, 0);
     const auto& date_ref = ts.date();
 
@@ -349,7 +375,8 @@ TEST(timestamp_test, date_component_access) {
 }
 
 // Test time component access
-TEST(timestamp_test, time_component_access) {
+TEST(timestamp_test, time_component_access)
+{
     dross::timestamp ts(2024, 1, 21, 15, 30, 45);
     const auto& time_ref = ts.time();
 

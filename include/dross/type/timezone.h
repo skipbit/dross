@@ -1,11 +1,11 @@
 #pragma once
 
-#include <string>
+#include <chrono>
 #include <compare>
 #include <iosfwd>
 #include <memory>
-#include <chrono>
 #include <optional>
+#include <string>
 
 namespace dross {
 
@@ -169,4 +169,4 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const timezone& tz);
 
-}
+}  // namespace dross

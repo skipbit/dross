@@ -1,6 +1,7 @@
+#include "dross/type/string.h"
+
 #include <gtest/gtest.h>
 
-#include "dross/type/string.h"
 #include <algorithm>
 #include <limits>
 

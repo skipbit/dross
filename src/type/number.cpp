@@ -1,680 +1,761 @@
 #include "dross/type/number.h"
 
+#include <algorithm>
+#include <cmath>
 #include <compare>
-#include <string>
+#include <iomanip>
+#include <limits>
 #include <optional>
 #include <ostream>
 #include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include <cmath>
-#include <limits>
+#include <string>
 
 namespace dross {
 
 namespace {
-    // Internal NaN representation (implementation detail)
-    constexpr const char* NAN_VALUE = "__invalid__";
+// Internal NaN representation (implementation detail)
+constexpr const char* NAN_VALUE = "__invalid__";
+
+/**
+ * @brief Comprehensive number representation after parsing.
+ *
+ * This struct holds all parsed components of a number string, providing
+ * a unified interface for all conversion operations. It avoids the need
+ * for multiple parsing functions and ensures consistency across all
+ * type conversions.
+ */
+struct parsed_number {
+    bool is_negative = false;                    // Sign of the number
+    std::string integer_part = "0";              // Integer portion (without sign)
+    std::optional<std::string> fractional_part;  // Fractional portion (if any)
+    bool is_valid = true;                        // Whether parsing was successful
 
     /**
-     * @brief Comprehensive number representation after parsing.
-     *
-     * This struct holds all parsed components of a number string, providing
-     * a unified interface for all conversion operations. It avoids the need
-     * for multiple parsing functions and ensures consistency across all
-     * type conversions.
+     * @brief Convert to double with proper error handling.
+     * @return std::optional<double> containing the value or nullopt on error
      */
-    struct parsed_number {
-        bool is_negative = false;           // Sign of the number
-        std::string integer_part = "0";     // Integer portion (without sign)
-        std::optional<std::string> fractional_part; // Fractional portion (if any)
-        bool is_valid = true;               // Whether parsing was successful
-
-        /**
-         * @brief Convert to double with proper error handling.
-         * @return std::optional<double> containing the value or nullopt on error
-         */
-        std::optional<double> to_double() const {
-            if (!is_valid) return std::nullopt;
-
-            std::string full_str = (is_negative ? "-" : "") + integer_part;
-            if (fractional_part) {
-                full_str += "." + *fractional_part;
-            }
-
-            try {
-                size_t processed = 0;
-                double value = std::stod(full_str, &processed);
-                if (processed == full_str.length()) {
-                    return value;
-                }
-            } catch (const std::exception&) {
-                // Invalid conversion
-            }
+    std::optional<double> to_double() const
+    {
+        if (! is_valid) {
             return std::nullopt;
         }
 
-        /**
-         * @brief Convert to long long with proper overflow handling.
-         * @return std::optional<long long> containing the value or nullopt on error
-         */
-        std::optional<long long> to_long_long() const {
-            if (!is_valid) return std::nullopt;
+        std::string full_str = (is_negative ? "-" : "") + integer_part;
+        if (fractional_part) {
+            full_str += "." + *fractional_part;
+        }
 
-            // For long long conversion, we only use the integer part
-            std::string int_str = (is_negative ? "-" : "") + integer_part;
-
-            try {
-                size_t processed = 0;
-                long long value = std::stoll(int_str, &processed);
-                if (processed == int_str.length()) {
-                    return value;
-                }
-            } catch (const std::exception&) {
-                // Invalid conversion or overflow
+        try {
+            size_t processed = 0;
+            double value = std::stod(full_str, &processed);
+            if (processed == full_str.length()) {
+                return value;
             }
+        } catch (const std::exception&) {
+            // Invalid conversion
+        }
+        return std::nullopt;
+    }
+
+    /**
+     * @brief Convert to long long with proper overflow handling.
+     * @return std::optional<long long> containing the value or nullopt on error
+     */
+    std::optional<long long> to_long_long() const
+    {
+        if (! is_valid) {
             return std::nullopt;
         }
 
-        /**
-         * @brief Convert to int with rounding and clamping.
-         * @return int value with proper overflow protection
-         */
-        int to_int() const {
-            auto double_val = to_double();
-            if (!double_val) return 0;
+        // For long long conversion, we only use the integer part
+        std::string int_str = (is_negative ? "-" : "") + integer_part;
 
-            // Apply rounding for decimal numbers
-            double rounded = std::round(*double_val);
-
-            // Clamp to int range to prevent overflow
-            return static_cast<int>(std::clamp(rounded,
-                static_cast<double>(std::numeric_limits<int>::min()),
-                static_cast<double>(std::numeric_limits<int>::max())));
+        try {
+            size_t processed = 0;
+            long long value = std::stoll(int_str, &processed);
+            if (processed == int_str.length()) {
+                return value;
+            }
+        } catch (const std::exception&) {
+            // Invalid conversion or overflow
         }
-
-        /**
-         * @brief Check if this represents an integer (no fractional part).
-         * @return true if the number has no fractional component
-         */
-        bool is_integer() const {
-            return is_valid && !fractional_part.has_value();
-        }
-    };
+        return std::nullopt;
+    }
 
     /**
-     * @brief Unified number parsing function.
-     *
-     * This function provides a single point for parsing number strings,
-     * replacing the multiple specialized parsing functions. It handles
-     * all number formats including scientific notation and provides
-     * comprehensive error checking.
-     *
-     * @param str The string to parse
-     * @return parsed_number struct containing all components
+     * @brief Convert to int with rounding and clamping.
+     * @return int value with proper overflow protection
      */
-    parsed_number parse_number_unified(const std::string& str) {
-        parsed_number result;
-
-        if (str.empty()) {
-            result.is_valid = false;
-            return result;
+    int to_int() const
+    {
+        auto double_val = to_double();
+        if (! double_val) {
+            return 0;
         }
 
-        // We'll validate the format as part of the parsing process
+        // Apply rounding for decimal numbers
+        double rounded = std::round(*double_val);
 
-        // For scientific notation, we convert to regular decimal first
-        std::string work_str = str;
+        // Clamp to int range to prevent overflow
+        return static_cast<int>(std::clamp(
+            rounded, static_cast<double>(std::numeric_limits<int>::min()), static_cast<double>(std::numeric_limits<int>::max())));
+    }
 
-        // Check for scientific notation
-        size_t exp_pos = work_str.find_first_of("eE");
-        if (exp_pos != std::string::npos) {
-            // Use std::stod to convert scientific notation to regular decimal
-            try {
-                double value = std::stod(work_str);
+    /**
+     * @brief Check if this represents an integer (no fractional part).
+     * @return true if the number has no fractional component
+     */
+    bool is_integer() const
+    {
+        return is_valid && ! fractional_part.has_value();
+    }
+};
 
-                // Use stringstream with high precision to preserve accuracy
-                std::ostringstream oss;
-                oss << std::fixed << std::setprecision(17) << value;
-                work_str = oss.str();
+/**
+ * @brief Unified number parsing function.
+ *
+ * This function provides a single point for parsing number strings,
+ * replacing the multiple specialized parsing functions. It handles
+ * all number formats including scientific notation and provides
+ * comprehensive error checking.
+ *
+ * @param str The string to parse
+ * @return parsed_number struct containing all components
+ */
+parsed_number parse_number_unified(const std::string& str)
+{
+    parsed_number result;
 
-                // Remove trailing zeros after decimal point
-                if (work_str.find('.') != std::string::npos) {
-                    work_str = work_str.substr(0, work_str.find_last_not_of('0') + 1);
-                    if (work_str.back() == '.') {
-                        work_str.pop_back();
-                    }
-                }
-            } catch (const std::exception&) {
-                result.is_valid = false;
-                return result;
-            }
-        }
-
-        size_t start = 0;
-
-        // Handle sign
-        if (work_str[0] == '-') {
-            result.is_negative = true;
-            start = 1;
-        } else if (work_str[0] == '+') {
-            start = 1;
-        }
-
-        if (start >= work_str.length()) {
-            result.is_valid = false;
-            return result;
-        }
-
-        // Find decimal point
-        size_t decimal_pos = work_str.find('.', start);
-        bool has_decimal = (decimal_pos != std::string::npos);
-
-        // Extract integer part
-        std::string integer_str;
-        if (has_decimal) {
-            integer_str = work_str.substr(start, decimal_pos - start);
-        } else {
-            integer_str = work_str.substr(start);
-        }
-
-        // Validate integer part
-        if (integer_str.empty()) {
-            // Handle cases like ".5" or "-.5"
-            if (has_decimal && decimal_pos + 1 < work_str.length()) {
-                integer_str = "0";
-            } else {
-                result.is_valid = false;
-                return result;
-            }
-        }
-
-        // Check if integer part contains only digits
-        for (char c : integer_str) {
-            if (!std::isdigit(c)) {
-                result.is_valid = false;
-                return result;
-            }
-        }
-
-        result.integer_part = integer_str;
-
-        // Extract fractional part if present
-        if (has_decimal) {
-            if (decimal_pos + 1 >= work_str.length()) {
-                // Handle trailing decimal point like "5."
-                result.fractional_part = std::nullopt;
-            } else {
-                std::string frac_str = work_str.substr(decimal_pos + 1);
-
-                // Validate fractional part
-                for (char c : frac_str) {
-                    if (!std::isdigit(c)) {
-                        result.is_valid = false;
-                        return result;
-                    }
-                }
-
-                // Remove trailing zeros from fractional part
-                while (!frac_str.empty() && frac_str.back() == '0') {
-                    frac_str.pop_back();
-                }
-
-                if (!frac_str.empty()) {
-                    result.fractional_part = frac_str;
-                }
-            }
-        }
-
-        // Remove leading zeros from integer part (but keep at least one digit)
-        while (result.integer_part.length() > 1 && result.integer_part[0] == '0') {
-            result.integer_part = result.integer_part.substr(1);
-        }
-
-        // Handle special case of zero
-        if (result.integer_part == "0" && !result.fractional_part.has_value()) {
-            result.is_negative = false; // Zero is always positive
-        }
-
-        // Also handle case where fractional part is present but all zeros
-        if (result.integer_part == "0" && result.fractional_part.has_value() &&
-            result.fractional_part->empty()) {
-            result.is_negative = false; // Zero is always positive
-            result.fractional_part = std::nullopt; // Remove empty fractional part
-        }
-
+    if (str.empty()) {
+        result.is_valid = false;
         return result;
     }
 
-    // Check if string represents a valid number (integer, decimal, or scientific notation)
-    bool is_valid_number(const std::string& str) {
-        if (str.empty()) return false;
+    // We'll validate the format as part of the parsing process
 
-        size_t start = 0;
-        bool has_dot = false;
+    // For scientific notation, we convert to regular decimal first
+    std::string work_str = str;
 
-        // Handle optional sign
-        if (str[0] == '-' || str[0] == '+') {
-            if (str.length() == 1) return false;
-            start = 1;
+    // Check for scientific notation
+    size_t exp_pos = work_str.find_first_of("eE");
+    if (exp_pos != std::string::npos) {
+        // Use std::stod to convert scientific notation to regular decimal
+        try {
+            double value = std::stod(work_str);
+
+            // Use stringstream with high precision to preserve accuracy
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(17) << value;
+            work_str = oss.str();
+
+            // Remove trailing zeros after decimal point
+            if (work_str.find('.') != std::string::npos) {
+                work_str = work_str.substr(0, work_str.find_last_not_of('0') + 1);
+                if (work_str.back() == '.') {
+                    work_str.pop_back();
+                }
+            }
+        } catch (const std::exception&) {
+            result.is_valid = false;
+            return result;
+        }
+    }
+
+    size_t start = 0;
+
+    // Handle sign
+    if (work_str[0] == '-') {
+        result.is_negative = true;
+        start = 1;
+    } else if (work_str[0] == '+') {
+        start = 1;
+    }
+
+    if (start >= work_str.length()) {
+        result.is_valid = false;
+        return result;
+    }
+
+    // Find decimal point
+    size_t decimal_pos = work_str.find('.', start);
+    bool has_decimal = (decimal_pos != std::string::npos);
+
+    // Extract integer part
+    std::string integer_str;
+    if (has_decimal) {
+        integer_str = work_str.substr(start, decimal_pos - start);
+    } else {
+        integer_str = work_str.substr(start);
+    }
+
+    // Validate integer part
+    if (integer_str.empty()) {
+        // Handle cases like ".5" or "-.5"
+        if (has_decimal && decimal_pos + 1 < work_str.length()) {
+            integer_str = "0";
+        } else {
+            result.is_valid = false;
+            return result;
+        }
+    }
+
+    // Check if integer part contains only digits
+    for (char c : integer_str) {
+        if (! std::isdigit(c)) {
+            result.is_valid = false;
+            return result;
+        }
+    }
+
+    result.integer_part = integer_str;
+
+    // Extract fractional part if present
+    if (has_decimal) {
+        if (decimal_pos + 1 >= work_str.length()) {
+            // Handle trailing decimal point like "5."
+            result.fractional_part = std::nullopt;
+        } else {
+            std::string frac_str = work_str.substr(decimal_pos + 1);
+
+            // Validate fractional part
+            for (char c : frac_str) {
+                if (! std::isdigit(c)) {
+                    result.is_valid = false;
+                    return result;
+                }
+            }
+
+            // Remove trailing zeros from fractional part
+            while (! frac_str.empty() && frac_str.back() == '0') {
+                frac_str.pop_back();
+            }
+
+            if (! frac_str.empty()) {
+                result.fractional_part = frac_str;
+            }
+        }
+    }
+
+    // Remove leading zeros from integer part (but keep at least one digit)
+    while (result.integer_part.length() > 1 && result.integer_part[0] == '0') {
+        result.integer_part = result.integer_part.substr(1);
+    }
+
+    // Handle special case of zero
+    if (result.integer_part == "0" && ! result.fractional_part.has_value()) {
+        result.is_negative = false;  // Zero is always positive
+    }
+
+    // Also handle case where fractional part is present but all zeros
+    if (result.integer_part == "0" && result.fractional_part.has_value() && result.fractional_part->empty()) {
+        result.is_negative = false;             // Zero is always positive
+        result.fractional_part = std::nullopt;  // Remove empty fractional part
+    }
+
+    return result;
+}
+
+// Check if string represents a valid number (integer, decimal, or scientific notation)
+bool is_valid_number(const std::string& str)
+{
+    if (str.empty()) {
+        return false;
+    }
+
+    size_t start = 0;
+    bool has_dot = false;
+
+    // Handle optional sign
+    if (str[0] == '-' || str[0] == '+') {
+        if (str.length() == 1) {
+            return false;
+        }
+        start = 1;
+    }
+
+    // Check for exponent position
+    size_t exp_pos = str.find_first_of("eE", start);
+    bool has_exp = (exp_pos != std::string::npos);
+
+    // Validate mantissa (part before exponent)
+    size_t mantissa_end = has_exp ? exp_pos : str.length();
+
+    // For scientific notation, mantissa cannot be empty
+    if (has_exp && mantissa_end <= start) {
+        return false;
+    }
+
+    for (size_t i = start; i < mantissa_end; ++i) {
+        if (str[i] == '.') {
+            if (has_dot) {
+                return false;  // Multiple dots
+            }
+            has_dot = true;
+        } else if (! std::isdigit(str[i])) {
+            return false;
+        }
+    }
+
+    // Don't allow trailing or leading dot in mantissa
+    if (has_dot && (str[start] == '.' || (mantissa_end > start && str[mantissa_end - 1] == '.'))) {
+        // Allow ".5" or "5." patterns
+        if (mantissa_end <= start + 1) {
+            return false;
+        }
+    }
+
+    // Validate exponent part if present
+    if (has_exp) {
+        if (exp_pos + 1 >= str.length()) {
+            return false;  // Nothing after 'e'
         }
 
-        // Check for exponent position
-        size_t exp_pos = str.find_first_of("eE", start);
-        bool has_exp = (exp_pos != std::string::npos);
+        size_t exp_start = exp_pos + 1;
 
-        // Validate mantissa (part before exponent)
-        size_t mantissa_end = has_exp ? exp_pos : str.length();
+        // Handle optional sign in exponent
+        if (str[exp_start] == '-' || str[exp_start] == '+') {
+            exp_start++;
+            if (exp_start >= str.length()) {
+                return false;  // Nothing after sign
+            }
+        }
 
-        // For scientific notation, mantissa cannot be empty
-        if (has_exp && mantissa_end <= start) return false;
+        // Exponent must have at least one digit
+        if (exp_start >= str.length()) {
+            return false;
+        }
 
-        for (size_t i = start; i < mantissa_end; ++i) {
-            if (str[i] == '.') {
-                if (has_dot) return false;  // Multiple dots
-                has_dot = true;
-            } else if (!std::isdigit(str[i])) {
+        // Check that exponent contains only digits
+        for (size_t i = exp_start; i < str.length(); ++i) {
+            if (! std::isdigit(str[i])) {
                 return false;
             }
         }
-
-        // Don't allow trailing or leading dot in mantissa
-        if (has_dot && (str[start] == '.' || (mantissa_end > start && str[mantissa_end - 1] == '.'))) {
-            // Allow ".5" or "5." patterns
-            if (mantissa_end <= start + 1) return false;
-        }
-
-        // Validate exponent part if present
-        if (has_exp) {
-            if (exp_pos + 1 >= str.length()) return false;  // Nothing after 'e'
-
-            size_t exp_start = exp_pos + 1;
-
-            // Handle optional sign in exponent
-            if (str[exp_start] == '-' || str[exp_start] == '+') {
-                exp_start++;
-                if (exp_start >= str.length()) return false;  // Nothing after sign
-            }
-
-            // Exponent must have at least one digit
-            if (exp_start >= str.length()) return false;
-
-            // Check that exponent contains only digits
-            for (size_t i = exp_start; i < str.length(); ++i) {
-                if (!std::isdigit(str[i])) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
-    /**
-     * @brief Normalize a number string to decimal representation.
-     *
-     * This function converts scientific notation to decimal representation
-     * for internal storage and calculations, ensuring consistent behavior.
-     */
-    std::string normalize_to_decimal(const std::string& str) {
-        if (!is_valid_number(str)) return str;
+    return true;
+}
 
-        // Check for scientific notation
-        size_t exp_pos = str.find_first_of("eE");
-        if (exp_pos != std::string::npos) {
-            try {
-                double value = std::stod(str);
+/**
+ * @brief Normalize a number string to decimal representation.
+ *
+ * This function converts scientific notation to decimal representation
+ * for internal storage and calculations, ensuring consistent behavior.
+ */
+std::string normalize_to_decimal(const std::string& str)
+{
+    if (! is_valid_number(str)) {
+        return str;
+    }
 
-                // Check if the value is zero or infinite
-                if (value == 0.0) {
-                    return "0";
-                }
-                if (!std::isfinite(value)) {
-                    return str; // Keep original for non-finite values
-                }
+    // Check for scientific notation
+    size_t exp_pos = str.find_first_of("eE");
+    if (exp_pos != std::string::npos) {
+        try {
+            double value = std::stod(str);
 
-                // Use scientific notation format for very small or very large numbers
-                // to maintain precision
-                if (std::abs(value) < 1e-100 || std::abs(value) > 1e100) {
-                    std::ostringstream oss;
-                    oss << std::scientific << std::setprecision(16) << value;
-                    return oss.str();
-                }
+            // Check if the value is zero or infinite
+            if (value == 0.0) {
+                return "0";
+            }
+            if (! std::isfinite(value)) {
+                return str;  // Keep original for non-finite values
+            }
 
-                // Use stringstream with high precision to preserve accuracy
+            // Use scientific notation format for very small or very large numbers
+            // to maintain precision
+            if (std::abs(value) < 1e-100 || std::abs(value) > 1e100) {
                 std::ostringstream oss;
-                oss << std::fixed << std::setprecision(17) << value;
-                std::string result = oss.str();
-
-                // Remove trailing zeros after decimal point
-                if (result.find('.') != std::string::npos) {
-                    result = result.substr(0, result.find_last_not_of('0') + 1);
-                    if (result.back() == '.') {
-                        result.pop_back();
-                    }
-                }
-
-                return result;
-            } catch (const std::out_of_range&) {
-                // Value is outside double range - keep original scientific notation
-                return str;
-            } catch (const std::exception&) {
-                return str; // Return original if conversion fails
+                oss << std::scientific << std::setprecision(16) << value;
+                return oss.str();
             }
-        }
 
-        return str; // Return as-is if not scientific notation
-    }
+            // Use stringstream with high precision to preserve accuracy
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(17) << value;
+            std::string result = oss.str();
 
-    // Normalize number string (remove unnecessary zeros, handle decimal point)
-    std::string normalize_number(const std::string& str) {
-        if (!is_valid_number(str)) return str;
-
-        bool negative = (str[0] == '-');
-        std::string s = negative ? str.substr(1) : str;
-
-        // Find decimal point
-        size_t dot_pos = s.find('.');
-        bool has_decimal = (dot_pos != std::string::npos);
-
-        if (has_decimal) {
             // Remove trailing zeros after decimal point
-            size_t last_nonzero = s.find_last_not_of('0');
-            if (last_nonzero != std::string::npos && last_nonzero > dot_pos) {
-                s = s.substr(0, last_nonzero + 1);
+            if (result.find('.') != std::string::npos) {
+                result = result.substr(0, result.find_last_not_of('0') + 1);
+                if (result.back() == '.') {
+                    result.pop_back();
+                }
             }
-            // Remove decimal point if no fractional part
-            if (s.back() == '.') {
-                s.pop_back();
-                has_decimal = false;
-            }
+
+            return result;
+        } catch (const std::out_of_range&) {
+            // Value is outside double range - keep original scientific notation
+            return str;
+        } catch (const std::exception&) {
+            return str;  // Return original if conversion fails
         }
-
-        // Remove leading zeros
-        size_t first_nonzero = 0;
-        while (first_nonzero < s.length() - 1 && s[first_nonzero] == '0' && s[first_nonzero + 1] != '.') {
-            first_nonzero++;
-        }
-        s = s.substr(first_nonzero);
-
-        // Handle zero
-        if (s.empty() || s == "." || s == "0") return "0";
-
-        return negative && s != "0" ? "-" + s : s;
     }
 
-    // Compare two number strings (handles both integers and decimals)
-    int compare_numbers(const std::string& a, const std::string& b) {
-        std::string na = normalize_number(normalize_to_decimal(a));
-        std::string nb = normalize_number(normalize_to_decimal(b));
+    return str;  // Return as-is if not scientific notation
+}
 
-        if (na == nb) return 0;
+// Normalize number string (remove unnecessary zeros, handle decimal point)
+std::string normalize_number(const std::string& str)
+{
+    if (! is_valid_number(str)) {
+        return str;
+    }
 
-        bool a_neg = (na[0] == '-');
-        bool b_neg = (nb[0] == '-');
+    bool negative = (str[0] == '-');
+    std::string s = negative ? str.substr(1) : str;
 
-        // Different signs
-        if (a_neg != b_neg) {
-            return a_neg ? -1 : 1;
+    // Find decimal point
+    size_t dot_pos = s.find('.');
+    bool has_decimal = (dot_pos != std::string::npos);
+
+    if (has_decimal) {
+        // Remove trailing zeros after decimal point
+        size_t last_nonzero = s.find_last_not_of('0');
+        if (last_nonzero != std::string::npos && last_nonzero > dot_pos) {
+            s = s.substr(0, last_nonzero + 1);
         }
-
-        // Both positive or both negative
-        std::string a_abs = a_neg ? na.substr(1) : na;
-        std::string b_abs = b_neg ? nb.substr(1) : nb;
-
-        // Split into integer and fractional parts
-        size_t a_dot = a_abs.find('.');
-        size_t b_dot = b_abs.find('.');
-
-        std::string a_int = (a_dot == std::string::npos) ? a_abs : a_abs.substr(0, a_dot);
-        std::string b_int = (b_dot == std::string::npos) ? b_abs : b_abs.substr(0, b_dot);
-
-        std::string a_frac = (a_dot == std::string::npos) ? "" : a_abs.substr(a_dot + 1);
-        std::string b_frac = (b_dot == std::string::npos) ? "" : b_abs.substr(b_dot + 1);
-
-        // Compare integer parts (inline comparison)
-        int int_cmp = (a_int.length() != b_int.length()) ?
-                      (a_int.length() < b_int.length() ? -1 : 1) :
-                      a_int.compare(b_int);
-        if (int_cmp != 0) {
-            return a_neg ? -int_cmp : int_cmp;
+        // Remove decimal point if no fractional part
+        if (s.back() == '.') {
+            s.pop_back();
+            has_decimal = false;
         }
+    }
 
-        // Integer parts are equal, compare fractional parts
-        // Pad with zeros to make same length
-        size_t max_frac = std::max(a_frac.length(), b_frac.length());
-        a_frac.resize(max_frac, '0');
-        b_frac.resize(max_frac, '0');
+    // Remove leading zeros
+    size_t first_nonzero = 0;
+    while (first_nonzero < s.length() - 1 && s[first_nonzero] == '0' && s[first_nonzero + 1] != '.') {
+        first_nonzero++;
+    }
+    s = s.substr(first_nonzero);
 
-        int frac_cmp = a_frac.compare(b_frac);
-        if (frac_cmp < 0) return a_neg ? 1 : -1;
-        if (frac_cmp > 0) return a_neg ? -1 : 1;
+    // Handle zero
+    if (s.empty() || s == "." || s == "0") {
+        return "0";
+    }
 
+    return negative && s != "0" ? "-" + s : s;
+}
+
+// Compare two number strings (handles both integers and decimals)
+int compare_numbers(const std::string& a, const std::string& b)
+{
+    std::string na = normalize_number(normalize_to_decimal(a));
+    std::string nb = normalize_number(normalize_to_decimal(b));
+
+    if (na == nb) {
         return 0;
     }
 
-    // Parse number into integer and fractional parts
-    struct NumberParts {
-        bool negative;
-        std::string integer;
-        std::string fractional;
+    bool a_neg = (na[0] == '-');
+    bool b_neg = (nb[0] == '-');
 
-        NumberParts(const std::string& num) {
-            std::string normalized = normalize_number(num);
-            negative = (normalized[0] == '-');
-            std::string abs_num = negative ? normalized.substr(1) : normalized;
-
-            size_t dot_pos = abs_num.find('.');
-            if (dot_pos == std::string::npos) {
-                integer = abs_num;
-                fractional = "";
-            } else {
-                integer = abs_num.substr(0, dot_pos);
-                fractional = abs_num.substr(dot_pos + 1);
-            }
-
-            // Ensure integer part is not empty
-            if (integer.empty()) integer = "0";
-        }
-    };
-
-    // Add two positive number strings (supports decimals)
-    std::string add_positive_numbers(const std::string& a, const std::string& b) {
-        NumberParts pa(a);
-        NumberParts pb(b);
-
-        // Make fractional parts same length
-        size_t max_frac = std::max(pa.fractional.length(), pb.fractional.length());
-        pa.fractional.resize(max_frac, '0');
-        pb.fractional.resize(max_frac, '0');
-
-        // Add fractional parts
-        std::string result_frac;
-        int carry = 0;
-        for (int i = max_frac - 1; i >= 0; i--) {
-            int sum = carry + (pa.fractional[i] - '0') + (pb.fractional[i] - '0');
-            carry = sum / 10;
-            result_frac = char('0' + sum % 10) + result_frac;
-        }
-
-        // Add integer parts
-        std::string result_int;
-        int i = pa.integer.length() - 1;
-        int j = pb.integer.length() - 1;
-
-        while (i >= 0 || j >= 0 || carry > 0) {
-            int sum = carry;
-            if (i >= 0) sum += pa.integer[i--] - '0';
-            if (j >= 0) sum += pb.integer[j--] - '0';
-
-            carry = sum / 10;
-            result_int = char('0' + sum % 10) + result_int;
-        }
-
-        // Combine result
-        std::string result = result_int;
-        if (!result_frac.empty()) {
-            // Remove trailing zeros from fractional part
-            while (!result_frac.empty() && result_frac.back() == '0') {
-                result_frac.pop_back();
-            }
-            if (!result_frac.empty()) {
-                result += "." + result_frac;
-            }
-        }
-
-        return normalize_number(result);
+    // Different signs
+    if (a_neg != b_neg) {
+        return a_neg ? -1 : 1;
     }
 
-    // Subtract two positive number strings (a >= b, supports decimals)
-    std::string subtract_positive_numbers(const std::string& a, const std::string& b) {
-        NumberParts pa(a);
-        NumberParts pb(b);
+    // Both positive or both negative
+    std::string a_abs = a_neg ? na.substr(1) : na;
+    std::string b_abs = b_neg ? nb.substr(1) : nb;
 
-        // Make fractional parts same length
-        size_t max_frac = std::max(pa.fractional.length(), pb.fractional.length());
-        pa.fractional.resize(max_frac, '0');
-        pb.fractional.resize(max_frac, '0');
+    // Split into integer and fractional parts
+    size_t a_dot = a_abs.find('.');
+    size_t b_dot = b_abs.find('.');
 
-        // Subtract fractional parts
-        std::string result_frac;
-        int borrow = 0;
-        for (int i = max_frac - 1; i >= 0; i--) {
-            int diff = (pa.fractional[i] - '0') - (pb.fractional[i] - '0') - borrow;
-            if (diff < 0) {
-                diff += 10;
-                borrow = 1;
-            } else {
-                borrow = 0;
-            }
-            result_frac = char('0' + diff) + result_frac;
-        }
+    std::string a_int = (a_dot == std::string::npos) ? a_abs : a_abs.substr(0, a_dot);
+    std::string b_int = (b_dot == std::string::npos) ? b_abs : b_abs.substr(0, b_dot);
 
-        // Subtract integer parts
-        std::string result_int;
-        int i = pa.integer.length() - 1;
-        int j = pb.integer.length() - 1;
+    std::string a_frac = (a_dot == std::string::npos) ? "" : a_abs.substr(a_dot + 1);
+    std::string b_frac = (b_dot == std::string::npos) ? "" : b_abs.substr(b_dot + 1);
 
-        while (i >= 0) {
-            int diff = (pa.integer[i] - '0') - borrow;
-            if (j >= 0) diff -= (pb.integer[j--] - '0');
-
-            if (diff < 0) {
-                diff += 10;
-                borrow = 1;
-            } else {
-                borrow = 0;
-            }
-
-            result_int = char('0' + diff) + result_int;
-            i--;
-        }
-
-        // Combine result
-        std::string result = result_int;
-        if (!result_frac.empty()) {
-            // Remove trailing zeros from fractional part
-            while (!result_frac.empty() && result_frac.back() == '0') {
-                result_frac.pop_back();
-            }
-            if (!result_frac.empty()) {
-                result += "." + result_frac;
-            }
-        }
-
-        return normalize_number(result);
+    // Compare integer parts (inline comparison)
+    int int_cmp = (a_int.length() != b_int.length()) ? (a_int.length() < b_int.length() ? -1 : 1) : a_int.compare(b_int);
+    if (int_cmp != 0) {
+        return a_neg ? -int_cmp : int_cmp;
     }
 
-    // Multiply two positive number strings (supports decimals)
-    std::string multiply_positive_numbers(const std::string& a, const std::string& b) {
-        NumberParts pa(a);
-        NumberParts pb(b);
+    // Integer parts are equal, compare fractional parts
+    // Pad with zeros to make same length
+    size_t max_frac = std::max(a_frac.length(), b_frac.length());
+    a_frac.resize(max_frac, '0');
+    b_frac.resize(max_frac, '0');
 
-        // Convert to pure integers by combining integer and fractional parts
-        std::string num_a = pa.integer + pa.fractional;
-        std::string num_b = pb.integer + pb.fractional;
-        int total_decimal_places = pa.fractional.length() + pb.fractional.length();
-
-        // Multiply as integers
-        if (num_a == "0" || num_b == "0") return "0";
-
-        std::string result(num_a.length() + num_b.length(), '0');
-
-        for (int i = num_a.length() - 1; i >= 0; i--) {
-            for (int j = num_b.length() - 1; j >= 0; j--) {
-                int mul = (num_a[i] - '0') * (num_b[j] - '0');
-                int p1 = i + j, p2 = i + j + 1;
-                int sum = mul + (result[p2] - '0');
-
-                result[p2] = char('0' + sum % 10);
-                result[p1] += sum / 10;
-            }
-        }
-
-        // Remove leading zeros
-        size_t start = 0;
-        while (start < result.length() - 1 && result[start] == '0') {
-            start++;
-        }
-        result = result.substr(start);
-
-        // Insert decimal point
-        if (total_decimal_places > 0) {
-            if (result.length() <= static_cast<size_t>(total_decimal_places)) {
-                // Need to pad with leading zeros
-                result = std::string(static_cast<size_t>(total_decimal_places) - result.length() + 1, '0') + result;
-            }
-
-            size_t decimal_pos = result.length() - static_cast<size_t>(total_decimal_places);
-            if (decimal_pos == 0) {
-                result = "0." + result;
-            } else {
-                result = result.substr(0, decimal_pos) + "." + result.substr(decimal_pos);
-            }
-        }
-
-        return normalize_number(result);
+    int frac_cmp = a_frac.compare(b_frac);
+    if (frac_cmp < 0) {
+        return a_neg ? 1 : -1;
+    }
+    if (frac_cmp > 0) {
+        return a_neg ? -1 : 1;
     }
 
-    // Divide two positive number strings (supports decimals) with precision control
-    std::string divide_positive_numbers(const std::string& a, const std::string& b, int max_decimal_places = 10) {
-        if (b == "0") return NAN_VALUE;
+    return 0;
+}
 
-        NumberParts pa(a);
-        NumberParts pb(b);
+// Parse number into integer and fractional parts
+struct NumberParts {
+    bool negative;
+    std::string integer;
+    std::string fractional;
 
-        // Scaling both operands by the same power of ten leaves the quotient
-        // unchanged, so padding the shorter fraction removes the need to move
-        // the point afterwards.
-        const size_t scale = std::max(pa.fractional.length(), pb.fractional.length());
-        pa.fractional.resize(scale, '0');
-        pb.fractional.resize(scale, '0');
+    NumberParts(const std::string& num)
+    {
+        std::string normalized = normalize_number(num);
+        negative = (normalized[0] == '-');
+        std::string abs_num = negative ? normalized.substr(1) : normalized;
 
-        // Convert to pure integers for division algorithm
-        std::string dividend = pa.integer + pa.fractional;
-        std::string divisor = pb.integer + pb.fractional;
-
-        // Remove leading zeros from divisor
-        while (divisor.length() > 1 && divisor[0] == '0') {
-            divisor = divisor.substr(1);
+        size_t dot_pos = abs_num.find('.');
+        if (dot_pos == std::string::npos) {
+            integer = abs_num;
+            fractional = "";
+        } else {
+            integer = abs_num.substr(0, dot_pos);
+            fractional = abs_num.substr(dot_pos + 1);
         }
 
-        if (divisor == "0") return NAN_VALUE;
+        // Ensure integer part is not empty
+        if (integer.empty()) {
+            integer = "0";
+        }
+    }
+};
 
-        // Perform long division
-        std::string quotient = "0";
-        std::string remainder = "0";
+// Add two positive number strings (supports decimals)
+std::string add_positive_numbers(const std::string& a, const std::string& b)
+{
+    NumberParts pa(a);
+    NumberParts pb(b);
 
-        // Integer division first
-        for (char digit : dividend) {
-            remainder = remainder + digit;
+    // Make fractional parts same length
+    size_t max_frac = std::max(pa.fractional.length(), pb.fractional.length());
+    pa.fractional.resize(max_frac, '0');
+    pb.fractional.resize(max_frac, '0');
 
-            // Remove leading zeros from remainder
-            while (remainder.length() > 1 && remainder[0] == '0') {
-                remainder = remainder.substr(1);
-            }
+    // Add fractional parts
+    std::string result_frac;
+    int carry = 0;
+    for (int i = max_frac - 1; i >= 0; i--) {
+        int sum = carry + (pa.fractional[i] - '0') + (pb.fractional[i] - '0');
+        carry = sum / 10;
+        result_frac = char('0' + sum % 10) + result_frac;
+    }
 
-            // Find how many times divisor goes into current remainder
+    // Add integer parts
+    std::string result_int;
+    int i = pa.integer.length() - 1;
+    int j = pb.integer.length() - 1;
+
+    while (i >= 0 || j >= 0 || carry > 0) {
+        int sum = carry;
+        if (i >= 0) {
+            sum += pa.integer[i--] - '0';
+        }
+        if (j >= 0) {
+            sum += pb.integer[j--] - '0';
+        }
+
+        carry = sum / 10;
+        result_int = char('0' + sum % 10) + result_int;
+    }
+
+    // Combine result
+    std::string result = result_int;
+    if (! result_frac.empty()) {
+        // Remove trailing zeros from fractional part
+        while (! result_frac.empty() && result_frac.back() == '0') {
+            result_frac.pop_back();
+        }
+        if (! result_frac.empty()) {
+            result += "." + result_frac;
+        }
+    }
+
+    return normalize_number(result);
+}
+
+// Subtract two positive number strings (a >= b, supports decimals)
+std::string subtract_positive_numbers(const std::string& a, const std::string& b)
+{
+    NumberParts pa(a);
+    NumberParts pb(b);
+
+    // Make fractional parts same length
+    size_t max_frac = std::max(pa.fractional.length(), pb.fractional.length());
+    pa.fractional.resize(max_frac, '0');
+    pb.fractional.resize(max_frac, '0');
+
+    // Subtract fractional parts
+    std::string result_frac;
+    int borrow = 0;
+    for (int i = max_frac - 1; i >= 0; i--) {
+        int diff = (pa.fractional[i] - '0') - (pb.fractional[i] - '0') - borrow;
+        if (diff < 0) {
+            diff += 10;
+            borrow = 1;
+        } else {
+            borrow = 0;
+        }
+        result_frac = char('0' + diff) + result_frac;
+    }
+
+    // Subtract integer parts
+    std::string result_int;
+    int i = pa.integer.length() - 1;
+    int j = pb.integer.length() - 1;
+
+    while (i >= 0) {
+        int diff = (pa.integer[i] - '0') - borrow;
+        if (j >= 0) {
+            diff -= (pb.integer[j--] - '0');
+        }
+
+        if (diff < 0) {
+            diff += 10;
+            borrow = 1;
+        } else {
+            borrow = 0;
+        }
+
+        result_int = char('0' + diff) + result_int;
+        i--;
+    }
+
+    // Combine result
+    std::string result = result_int;
+    if (! result_frac.empty()) {
+        // Remove trailing zeros from fractional part
+        while (! result_frac.empty() && result_frac.back() == '0') {
+            result_frac.pop_back();
+        }
+        if (! result_frac.empty()) {
+            result += "." + result_frac;
+        }
+    }
+
+    return normalize_number(result);
+}
+
+// Multiply two positive number strings (supports decimals)
+std::string multiply_positive_numbers(const std::string& a, const std::string& b)
+{
+    NumberParts pa(a);
+    NumberParts pb(b);
+
+    // Convert to pure integers by combining integer and fractional parts
+    std::string num_a = pa.integer + pa.fractional;
+    std::string num_b = pb.integer + pb.fractional;
+    int total_decimal_places = pa.fractional.length() + pb.fractional.length();
+
+    // Multiply as integers
+    if (num_a == "0" || num_b == "0") {
+        return "0";
+    }
+
+    std::string result(num_a.length() + num_b.length(), '0');
+
+    for (int i = num_a.length() - 1; i >= 0; i--) {
+        for (int j = num_b.length() - 1; j >= 0; j--) {
+            int mul = (num_a[i] - '0') * (num_b[j] - '0');
+            int p1 = i + j, p2 = i + j + 1;
+            int sum = mul + (result[p2] - '0');
+
+            result[p2] = char('0' + sum % 10);
+            result[p1] += sum / 10;
+        }
+    }
+
+    // Remove leading zeros
+    size_t start = 0;
+    while (start < result.length() - 1 && result[start] == '0') {
+        start++;
+    }
+    result = result.substr(start);
+
+    // Insert decimal point
+    if (total_decimal_places > 0) {
+        if (result.length() <= static_cast<size_t>(total_decimal_places)) {
+            // Need to pad with leading zeros
+            result = std::string(static_cast<size_t>(total_decimal_places) - result.length() + 1, '0') + result;
+        }
+
+        size_t decimal_pos = result.length() - static_cast<size_t>(total_decimal_places);
+        if (decimal_pos == 0) {
+            result = "0." + result;
+        } else {
+            result = result.substr(0, decimal_pos) + "." + result.substr(decimal_pos);
+        }
+    }
+
+    return normalize_number(result);
+}
+
+// Divide two positive number strings (supports decimals) with precision control
+std::string divide_positive_numbers(const std::string& a, const std::string& b, int max_decimal_places = 10)
+{
+    if (b == "0") {
+        return NAN_VALUE;
+    }
+
+    NumberParts pa(a);
+    NumberParts pb(b);
+
+    // Scaling both operands by the same power of ten leaves the quotient
+    // unchanged, so padding the shorter fraction removes the need to move
+    // the point afterwards.
+    const size_t scale = std::max(pa.fractional.length(), pb.fractional.length());
+    pa.fractional.resize(scale, '0');
+    pb.fractional.resize(scale, '0');
+
+    // Convert to pure integers for division algorithm
+    std::string dividend = pa.integer + pa.fractional;
+    std::string divisor = pb.integer + pb.fractional;
+
+    // Remove leading zeros from divisor
+    while (divisor.length() > 1 && divisor[0] == '0') {
+        divisor = divisor.substr(1);
+    }
+
+    if (divisor == "0") {
+        return NAN_VALUE;
+    }
+
+    // Perform long division
+    std::string quotient = "0";
+    std::string remainder = "0";
+
+    // Integer division first
+    for (char digit : dividend) {
+        remainder = remainder + digit;
+
+        // Remove leading zeros from remainder
+        while (remainder.length() > 1 && remainder[0] == '0') {
+            remainder = remainder.substr(1);
+        }
+
+        // Find how many times divisor goes into current remainder
+        int count = 0;
+        std::string temp_remainder = remainder;
+
+        while (compare_numbers(temp_remainder, divisor) >= 0) {
+            temp_remainder = subtract_positive_numbers(temp_remainder, divisor);
+            count++;
+        }
+
+        quotient = quotient + std::to_string(count);
+        remainder = temp_remainder;
+    }
+
+    // Remove leading zeros from quotient
+    while (quotient.length() > 1 && quotient[0] == '0') {
+        quotient = quotient.substr(1);
+    }
+
+    // Handle decimal places if needed
+    std::string decimal_part = "";
+    if (remainder != "0" && max_decimal_places > 0) {
+        for (int i = 0; i < max_decimal_places && remainder != "0"; i++) {
+            remainder = remainder + "0";  // Add a zero for next decimal place
+
             int count = 0;
             std::string temp_remainder = remainder;
 
@@ -683,159 +764,163 @@ namespace {
                 count++;
             }
 
-            quotient = quotient + std::to_string(count);
+            decimal_part = decimal_part + std::to_string(count);
             remainder = temp_remainder;
         }
-
-        // Remove leading zeros from quotient
-        while (quotient.length() > 1 && quotient[0] == '0') {
-            quotient = quotient.substr(1);
-        }
-
-        // Handle decimal places if needed
-        std::string decimal_part = "";
-        if (remainder != "0" && max_decimal_places > 0) {
-            for (int i = 0; i < max_decimal_places && remainder != "0"; i++) {
-                remainder = remainder + "0"; // Add a zero for next decimal place
-
-                int count = 0;
-                std::string temp_remainder = remainder;
-
-                while (compare_numbers(temp_remainder, divisor) >= 0) {
-                    temp_remainder = subtract_positive_numbers(temp_remainder, divisor);
-                    count++;
-                }
-
-                decimal_part = decimal_part + std::to_string(count);
-                remainder = temp_remainder;
-            }
-        }
-
-        // Combine integer and decimal parts
-        std::string result = quotient;
-        if (!decimal_part.empty()) {
-            // Remove trailing zeros from decimal part
-            while (!decimal_part.empty() && decimal_part.back() == '0') {
-                decimal_part.pop_back();
-            }
-            if (!decimal_part.empty()) {
-                result = result + "." + decimal_part;
-            }
-        }
-
-        return normalize_number(result);
     }
 
-    // Modulo operation for positive numbers (a % b = a - floor(a/b) * b)
-    std::string modulo_positive_numbers(const std::string& a, const std::string& b) {
-        if (b == "0") return NAN_VALUE;
-
-        // For modulo, we need integer division (floor division)
-        std::string quotient = divide_positive_numbers(a, b, 0); // No decimal places for integer division
-
-        // Handle case where quotient might have decimal (shouldn't happen with precision 0, but safety check)
-        size_t dot_pos = quotient.find('.');
-        if (dot_pos != std::string::npos) {
-            quotient = quotient.substr(0, dot_pos); // Take only integer part
+    // Combine integer and decimal parts
+    std::string result = quotient;
+    if (! decimal_part.empty()) {
+        // Remove trailing zeros from decimal part
+        while (! decimal_part.empty() && decimal_part.back() == '0') {
+            decimal_part.pop_back();
         }
-
-        // Calculate b * quotient
-        std::string product = multiply_positive_numbers(b, quotient);
-
-        // Calculate a - (b * quotient)
-        std::string result = subtract_positive_numbers(a, product);
-
-        return normalize_number(result);
+        if (! decimal_part.empty()) {
+            result = result + "." + decimal_part;
+        }
     }
 
-    // Perform string-based arithmetic
-    std::string perform_arithmetic(const std::string& a, const std::string& b, char operation) {
-        if (!is_valid_number(a) || !is_valid_number(b)) {
+    return normalize_number(result);
+}
+
+// Modulo operation for positive numbers (a % b = a - floor(a/b) * b)
+std::string modulo_positive_numbers(const std::string& a, const std::string& b)
+{
+    if (b == "0") {
+        return NAN_VALUE;
+    }
+
+    // For modulo, we need integer division (floor division)
+    std::string quotient = divide_positive_numbers(a, b, 0);  // No decimal places for integer division
+
+    // Handle case where quotient might have decimal (shouldn't happen with precision 0, but safety check)
+    size_t dot_pos = quotient.find('.');
+    if (dot_pos != std::string::npos) {
+        quotient = quotient.substr(0, dot_pos);  // Take only integer part
+    }
+
+    // Calculate b * quotient
+    std::string product = multiply_positive_numbers(b, quotient);
+
+    // Calculate a - (b * quotient)
+    std::string result = subtract_positive_numbers(a, product);
+
+    return normalize_number(result);
+}
+
+// Perform string-based arithmetic
+std::string perform_arithmetic(const std::string& a, const std::string& b, char operation)
+{
+    if (! is_valid_number(a) || ! is_valid_number(b)) {
+        return NAN_VALUE;
+    }
+
+    std::string na = normalize_number(normalize_to_decimal(a));
+    std::string nb = normalize_number(normalize_to_decimal(b));
+
+    bool a_neg = (na[0] == '-');
+    bool b_neg = (nb[0] == '-');
+
+    std::string a_abs = a_neg ? na.substr(1) : na;
+    std::string b_abs = b_neg ? nb.substr(1) : nb;
+
+    switch (operation) {
+    case '+': {
+        if (a_neg == b_neg) {
+            // Same sign: add absolute values
+            std::string result = add_positive_numbers(a_abs, b_abs);
+            return a_neg ? "-" + result : result;
+        } else {
+            // Different signs: subtract smaller from larger
+            int cmp = compare_numbers(a_abs, b_abs);
+            if (cmp == 0) {
+                return "0";
+            }
+
+            if (cmp > 0) {
+                std::string result = subtract_positive_numbers(a_abs, b_abs);
+                return a_neg ? "-" + result : result;
+            } else {
+                std::string result = subtract_positive_numbers(b_abs, a_abs);
+                return b_neg ? "-" + result : result;
+            }
+        }
+    }
+    case '-': {
+        if (a_neg != b_neg) {
+            // Different signs: add absolute values
+            std::string result = add_positive_numbers(a_abs, b_abs);
+            return a_neg ? "-" + result : result;
+        } else {
+            // Same signs: subtract
+            int cmp = compare_numbers(a_abs, b_abs);
+            if (cmp == 0) {
+                return "0";
+            }
+
+            if (cmp > 0) {
+                std::string result = subtract_positive_numbers(a_abs, b_abs);
+                return a_neg ? "-" + result : result;
+            } else {
+                std::string result = subtract_positive_numbers(b_abs, a_abs);
+                return a_neg ? result : "-" + result;
+            }
+        }
+    }
+    case '*': {
+        std::string result = multiply_positive_numbers(a_abs, b_abs);
+        if (result == "0") {
+            return "0";
+        }
+        return (a_neg != b_neg) ? "-" + result : result;
+    }
+    case '/': {
+        if (nb == "0") {
             return NAN_VALUE;
         }
-
-        std::string na = normalize_number(normalize_to_decimal(a));
-        std::string nb = normalize_number(normalize_to_decimal(b));
-
-        bool a_neg = (na[0] == '-');
-        bool b_neg = (nb[0] == '-');
-
-        std::string a_abs = a_neg ? na.substr(1) : na;
-        std::string b_abs = b_neg ? nb.substr(1) : nb;
-
-        switch (operation) {
-            case '+': {
-                if (a_neg == b_neg) {
-                    // Same sign: add absolute values
-                    std::string result = add_positive_numbers(a_abs, b_abs);
-                    return a_neg ? "-" + result : result;
-                } else {
-                    // Different signs: subtract smaller from larger
-                    int cmp = compare_numbers(a_abs, b_abs);
-                    if (cmp == 0) return "0";
-
-                    if (cmp > 0) {
-                        std::string result = subtract_positive_numbers(a_abs, b_abs);
-                        return a_neg ? "-" + result : result;
-                    } else {
-                        std::string result = subtract_positive_numbers(b_abs, a_abs);
-                        return b_neg ? "-" + result : result;
-                    }
-                }
-            }
-            case '-': {
-                if (a_neg != b_neg) {
-                    // Different signs: add absolute values
-                    std::string result = add_positive_numbers(a_abs, b_abs);
-                    return a_neg ? "-" + result : result;
-                } else {
-                    // Same signs: subtract
-                    int cmp = compare_numbers(a_abs, b_abs);
-                    if (cmp == 0) return "0";
-
-                    if (cmp > 0) {
-                        std::string result = subtract_positive_numbers(a_abs, b_abs);
-                        return a_neg ? "-" + result : result;
-                    } else {
-                        std::string result = subtract_positive_numbers(b_abs, a_abs);
-                        return a_neg ? result : "-" + result;
-                    }
-                }
-            }
-            case '*': {
-                std::string result = multiply_positive_numbers(a_abs, b_abs);
-                if (result == "0") return "0";
-                return (a_neg != b_neg) ? "-" + result : result;
-            }
-            case '/': {
-                if (nb == "0") return NAN_VALUE;
-                std::string result = divide_positive_numbers(a_abs, b_abs);
-                if (result == NAN_VALUE) return NAN_VALUE;
-                return (a_neg != b_neg) ? "-" + result : result;
-            }
-            case '%': {
-                if (nb == "0") return NAN_VALUE;
-                std::string result = modulo_positive_numbers(a_abs, b_abs);
-                if (result == NAN_VALUE) return NAN_VALUE;
-                // For modulo, result has same sign as dividend (a)
-                return a_neg ? "-" + result : result;
-            }
-            default:
-                return NAN_VALUE;
+        std::string result = divide_positive_numbers(a_abs, b_abs);
+        if (result == NAN_VALUE) {
+            return NAN_VALUE;
         }
+        return (a_neg != b_neg) ? "-" + result : result;
+    }
+    case '%': {
+        if (nb == "0") {
+            return NAN_VALUE;
+        }
+        std::string result = modulo_positive_numbers(a_abs, b_abs);
+        if (result == NAN_VALUE) {
+            return NAN_VALUE;
+        }
+        // For modulo, result has same sign as dividend (a)
+        return a_neg ? "-" + result : result;
+    }
+    default:
+        return NAN_VALUE;
     }
 }
+}  // namespace
 
 class number::storage {
 public:
     std::string number{ "0" };
 
     storage() = default;
-    storage(const char* s) : number(normalize_to_decimal(s)) {}
-    storage(const std::string& s) : number(normalize_to_decimal(s)) {}
+    storage(const char* s)
+        : number(normalize_to_decimal(s))
+    {
+    }
+    storage(const std::string& s)
+        : number(normalize_to_decimal(s))
+    {
+    }
 
     template <number_type T>
-    storage(const T& n) : number(std::to_string(n)) {}
+    storage(const T& n)
+        : number(std::to_string(n))
+    {
+    }
 };
 
 number::number()
@@ -862,7 +947,7 @@ number::~number() = default;
 
 bool number::is_nan() const
 {
-    return !is_valid_number(_store->number);
+    return ! is_valid_number(_store->number);
 }
 
 bool number::is_integer() const
@@ -874,9 +959,9 @@ bool number::is_integer() const
 bool number::equals(const number& n) const
 {
     // Both must be valid numbers
-    if (!is_valid_number(_store->number) || !is_valid_number(n._store->number)) {
+    if (! is_valid_number(_store->number) || ! is_valid_number(n._store->number)) {
         // If both are invalid, they're equal if strings match
-        if (!is_valid_number(_store->number) && !is_valid_number(n._store->number)) {
+        if (! is_valid_number(_store->number) && ! is_valid_number(n._store->number)) {
             return _store->number == n._store->number;
         }
         return false;
@@ -891,8 +976,8 @@ std::strong_ordering number::compare(const number& n) const noexcept
     const bool valid1 = is_valid_number(_store->number);
     const bool valid2 = is_valid_number(n._store->number);
 
-    if (!valid1 || !valid2) {
-        if (!valid1 && !valid2) {
+    if (! valid1 || ! valid2) {
+        if (! valid1 && ! valid2) {
             // Both invalid - compare as strings
             return _store->number <=> n._store->number;
         }
@@ -902,8 +987,12 @@ std::strong_ordering number::compare(const number& n) const noexcept
 
     // Both are valid numbers
     int cmp = compare_numbers(_store->number, n._store->number);
-    if (cmp < 0) return std::strong_ordering::less;
-    if (cmp > 0) return std::strong_ordering::greater;
+    if (cmp < 0) {
+        return std::strong_ordering::less;
+    }
+    if (cmp > 0) {
+        return std::strong_ordering::greater;
+    }
     return std::strong_ordering::equal;
 }
 
@@ -981,31 +1070,31 @@ number::operator long long() const
 number number::operator+(const number& other) const
 {
     std::string result = perform_arithmetic(_store->number, other._store->number, '+');
-    return number{result};
+    return number{ result };
 }
 
 number number::operator-(const number& other) const
 {
     std::string result = perform_arithmetic(_store->number, other._store->number, '-');
-    return number{result};
+    return number{ result };
 }
 
 number number::operator*(const number& other) const
 {
     std::string result = perform_arithmetic(_store->number, other._store->number, '*');
-    return number{result};
+    return number{ result };
 }
 
 number number::operator/(const number& other) const
 {
     std::string result = perform_arithmetic(_store->number, other._store->number, '/');
-    return number{result};
+    return number{ result };
 }
 
 number number::operator%(const number& other) const
 {
     std::string result = perform_arithmetic(_store->number, other._store->number, '%');
-    return number{result};
+    return number{ result };
 }
 
 // Compound assignment operators
@@ -1042,7 +1131,7 @@ number& number::operator%=(const number& other)
 // Static NaN accessor
 number number::nan()
 {
-    return number{NAN_VALUE};
+    return number{ NAN_VALUE };
 }
 
 // Stream output operator
@@ -1051,4 +1140,4 @@ std::ostream& operator<<(std::ostream& os, const number& n)
     return os << std::string(n);
 }
 
-}
+}  // namespace dross

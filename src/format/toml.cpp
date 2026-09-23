@@ -1,11 +1,13 @@
 #include "dross/format/toml.h"
-#include "dross/type/string.h"
-#include "dross/type/number.h"
-#include "dross/type/boolean.h"
+
 #include "dross/type/array.h"
+#include "dross/type/boolean.h"
 #include "dross/type/dictionary.h"
-#include <sstream>
+#include "dross/type/number.h"
+#include "dross/type/string.h"
+
 #include <cctype>
+#include <sstream>
 
 namespace dross::toml {
 
@@ -21,13 +23,18 @@ namespace {
 class parser {
 public:
     explicit parser(const std::string& input)
-        : _input(input), _pos(0), _line(1), _column(1) {}
+        : _input(input)
+        , _pos(0)
+        , _line(1)
+        , _column(1)
+    {
+    }
 
     std::expected<dictionary, error> parse()
     {
         try {
             auto result = parse_document();
-            if (!result) {
+            if (! result) {
                 return std::unexpected(result.error());
             }
 
@@ -54,7 +61,7 @@ private:
         std::ostringstream oss;
         oss << "TOML parse error at line " << _line << ", column " << _column << ": " << message;
         // Use the error constructor that takes error code and category
-        return error{static_cast<int>(std::errc::invalid_argument), std::generic_category()};
+        return error{ static_cast<int>(std::errc::invalid_argument), std::generic_category() };
     }
 
     char current_char() const
@@ -112,21 +119,29 @@ private:
 
         while (_pos < _input.size()) {
             skip_whitespace_and_comments();
-            if (_pos >= _input.size()) break;
+            if (_pos >= _input.size()) {
+                break;
+            }
 
             if (current_char() == '[') {
                 auto table_result = parse_table_header();
-                if (!table_result) return std::unexpected(table_result.error());
+                if (! table_result) {
+                    return std::unexpected(table_result.error());
+                }
 
                 auto key_path = table_result.value();
                 auto table_content = parse_table_content();
-                if (!table_content) return std::unexpected(table_content.error());
+                if (! table_content) {
+                    return std::unexpected(table_content.error());
+                }
 
                 // Insert nested table into result
                 set_nested_value(result, key_path, table_content.value());
             } else {
                 auto kv_result = parse_key_value();
-                if (!kv_result) return std::unexpected(kv_result.error());
+                if (! kv_result) {
+                    return std::unexpected(kv_result.error());
+                }
 
                 auto [key, val] = kv_result.value();
                 result[key] = val;
@@ -141,12 +156,12 @@ private:
         if (current_char() != '[') {
             return std::unexpected(create_error("Expected '['"));
         }
-        advance(); // skip '['
+        advance();  // skip '['
 
         bool is_array_table = false;
         if (current_char() == '[') {
             is_array_table = true;
-            advance(); // skip second '['
+            advance();  // skip second '['
         }
 
         std::vector<std::string> key_path;
@@ -154,7 +169,9 @@ private:
         while (true) {
             skip_whitespace();
             auto key_result = parse_key();
-            if (!key_result) return std::unexpected(key_result.error());
+            if (! key_result) {
+                return std::unexpected(key_result.error());
+            }
 
             key_path.push_back(key_result.value());
 
@@ -190,7 +207,9 @@ private:
             }
 
             auto kv_result = parse_key_value();
-            if (!kv_result) return std::unexpected(kv_result.error());
+            if (! kv_result) {
+                return std::unexpected(kv_result.error());
+            }
 
             auto [key, val] = kv_result.value();
             result[key] = val;
@@ -202,7 +221,9 @@ private:
     std::expected<std::pair<std::string, value>, error> parse_key_value()
     {
         auto key_result = parse_key();
-        if (!key_result) return std::unexpected(key_result.error());
+        if (! key_result) {
+            return std::unexpected(key_result.error());
+        }
 
         std::string key = key_result.value();
 
@@ -210,11 +231,13 @@ private:
         if (current_char() != '=') {
             return std::unexpected(create_error("Expected '='"));
         }
-        advance(); // skip '='
+        advance();  // skip '='
 
         skip_whitespace();
         auto value_result = parse_value();
-        if (!value_result) return std::unexpected(value_result.error());
+        if (! value_result) {
+            return std::unexpected(value_result.error());
+        }
 
         skip_whitespace_and_comments();
 
@@ -235,8 +258,7 @@ private:
     std::expected<std::string, error> parse_bare_key()
     {
         std::string result;
-        while (_pos < _input.size() &&
-               (std::isalnum(current_char()) || current_char() == '_' || current_char() == '-')) {
+        while (_pos < _input.size() && (std::isalnum(current_char()) || current_char() == '_' || current_char() == '-')) {
             result += current_char();
             advance();
         }
@@ -253,7 +275,7 @@ private:
         if (current_char() != '"') {
             return std::unexpected(create_error("Expected '\"'"));
         }
-        advance(); // skip opening quote
+        advance();  // skip opening quote
 
         std::string result;
         while (_pos < _input.size() && current_char() != '"') {
@@ -264,13 +286,23 @@ private:
                 }
                 // Handle escape sequences
                 switch (current_char()) {
-                    case '"': result += '"'; break;
-                    case '\\': result += '\\'; break;
-                    case 'n': result += '\n'; break;
-                    case 't': result += '\t'; break;
-                    case 'r': result += '\r'; break;
-                    default:
-                        return std::unexpected(create_error("Invalid escape sequence"));
+                case '"':
+                    result += '"';
+                    break;
+                case '\\':
+                    result += '\\';
+                    break;
+                case 'n':
+                    result += '\n';
+                    break;
+                case 't':
+                    result += '\t';
+                    break;
+                case 'r':
+                    result += '\r';
+                    break;
+                default:
+                    return std::unexpected(create_error("Invalid escape sequence"));
                 }
             } else {
                 result += current_char();
@@ -281,7 +313,7 @@ private:
         if (current_char() != '"') {
             return std::unexpected(create_error("Unterminated quoted key"));
         }
-        advance(); // skip closing quote
+        advance();  // skip closing quote
 
         return result;
     }
@@ -312,7 +344,7 @@ private:
         if (current_char() != '"') {
             return std::unexpected(create_error("Expected '\"'"));
         }
-        advance(); // skip opening quote
+        advance();  // skip opening quote
 
         std::string result;
         while (_pos < _input.size() && current_char() != '"') {
@@ -323,15 +355,29 @@ private:
                 }
                 // Handle escape sequences
                 switch (current_char()) {
-                    case '"': result += '"'; break;
-                    case '\\': result += '\\'; break;
-                    case 'n': result += '\n'; break;
-                    case 't': result += '\t'; break;
-                    case 'r': result += '\r'; break;
-                    case 'b': result += '\b'; break;
-                    case 'f': result += '\f'; break;
-                    default:
-                        return std::unexpected(create_error("Invalid escape sequence"));
+                case '"':
+                    result += '"';
+                    break;
+                case '\\':
+                    result += '\\';
+                    break;
+                case 'n':
+                    result += '\n';
+                    break;
+                case 't':
+                    result += '\t';
+                    break;
+                case 'r':
+                    result += '\r';
+                    break;
+                case 'b':
+                    result += '\b';
+                    break;
+                case 'f':
+                    result += '\f';
+                    break;
+                default:
+                    return std::unexpected(create_error("Invalid escape sequence"));
                 }
             } else {
                 result += current_char();
@@ -342,9 +388,9 @@ private:
         if (current_char() != '"') {
             return std::unexpected(create_error("Unterminated string"));
         }
-        advance(); // skip closing quote
+        advance();  // skip closing quote
 
-        return value(string{result});
+        return value(string{ result });
     }
 
     std::expected<value, error> parse_array()
@@ -352,7 +398,7 @@ private:
         if (current_char() != '[') {
             return std::unexpected(create_error("Expected '['"));
         }
-        advance(); // skip '['
+        advance();  // skip '['
 
         array result;
 
@@ -364,7 +410,9 @@ private:
 
         while (true) {
             auto value_result = parse_value();
-            if (!value_result) return std::unexpected(value_result.error());
+            if (! value_result) {
+                return std::unexpected(value_result.error());
+            }
 
             result.append(value_result.value());
 
@@ -389,7 +437,7 @@ private:
         if (current_char() != '{') {
             return std::unexpected(create_error("Expected '{'"));
         }
-        advance(); // skip '{'
+        advance();  // skip '{'
 
         dictionary result;
 
@@ -401,7 +449,9 @@ private:
 
         while (true) {
             auto kv_result = parse_key_value();
-            if (!kv_result) return std::unexpected(kv_result.error());
+            if (! kv_result) {
+                return std::unexpected(kv_result.error());
+            }
 
             auto [key, val] = kv_result.value();
             result[key] = val;
@@ -427,11 +477,11 @@ private:
         if (_pos + 4 <= _input.size() && _input.substr(_pos, 4) == "true") {
             _pos += 4;
             _column += 4;
-            return value(boolean{true});
+            return value(boolean{ true });
         } else if (_pos + 5 <= _input.size() && _input.substr(_pos, 5) == "false") {
             _pos += 5;
             _column += 5;
-            return value(boolean{false});
+            return value(boolean{ false });
         } else {
             return std::unexpected(create_error("Invalid boolean value"));
         }
@@ -449,10 +499,11 @@ private:
 
         // Parse digits and decimal point
         bool has_dot = false;
-        while (_pos < _input.size() &&
-               (std::isdigit(current_char()) || current_char() == '.')) {
+        while (_pos < _input.size() && (std::isdigit(current_char()) || current_char() == '.')) {
             if (current_char() == '.') {
-                if (has_dot) break; // Only one decimal point allowed
+                if (has_dot) {
+                    break;  // Only one decimal point allowed
+                }
                 has_dot = true;
             }
             num_str += current_char();
@@ -463,7 +514,7 @@ private:
             return std::unexpected(create_error("Invalid number format"));
         }
 
-        return value(number{num_str});
+        return value(number{ num_str });
     }
 
     void set_nested_value(dictionary& root, const std::vector<std::string>& key_path, const value& val)
@@ -486,9 +537,9 @@ private:
         }
 
         // This is an intermediate key, ensure it's a dictionary
-        if (!current_dict.contains(current_key)) {
+        if (! current_dict.contains(current_key)) {
             current_dict[current_key] = value(dictionary{});
-        } else if (!current_dict[current_key].is<dictionary>()) {
+        } else if (! current_dict[current_key].is<dictionary>()) {
             // Key exists but is not a dictionary - replace it
             current_dict[current_key] = value(dictionary{});
         }
@@ -518,9 +569,9 @@ public:
 
             serialize_dictionary(input, {});
 
-            return data{_output};
+            return data{ _output };
         } catch (const std::exception& e) {
-            return std::unexpected(error{static_cast<int>(std::errc::operation_not_supported), std::generic_category()});
+            return std::unexpected(error{ static_cast<int>(std::errc::operation_not_supported), std::generic_category() });
         }
     }
 
@@ -532,7 +583,7 @@ private:
     {
         // First, output simple key-value pairs
         for (const auto& [key, val] : dict) {
-            if (!val.is<dictionary>()) {
+            if (! val.is<dictionary>()) {
                 serialize_key_value(key, val);
             }
         }
@@ -578,7 +629,9 @@ private:
     {
         _output += "[";
         for (size_t i = 0; i < arr.length(); ++i) {
-            if (i > 0) _output += ", ";
+            if (i > 0) {
+                _output += ", ";
+            }
             serialize_value(arr[i]);
         }
         _output += "]";
@@ -589,7 +642,9 @@ private:
         _output += "{";
         bool first = true;
         for (const auto& [key, val] : dict) {
-            if (!first) _output += ", ";
+            if (! first) {
+                _output += ", ";
+            }
             first = false;
             _output += escape_key(key) + " = ";
             serialize_value(val);
@@ -602,7 +657,7 @@ private:
         // Check if key needs quoting
         bool needs_quotes = false;
         for (char ch : key) {
-            if (!std::isalnum(ch) && ch != '_' && ch != '-') {
+            if (! std::isalnum(ch) && ch != '_' && ch != '-') {
                 needs_quotes = true;
                 break;
             }
@@ -620,14 +675,30 @@ private:
         std::string result;
         for (char ch : str) {
             switch (ch) {
-                case '"': result += "\\\""; break;
-                case '\\': result += "\\\\"; break;
-                case '\n': result += "\\n"; break;
-                case '\t': result += "\\t"; break;
-                case '\r': result += "\\r"; break;
-                case '\b': result += "\\b"; break;
-                case '\f': result += "\\f"; break;
-                default: result += ch; break;
+            case '"':
+                result += "\\\"";
+                break;
+            case '\\':
+                result += "\\\\";
+                break;
+            case '\n':
+                result += "\\n";
+                break;
+            case '\t':
+                result += "\\t";
+                break;
+            case '\r':
+                result += "\\r";
+                break;
+            case '\b':
+                result += "\\b";
+                break;
+            case '\f':
+                result += "\\f";
+                break;
+            default:
+                result += ch;
+                break;
             }
         }
         return result;
@@ -637,7 +708,9 @@ private:
     {
         std::string result;
         for (size_t i = 0; i < path.size(); ++i) {
-            if (i > 0) result += ".";
+            if (i > 0) {
+                result += ".";
+            }
             result += escape_key(path[i]);
         }
         return result;
@@ -646,7 +719,7 @@ private:
     bool has_non_dict_values(const dictionary& dict) const
     {
         for (const auto& [key, val] : dict) {
-            if (!val.is<dictionary>()) {
+            if (! val.is<dictionary>()) {
                 return true;
             }
         }
@@ -654,7 +727,7 @@ private:
     }
 };
 
-} // anonymous namespace
+}  // anonymous namespace
 
 std::expected<dictionary, error> deserialize(const data& input)
 {
@@ -665,7 +738,7 @@ std::expected<dictionary, error> deserialize(const data& input)
     // Convert binary data to string
     std::string toml_string = input;
 
-    parser p{toml_string};
+    parser p{ toml_string };
     return p.parse();
 }
 
@@ -675,4 +748,4 @@ std::expected<data, error> serialize(const dictionary& input)
     return s.serialize(input);
 }
 
-} // namespace dross::toml
+}  // namespace dross::toml

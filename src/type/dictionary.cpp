@@ -1,6 +1,7 @@
 #include "dross/type/dictionary.h"
 
 #include "dross/type/value.h"
+
 #include <map>
 #include <memory>
 #include <string>
@@ -70,10 +71,12 @@ const value& dictionary::operator[](const std::string& key) const
     return _store->properties.at(key);
 }
 
-
 class dictionary::iterator::impl {
 public:
-    impl(std::map<std::string, dross::value>::iterator i) : cursor(i) {}
+    impl(std::map<std::string, dross::value>::iterator i)
+        : cursor(i)
+    {
+    }
 
     std::map<std::string, dross::value>::iterator cursor;
 };
@@ -98,7 +101,7 @@ dictionary::iterator& dictionary::iterator::operator++()
 
 dictionary::iterator::value_type dictionary::iterator::operator*() const
 {
-    return {_impl->cursor->first, _impl->cursor->second};
+    return { _impl->cursor->first, _impl->cursor->second };
 }
 
 bool dictionary::iterator::operator==(const iterator& i) const
@@ -113,7 +116,10 @@ bool dictionary::iterator::operator!=(const iterator& i) const
 
 class dictionary::const_iterator::impl {
 public:
-    impl(std::map<std::string, dross::value>::const_iterator i) : cursor(i) {}
+    impl(std::map<std::string, dross::value>::const_iterator i)
+        : cursor(i)
+    {
+    }
 
     std::map<std::string, dross::value>::const_iterator cursor;
 };
@@ -138,7 +144,7 @@ dictionary::const_iterator& dictionary::const_iterator::operator++()
 
 dictionary::const_iterator::value_type dictionary::const_iterator::operator*() const
 {
-    return {_impl->cursor->first, _impl->cursor->second};
+    return { _impl->cursor->first, _impl->cursor->second };
 }
 
 bool dictionary::const_iterator::operator==(const const_iterator& i) const
@@ -181,4 +187,4 @@ dictionary::const_iterator dictionary::cend() const
     return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cend()));
 }
 
-}
+}  // namespace dross

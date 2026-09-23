@@ -15,10 +15,21 @@ namespace dross {
 
 class value::storage {
 public:
-    std::variant<std::monostate, dross::boolean, dross::number, dross::string, dross::array, dross::dictionary, dross::timestamp, dross::data> value;
+    std::variant<std::monostate,
+                 dross::boolean,
+                 dross::number,
+                 dross::string,
+                 dross::array,
+                 dross::dictionary,
+                 dross::timestamp,
+                 dross::data>
+        value;
 
     storage() = default;
-    storage(const storage& s) : value(s.value) {}
+    storage(const storage& s)
+        : value(s.value)
+    {
+    }
 };
 
 value::value()
@@ -197,4 +208,4 @@ template dictionary value_cast<dictionary>(const value&) noexcept;
 template timestamp value_cast<timestamp>(const value&) noexcept;
 template data value_cast<data>(const value&) noexcept;
 
-}
+}  // namespace dross

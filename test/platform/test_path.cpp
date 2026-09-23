@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "dross/platform/path.h"
+
+#include <gtest/gtest.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -22,7 +22,7 @@ class scoped_temp_dir {
 public:
     scoped_temp_dir()
         : _path(std::filesystem::temp_directory_path()
-              / ("dross_path_test_" + std::to_string(::getpid()) + "_" + std::to_string(_next_id++)))
+                / ("dross_path_test_" + std::to_string(::getpid()) + "_" + std::to_string(_next_id++)))
     {
         std::filesystem::create_directories(_path);
     }
@@ -36,7 +36,10 @@ public:
     scoped_temp_dir(const scoped_temp_dir&) = delete;
     scoped_temp_dir& operator=(const scoped_temp_dir&) = delete;
 
-    const std::filesystem::path& path() const { return _path; }
+    const std::filesystem::path& path() const
+    {
+        return _path;
+    }
 
 private:
     std::filesystem::path _path;
@@ -89,7 +92,7 @@ void write_regular_file(const std::filesystem::path& p)
     out << "content";
 }
 
-}
+}  // namespace
 
 // --- path::mkdir -------------------------------------------------------
 
@@ -201,14 +204,14 @@ TEST(path_test, mkdir_on_a_symlink_that_resolves_to_a_directory_succeeds)
 
 TEST(path_test, expand_of_a_tilde_path_matches_a_freshly_computed_canonical_path)
 {
-    const dross::path p{std::string{"~"}};
+    const dross::path p{ std::string{ "~" } };
 
     const auto result = p.expand();
 
     ASSERT_TRUE(result.has_value());
     const auto home = dross::path::home();
     ASSERT_TRUE(home.has_value());
-    const auto expected = std::filesystem::canonical(std::filesystem::path{home->string()});
+    const auto expected = std::filesystem::canonical(std::filesystem::path{ home->string() });
     EXPECT_EQ(result->string(), expected.string());
 }
 
@@ -223,7 +226,7 @@ TEST(path_test, expand_of_a_tilde_path_resolves_through_a_symlinked_home)
     scoped_env_var home("HOME");
     home.set(home_link.string());
 
-    const dross::path p{std::string{"~"}};
+    const dross::path p{ std::string{ "~" } };
     const auto result = p.expand();
 
     ASSERT_TRUE(result.has_value());
@@ -241,7 +244,7 @@ TEST(path_test, expand_of_a_tilde_path_to_a_nonexistent_target_does_not_terminat
     ASSERT_TRUE(dross::path::home().has_value());
 
     const std::string tilde_path = "~/dross_test_nonexistent_" + std::to_string(::getpid());
-    const dross::path p{tilde_path};
+    const dross::path p{ tilde_path };
 
     const auto result = p.expand();
 
@@ -251,7 +254,7 @@ TEST(path_test, expand_of_a_tilde_path_to_a_nonexistent_target_does_not_terminat
 TEST(path_test, expand_of_a_non_tilde_path_is_returned_unchanged)
 {
     const std::string original = "relative/does/not/exist";
-    const dross::path p{original};
+    const dross::path p{ original };
 
     const auto result = p.expand();
 
@@ -264,7 +267,7 @@ TEST(path_test, expand_of_a_non_tilde_path_is_returned_unchanged)
 TEST(path_test, resolve_of_an_existing_path_succeeds_in_canonical_form)
 {
     const scoped_temp_dir base;
-    const dross::path p{base.path()};
+    const dross::path p{ base.path() };
 
     const auto result = p.resolve();
 
@@ -275,7 +278,7 @@ TEST(path_test, resolve_of_an_existing_path_succeeds_in_canonical_form)
 TEST(path_test, resolve_of_a_missing_path_returns_unexpected)
 {
     const scoped_temp_dir base;
-    const dross::path p{base.path() / "does_not_exist"};
+    const dross::path p{ base.path() / "does_not_exist" };
 
     const auto result = p.resolve();
 
@@ -287,7 +290,7 @@ TEST(path_test, resolve_of_a_missing_path_returns_unexpected)
 TEST(path_test, exists_is_false_for_a_missing_path)
 {
     const scoped_temp_dir base;
-    const dross::path p{base.path() / "does_not_exist"};
+    const dross::path p{ base.path() / "does_not_exist" };
 
     EXPECT_FALSE(p.exists());
 }
@@ -295,7 +298,7 @@ TEST(path_test, exists_is_false_for_a_missing_path)
 TEST(path_test, exists_is_true_for_a_present_path)
 {
     const scoped_temp_dir base;
-    const dross::path p{base.path()};
+    const dross::path p{ base.path() };
 
     EXPECT_TRUE(p.exists());
 }

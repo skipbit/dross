@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "dross/platform/environment.h"
+
+#include <gtest/gtest.h>
 
 TEST(environment_test, existing_value)
 {

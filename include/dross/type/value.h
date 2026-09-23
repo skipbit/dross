@@ -1,10 +1,10 @@
 #pragma once
 
 #include "dross/type/boolean.h"
-#include "dross/type/number.h"  
+#include "dross/type/data.h"
+#include "dross/type/number.h"
 #include "dross/type/string.h"
 #include "dross/type/timestamp.h"
-#include "dross/type/data.h"
 
 #include <initializer_list>
 #include <memory>
@@ -151,7 +151,10 @@ public:
      * Automatically converts arithmetic types to number for convenient usage.
      */
     template <number_type T>
-    value(const T n) : value(number(n)) {}
+    value(const T n)
+        : value(number(n))
+    {
+    }
 
     /**
      * @brief Construct from any string-like type.
@@ -160,7 +163,10 @@ public:
      * Automatically converts string types to string for convenient usage.
      */
     template <string_type T>
-    value(const T s) : value(string(s)) {}
+    value(const T s)
+        : value(string(s))
+    {
+    }
 
     /**
      * @brief Test equality with another value.
@@ -311,4 +317,4 @@ private:
 template <class T>
 T value_cast(const value& val) noexcept;
 
-}
+}  // namespace dross

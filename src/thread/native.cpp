@@ -47,7 +47,7 @@ std::optional<std::uint64_t> main_thread_id()
 #else
     // No API answers this for a thread other than the one asking, so this
     // is only ever known once the main thread has used the module itself.
-    return is_main_thread() ? std::optional{thread_id()} : std::nullopt;
+    return is_main_thread() ? std::optional{ thread_id() } : std::nullopt;
 #endif
 }
 
@@ -57,4 +57,4 @@ bool on_main_thread()
     return is_main;
 }
 
-}
+}  // namespace dross::native

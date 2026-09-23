@@ -1,8 +1,10 @@
 #pragma once
 
+#include "error.h"
+
+#include <compare>
 #include <cstddef>
 #include <cstdint>
-#include <compare>
 #include <expected>
 #include <functional>
 #include <initializer_list>
@@ -11,8 +13,6 @@
 #include <optional>
 #include <string>
 #include <vector>
-
-#include "error.h"
 
 namespace dross {
 
@@ -357,31 +357,99 @@ public:
     using pointer = uint8_t*;
     using reference = uint8_t&;
 
-    iterator() : _ptr(nullptr) {}
-    explicit iterator(uint8_t* ptr) : _ptr(ptr) {}
+    iterator()
+        : _ptr(nullptr)
+    {
+    }
+    explicit iterator(uint8_t* ptr)
+        : _ptr(ptr)
+    {
+    }
 
-    uint8_t& operator*() const { return *_ptr; }
-    uint8_t* operator->() const { return _ptr; }
-    uint8_t& operator[](std::ptrdiff_t n) const { return _ptr[n]; }
+    uint8_t& operator*() const
+    {
+        return *_ptr;
+    }
+    uint8_t* operator->() const
+    {
+        return _ptr;
+    }
+    uint8_t& operator[](std::ptrdiff_t n) const
+    {
+        return _ptr[n];
+    }
 
-    iterator& operator++() { ++_ptr; return *this; }
-    iterator operator++(int) { auto tmp = *this; ++_ptr; return tmp; }
-    iterator& operator--() { --_ptr; return *this; }
-    iterator operator--(int) { auto tmp = *this; --_ptr; return tmp; }
+    iterator& operator++()
+    {
+        ++_ptr;
+        return *this;
+    }
+    iterator operator++(int)
+    {
+        auto tmp = *this;
+        ++_ptr;
+        return tmp;
+    }
+    iterator& operator--()
+    {
+        --_ptr;
+        return *this;
+    }
+    iterator operator--(int)
+    {
+        auto tmp = *this;
+        --_ptr;
+        return tmp;
+    }
 
-    iterator& operator+=(std::ptrdiff_t n) { _ptr += n; return *this; }
-    iterator& operator-=(std::ptrdiff_t n) { _ptr -= n; return *this; }
+    iterator& operator+=(std::ptrdiff_t n)
+    {
+        _ptr += n;
+        return *this;
+    }
+    iterator& operator-=(std::ptrdiff_t n)
+    {
+        _ptr -= n;
+        return *this;
+    }
 
-    iterator operator+(std::ptrdiff_t n) const { return iterator(_ptr + n); }
-    iterator operator-(std::ptrdiff_t n) const { return iterator(_ptr - n); }
-    std::ptrdiff_t operator-(const iterator& other) const { return _ptr - other._ptr; }
+    iterator operator+(std::ptrdiff_t n) const
+    {
+        return iterator(_ptr + n);
+    }
+    iterator operator-(std::ptrdiff_t n) const
+    {
+        return iterator(_ptr - n);
+    }
+    std::ptrdiff_t operator-(const iterator& other) const
+    {
+        return _ptr - other._ptr;
+    }
 
-    bool operator==(const iterator& other) const noexcept { return _ptr == other._ptr; }
-    bool operator!=(const iterator& other) const noexcept { return _ptr != other._ptr; }
-    bool operator<(const iterator& other) const noexcept { return _ptr < other._ptr; }
-    bool operator<=(const iterator& other) const noexcept { return _ptr <= other._ptr; }
-    bool operator>(const iterator& other) const noexcept { return _ptr > other._ptr; }
-    bool operator>=(const iterator& other) const noexcept { return _ptr >= other._ptr; }
+    bool operator==(const iterator& other) const noexcept
+    {
+        return _ptr == other._ptr;
+    }
+    bool operator!=(const iterator& other) const noexcept
+    {
+        return _ptr != other._ptr;
+    }
+    bool operator<(const iterator& other) const noexcept
+    {
+        return _ptr < other._ptr;
+    }
+    bool operator<=(const iterator& other) const noexcept
+    {
+        return _ptr <= other._ptr;
+    }
+    bool operator>(const iterator& other) const noexcept
+    {
+        return _ptr > other._ptr;
+    }
+    bool operator>=(const iterator& other) const noexcept
+    {
+        return _ptr >= other._ptr;
+    }
 
 private:
     uint8_t* _ptr;
@@ -401,32 +469,103 @@ public:
     using pointer = const uint8_t*;
     using reference = const uint8_t&;
 
-    const_iterator() : _ptr(nullptr) {}
-    explicit const_iterator(const uint8_t* ptr) : _ptr(ptr) {}
-    const_iterator(const iterator& iter) : _ptr(&(*iter)) {}
+    const_iterator()
+        : _ptr(nullptr)
+    {
+    }
+    explicit const_iterator(const uint8_t* ptr)
+        : _ptr(ptr)
+    {
+    }
+    const_iterator(const iterator& iter)
+        : _ptr(&(*iter))
+    {
+    }
 
-    const uint8_t& operator*() const { return *_ptr; }
-    const uint8_t* operator->() const { return _ptr; }
-    const uint8_t& operator[](std::ptrdiff_t n) const { return _ptr[n]; }
+    const uint8_t& operator*() const
+    {
+        return *_ptr;
+    }
+    const uint8_t* operator->() const
+    {
+        return _ptr;
+    }
+    const uint8_t& operator[](std::ptrdiff_t n) const
+    {
+        return _ptr[n];
+    }
 
-    const_iterator& operator++() { ++_ptr; return *this; }
-    const_iterator operator++(int) { auto tmp = *this; ++_ptr; return tmp; }
-    const_iterator& operator--() { --_ptr; return *this; }
-    const_iterator operator--(int) { auto tmp = *this; --_ptr; return tmp; }
+    const_iterator& operator++()
+    {
+        ++_ptr;
+        return *this;
+    }
+    const_iterator operator++(int)
+    {
+        auto tmp = *this;
+        ++_ptr;
+        return tmp;
+    }
+    const_iterator& operator--()
+    {
+        --_ptr;
+        return *this;
+    }
+    const_iterator operator--(int)
+    {
+        auto tmp = *this;
+        --_ptr;
+        return tmp;
+    }
 
-    const_iterator& operator+=(std::ptrdiff_t n) { _ptr += n; return *this; }
-    const_iterator& operator-=(std::ptrdiff_t n) { _ptr -= n; return *this; }
+    const_iterator& operator+=(std::ptrdiff_t n)
+    {
+        _ptr += n;
+        return *this;
+    }
+    const_iterator& operator-=(std::ptrdiff_t n)
+    {
+        _ptr -= n;
+        return *this;
+    }
 
-    const_iterator operator+(std::ptrdiff_t n) const { return const_iterator(_ptr + n); }
-    const_iterator operator-(std::ptrdiff_t n) const { return const_iterator(_ptr - n); }
-    std::ptrdiff_t operator-(const const_iterator& other) const { return _ptr - other._ptr; }
+    const_iterator operator+(std::ptrdiff_t n) const
+    {
+        return const_iterator(_ptr + n);
+    }
+    const_iterator operator-(std::ptrdiff_t n) const
+    {
+        return const_iterator(_ptr - n);
+    }
+    std::ptrdiff_t operator-(const const_iterator& other) const
+    {
+        return _ptr - other._ptr;
+    }
 
-    bool operator==(const const_iterator& other) const noexcept { return _ptr == other._ptr; }
-    bool operator!=(const const_iterator& other) const noexcept { return _ptr != other._ptr; }
-    bool operator<(const const_iterator& other) const noexcept { return _ptr < other._ptr; }
-    bool operator<=(const const_iterator& other) const noexcept { return _ptr <= other._ptr; }
-    bool operator>(const const_iterator& other) const noexcept { return _ptr > other._ptr; }
-    bool operator>=(const const_iterator& other) const noexcept { return _ptr >= other._ptr; }
+    bool operator==(const const_iterator& other) const noexcept
+    {
+        return _ptr == other._ptr;
+    }
+    bool operator!=(const const_iterator& other) const noexcept
+    {
+        return _ptr != other._ptr;
+    }
+    bool operator<(const const_iterator& other) const noexcept
+    {
+        return _ptr < other._ptr;
+    }
+    bool operator<=(const const_iterator& other) const noexcept
+    {
+        return _ptr <= other._ptr;
+    }
+    bool operator>(const const_iterator& other) const noexcept
+    {
+        return _ptr > other._ptr;
+    }
+    bool operator>=(const const_iterator& other) const noexcept
+    {
+        return _ptr >= other._ptr;
+    }
 
 private:
     const uint8_t* _ptr;
@@ -442,4 +581,4 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const data& d);
 
-}
+}  // namespace dross

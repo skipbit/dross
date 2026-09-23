@@ -277,4 +277,4 @@ runloop main_runloop();
  */
 runloop current_runloop();
 
-}
+}  // namespace dross

@@ -1,9 +1,10 @@
 #pragma once
 
-#include <expected>
-#include "../type/value.h"
 #include "../type/data.h"
 #include "../type/error.h"
+#include "../type/value.h"
+
+#include <expected>
 
 namespace dross::toml {
 
@@ -56,7 +57,7 @@ namespace dross::toml {
 
 /**
  * @brief Deserialize TOML format binary data to dictionary structure.
- * 
+ *
  * Converts TOML format text data to dross dictionary type.
  * The input data is expected to be valid UTF-8 encoded TOML content.
  * TOML documents always have a table (dictionary) as their root structure.
@@ -106,4 +107,4 @@ std::expected<dictionary, error> deserialize(const data& input);
  */
 std::expected<data, error> serialize(const dictionary& input);
 
-}
+}  // namespace dross::toml
