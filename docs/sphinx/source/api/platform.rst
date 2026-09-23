@@ -127,7 +127,8 @@ Some caveats apply to the current implementation:
 - ``mkdir()`` is idempotent: it succeeds whether it creates
   the directory or finds it already there. It fails only when
   ``std::filesystem::create_directories`` reports an actual error, such as
-  a path component that exists and is not a directory. The operation is
+  a path component that exists and is not a directory. An empty path is not
+  taken as an existing directory: it fails. The operation is
   not atomic — directories created before the failure may remain. Some
   failures are rejected before anything is created at all. Because an
   already-present directory is accepted without inspection, a directory,
