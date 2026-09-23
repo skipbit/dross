@@ -285,6 +285,32 @@ TEST(path_test, resolve_of_a_missing_path_returns_unexpected)
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(path_test, resolve_of_a_tilde_path_to_an_existing_target_resolves_under_home)
+{
+    const scoped_temp_dir base;
+    std::filesystem::create_directories(base.path() / "x");
+
+    scoped_env_var home("HOME");
+    home.set(base.path().string());
+
+    const auto result = dross::path{ std::string{ "~/x" } }.resolve();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->string(), std::filesystem::canonical(base.path() / "x").string());
+}
+
+TEST(path_test, resolve_of_a_tilde_path_to_a_missing_target_returns_unexpected)
+{
+    const scoped_temp_dir base;
+
+    scoped_env_var home("HOME");
+    home.set(base.path().string());
+
+    const auto result = dross::path{ std::string{ "~/does_not_exist" } }.resolve();
+
+    EXPECT_FALSE(result.has_value());
+}
+
 // --- path::exists / default constructor (pinning current, unmodified behavior) ---
 
 TEST(path_test, exists_is_false_for_a_missing_path)

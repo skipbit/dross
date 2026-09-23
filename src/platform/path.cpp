@@ -110,13 +110,13 @@ std::expected<path, std::filesystem::filesystem_error> path::expand() const
 
 std::expected<path, std::filesystem::filesystem_error> path::resolve() const
 {
+    const auto expanded = expand();
+    if (! expanded) {
+        return expanded;
+    }
+
     try {
-        const auto expanded = expand();
-        if (expanded) {
-            return path{ std::filesystem::canonical(expanded.value()._path) };
-        } else {
-            return expanded;
-        }
+        return path{ std::filesystem::canonical(expanded.value()._path) };
     } catch (const std::filesystem::filesystem_error& e) {
         return std::unexpected(e);
     }
