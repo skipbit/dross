@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../type/data.h"
+#include "../type/dictionary.h"
 #include "../type/error.h"
 #include "../type/value.h"
 
