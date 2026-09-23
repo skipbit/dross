@@ -309,3 +309,22 @@ TEST(path_test, default_constructor_refers_to_the_current_working_directory)
 
     EXPECT_TRUE(std::filesystem::equivalent(std::filesystem::path(p), std::filesystem::current_path()));
 }
+
+TEST(path_test, append_joins_a_component_whatever_its_leading_separators)
+{
+    const dross::path base{ std::string{ "/a/b" } };
+
+    EXPECT_EQ(base.append("c").string(), "/a/b/c");
+    EXPECT_EQ(base.append("/c").string(), "/a/b/c");
+    EXPECT_EQ(base.append("//c").string(), "/a/b/c");
+    EXPECT_EQ(base.append("///c").string(), "/a/b/c");
+    EXPECT_EQ(base.append("//server/share").string(), "/a/b/server/share");
+}
+
+TEST(path_test, append_of_only_separators_does_not_replace_the_path)
+{
+    const dross::path base{ std::string{ "/a/b" } };
+
+    EXPECT_EQ(base.append("/").string(), "/a/b/");
+    EXPECT_EQ(base.append("//").string(), "/a/b/");
+}

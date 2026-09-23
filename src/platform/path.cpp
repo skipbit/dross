@@ -75,12 +75,11 @@ bool path::exists() const
 
 path path::append(const std::string& component) const
 {
+    // Every leading separator is dropped, not just one: a component still
+    // starting with one would replace the path instead of joining it.
+    const auto first = component.find_first_not_of(path::separator());
     std::filesystem::path p(_path);
-    if (component.substr(0, 1) == path::separator()) {
-        p.append(std::string(component).replace(0, 1, ""));
-    } else {
-        p.append(component);
-    }
+    p.append((first == std::string::npos) ? std::string{} : component.substr(first));
     return path{ p };
 }
 
