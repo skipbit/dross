@@ -334,7 +334,10 @@ TEST(timer_test, a_slow_fire_does_not_shorten_another_timers_next_interval)
 
     std::this_thread::sleep_for(std::chrono::milliseconds{ 60 });
 
-    loop.run_for(std::chrono::milliseconds{ 350 });
+    // Wide enough that the 200ms callback has to overrun by 350ms before the
+    // second fire falls outside: on a loaded runner a 100ms margin was not
+    // enough and this failed twice.
+    loop.run_for(std::chrono::milliseconds{ 800 });
     fast.invalidate();
     slow.invalidate();
 
