@@ -47,6 +47,8 @@ public:
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;
 
+    bool operator==(const error&) const noexcept;
+    bool operator!=(const error&) const noexcept;
     std::strong_ordering operator<=>(const error&) const noexcept;
 
 private:

@@ -72,14 +72,43 @@ TEST(error_test, copy_constructor_preserves_the_underlying_code)
 
 TEST(error_test, three_way_comparison_orders_by_the_underlying_error_code)
 {
-    // dross::error has no operator==(const error&) of its own (only the
-    // category/enum overloads), so equality here is checked through <=>.
     const dross::error smaller(0, std::generic_category());
     const dross::error larger(1, std::generic_category());
 
     EXPECT_TRUE(smaller < larger);
     EXPECT_TRUE(larger > smaller);
     EXPECT_TRUE((smaller <=> smaller) == std::strong_ordering::equal);
+}
+
+TEST(error_test, equality_operator_compares_the_underlying_error_code)
+{
+    const dross::error one(1, std::generic_category());
+    const dross::error same(1, std::generic_category());
+    const dross::error other_value(2, std::generic_category());
+    const dross::error other_category(1, std::system_category());
+
+    EXPECT_TRUE(one == same);
+    EXPECT_FALSE(one != same);
+    EXPECT_FALSE(one == other_value);
+    EXPECT_TRUE(one != other_value);
+    EXPECT_FALSE(one == other_category);
+    EXPECT_TRUE(one != other_category);
+}
+
+TEST(error_test, equality_agrees_with_three_way_comparison)
+{
+    const dross::error errors[] = {
+        dross::error(1, std::generic_category()),
+        dross::error(2, std::generic_category()),
+        dross::error(1, std::system_category()),
+        dross::error(std::io_errc::stream),
+    };
+
+    for (const auto& a : errors) {
+        for (const auto& b : errors) {
+            EXPECT_EQ(a == b, (a <=> b) == std::strong_ordering::equal);
+        }
+    }
 }
 
 TEST(error_test, stream_insertion_writes_domain_and_code)
