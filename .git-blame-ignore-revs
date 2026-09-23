@@ -1,0 +1,21 @@
+# Commits that changed how the sources read without changing what they do.
+# GitHub reads this file automatically. To enable it locally, run once:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: add the formatting configuration and reformat
+e6fcfe3910d8e15e2184853e255d1ae14c65e2d6
+
+# style: open the braced list on its own line
+27a5c5047d8a1c40bedc5baa6afdfb4f351b93fe
+
+# style: keep a call's first argument on the line that opens it
+8652d6ed15a1c9337c557b5922222883691024ef
+
+# style: drop the stray semicolon after a constructor body
+84587cd5de122b732208fa6c3b2a08b7281d7b89
+
+# style: keep a chained call on the line it continues
+9b1cb9ee34d36de66585fef1aef4914bea303cda
+
+# style: move the data iterators' bodies out of the header
+fc74332e84a8ba5a528d1ca55db9d758c79355ce
