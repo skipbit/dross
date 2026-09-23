@@ -354,7 +354,7 @@ timestamp::timestamp(const std::string& iso8601_str)
                     if (match[9].str() == "-") {
                         offset = -offset;
                     }
-                    _store->tz = dross::timezone::offset(offset / 60, std::abs(offset) % 60);
+                    _store->tz = dross::timezone::offset(std::chrono::minutes{ offset });
                 } else {
                     // No timezone specified, keep default UTC
                 }

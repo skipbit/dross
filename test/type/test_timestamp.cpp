@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <string>
 #include <thread>
 
 // Test static factory method
@@ -103,6 +104,22 @@ TEST(timestamp_test, string_constructor_offset_timestamp)
     EXPECT_EQ(ts.time().minute(), 30);
     EXPECT_EQ(ts.time().second(), 0);
     EXPECT_EQ(ts.timezone().offset().count(), 540);
+}
+
+// A negative offset under an hour keeps its sign
+TEST(timestamp_test, string_constructor_negative_offset_under_an_hour)
+{
+    EXPECT_EQ(dross::timestamp("2024-01-21T15:30:00-00:30").timezone().offset().count(), -30);
+    EXPECT_EQ(dross::timestamp("2024-01-21T15:30:00-00:01").timezone().offset().count(), -1);
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T15:30:00-00:30")), "2024-01-21T15:30:00-00:30");
+
+    // Controls: an hour or more, and a positive offset under an hour
+    EXPECT_EQ(dross::timestamp("2024-01-21T15:30:00-01:30").timezone().offset().count(), -90);
+    EXPECT_EQ(dross::timestamp("2024-01-21T15:30:00+00:30").timezone().offset().count(), 30);
+
+    // The ends of the accepted range are kept
+    EXPECT_EQ(dross::timestamp("2024-01-21T15:30:00-12:00").timezone().offset().count(), -720);
+    EXPECT_EQ(dross::timestamp("2024-01-21T15:30:00+14:00").timezone().offset().count(), 840);
 }
 
 // Test string constructor - UTC timestamp
