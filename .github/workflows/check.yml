@@ -270,6 +270,64 @@ jobs:
           pkg-config --cflags dross
           pkg-config --libs dross
 
+      # What drossConfigVersion.cmake accepts depends on the COMPATIBILITY in
+      # CMakeLists.txt, and while the version is 0.0.0 every mode answers the
+      # same. So a copy of this commit, fetched without the tags, is tagged
+      # v0.9.3 here and installed on its own: 0 and 0.1 are refused under
+      # SameMinorVersion but accepted under SameMajorVersion. The tag exists
+      # only in that copy. The probe searches that prefix alone, since the
+      # install above left a 0.0.0 in the system one.
+      - name: Check which versions find_package accepts
+        if: matrix.kind == 'install'
+        run: |
+          copy="$RUNNER_TEMP/versioned"
+          prefix="$RUNNER_TEMP/versioned-install"
+          git init --quiet "$copy"
+          git -C "$copy" fetch --quiet --no-tags "$GITHUB_WORKSPACE" HEAD
+          git -C "$copy" checkout --quiet --detach FETCH_HEAD
+          git -C "$copy" tag v0.9.3
+          (cd "$copy" && cmake --preset release > /dev/null)
+          cmake --build "$copy/build/release" --target dross --parallel "$(getconf _NPROCESSORS_ONLN)" > /dev/null
+          cmake --install "$copy/build/release" --prefix "$prefix" > /dev/null
+
+          mkdir "$RUNNER_TEMP/probe"
+          cat > "$RUNNER_TEMP/probe/CMakeLists.txt" << 'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(probe CXX)
+          find_package(dross ${REQUEST} REQUIRED NO_DEFAULT_PATH PATHS ${PREFIX})
+          message(STATUS "found dross ${dross_VERSION}")
+          EOF
+
+          # A refusal has to be the version's: a package that is not found at
+          # all also fails the configure. The list of files considered but not
+          # accepted is printed by every CMake the runners carry; the reason
+          # after it is not.
+          probe() {
+            rm -rf "$RUNNER_TEMP/probe-build"
+            cmake -S "$RUNNER_TEMP/probe" -B "$RUNNER_TEMP/probe-build" \
+              -D "REQUEST=$1" -D "PREFIX=$prefix" > "$RUNNER_TEMP/probe.log" 2>&1
+          }
+          failed=0
+          for request in 0.9 0.9.0 0.9.3; do
+            if probe "$request" && grep -q 'found dross 0.9.3$' "$RUNNER_TEMP/probe.log"; then
+              echo "$request: accepted"
+            else
+              echo "::error::find_package(dross $request) did not accept the installed 0.9.3"
+              cat "$RUNNER_TEMP/probe.log"
+              failed=1
+            fi
+          done
+          for request in 0.9.4 0.1 0 1; do
+            if ! probe "$request" && grep -qF 'drossConfig.cmake, version: 0.9.3' "$RUNNER_TEMP/probe.log"; then
+              echo "$request: refused"
+            else
+              echo "::error::find_package(dross $request) did not refuse the installed 0.9.3 for its version"
+              cat "$RUNNER_TEMP/probe.log"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
   # One pairing carries the sanitizers: the newest Clang against the runner's
   # own libstdc++, in a debug build. What they report is the point, so the
   # flags and the runtime they pull in are checked as well.
