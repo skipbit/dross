@@ -240,7 +240,7 @@ ctest -V
 
 ### Planned Features
 - **Configuration** - TOML, JSON, XML, YAML parsers
-- **Concurrency** - Thread management, async operations, coroutines
+- **Concurrency** - Async operations, coroutines
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
 
