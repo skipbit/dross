@@ -1,7 +1,9 @@
 #include "dross/thread/thread.h"
 #include "dross/thread/timer.h"
 #include "manual_time_source.h"
+#include "observed_time_source.h"
 #include "test_support.h"
+#include "thread/runloop_access.h"
 
 #include <gtest/gtest.h>
 
@@ -417,25 +419,18 @@ TEST(timer_test, a_huge_delay_does_not_overflow)
 
 TEST(timer_test, installing_a_sooner_timer_cuts_short_a_wait_on_a_later_one)
 {
-    dross::thread worker;
-    std::optional<dross::runloop> worker_loop;
-    std::atomic<bool> captured{ false };
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::runloop loop = dross::runloop_access::standalone(source);
+    std::thread runner{ [loop]() mutable {
+        loop.run();
+    } };
 
-    ASSERT_TRUE(worker.perform([&worker_loop, &captured]() {
-        worker_loop = dross::current_runloop();
-        captured.store(true);
-    }));
-    const auto capture_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while ((! captured.load()) && std::chrono::steady_clock::now() < capture_deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
-    }
-    ASSERT_TRUE(worker_loop.has_value());
-
-    // Far enough out that the worker's already-running run() loop, with
-    // nothing else queued, parks its wait on this deadline.
-    dross::timer far = dross::timer::once(std::chrono::seconds{ 10 }, [](dross::timer) {
-    }, *worker_loop);
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 50 });
+    // Far enough out that it never comes due while this test runs. With
+    // nothing else installed or queued, the loop's only wait with a deadline
+    // is parked on this one.
+    dross::timer far = dross::timer::once(std::chrono::hours{ 1 }, [](dross::timer) {
+    }, loop);
+    EXPECT_TRUE(source->await_timed_waits(1));
 
     // install_timer() notifies the condition variable the parked wait is
     // blocked on. A black-box test cannot isolate that one call by itself,
@@ -445,72 +440,53 @@ TEST(timer_test, installing_a_sooner_timer_cuts_short_a_wait_on_a_later_one)
     // effect, which is what this checks: a sooner deadline installed while
     // parked on a later one is not missed until the later one's own stale
     // timeout.
-    std::atomic<bool> soon_fired{ false };
-    dross::timer soon = dross::timer::once(std::chrono::milliseconds{ 100 }, [&soon_fired](dross::timer) {
-        soon_fired.store(true);
-    }, *worker_loop);
+    dross_test::event soon_fired;
+    dross::timer soon = dross::timer::once(std::chrono::milliseconds{ 0 }, [&soon_fired](dross::timer) {
+        soon_fired.set();
+    }, loop);
 
-    // Bounded well under far's 10-second deadline: if installing soon had
-    // not woken the parked loop, this would only settle once that stale
-    // deadline finally timed out on its own.
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{ 2 };
-    while ((! soon_fired.load()) && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 5 });
-    }
-
-    EXPECT_TRUE(soon_fired.load());
+    // If installing soon had not woken the parked loop, it would sleep on
+    // until far's deadline, an hour away, and this would reach its bound.
+    EXPECT_TRUE(soon_fired.wait());
 
     far.invalidate();
-    ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
-    }));
-    ASSERT_TRUE(worker.join_for(kTimeout));
+    loop.quit();
+    runner.join();
 }
 
 TEST(timer_test, invalidate_from_another_thread_while_the_loop_is_running_it)
 {
-    dross::thread worker;
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::runloop loop = dross::runloop_access::standalone(source);
+    std::thread runner{ [loop]() mutable {
+        loop.run();
+    } };
 
     std::atomic<int> fire_count{ 0 };
-    std::optional<dross::timer> t;
-    std::atomic<bool> installed{ false };
+    dross_test::event fired;
+    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 1 }, [&fire_count, &fired](dross::timer) {
+        fire_count.fetch_add(1);
+        fired.set();
+    }, loop);
+    EXPECT_TRUE(fired.wait());
 
-    ASSERT_TRUE(worker.perform([&t, &installed, &fire_count]() {
-        t = dross::timer::repeating(std::chrono::milliseconds{ 1 }, [&fire_count](dross::timer) {
-            fire_count.fetch_add(1);
-        });
-        installed.store(true);
-    }));
+    // While the timer is installed, every wait the loop begins has a
+    // deadline, so this count holds still until invalidate() below.
+    const std::size_t untimed_before = source->untimed_waits();
 
-    const auto install_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while ((! installed.load()) && std::chrono::steady_clock::now() < install_deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
-    }
-    ASSERT_TRUE(installed.load());
+    // Racing this against the runner actively firing the same timer is what
+    // exercises the thread sanitizer; see invalidate()'s own doc comment on
+    // being callable from any thread.
+    t.invalidate();
+    EXPECT_FALSE(t.valid());
 
-    const auto fire_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while ((fire_count.load() < 1) && std::chrono::steady_clock::now() < fire_deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
-    }
-    ASSERT_GE(fire_count.load(), 1);
-
-    // Racing this against the worker thread actively firing the same timer
-    // is what exercises the thread sanitizer; see invalidate()'s own doc
-    // comment on being callable from any thread.
-    t->invalidate();
-    EXPECT_FALSE(t->valid());
-
-    // A fire the loop had already taken when invalidate() ran still finishes,
-    // so the count is read after that one has landed. What invalidate()
-    // promises is that no further fire is taken, which is what the second
-    // reading checks.
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 50 });
+    // A fire the loop had already taken when invalidate() ran still finishes.
+    // The loop begins a wait with no deadline only after that, once no timer
+    // is left to wait for, and from then on nothing can fire.
+    EXPECT_TRUE(source->await_untimed_waits(untimed_before + 1));
     const int settled = fire_count.load();
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 50 });
-    EXPECT_EQ(fire_count.load(), settled);
 
-    ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
-    }));
-    ASSERT_TRUE(worker.join_for(kTimeout));
+    loop.quit();
+    runner.join();
+    EXPECT_EQ(fire_count.load(), settled);
 }

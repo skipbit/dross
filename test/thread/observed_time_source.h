@@ -39,20 +39,33 @@ public:
     std::size_t waits() const
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
-        return _waits;
+        return _timed_waits + _untimed_waits;
     }
 
-    // Returns false if bound passed before count waits of any kind had begun.
+    std::size_t untimed_waits() const
+    {
+        const std::lock_guard<std::mutex> guard{ _mutex };
+        return _untimed_waits;
+    }
+
+    // Each returns false if bound passed before count waits of its kind had
+    // begun.
     bool await_waits(std::size_t count, std::chrono::milliseconds bound = kTimeout) const
     {
         std::unique_lock<std::mutex> lock{ _mutex };
         return _changed.wait_for(lock, bound, [this, count]() {
-            return (_waits >= count);
+            return (_timed_waits + _untimed_waits >= count);
         });
     }
 
-    // Returns false if bound passed before count waits with no deadline had
-    // begun.
+    bool await_timed_waits(std::size_t count, std::chrono::milliseconds bound = kTimeout) const
+    {
+        std::unique_lock<std::mutex> lock{ _mutex };
+        return _changed.wait_for(lock, bound, [this, count]() {
+            return (_timed_waits >= count);
+        });
+    }
+
     bool await_untimed_waits(std::size_t count, std::chrono::milliseconds bound = kTimeout) const
     {
         std::unique_lock<std::mutex> lock{ _mutex };
@@ -66,17 +79,14 @@ private:
     {
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
-            ++_waits;
-            if (untimed) {
-                ++_untimed_waits;
-            }
+            ++(untimed ? _untimed_waits : _timed_waits);
         }
         _changed.notify_all();
     }
 
     mutable std::mutex _mutex;
     mutable std::condition_variable _changed;
-    mutable std::size_t _waits{ 0 };
+    mutable std::size_t _timed_waits{ 0 };
     mutable std::size_t _untimed_waits{ 0 };
 };
 
