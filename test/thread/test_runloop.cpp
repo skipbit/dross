@@ -1,6 +1,7 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
 #include "manual_time_source.h"
+#include "test_support.h"
 
 #include <gtest/gtest.h>
 
@@ -15,14 +16,7 @@
 
 namespace {
 
-// Every test here shares the main thread's loop, so the ones that use it
-// start from a known state: no queued tasks, no quit request left behind.
-void reset_main_runloop()
-{
-    dross::runloop loop = dross::main_runloop();
-    loop.clear();
-    loop.run_for(std::chrono::milliseconds{ 1 });
-}
+using dross_test::reset_main_runloop;
 
 }  // namespace
 

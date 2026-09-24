@@ -1,6 +1,7 @@
 #include "dross/thread/thread.h"
 #include "dross/thread/timer.h"
 #include "manual_time_source.h"
+#include "test_support.h"
 
 #include <gtest/gtest.h>
 
@@ -14,20 +15,8 @@
 
 namespace {
 
-// Generous enough that a real regression fails instead of flaking, but short
-// enough that a genuine hang does not stall the suite.
-constexpr auto kTimeout = std::chrono::seconds{ 5 };
-
-// Every test here shares the main thread's loop, so the ones that use it
-// start from a known state: no queued tasks, no quit request left behind.
-// Every timer installed on it must be invalidated before the test returns,
-// since there is no bulk equivalent of clear() for timers.
-void reset_main_runloop()
-{
-    dross::runloop loop = dross::main_runloop();
-    loop.clear();
-    loop.run_for(std::chrono::milliseconds{ 1 });
-}
+using dross_test::kTimeout;
+using dross_test::reset_main_runloop;
 
 // Runs loop in short slices until predicate() is true or bound passes.
 // Short slices, rather than one run_for(bound), keep a test fast once its
@@ -95,6 +84,7 @@ TEST(timer_test, the_callback_receives_the_timer_and_can_invalidate_itself_from_
             self.invalidate();
         }
     }, loop);
+    const dross_test::invalidate_on_exit cleanup{ t };
 
     spin_until(loop, [&t]() {
         return (! t.valid());
@@ -132,6 +122,7 @@ TEST(timer_test, invalidate_is_idempotent_and_safe_after_the_timer_has_ended)
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer) {
         ++fire_count;
     }, loop);
+    const dross_test::invalidate_on_exit cleanup{ t };
 
     spin_until(loop, [&fire_count]() {
         return (fire_count > 0);
@@ -147,6 +138,7 @@ TEST(timer_test, invalidate_is_idempotent_and_safe_after_the_timer_has_ended)
     // Also idempotent before any fire at all.
     dross::timer t2 = dross::timer::once(std::chrono::milliseconds{ 50 }, [](dross::timer) {
     }, loop);
+    const dross_test::invalidate_on_exit cleanup2{ t2 };
     t2.invalidate();
     t2.invalidate();
     EXPECT_FALSE(t2.valid());
@@ -181,6 +173,7 @@ TEST(timer_test, a_copied_handle_names_the_same_timer)
 
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 1000 }, [](dross::timer) {
     }, loop);
+    const dross_test::invalidate_on_exit cleanup{ t };
     dross::timer copy = t;
 
     EXPECT_TRUE(copy == t);
@@ -195,29 +188,25 @@ TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
 {
     dross::thread worker;
     std::optional<dross::runloop> worker_loop;
-    std::atomic<bool> captured{ false };
+    dross_test::event captured;
 
     ASSERT_TRUE(worker.perform([&worker_loop, &captured]() {
         worker_loop = dross::current_runloop();
-        captured.store(true);
+        captured.set();
     }));
 
-    const auto capture_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while ((! captured.load()) && std::chrono::steady_clock::now() < capture_deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
-    }
+    ASSERT_TRUE(captured.wait());
     ASSERT_TRUE(worker_loop.has_value());
 
     std::atomic<std::uint64_t> ran_on{ 0 };
-    dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&ran_on](dross::timer) {
+    dross_test::event fired;
+    dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&ran_on, &fired](dross::timer) {
         ran_on.store(dross::current_thread().native_id().value());
+        fired.set();
     }, *worker_loop);
     static_cast<void>(t);
 
-    const auto fire_deadline = std::chrono::steady_clock::now() + kTimeout;
-    while ((ran_on.load() == 0) && std::chrono::steady_clock::now() < fire_deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
-    }
+    ASSERT_TRUE(fired.wait());
 
     ASSERT_TRUE(worker.native_id().has_value());
     EXPECT_EQ(ran_on.load(), *worker.native_id());
@@ -238,10 +227,12 @@ TEST(timer_test, timer_count_rises_on_install_and_falls_on_invalidate_and_after_
 
     dross::timer repeating = dross::timer::repeating(std::chrono::milliseconds{ 1000 }, [](dross::timer) {
     }, loop);
+    const dross_test::invalidate_on_exit cleanup_repeating{ repeating };
     EXPECT_EQ(loop.timer_count(), 1U);
 
     dross::timer one_shot = dross::timer::once(std::chrono::milliseconds{ 0 }, [](dross::timer) {
     }, loop);
+    const dross_test::invalidate_on_exit cleanup_one_shot{ one_shot };
     EXPECT_EQ(loop.timer_count(), 2U);
 
     spin_until(loop, [&one_shot]() {
@@ -350,6 +341,7 @@ TEST(timer_test, an_exception_from_the_callback_propagates_and_the_timer_stays_i
         ++fire_count;
         throw std::runtime_error{ "from a timer" };
     }, loop);
+    const dross_test::invalidate_on_exit cleanup{ t };
 
     EXPECT_THROW(loop.run_pending(), std::runtime_error);
     EXPECT_EQ(fire_count, 1);
@@ -359,8 +351,6 @@ TEST(timer_test, an_exception_from_the_callback_propagates_and_the_timer_stays_i
     // Still installed: it fires again on the next opportunity.
     EXPECT_THROW(loop.run_pending(), std::runtime_error);
     EXPECT_EQ(fire_count, 2);
-
-    t.invalidate();
 }
 
 TEST(timer_test, an_exception_from_a_one_shot_callback_propagates_and_the_timer_is_gone)
@@ -374,6 +364,7 @@ TEST(timer_test, an_exception_from_a_one_shot_callback_propagates_and_the_timer_
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [](dross::timer) {
         throw std::runtime_error{ "from a timer" };
     }, loop);
+    const dross_test::invalidate_on_exit cleanup{ t };
 
     EXPECT_THROW(loop.run_pending(), std::runtime_error);
     EXPECT_FALSE(t.valid());
@@ -418,11 +409,10 @@ TEST(timer_test, a_huge_delay_does_not_overflow)
     // catch a regression of the signed-overflow bug on this addition.
     dross::timer t = dross::timer::once(std::chrono::milliseconds::max(), [](dross::timer) {
     }, loop);
+    const dross_test::invalidate_on_exit cleanup{ t };
 
     EXPECT_TRUE(t.valid());
     EXPECT_EQ(loop.timer_count(), 1U);
-
-    t.invalidate();
 }
 
 TEST(timer_test, installing_a_sooner_timer_cuts_short_a_wait_on_a_later_one)

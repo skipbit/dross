@@ -1,5 +1,6 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
+#include "test_support.h"
 
 #include <gtest/gtest.h>
 
@@ -14,9 +15,7 @@
 
 namespace {
 
-// Generous enough that a real regression fails instead of flaking, but short
-// enough that a genuine hang does not stall the suite.
-constexpr auto kTimeout = std::chrono::seconds{ 5 };
+using dross_test::kTimeout;
 
 }  // namespace
 
