@@ -257,33 +257,20 @@ TEST(runloop_test, run_one_returns_false_when_quit_is_pending)
 
 TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     loop.perform([loop]() mutable {
         loop.quit();
         loop.run_one();
     });
 
-    // A watchdog in case of a regression: without the fix, the outer run()
-    // below hangs because the nested run_one() above already consumed the
-    // quit it was not meant to see.
-    std::atomic<bool> outer_done{ false };
-    std::thread watchdog{ [loop, &outer_done]() mutable {
-        std::this_thread::sleep_for(std::chrono::seconds{ 2 });
-        if (! outer_done.load()) {
-            loop.quit();
-        }
-    } };
-
-    const auto started = std::chrono::steady_clock::now();
-    loop.run();
-    const auto elapsed = std::chrono::steady_clock::now() - started;
-    outer_done.store(true);
-
-    watchdog.join();
-
-    EXPECT_LT(elapsed, std::chrono::milliseconds{ 500 });
+    // The quit left for the outer run ends it as soon as the task returns. Had
+    // the nested run_one() consumed it, the outer run would wait out the full
+    // timeout, which would move this clock.
+    const auto started = manual.clock->now();
+    EXPECT_EQ(loop.run_for(kTimeout), 1U);
+    EXPECT_EQ(manual.clock->now(), started);
 }
 
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
