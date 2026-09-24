@@ -4,6 +4,7 @@
 #include "thread/native.h"
 #include "thread/runloop_access.h"
 #include "thread/runloop_storage.h"
+#include "thread/teardown.h"
 #include "thread/timer_storage.h"
 
 #include <algorithm>
@@ -71,31 +72,13 @@ std::shared_ptr<runloop::storage> runloop::storage::main_loop()
     return *the_loop;
 }
 
-std::shared_ptr<runloop::storage> runloop::storage::finished_placeholder()
-{
-    // Shared by every thread that reaches it, rather than kept thread_local:
-    // nothing is ever installed on it, so nothing needs it to be distinct
-    // per thread. Never destroyed, for the same reason as main_loop().
-    static const std::shared_ptr<storage>* const the_loop = []() {
-        auto loop = std::make_shared<storage>();
-        loop->finish();
-        return new std::shared_ptr<storage>{ std::move(loop) };
-    }();
-    return *the_loop;
-}
-
 std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
 {
-    // Trivially destructible, so it has no destructor of its own and stays
-    // readable no matter what order thread-locals on this thread are torn
-    // down in. A user's own thread-local destructor may call
-    // current_runloop() after the holder below has already run its own
-    // destructor; this is what keeps that call defined instead of reaching
-    // into a destroyed loop. See current_runloop()'s doc comment.
-    static thread_local bool torn_down = false;
-
-    if (torn_down) {
-        return finished_placeholder();
+    // A user's own thread-local destructor may call current_runloop() after
+    // the holder below has already run its own destructor; see
+    // current_runloop()'s doc comment.
+    if (teardown::torn_down<storage>()) {
+        return teardown::finished_placeholder(&storage::finish);
     }
 
     // Destroyed when the thread ends, which is how a loop learns that no
@@ -112,7 +95,7 @@ std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
             // into current_runloop(). That call must see torn_down already
             // true, or it would reach into this very holder while it is
             // mid-destruction.
-            torn_down = true;
+            teardown::torn_down<storage>() = true;
             loop->finish();
         }
     };
