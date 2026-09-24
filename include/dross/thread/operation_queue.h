@@ -42,6 +42,9 @@ namespace dross {
  *   the way to wait for it
  * - A timer installed on a worker's loop does not keep the worker alive; it
  *   goes when the worker ends
+ * - quit() on a worker's thread, such as current_thread().quit() from a
+ *   task, ends that worker early. A queue whose workers have all ended that
+ *   way still accepts tasks but never runs them
  *
  * Waiting:
  * - wait_for() waits for the tasks already submitted to finish, while the
