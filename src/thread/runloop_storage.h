@@ -121,10 +121,6 @@ private:
     // hold _mutex.
     std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled);
 
-    // A loop that is already finished, shared by every call made after this
-    // thread's own bookkeeping has been torn down; see for_current_thread().
-    static std::shared_ptr<storage> finished_placeholder();
-
     // Set once, at construction, and never reassigned, so it is read without
     // _mutex.
     const std::shared_ptr<const time_source> _source;
