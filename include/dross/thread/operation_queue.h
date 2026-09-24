@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -36,6 +37,12 @@ namespace dross {
  * - The destructor never waits for that, even the last one
  * - A timer installed on a worker's loop does not keep the worker alive; it
  *   goes when the worker ends
+ *
+ * Waiting:
+ * - wait_for() waits for the tasks already submitted to finish, while the
+ *   queue goes on accepting more
+ * - Called from one of the queue's own workers, it returns at once instead,
+ *   since the task it is called from can never finish while it waits
  *
  * Thread safety:
  * - Every operation is free of data races when called from any thread,
@@ -101,6 +108,19 @@ public:
     bool submit(std::function<void()> task);
 
     /**
+     * @brief Wait for the tasks submitted so far to finish, for at most
+     * timeout.
+     * @param timeout How long to wait
+     * @return true when every task submitted before this call has finished
+     *
+     * Tasks submitted after the call starts are not waited for. A timeout of
+     * zero does not wait; it reports whether they have already finished.
+     * Called from one of the queue's own workers, this does not wait either,
+     * for the same reason as thread::join().
+     */
+    bool wait_for(std::chrono::milliseconds timeout);
+
+    /**
      * @brief Get the number of workers.
      * @return The count the queue was made with
      */
@@ -116,7 +136,11 @@ public:
 private:
     class storage;
 
+    explicit operation_queue(std::shared_ptr<storage> store) noexcept;
+
     std::shared_ptr<storage> _store;
+
+    friend class operation_queue_access;
 };
 
 }  // namespace dross

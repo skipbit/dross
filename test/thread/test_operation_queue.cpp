@@ -2,7 +2,9 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
 #include "dross/thread/timer.h"
+#include "observed_time_source.h"
 #include "test_support.h"
+#include "thread/operation_queue_access.h"
 
 #include <gtest/gtest.h>
 
@@ -330,4 +332,113 @@ TEST(operation_queue_test, the_last_handle_going_on_its_own_worker_ends_that_wor
     holder.reset();
 
     EXPECT_TRUE(all_end(workers));
+}
+
+TEST(operation_queue_test, wait_for_returns_once_the_submitted_tasks_have_finished)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(2, source);
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+
+    // The waiter's own bound is longer than the test waits for it, so only
+    // the task finishing, not its deadline, ends the wait in time.
+    std::atomic<bool> finished{ false };
+    event returned;
+    std::thread waiter{ [queue, &finished, &returned]() mutable {
+        finished.store(queue.wait_for(kTimeout * 2));
+        returned.set();
+    } };
+    // Released only once the waiter is waiting, so the task finishing is
+    // what wakes it.
+    const bool saw_wait = source->await_timed_waits(1);
+    release->set();
+    const bool woke = returned.wait();
+    waiter.join();
+
+    EXPECT_TRUE(saw_wait);
+    EXPECT_TRUE(woke);
+    EXPECT_TRUE(finished.load());
+}
+
+TEST(operation_queue_test, wait_for_does_not_wait_for_tasks_submitted_after_it_starts)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(2, source);
+    auto first = std::make_shared<event>();
+    auto later = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([first]() {
+        first->wait();
+    }));
+
+    std::atomic<bool> finished{ false };
+    std::thread waiter{ [queue, &finished]() mutable {
+        finished.store(queue.wait_for(kTimeout));
+    } };
+    const bool saw_wait = source->await_timed_waits(1);
+    ASSERT_TRUE(queue.submit([later]() {
+        later->wait();
+    }));
+    first->set();
+    waiter.join();
+    later->set();
+
+    EXPECT_TRUE(saw_wait);
+    EXPECT_TRUE(finished.load());
+}
+
+TEST(operation_queue_test, wait_for_times_out_while_a_task_is_still_running)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+
+    EXPECT_FALSE(queue.wait_for(std::chrono::milliseconds{ 1 }));
+
+    release->set();
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, wait_for_zero_does_not_wait_and_reports_the_current_state)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(1, source);
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+
+    const bool while_running = queue.wait_for(std::chrono::milliseconds::zero());
+    release->set();
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    const std::size_t waits_before = source->waits();
+    const bool once_finished = queue.wait_for(std::chrono::milliseconds::zero());
+
+    EXPECT_FALSE(while_running);
+    EXPECT_TRUE(once_finished);
+    EXPECT_EQ(source->waits(), waits_before);
+}
+
+TEST(operation_queue_test, wait_for_on_one_of_its_own_workers_does_not_wait)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(1, source);
+    struct state {
+        std::atomic<bool> finished{ true };
+        event returned;
+    };
+    auto shared = std::make_shared<state>();
+
+    ASSERT_TRUE(queue.submit([queue, shared]() mutable {
+        shared->finished.store(queue.wait_for(kTimeout));
+        shared->returned.set();
+    }));
+
+    ASSERT_TRUE(shared->returned.wait());
+    EXPECT_FALSE(shared->finished.load());
+    EXPECT_EQ(source->waits(), 0U);
 }
