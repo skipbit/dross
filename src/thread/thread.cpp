@@ -4,6 +4,8 @@
 #include "thread/deadline.h"
 #include "thread/native.h"
 #include "thread/teardown.h"
+#include "thread/thread_access.h"
+#include "thread/time_source.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -18,8 +20,11 @@ namespace dross {
 
 class thread::storage final {
 public:
-    static std::shared_ptr<storage> start_loop_thread();
-    static std::shared_ptr<storage> start_one_shot_thread(std::function<void()> body);
+    explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
+
+    static std::shared_ptr<storage> start_loop_thread(std::shared_ptr<const time_source> source = time_source::steady());
+    static std::shared_ptr<storage> start_one_shot_thread(std::function<void()> body,
+                                                          std::shared_ptr<const time_source> source = time_source::steady());
     static std::shared_ptr<storage> main_thread_storage();
     static std::shared_ptr<storage> current_thread_storage();
     static std::vector<std::shared_ptr<storage>> all();
@@ -55,7 +60,7 @@ private:
         std::shared_ptr<storage> _store;
     };
 
-    static std::shared_ptr<storage> start(std::function<void()> body, bool run_loop);
+    static std::shared_ptr<storage> start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source);
     static std::shared_ptr<storage> make_adopted();
     static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop);
 
@@ -69,6 +74,10 @@ private:
 
     void finish();
     void deregister();
+
+    // How join() and join_for() read the time and wait. Set once, at
+    // construction, and never reassigned, so it is read without _mutex.
+    const std::shared_ptr<const time_source> _source;
 
     mutable std::mutex _mutex;
     std::condition_variable _ready_cv;
@@ -90,6 +99,11 @@ private:
     // setting a flag and reading it.
     std::atomic<bool> _stop_requested{ false };
 };
+
+thread::storage::storage(std::shared_ptr<const time_source> source)
+    : _source{ std::move(source) }
+{
+}
 
 thread::storage::current_holder::~current_holder()
 {
@@ -159,9 +173,9 @@ void thread::storage::finish()
     _done_cv.notify_all();
 }
 
-std::shared_ptr<thread::storage> thread::storage::start(std::function<void()> body, bool run_loop)
+std::shared_ptr<thread::storage> thread::storage::start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source)
 {
-    auto self = std::make_shared<storage>();
+    auto self = std::make_shared<storage>(std::move(source));
 
     std::thread runner{ [self, body = std::move(body), run_loop]() mutable {
         run_on_new_thread(std::move(self), std::move(body), run_loop);
@@ -205,14 +219,14 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     // and removes it from the registry.
 }
 
-std::shared_ptr<thread::storage> thread::storage::start_loop_thread()
+std::shared_ptr<thread::storage> thread::storage::start_loop_thread(std::shared_ptr<const time_source> source)
 {
-    return start(nullptr, true);
+    return start(nullptr, true, std::move(source));
 }
 
-std::shared_ptr<thread::storage> thread::storage::start_one_shot_thread(std::function<void()> body)
+std::shared_ptr<thread::storage> thread::storage::start_one_shot_thread(std::function<void()> body, std::shared_ptr<const time_source> source)
 {
-    return start(std::move(body), false);
+    return start(std::move(body), false, std::move(source));
 }
 
 std::shared_ptr<thread::storage> thread::storage::make_adopted()
@@ -372,9 +386,9 @@ void thread::storage::join()
     }
 
     std::unique_lock<std::mutex> lock{ _mutex };
-    _done_cv.wait(lock, [this]() {
-        return _finished;
-    });
+    while (! _finished) {
+        _source->wait(lock, _done_cv);
+    }
 }
 
 bool thread::storage::join_for(std::chrono::milliseconds timeout)
@@ -391,12 +405,13 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     // wait_for() would hand steady_clock::now() + timeout to the clock
     // unclamped; for a timeout as large as milliseconds::max() that
     // overflows.
-    const auto deadline = deadline::after(std::chrono::steady_clock::now(), timeout);
+    const auto deadline = deadline::after(_source->now(), timeout);
 
     std::unique_lock<std::mutex> lock{ _mutex };
-    return _done_cv.wait_until(lock, deadline, [this]() {
-        return _finished;
-    });
+    while ((! _finished) && (_source->now() < deadline)) {
+        _source->wait_until(lock, _done_cv, deadline);
+    }
+    return _finished;
 }
 
 thread::thread(std::shared_ptr<storage> store) noexcept
@@ -489,6 +504,16 @@ thread main_thread()
 thread current_thread()
 {
     return thread{ thread::storage::current_thread_storage() };
+}
+
+thread thread_access::start(std::shared_ptr<const time_source> source)
+{
+    return thread{ thread::storage::start_loop_thread(std::move(source)) };
+}
+
+thread thread_access::start(std::function<void()> body, std::shared_ptr<const time_source> source)
+{
+    return thread{ thread::storage::start_one_shot_thread(std::move(body), std::move(source)) };
 }
 
 std::vector<thread> all_threads()

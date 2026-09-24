@@ -24,6 +24,13 @@ public:
         return _now.load();
     }
 
+    // Nothing to move the time to, so this waits for a notify like any other
+    // source would.
+    void wait(std::unique_lock<std::mutex>& lock, std::condition_variable& wake) const override
+    {
+        wake.wait(lock);
+    }
+
     void wait_until(std::unique_lock<std::mutex>& /*lock*/, std::condition_variable& /*wake*/, time_point deadline) const override
     {
         if (deadline > _now.load()) {

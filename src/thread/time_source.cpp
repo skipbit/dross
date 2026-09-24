@@ -11,6 +11,11 @@ public:
         return std::chrono::steady_clock::now();
     }
 
+    void wait(std::unique_lock<std::mutex>& lock, std::condition_variable& wake) const override
+    {
+        wake.wait(lock);
+    }
+
     void wait_until(std::unique_lock<std::mutex>& lock, std::condition_variable& wake, time_point deadline) const override
     {
         wake.wait_until(lock, deadline);

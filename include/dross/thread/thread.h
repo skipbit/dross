@@ -209,6 +209,7 @@ private:
     friend thread main_thread();
     friend thread current_thread();
     friend std::vector<thread> all_threads();
+    friend class thread_access;
 };
 
 /**

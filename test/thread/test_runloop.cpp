@@ -1,6 +1,9 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
 #include "manual_time_source.h"
+#include "observed_time_source.h"
+#include "test_support.h"
+#include "thread/runloop_access.h"
 
 #include <gtest/gtest.h>
 
@@ -15,14 +18,8 @@
 
 namespace {
 
-// Every test here shares the main thread's loop, so the ones that use it
-// start from a known state: no queued tasks, no quit request left behind.
-void reset_main_runloop()
-{
-    dross::runloop loop = dross::main_runloop();
-    loop.clear();
-    loop.run_for(std::chrono::milliseconds{ 1 });
-}
+using dross_test::kTimeout;
+using dross_test::reset_main_runloop;
 
 }  // namespace
 
@@ -213,16 +210,19 @@ TEST(runloop_test, run_pending_does_not_consume_a_pending_quit)
 
 TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::runloop loop = dross::runloop_access::standalone(source);
 
-    std::thread worker{ [loop]() mutable {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 10 });
+    // Quits only once run() below is waiting, so the quit is what wakes it.
+    std::atomic<bool> saw_wait{ false };
+    std::thread worker{ [loop, source, &saw_wait]() mutable {
+        saw_wait.store(source->await_untimed_waits(1));
         loop.quit();
     } };
 
     EXPECT_EQ(loop.run(), 0U);
     worker.join();
+    EXPECT_TRUE(saw_wait.load());
 }
 
 TEST(runloop_test, run_returns_the_number_of_tasks_it_ran)
@@ -257,33 +257,25 @@ TEST(runloop_test, run_one_returns_false_when_quit_is_pending)
 
 TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
 
     loop.perform([loop]() mutable {
         loop.quit();
+        // Queued so that a nested run_one() ignoring the quit runs this and
+        // returns, instead of waiting with nothing to run.
+        loop.perform([]() {
+        });
         loop.run_one();
     });
 
-    // A watchdog in case of a regression: without the fix, the outer run()
-    // below hangs because the nested run_one() above already consumed the
-    // quit it was not meant to see.
-    std::atomic<bool> outer_done{ false };
-    std::thread watchdog{ [loop, &outer_done]() mutable {
-        std::this_thread::sleep_for(std::chrono::seconds{ 2 });
-        if (! outer_done.load()) {
-            loop.quit();
-        }
-    } };
-
-    const auto started = std::chrono::steady_clock::now();
-    loop.run();
-    const auto elapsed = std::chrono::steady_clock::now() - started;
-    outer_done.store(true);
-
-    watchdog.join();
-
-    EXPECT_LT(elapsed, std::chrono::milliseconds{ 500 });
+    // The quit left for the outer run ends it as soon as the task returns. Had
+    // the nested run_one() consumed it, the outer run would wait out the full
+    // timeout, which would move this clock.
+    const auto started = manual.clock->now();
+    EXPECT_EQ(loop.run_for(kTimeout), 1U);
+    EXPECT_EQ(manual.clock->now(), started);
+    EXPECT_EQ(loop.pending_count(), 1U);
 }
 
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
@@ -309,21 +301,32 @@ TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
 
 TEST(runloop_test, tasks_from_many_threads_all_arrive)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::runloop loop = dross::runloop_access::standalone(source);
 
     constexpr int kPosters = 4;
     constexpr int kPerPoster = 50;
+    constexpr int kTotal = kPosters * kPerPoster;
 
     std::atomic<int> ran{ 0 };
     std::atomic<int> queued{ 0 };
+    std::atomic<int> saw_wait{ 0 };
     std::vector<std::thread> posters;
     posters.reserve(kPosters);
     for (int poster = 0; poster < kPosters; ++poster) {
-        posters.emplace_back([loop, &ran, &queued]() mutable {
+        posters.emplace_back([loop, source, &ran, &queued, &saw_wait]() mutable {
+            // Posts only once the loop is waiting, so the first task to
+            // arrive wakes it from another thread.
+            if (source->await_waits(1)) {
+                saw_wait.fetch_add(1);
+            }
             for (int n = 0; n < kPerPoster; ++n) {
-                if (loop.perform([&ran]() {
-                    ran.fetch_add(1);
+                if (loop.perform([loop, &ran]() mutable {
+                    // The last task to run ends the run below, however the
+                    // posters' tasks interleave.
+                    if (ran.fetch_add(1) + 1 == kTotal) {
+                        loop.quit();
+                    }
                 })) {
                     queued.fetch_add(1);
                 }
@@ -331,19 +334,16 @@ TEST(runloop_test, tasks_from_many_threads_all_arrive)
         });
     }
 
-    std::size_t seen = 0;
-    while (seen < static_cast<std::size_t>(kPosters * kPerPoster)) {
-        const std::size_t n = loop.run_for(std::chrono::milliseconds{ 100 });
-        ASSERT_GT(n, 0U);
-        seen += n;
-    }
+    const std::size_t seen = loop.run_for(kTimeout);
 
     for (auto& poster : posters) {
         poster.join();
     }
 
-    EXPECT_EQ(queued.load(), kPosters * kPerPoster);
-    EXPECT_EQ(ran.load(), kPosters * kPerPoster);
+    EXPECT_EQ(saw_wait.load(), kPosters);
+    EXPECT_EQ(seen, static_cast<std::size_t>(kTotal));
+    EXPECT_EQ(queued.load(), kTotal);
+    EXPECT_EQ(ran.load(), kTotal);
     EXPECT_TRUE(loop.empty());
 }
 

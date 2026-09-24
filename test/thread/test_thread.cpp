@@ -1,22 +1,25 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
+#include "observed_time_source.h"
+#include "test_support.h"
+#include "thread/thread_access.h"
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <thread>
 #include <vector>
 
 namespace {
 
-// Generous enough that a real regression fails instead of flaking, but short
-// enough that a genuine hang does not stall the suite.
-constexpr auto kTimeout = std::chrono::seconds{ 5 };
+using dross_test::kTimeout;
 
 }  // namespace
 
@@ -209,21 +212,26 @@ TEST(thread_test, finished_and_running_reflect_the_threads_lifetime)
 
 TEST(thread_test, join_for_zero_does_not_wait_and_reports_the_current_state)
 {
-    dross::thread worker;
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::thread worker = dross::thread_access::start(source);
 
-    const auto started = std::chrono::steady_clock::now();
-    const bool already_finished = worker.join_for(std::chrono::milliseconds{ 0 });
-    const auto elapsed = std::chrono::steady_clock::now() - started;
+    EXPECT_FALSE(worker.join_for(std::chrono::milliseconds{ 0 }));
+    EXPECT_EQ(source->waits(), 0U);
 
-    EXPECT_FALSE(already_finished);
-    EXPECT_LT(elapsed, std::chrono::milliseconds{ 100 });
+    // A join_for() that does wait is seen as one, so the zero above means no
+    // wait began rather than that none could be seen.
+    std::thread quitter{ [worker, source]() mutable {
+        static_cast<void>(source->await_waits(1));
+        worker.quit();
+    } };
+    const bool joined = worker.join_for(kTimeout);
+    quitter.join();
+    ASSERT_TRUE(joined);
+    EXPECT_GE(source->waits(), 1U);
 
-    ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
-    }));
-    ASSERT_TRUE(worker.join_for(kTimeout));
-
+    const std::size_t waits_before = source->waits();
     EXPECT_TRUE(worker.join_for(std::chrono::milliseconds{ 0 }));
+    EXPECT_EQ(source->waits(), waits_before);
 }
 
 TEST(thread_test, all_threads_includes_the_main_thread)
@@ -310,7 +318,8 @@ TEST(thread_test, many_threads_drive_the_registry_and_the_loop_concurrently)
 
 TEST(thread_test, join_blocks_until_another_thread_ends)
 {
-    dross::thread worker;
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::thread worker = dross::thread_access::start(source);
     std::atomic<bool> join_returned{ false };
 
     // The watcher's own join_for() below is what keeps this bounded even if
@@ -322,7 +331,9 @@ TEST(thread_test, join_blocks_until_another_thread_ends)
         join_returned.store(true);
     } };
 
-    std::this_thread::sleep_for(std::chrono::milliseconds{ 50 });
+    // Read once the watcher is inside join() and waiting, not after a guess
+    // at how long it takes to get there.
+    EXPECT_TRUE(source->await_untimed_waits(1));
     EXPECT_FALSE(join_returned.load());
 
     ASSERT_TRUE(worker.perform([]() {
@@ -481,22 +492,20 @@ TEST(thread_test, a_worker_asking_for_main_thread_first_still_reaches_the_real_m
 
 TEST(thread_test, join_for_with_a_huge_timeout_does_not_overflow)
 {
-    dross::thread worker;
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::thread worker = dross::thread_access::start(source);
 
-    std::thread delayed_quit{ [worker]() mutable {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 50 });
+    // Quits only once join_for() below is waiting, so the worker is still
+    // running when it is called: an overflowed deadline would make it return
+    // false at once, without ever waiting.
+    std::atomic<bool> saw_wait{ false };
+    std::thread delayed_quit{ [worker, source, &saw_wait]() mutable {
+        saw_wait.store(source->await_waits(1));
         worker.quit();
     } };
 
-    // Definitely still running when this is called, since the quit above is
-    // delayed: an overflowed deadline would make this return false at once
-    // instead of waiting the short while for that quit() to land.
-    const auto started = std::chrono::steady_clock::now();
     EXPECT_TRUE(worker.join_for(std::chrono::milliseconds::max()));
-    const auto elapsed = std::chrono::steady_clock::now() - started;
-
-    EXPECT_GE(elapsed, std::chrono::milliseconds{ 40 });
-    EXPECT_LT(elapsed, kTimeout);
 
     delayed_quit.join();
+    EXPECT_TRUE(saw_wait.load());
 }

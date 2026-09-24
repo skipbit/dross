@@ -251,7 +251,7 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
         // call to keep re-checking a fixed one, is what lets a newly
         // installed timer with an earlier deadline cut this wait short.
         if (wait_deadline == kNoDeadline) {
-            _wake.wait(lock);
+            _source->wait(lock, _wake);
         } else {
             _source->wait_until(lock, _wake, wait_deadline);
         }
