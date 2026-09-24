@@ -5,9 +5,9 @@
 #include <memory>
 #include <mutex>
 
-// Where a run loop reads the time and how it waits. Every loop uses steady()
-// unless it was made with another, which only a test does: see
-// runloop_access.
+// Where a run loop, and a thread's join() and join_for(), read the time and
+// how they wait. Every one uses steady() unless it was made with another,
+// which only a test does: see runloop_access and thread_access.
 //
 // Time points stay steady_clock's own, so a time_source other than steady()
 // only decides which one is "now"; nothing downstream changes type.
