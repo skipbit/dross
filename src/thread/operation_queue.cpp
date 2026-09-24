@@ -37,9 +37,12 @@ public:
     {
     }
 
-    // Queues task and hands a sweep to a worker that has none, unless every
-    // worker already has one; a sweep keeps taking until the list is empty,
-    // so an existing one reaches task too.
+    // Queues task and hands a sweep to every worker that has none; a sweep
+    // keeps taking until the list is empty, so an existing one reaches task
+    // too. Every idle worker gets one, not just the first, since a worker
+    // with no sweep may still be busy running something else on its loop.
+    // Whichever gets there first takes task, and the rest find the list
+    // empty.
     bool submit(std::function<void()> task, std::vector<thread>& workers)
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
@@ -56,9 +59,7 @@ public:
             // Marked even when perform() fails: a worker whose loop has
             // ended is never offered a sweep again.
             _sweeping[i] = true;
-            if (workers[i].perform(sweep(i))) {
-                break;
-            }
+            workers[i].perform(sweep(i));
         }
         return true;
     }

@@ -137,6 +137,46 @@ TEST(operation_queue_test, every_worker_runs_a_task_at_once)
     }
 }
 
+TEST(operation_queue_test, a_worker_busy_with_its_own_loop_does_not_hold_up_a_task)
+{
+    dross::operation_queue queue{ 2 };
+    const auto workers = workers_of(queue);
+    ASSERT_EQ(workers.size(), 2U);
+
+    // Busies each worker in turn, so whichever one submit() would try first
+    // is busy in one of the rounds.
+    for (const auto& busy : workers) {
+        struct state {
+            event queued;
+            event release;
+            event ran;
+        };
+        auto shared = std::make_shared<state>();
+        const auto gather = std::make_shared<gathering>(2);
+        for (int n = 0; n < 2; ++n) {
+            ASSERT_TRUE(queue.submit([busy, gather, shared]() {
+                gather->arrive();
+                if (busy == dross::current_thread()) {
+                    dross::current_thread().perform([shared]() {
+                        shared->release.wait();
+                    });
+                    shared->queued.set();
+                }
+            }));
+        }
+        ASSERT_TRUE(shared->queued.wait());
+        ASSERT_TRUE(queue.wait_for(kTimeout));
+
+        ASSERT_TRUE(queue.submit([shared]() {
+            shared->ran.set();
+        }));
+        const bool ran = shared->ran.wait();
+        shared->release.set();
+
+        EXPECT_TRUE(ran);
+    }
+}
+
 TEST(operation_queue_test, tasks_start_in_the_order_they_were_submitted)
 {
     struct state {
