@@ -32,8 +32,12 @@ namespace dross {
  *
  * Lifetime:
  * - When the last handle goes, or on shutdown(), the queue stops accepting
- *   tasks. Its workers run what is left, both the queue's tasks and the
- *   tasks queued on their own loops, and then end on their own
+ *   tasks. Its workers run what is left, both the queue's tasks and what
+ *   those tasks queued on their own worker's loop, and then end on their
+ *   own
+ * - A task another thread queues on a worker's loop once the queue has
+ *   stopped may not run, the same as one queued on any dross::thread whose
+ *   loop is quitting
  * - The destructor never waits for that, even the last one; shutdown() is
  *   the way to wait for it
  * - A timer installed on a worker's loop does not keep the worker alive; it
