@@ -262,6 +262,10 @@ TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
 
     loop.perform([loop]() mutable {
         loop.quit();
+        // Queued so that a nested run_one() ignoring the quit runs this and
+        // returns, instead of waiting with nothing to run.
+        loop.perform([]() {
+        });
         loop.run_one();
     });
 
@@ -271,6 +275,7 @@ TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
     const auto started = manual.clock->now();
     EXPECT_EQ(loop.run_for(kTimeout), 1U);
     EXPECT_EQ(manual.clock->now(), started);
+    EXPECT_EQ(loop.pending_count(), 1U);
 }
 
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
