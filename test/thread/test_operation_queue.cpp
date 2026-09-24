@@ -442,3 +442,115 @@ TEST(operation_queue_test, wait_for_on_one_of_its_own_workers_does_not_wait)
     EXPECT_FALSE(shared->finished.load());
     EXPECT_EQ(source->waits(), 0U);
 }
+
+TEST(operation_queue_test, shutdown_stops_accepting_and_ends_the_workers)
+{
+    dross::operation_queue queue{ 2 };
+    auto workers = workers_of(queue);
+    ASSERT_EQ(workers.size(), 2U);
+
+    EXPECT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_FALSE(queue.submit([]() {
+    }));
+    for (const auto& worker : workers) {
+        EXPECT_TRUE(worker.finished());
+    }
+}
+
+TEST(operation_queue_test, shutdown_waits_for_the_tasks_already_submitted)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(1, source);
+    struct state {
+        event release;
+        std::atomic<int> ran{ 0 };
+    };
+    auto shared = std::make_shared<state>();
+    ASSERT_TRUE(queue.submit([shared]() {
+        shared->release.wait();
+    }));
+    for (int n = 0; n < 3; ++n) {
+        ASSERT_TRUE(queue.submit([shared]() {
+            shared->ran.fetch_add(1);
+        }));
+    }
+
+    // The same bounds as in wait_for's test: only the workers ending, not
+    // the shutdown's own deadline, ends the wait in time.
+    std::atomic<bool> ended{ false };
+    event returned;
+    std::thread stopper{ [queue, &ended, &returned]() mutable {
+        ended.store(queue.shutdown(kTimeout * 2));
+        returned.set();
+    } };
+    const bool saw_wait = source->await_timed_waits(1);
+    shared->release.set();
+    const bool woke = returned.wait();
+    stopper.join();
+
+    EXPECT_TRUE(saw_wait);
+    EXPECT_TRUE(woke);
+    EXPECT_TRUE(ended.load());
+    EXPECT_EQ(shared->ran.load(), 3);
+}
+
+TEST(operation_queue_test, shutdown_times_out_while_a_task_is_still_running)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+
+    EXPECT_FALSE(queue.shutdown(std::chrono::milliseconds{ 1 }));
+    EXPECT_FALSE(queue.submit([]() {
+    }));
+
+    release->set();
+    EXPECT_TRUE(queue.shutdown(kTimeout));
+}
+
+TEST(operation_queue_test, shutdown_zero_does_not_wait_and_reports_the_current_state)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(1, source);
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+
+    const bool while_running = queue.shutdown(std::chrono::milliseconds::zero());
+    release->set();
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+    const std::size_t waits_before = source->waits();
+    const bool once_ended = queue.shutdown(std::chrono::milliseconds::zero());
+
+    EXPECT_FALSE(while_running);
+    EXPECT_TRUE(once_ended);
+    EXPECT_EQ(source->waits(), waits_before);
+}
+
+TEST(operation_queue_test, shutdown_on_one_of_its_own_workers_does_not_wait)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    dross::operation_queue queue = dross::operation_queue_access::make(2, source);
+    auto workers = workers_of(queue);
+    ASSERT_EQ(workers.size(), 2U);
+    struct state {
+        std::atomic<bool> ended{ true };
+        event returned;
+    };
+    auto shared = std::make_shared<state>();
+
+    ASSERT_TRUE(queue.submit([queue, shared]() mutable {
+        shared->ended.store(queue.shutdown(kTimeout));
+        shared->returned.set();
+    }));
+
+    ASSERT_TRUE(shared->returned.wait());
+    EXPECT_FALSE(shared->ended.load());
+    EXPECT_EQ(source->waits(), 0U);
+    EXPECT_FALSE(queue.submit([]() {
+    }));
+    EXPECT_TRUE(all_end(workers));
+}

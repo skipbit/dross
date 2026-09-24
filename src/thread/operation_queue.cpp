@@ -192,18 +192,21 @@ public:
 
     bool submit(std::function<void()> task);
     bool wait_for(std::chrono::milliseconds timeout);
+    bool shutdown(std::chrono::milliseconds timeout);
 
     std::size_t thread_count() const noexcept;
 
 private:
     bool on_a_worker() const;
 
+    const std::shared_ptr<const time_source> _source;
     std::shared_ptr<backlog> _backlog;
     std::vector<thread> _workers;
 };
 
 operation_queue::storage::storage(std::size_t thread_count, std::shared_ptr<const time_source> source)
-    : _backlog{ std::make_shared<backlog>(thread_count, source) }
+    : _source{ source }
+    , _backlog{ std::make_shared<backlog>(thread_count, source) }
 {
     if (thread_count == 0) {
         throw std::invalid_argument("operation_queue needs at least one worker");
@@ -238,6 +241,24 @@ bool operation_queue::storage::submit(std::function<void()> task)
 bool operation_queue::storage::wait_for(std::chrono::milliseconds timeout)
 {
     return _backlog->wait_for(timeout, (! on_a_worker()));
+}
+
+bool operation_queue::storage::shutdown(std::chrono::milliseconds timeout)
+{
+    _backlog->stop(_workers);
+    if (on_a_worker()) {
+        timeout = std::chrono::milliseconds::zero();
+    }
+
+    // One deadline for every worker, rather than timeout for each in turn.
+    const auto deadline = deadline::after(_source->now(), timeout);
+    for (auto& worker : _workers) {
+        const auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - _source->now());
+        if (! worker.join_for(left)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 std::size_t operation_queue::storage::thread_count() const noexcept
@@ -276,6 +297,11 @@ bool operation_queue::submit(std::function<void()> task)
 bool operation_queue::wait_for(std::chrono::milliseconds timeout)
 {
     return _store->wait_for(timeout);
+}
+
+bool operation_queue::shutdown(std::chrono::milliseconds timeout)
+{
+    return _store->shutdown(timeout);
 }
 
 std::size_t operation_queue::thread_count() const noexcept
