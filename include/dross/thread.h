@@ -11,6 +11,10 @@
  *   worker happens to be free
  * - a callback can be sent back to the thread the work came from
  *
+ * operation_queue covers the other case, work for whichever of a fixed set
+ * of workers is free. Its workers keep a loop too, so the way back works
+ * from them as well.
+ *
  * Usage:
  * @code
  * #include <dross/thread.h>
@@ -41,6 +45,9 @@
  * - dross::timer installs a callback on a loop, firing it once or on an
  *   interval; it is the same kind of handle again, but the loop is what
  *   keeps it alive once installed, not the handle
+ * - dross::operation_queue is the same kind of handle; the last one going
+ *   stops the queue accepting tasks, and its workers end once they have run
+ *   what is left
  *
  * Errors:
  * - perform() returns false when the task cannot be queued, which the
@@ -58,6 +65,7 @@
 
 #pragma once
 
+#include <dross/thread/operation_queue.h>
 #include <dross/thread/runloop.h>
 #include <dross/thread/thread.h>
 #include <dross/thread/timer.h>
@@ -65,7 +73,7 @@
 /**
  * @brief Threading namespace members live directly in dross.
  *
- * The thread module adds runloop, thread and timer to the dross namespace,
- * alongside the type and platform layers, rather than a namespace of its
- * own.
+ * The thread module adds runloop, thread, timer and operation_queue to the
+ * dross namespace, alongside the type and platform layers, rather than a
+ * namespace of its own.
  */
