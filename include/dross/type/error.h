@@ -17,9 +17,11 @@ public:
     error(int, const std::error_category&);
     virtual ~error();
 
+    // std::error_code's own constructor finds make_error_code by
+    // argument-dependent lookup, so an enum from any namespace works.
     template <error_enum_type E>
     error(const E e)
-        : _code(std::make_error_code(e))
+        : _code(e)
     {
     }
 
