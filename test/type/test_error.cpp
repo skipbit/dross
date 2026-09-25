@@ -7,6 +7,46 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <type_traits>
+
+// An error code enum declared the way a library outside std declares one: its
+// own category and its own make_error_code, found only by argument-dependent
+// lookup.
+namespace library_errors {
+
+enum class failure {
+    first = 1,
+    second = 2
+};
+
+class failure_category_type final : public std::error_category {
+public:
+    const char* name() const noexcept override
+    {
+        return "library_errors";
+    }
+
+    std::string message(int value) const override
+    {
+        return (value == static_cast<int>(failure::first)) ? "first failure" : "second failure";
+    }
+};
+
+const std::error_category& failure_category()
+{
+    static const failure_category_type the_category;
+    return the_category;
+}
+
+std::error_code make_error_code(failure f)
+{
+    return { static_cast<int>(f), failure_category() };
+}
+
+}  // namespace library_errors
+
+template <>
+struct std::is_error_code_enum<library_errors::failure> : std::true_type { };
 
 TEST(error_test, default_constructed_error_is_falsy)
 {
@@ -128,4 +168,15 @@ TEST(error_test, value_and_category_constructor)
 
     EXPECT_EQ(e.code(), 5);
     EXPECT_EQ(e.category(), std::generic_category());
+}
+
+TEST(error_test, constructed_from_an_error_code_enum_declared_outside_std)
+{
+    const dross::error e(library_errors::failure::second);
+
+    EXPECT_TRUE(static_cast<bool>(e));
+    EXPECT_EQ(e.code(), 2);
+    EXPECT_EQ(&e.category(), &library_errors::failure_category());
+    EXPECT_EQ(e.message(), "second failure");
+    EXPECT_EQ(e.domain(), "library_errors");
 }
