@@ -193,6 +193,7 @@ if (auto config_dir = app.config_home()) {
 - **`runloop`** - Per-thread task queue, so work can be handed to a specific thread
 - **`thread`** - A handle to an OS thread, running a loop the library drives, a one-shot body, or one its owner drives
 - **`timer`** - A callback installed on a run loop, firing once or on an interval
+- **`operation_queue`** - A fixed set of worker threads, each running its own loop, taking submitted tasks from one shared queue in the order they were submitted
 
 
 ## 📖 Documentation
@@ -211,7 +212,7 @@ Dross follows modern C++ best practices:
 
 - **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg` and the `data` iterators, which hold theirs directly; the ABI can change in any 0.x release
 - **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
-- **Error Handling** - `std::expected` and `std::optional` for failures, apart from the bounds-checked accessors and the `path` calls that let `std::filesystem` exceptions through, `runloop::perform()`, which reports failure as a `bool`, the runloop running calls, which let an exception thrown by a task or a timer's callback propagate out, `thread`'s constructors, which let `std::system_error` from a failure to start the underlying OS thread propagate out, and the `timer` factory functions, which report a callback that cannot be installed, because it is empty or the loop has already finished, as a handle that is already invalid rather than a failure
+- **Error Handling** - `std::expected` and `std::optional` for failures, apart from the bounds-checked accessors and the `path` calls that let `std::filesystem` exceptions through, `runloop::perform()`, which reports failure as a `bool`, the runloop running calls, which let an exception thrown by a task or a timer's callback propagate out, `thread`'s constructors, which let `std::system_error` from a failure to start the underlying OS thread propagate out, the `timer` factory functions, which report a callback that cannot be installed, because it is empty or the loop has already finished, as a handle that is already invalid rather than a failure, and `operation_queue`, whose constructor throws `std::invalid_argument` for zero workers and lets `std::system_error` from a failure to start one propagate out, and whose `submit()`, `wait_for()` and `shutdown()` report their outcome as a `bool`
 - **Type Safety** - Concepts for compile-time constraints
 - **Zero-Cost Abstractions** - Performance without compromise
 
@@ -236,7 +237,7 @@ ctest -V
 ### Current Modules
 - ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
-- ✅ Thread utilities (runloop, thread, timer)
+- ✅ Thread utilities (runloop, thread, timer, operation_queue)
 
 ### Planned Features
 - **Configuration** - TOML, JSON, XML, YAML parsers
