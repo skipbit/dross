@@ -150,6 +150,19 @@ public:
     std::optional<operation_result> enqueue(F&& task);
 
     /**
+     * @brief Take a task given to enqueue() off the queue before it starts.
+     * @param id The id of the task's result
+     * @return true when the task was still waiting and has been taken off
+     *
+     * A task taken off never runs. Its result counts as finished and reports
+     * operation_errc::cancelled, whatever waits for it wakes, and wait_for()
+     * no longer waits for it. Returns false, and changes nothing, once the
+     * task has started or been cancelled, and for an id from another queue.
+     * A task that has started is never stopped.
+     */
+    bool cancel(const operation_id& id);
+
+    /**
      * @brief Wait for the tasks submitted so far to finish, for at most
      * timeout.
      * @param timeout How long to wait

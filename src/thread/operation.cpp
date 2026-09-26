@@ -100,28 +100,31 @@ public:
     bool is_finished()
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
-        return _finished;
+        return (_state != state::pending);
     }
 
     bool wait_for(std::chrono::milliseconds timeout)
     {
         std::unique_lock<std::mutex> lock{ _mutex };
         if (timeout <= std::chrono::milliseconds::zero()) {
-            return _finished;
+            return (_state != state::pending);
         }
 
         const auto deadline = deadline::after(_source->now(), timeout);
-        while ((! _finished) && (_source->now() < deadline)) {
+        while ((_state == state::pending) && (_source->now() < deadline)) {
             _source->wait_until(lock, _changed, deadline);
         }
-        return _finished;
+        return (_state != state::pending);
     }
 
     std::expected<const std::any*, error> held()
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
-        if (! _finished) {
+        if (_state == state::pending) {
             return std::unexpected(error(operation_errc::not_finished));
+        }
+        if (_state == state::cancelled) {
+            return std::unexpected(error(operation_errc::cancelled));
         }
         return &_value;
     }
@@ -130,13 +133,36 @@ public:
     {
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
+            if (_state != state::pending) {
+                return;
+            }
             _value = std::move(value);
-            _finished = true;
+            _state = state::returned;
+        }
+        _changed.notify_all();
+    }
+
+    void cancel()
+    {
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            if (_state != state::pending) {
+                return;
+            }
+            _state = state::cancelled;
         }
         _changed.notify_all();
     }
 
 private:
+    // Whether the operation is still waiting, has returned, or was
+    // cancelled before it ran.
+    enum class state {
+        pending,
+        returned,
+        cancelled
+    };
+
     // Set once, at construction, and never reassigned, so they are read
     // without _mutex.
     const operation_id _id;
@@ -144,10 +170,10 @@ private:
 
     std::mutex _mutex;
     std::condition_variable _changed;
-    // Written once, before _finished is set, and never again, so held()
-    // hands out a pointer to it that stays good.
+    // Written once, before _state leaves pending, and never again, so
+    // held() hands out a pointer to it that stays good.
     std::any _value;
-    bool _finished{ false };
+    state _state{ state::pending };
 };
 
 operation_result::operation_result(std::shared_ptr<storage> store) noexcept
@@ -195,6 +221,11 @@ operation_result operation_access::make(std::shared_ptr<const time_source> sourc
 void operation_access::finish(const operation_result& result, std::any value)
 {
     result._store->finish(std::move(value));
+}
+
+void operation_access::cancel(const operation_result& result)
+{
+    result._store->cancel();
 }
 
 }  // namespace dross

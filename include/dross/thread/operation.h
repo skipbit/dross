@@ -116,7 +116,9 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * @brief What one operation returned, once it has finished.
  *
  * A queue hands one back when it takes an operation, before the operation
- * runs, and fills it in when the operation returns.
+ * runs, and fills it in when the operation returns, or when
+ * operation_queue::cancel() takes the operation off the queue before it
+ * starts. Either way the operation has finished.
  *
  * Handle semantics:
  * - An operation_result is a handle. Copying gives another handle to the same
@@ -126,6 +128,7 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * Reading:
  * - get_as() never waits. Before the operation finishes it reports
  *   operation_errc::not_finished; wait_for() is the way to wait
+ * - For a cancelled operation it reports operation_errc::cancelled
  * - Once filled in, a result never changes, so get_as() may be called any
  *   number of times, from any thread
  *
@@ -169,14 +172,14 @@ public:
 
     /**
      * @brief Test whether the operation has finished.
-     * @return true once the operation has returned
+     * @return true once the operation has returned or been cancelled
      */
     bool is_finished() const;
 
     /**
      * @brief Wait for the operation to finish, for at most timeout.
      * @param timeout How long to wait
-     * @return true when the operation has finished
+     * @return true when the operation has returned or been cancelled
      *
      * A timeout of zero does not wait; it reports whether the operation has
      * already finished. Called from one of the queue's own workers, this
@@ -192,6 +195,7 @@ public:
      *
      * Never waits. The error is one of:
      * - operation_errc::not_finished when the operation has not finished
+     * - operation_errc::cancelled when it was cancelled before it started
      * - operation_errc::type_mismatch when the operation returned another
      *   type, including a value when T is void or nothing when it is not
      */
@@ -203,8 +207,8 @@ private:
 
     explicit operation_result(std::shared_ptr<storage> store) noexcept;
 
-    // What the operation returned, or not_finished. Never waits. The value
-    // lives as long as this result does and never changes.
+    // What the operation returned, or not_finished or cancelled. Never
+    // waits. The value lives as long as this result does and never changes.
     std::expected<const std::any*, error> held() const;
 
     std::shared_ptr<storage> _store;
