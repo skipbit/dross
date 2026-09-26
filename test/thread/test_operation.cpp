@@ -1,16 +1,36 @@
 #include "dross/thread/operation.h"
 #include "dross/type/error.h"
+#include "observed_time_source.h"
+#include "test_support.h"
 #include "thread/operation_access.h"
+#include "thread/time_source.h"
 
 #include <gtest/gtest.h>
 
+#include <any>
+#include <atomic>
+#include <chrono>
 #include <compare>
 #include <functional>
 #include <map>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <unordered_set>
+
+namespace {
+
+using dross_test::event;
+using dross_test::kTimeout;
+
+dross::operation_result unfinished()
+{
+    return dross::operation_access::make(dross::time_source::steady());
+}
+
+}  // namespace
 
 TEST(operation_errc_test, error_carries_the_value_and_the_category)
 {
@@ -79,4 +99,108 @@ TEST(operation_id_test, writes_as_a_number)
     EXPECT_FALSE(one.str().empty());
     EXPECT_EQ(one.str().find_first_not_of("0123456789"), std::string::npos);
     EXPECT_NE(one.str(), two.str());
+}
+
+TEST(operation_result_test, reports_not_finished_until_filled_in)
+{
+    const dross::operation_result result = unfinished();
+
+    EXPECT_FALSE(result.is_finished());
+    EXPECT_FALSE(result.wait_for(std::chrono::milliseconds::zero()));
+    const auto value = result.get_as<int>();
+    ASSERT_FALSE(value.has_value());
+    EXPECT_TRUE(value.error() == dross::operation_errc::not_finished);
+    const auto nothing = result.get_as<void>();
+    ASSERT_FALSE(nothing.has_value());
+    EXPECT_TRUE(nothing.error() == dross::operation_errc::not_finished);
+}
+
+TEST(operation_result_test, gives_the_value_as_its_own_type_any_number_of_times)
+{
+    const dross::operation_result result = unfinished();
+    dross::operation_access::finish(result, std::make_any<std::string>("answer"));
+
+    EXPECT_TRUE(result.is_finished());
+    EXPECT_TRUE(result.wait_for(std::chrono::milliseconds::zero()));
+    EXPECT_EQ(result.get_as<std::string>(), "answer");
+    EXPECT_EQ(result.get_as<std::string>(), "answer");
+}
+
+TEST(operation_result_test, reports_type_mismatch_for_any_other_type)
+{
+    const dross::operation_result result = unfinished();
+    dross::operation_access::finish(result, std::make_any<int>(7));
+
+    const auto as_long = result.get_as<long>();
+    ASSERT_FALSE(as_long.has_value());
+    EXPECT_TRUE(as_long.error() == dross::operation_errc::type_mismatch);
+    const auto as_void = result.get_as<void>();
+    ASSERT_FALSE(as_void.has_value());
+    EXPECT_TRUE(as_void.error() == dross::operation_errc::type_mismatch);
+    EXPECT_EQ(result.get_as<int>(), 7);
+}
+
+TEST(operation_result_test, one_that_returned_nothing_is_read_as_void_only)
+{
+    const dross::operation_result result = unfinished();
+    dross::operation_access::finish(result, std::any{});
+
+    EXPECT_TRUE(result.get_as<void>().has_value());
+    const auto as_int = result.get_as<int>();
+    ASSERT_FALSE(as_int.has_value());
+    EXPECT_TRUE(as_int.error() == dross::operation_errc::type_mismatch);
+}
+
+TEST(operation_result_test, copies_share_the_result_and_the_id)
+{
+    const dross::operation_result result = unfinished();
+    const dross::operation_result copy = result;
+    dross::operation_result assigned = unfinished();
+    assigned = result;
+
+    dross::operation_access::finish(result, std::make_any<int>(1));
+
+    EXPECT_TRUE(copy.id() == result.id());
+    EXPECT_TRUE(assigned.id() == result.id());
+    EXPECT_EQ(copy.get_as<int>(), 1);
+    EXPECT_EQ(assigned.get_as<int>(), 1);
+}
+
+TEST(operation_result_test, each_result_has_an_id_of_its_own)
+{
+    EXPECT_FALSE(unfinished().id() == unfinished().id());
+}
+
+TEST(operation_result_test, wait_for_returns_once_another_thread_fills_it_in)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    const dross::operation_result result = dross::operation_access::make(source);
+
+    // The waiter's own bound is longer than the test waits for it, so only
+    // the result being filled in, not its deadline, ends the wait in time.
+    std::atomic<bool> finished{ false };
+    event returned;
+    std::thread waiter{ [result, &finished, &returned]() {
+        finished.store(result.wait_for(kTimeout * 2));
+        returned.set();
+    } };
+    // Filled in only once the waiter is waiting, so filling it in is what
+    // wakes it.
+    const bool saw_wait = source->await_timed_waits(1);
+    dross::operation_access::finish(result, std::make_any<int>(3));
+    const bool woke = returned.wait();
+    waiter.join();
+
+    EXPECT_TRUE(saw_wait);
+    EXPECT_TRUE(woke);
+    EXPECT_TRUE(finished.load());
+    EXPECT_EQ(result.get_as<int>(), 3);
+}
+
+TEST(operation_result_test, wait_for_times_out_while_unfinished)
+{
+    const dross::operation_result result = unfinished();
+
+    EXPECT_FALSE(result.wait_for(std::chrono::milliseconds{ 1 }));
+    EXPECT_FALSE(result.is_finished());
 }

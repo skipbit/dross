@@ -1,15 +1,24 @@
 #include "dross/thread/operation.h"
 
+#include "thread/deadline.h"
 #include "thread/operation_access.h"
+#include "thread/time_source.h"
 
+#include <any>
 #include <atomic>
+#include <chrono>
 #include <compare>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <ostream>
 #include <string>
 #include <system_error>
+#include <utility>
 
 namespace dross {
 
@@ -75,10 +84,117 @@ std::ostream& operator<<(std::ostream& os, const operation_id& id)
     return (os << id._value);
 }
 
+class operation_result::storage final {
+public:
+    storage(operation_id id, std::shared_ptr<const time_source> source)
+        : _id{ id }
+        , _source{ std::move(source) }
+    {
+    }
+
+    operation_id id() const noexcept
+    {
+        return _id;
+    }
+
+    bool is_finished()
+    {
+        const std::lock_guard<std::mutex> guard{ _mutex };
+        return _finished;
+    }
+
+    bool wait_for(std::chrono::milliseconds timeout)
+    {
+        std::unique_lock<std::mutex> lock{ _mutex };
+        if (timeout <= std::chrono::milliseconds::zero()) {
+            return _finished;
+        }
+
+        const auto deadline = deadline::after(_source->now(), timeout);
+        while ((! _finished) && (_source->now() < deadline)) {
+            _source->wait_until(lock, _changed, deadline);
+        }
+        return _finished;
+    }
+
+    std::expected<const std::any*, error> held()
+    {
+        const std::lock_guard<std::mutex> guard{ _mutex };
+        if (! _finished) {
+            return std::unexpected(error(operation_errc::not_finished));
+        }
+        return &_value;
+    }
+
+    void finish(std::any value)
+    {
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            _value = std::move(value);
+            _finished = true;
+        }
+        _changed.notify_all();
+    }
+
+private:
+    // Set once, at construction, and never reassigned, so they are read
+    // without _mutex.
+    const operation_id _id;
+    const std::shared_ptr<const time_source> _source;
+
+    std::mutex _mutex;
+    std::condition_variable _changed;
+    // Written once, before _finished is set, and never again, so held()
+    // hands out a pointer to it that stays good.
+    std::any _value;
+    bool _finished{ false };
+};
+
+operation_result::operation_result(std::shared_ptr<storage> store) noexcept
+    : _store{ std::move(store) }
+{
+}
+
+operation_result::operation_result(const operation_result& other) = default;
+
+operation_result::~operation_result() = default;
+
+operation_result& operation_result::operator=(const operation_result& other) = default;
+
+operation_id operation_result::id() const noexcept
+{
+    return _store->id();
+}
+
+bool operation_result::is_finished() const
+{
+    return _store->is_finished();
+}
+
+bool operation_result::wait_for(std::chrono::milliseconds timeout) const
+{
+    return _store->wait_for(timeout);
+}
+
+std::expected<const std::any*, error> operation_result::held() const
+{
+    return _store->held();
+}
+
 operation_id operation_access::next_id() noexcept
 {
     static std::atomic<std::uint64_t> last{ 0 };
     return operation_id{ last.fetch_add(1, std::memory_order_relaxed) + 1 };
+}
+
+operation_result operation_access::make(std::shared_ptr<const time_source> source)
+{
+    return operation_result{ std::make_shared<operation_result::storage>(next_id(), std::move(source)) };
+}
+
+void operation_access::finish(const operation_result& result, std::any value)
+{
+    result._store->finish(std::move(value));
 }
 
 }  // namespace dross
