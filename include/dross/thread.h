@@ -58,8 +58,8 @@
  *   loop has already finished, returns a handle that is already invalid
  *   rather than failing outright
  * - operation_result::get_as() returns an error of operation_errc, rather
- *   than a value, for a result that is not finished or not of the type
- *   asked for
+ *   than a value, for a result that is not finished, was cancelled, or is
+ *   not of the type asked for
  * - An exception thrown by a task or a timer's callback propagates out of
  *   the run() call that was running it. It is not caught, stored or
  *   translated

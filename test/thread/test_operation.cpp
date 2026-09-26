@@ -204,3 +204,39 @@ TEST(operation_result_test, wait_for_times_out_while_unfinished)
     EXPECT_FALSE(result.wait_for(std::chrono::milliseconds{ 1 }));
     EXPECT_FALSE(result.is_finished());
 }
+
+TEST(operation_result_test, a_cancelled_one_counts_as_finished_and_reports_cancelled)
+{
+    const dross::operation_result result = unfinished();
+    dross::operation_access::cancel(result);
+
+    EXPECT_TRUE(result.is_finished());
+    EXPECT_TRUE(result.wait_for(std::chrono::milliseconds::zero()));
+    const auto value = result.get_as<int>();
+    ASSERT_FALSE(value.has_value());
+    EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    const auto nothing = result.get_as<void>();
+    ASSERT_FALSE(nothing.has_value());
+    EXPECT_TRUE(nothing.error() == dross::operation_errc::cancelled);
+}
+
+TEST(operation_result_test, wait_for_returns_once_another_thread_cancels_it)
+{
+    const auto source = std::make_shared<dross_test::observed_time_source>();
+    const dross::operation_result result = dross::operation_access::make(source);
+
+    std::atomic<bool> finished{ false };
+    event returned;
+    std::thread waiter{ [result, &finished, &returned]() {
+        finished.store(result.wait_for(kTimeout * 2));
+        returned.set();
+    } };
+    const bool saw_wait = source->await_timed_waits(1);
+    dross::operation_access::cancel(result);
+    const bool woke = returned.wait();
+    waiter.join();
+
+    EXPECT_TRUE(saw_wait);
+    EXPECT_TRUE(woke);
+    EXPECT_TRUE(finished.load());
+}

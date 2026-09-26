@@ -67,6 +67,28 @@ public:
         return result;
     }
 
+    // Takes the task whose result has id off the list and marks the result
+    // cancelled. wait_for() looks only at the front of the list and at what
+    // is running, so a task taken out of the middle leaves it right. The
+    // result is marked under _mutex, so a wait_for() that sees the task gone
+    // also sees its result finished.
+    bool cancel(const operation_id& id)
+    {
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            const auto found = std::find_if(_tasks.begin(), _tasks.end(), [&id](const entry& waiting) {
+                return waiting.result && (waiting.result->id() == id);
+            });
+            if (found == _tasks.end()) {
+                return false;
+            }
+            operation_access::cancel(*found->result);
+            _tasks.erase(found);
+        }
+        _settled.notify_all();
+        return true;
+    }
+
     // Stops accepting and hands every worker a task that runs what is left
     // and then ends the worker. Under the same lock as submit(), so every
     // sweep submit() handed out is ahead of it on its worker's loop.
@@ -218,6 +240,7 @@ public:
 
     bool submit(std::function<void()> task);
     std::optional<operation_result> enqueue_any(std::function<std::any()> task);
+    bool cancel(const operation_id& id);
     bool wait_for(std::chrono::milliseconds timeout);
     bool shutdown(std::chrono::milliseconds timeout);
 
@@ -268,6 +291,11 @@ bool operation_queue::storage::submit(std::function<void()> task)
 std::optional<operation_result> operation_queue::storage::enqueue_any(std::function<std::any()> task)
 {
     return _backlog->enqueue(std::move(task), _workers);
+}
+
+bool operation_queue::storage::cancel(const operation_id& id)
+{
+    return _backlog->cancel(id);
 }
 
 bool operation_queue::storage::wait_for(std::chrono::milliseconds timeout)
@@ -329,6 +357,11 @@ bool operation_queue::submit(std::function<void()> task)
 std::optional<operation_result> operation_queue::enqueue_any(std::function<std::any()> task)
 {
     return _store->enqueue_any(std::move(task));
+}
+
+bool operation_queue::cancel(const operation_id& id)
+{
+    return _store->cancel(id);
 }
 
 bool operation_queue::wait_for(std::chrono::milliseconds timeout)

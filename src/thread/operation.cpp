@@ -123,6 +123,9 @@ public:
         if (! _finished) {
             return std::unexpected(error(operation_errc::not_finished));
         }
+        if (_cancelled) {
+            return std::unexpected(error(operation_errc::cancelled));
+        }
         return &_value;
     }
 
@@ -131,6 +134,16 @@ public:
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
             _value = std::move(value);
+            _finished = true;
+        }
+        _changed.notify_all();
+    }
+
+    void cancel()
+    {
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            _cancelled = true;
             _finished = true;
         }
         _changed.notify_all();
@@ -147,7 +160,10 @@ private:
     // Written once, before _finished is set, and never again, so held()
     // hands out a pointer to it that stays good.
     std::any _value;
+    // Set when the operation returns or is cancelled, whichever happens;
+    // _cancelled tells which.
     bool _finished{ false };
+    bool _cancelled{ false };
 };
 
 operation_result::operation_result(std::shared_ptr<storage> store) noexcept
@@ -195,6 +211,11 @@ operation_result operation_access::make(std::shared_ptr<const time_source> sourc
 void operation_access::finish(const operation_result& result, std::any value)
 {
     result._store->finish(std::move(value));
+}
+
+void operation_access::cancel(const operation_result& result)
+{
+    result._store->cancel();
 }
 
 }  // namespace dross

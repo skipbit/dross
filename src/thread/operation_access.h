@@ -23,6 +23,10 @@ public:
     // Fills in result with value, an empty one for an operation that returns
     // nothing, and wakes whatever waits for it. Called once per result.
     static void finish(const operation_result& result, std::any value);
+
+    // Marks result cancelled, which counts as finished, and wakes whatever
+    // waits for it. Called instead of finish(), never as well.
+    static void cancel(const operation_result& result);
 };
 
 }  // namespace dross
