@@ -1,11 +1,26 @@
 #pragma once
 
+#include "dross/thread/operation.h"
+
+#include <any>
 #include <chrono>
+#include <concepts>
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <type_traits>
+#include <utility>
 
 namespace dross {
+
+/**
+ * @brief A task operation_queue::enqueue() takes: callable with no arguments,
+ * copyable, and returning nothing or a value operation_result can give back.
+ */
+template <typename F>
+concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::invocable<std::decay_t<F>&>
+                              && operation_value_type<std::decay_t<std::invoke_result_t<std::decay_t<F>&>>>;
 
 /**
  * @brief A fixed set of worker threads that run submitted tasks in the order
@@ -120,6 +135,21 @@ public:
     bool submit(std::function<void()> task);
 
     /**
+     * @brief Add a task for one of the workers to run, and get a handle to
+     * what it returns.
+     * @param task The task
+     * @return The result, not yet filled in, or none once the queue has been
+     * shut down
+     *
+     * Queued in the same list as submit(), so the two keep one order. Returns
+     * at once, as submit() does; the result is filled in when the task
+     * returns. A task that throws leaves its result unfinished, besides
+     * propagating the same as one given to submit().
+     */
+    template <operation_task_type F>
+    std::optional<operation_result> enqueue(F&& task);
+
+    /**
      * @brief Wait for the tasks submitted so far to finish, for at most
      * timeout.
      * @param timeout How long to wait
@@ -165,9 +195,30 @@ private:
 
     explicit operation_queue(std::shared_ptr<storage> store) noexcept;
 
+    // enqueue() without its type: task returns what the task returned, or
+    // an empty std::any for one that returns nothing.
+    std::optional<operation_result> enqueue_any(std::function<std::any()> task);
+
     std::shared_ptr<storage> _store;
 
     friend class operation_queue_access;
 };
+
+template <operation_task_type F>
+std::optional<operation_result> operation_queue::enqueue(F&& task)
+{
+    using value_type = std::decay_t<std::invoke_result_t<std::decay_t<F>&>>;
+
+    // Wrapped here, not in the library, so the value is put in on the same
+    // side of a shared library boundary as get_as() takes it out.
+    return enqueue_any([task = std::forward<F>(task)]() mutable {
+        if constexpr (std::is_void_v<value_type>) {
+            task();
+            return std::any{};
+        } else {
+            return std::make_any<value_type>(task());
+        }
+    });
+}
 
 }  // namespace dross

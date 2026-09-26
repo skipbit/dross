@@ -3,11 +3,13 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
 #include "thread/deadline.h"
+#include "thread/operation_access.h"
 #include "thread/operation_queue_access.h"
 #include "thread/thread_access.h"
 #include "thread/time_source.h"
 
 #include <algorithm>
+#include <any>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -192,6 +194,7 @@ public:
     ~storage();
 
     bool submit(std::function<void()> task);
+    std::optional<operation_result> enqueue_any(std::function<std::any()> task);
     bool wait_for(std::chrono::milliseconds timeout);
     bool shutdown(std::chrono::milliseconds timeout);
 
@@ -237,6 +240,18 @@ bool operation_queue::storage::submit(std::function<void()> task)
         return false;
     }
     return _backlog->submit(std::move(task), _workers);
+}
+
+std::optional<operation_result> operation_queue::storage::enqueue_any(std::function<std::any()> task)
+{
+    operation_result result = operation_access::make(_source);
+    auto run = [result, task = std::move(task)]() {
+        operation_access::finish(result, task());
+    };
+    if (! _backlog->submit(std::move(run), _workers)) {
+        return std::nullopt;
+    }
+    return result;
 }
 
 bool operation_queue::storage::wait_for(std::chrono::milliseconds timeout)
@@ -293,6 +308,11 @@ operation_queue& operation_queue::operator=(const operation_queue& other) = defa
 bool operation_queue::submit(std::function<void()> task)
 {
     return _store->submit(std::move(task));
+}
+
+std::optional<operation_result> operation_queue::enqueue_any(std::function<std::any()> task)
+{
+    return _store->enqueue_any(std::move(task));
 }
 
 bool operation_queue::wait_for(std::chrono::milliseconds timeout)
