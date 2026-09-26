@@ -71,9 +71,12 @@ public:
     // cancelled. wait_for() looks only at the front of the list and at what
     // is running, so a task taken out of the middle leaves it right. The
     // result is marked under _mutex, so a wait_for() that sees the task gone
-    // also sees its result finished.
+    // also sees its result finished. The task itself is destroyed only once
+    // _mutex is released, as take() leaves a task it hands out, since what
+    // it captured may use the queue as it goes.
     bool cancel(const operation_id& id)
     {
+        std::optional<entry> removed;
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
             const auto found = std::find_if(_tasks.begin(), _tasks.end(), [&id](const entry& waiting) {
@@ -83,6 +86,7 @@ public:
                 return false;
             }
             operation_access::cancel(*found->result);
+            removed = std::move(*found);
             _tasks.erase(found);
         }
         _settled.notify_all();

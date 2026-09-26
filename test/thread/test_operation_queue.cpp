@@ -995,6 +995,58 @@ TEST(operation_queue_test, wait_for_still_waits_for_an_earlier_task_when_a_later
     EXPECT_TRUE(queue.wait_for(kTimeout));
 }
 
+TEST(operation_queue_test, a_cancelled_task_is_destroyed_where_its_captures_may_use_the_queue)
+{
+    // Submits to the queue when the last copy goes, as a scope guard might.
+    struct submit_on_destroy final {
+        dross::operation_queue queue;
+        std::shared_ptr<event> submitted;
+
+        ~submit_on_destroy()
+        {
+            if (queue.submit([]() {
+            })) {
+                submitted->set();
+            }
+        }
+    };
+
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    auto submitted = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+    auto guard = std::make_shared<submit_on_destroy>(queue, submitted);
+    const auto waiting = queue.enqueue([guard]() {
+        return 1;
+    });
+    ASSERT_TRUE(waiting.has_value());
+    guard.reset();
+
+    // Cancelled on a thread of its own, so a cancel that never returns fails
+    // this test instead of stopping the suite.
+    auto returned = std::make_shared<event>();
+    auto cancelled = std::make_shared<std::atomic<bool>>(false);
+    std::thread canceller{ [queue, id = waiting->id(), returned, cancelled]() mutable {
+        cancelled->store(queue.cancel(id));
+        returned->set();
+    } };
+    if (! returned->wait()) {
+        // Kept so the queue is never torn down under the stuck cancel.
+        new dross::operation_queue{ queue };
+        canceller.detach();
+        release->set();
+        FAIL() << "cancel() did not return";
+    }
+    canceller.join();
+    release->set();
+
+    EXPECT_TRUE(cancelled->load());
+    EXPECT_TRUE(submitted->wait());
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
 TEST(operation_queue_test, cancel_from_many_threads_while_the_workers_take_tasks)
 {
     constexpr int kCancellers = 4;
