@@ -19,6 +19,7 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -1045,6 +1046,81 @@ TEST(operation_queue_test, a_cancelled_task_is_destroyed_where_its_captures_may_
     EXPECT_TRUE(cancelled->load());
     EXPECT_TRUE(submitted->wait());
     EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queues_lock)
+{
+    // Each time it is copied or destroyed, has another thread make a call
+    // that takes the queue's lock, and counts the times that call does not
+    // get through. Small enough that a std::function may keep it inline,
+    // and so copy it when it moves.
+    struct lock_check final {
+        struct counts final {
+            dross::operation_queue queue;
+            std::atomic<int> checked{ 0 };
+            std::atomic<int> blocked{ 0 };
+        };
+
+        std::shared_ptr<counts> state;
+
+        explicit lock_check(std::shared_ptr<counts> shared)
+            : state{ std::move(shared) }
+        {
+        }
+
+        lock_check(const lock_check& other) noexcept
+            : state{ other.state }
+        {
+            check();
+        }
+
+        ~lock_check()
+        {
+            check();
+        }
+
+        void check() const noexcept
+        {
+            ++state->checked;
+            // One is enough to fail; the rest would each wait out the bound.
+            if (state->blocked.load() > 0) {
+                return;
+            }
+            auto through = std::make_shared<event>();
+            std::thread{ [queue = std::optional<dross::operation_queue>{ state->queue }, through]() mutable {
+                queue->wait_for(std::chrono::milliseconds::zero());
+                queue.reset();
+                through->set();
+            } }.detach();
+            if (! through->wait()) {
+                ++state->blocked;
+            }
+        }
+    };
+
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+    const lock_check check{ std::make_shared<lock_check::counts>(queue) };
+    ASSERT_TRUE(queue.submit([check]() {
+    }));
+    const auto returned = queue.enqueue([check]() {
+        return 1;
+    });
+    const auto cancelled = queue.enqueue([check]() {
+        return 2;
+    });
+    ASSERT_TRUE(returned.has_value());
+    ASSERT_TRUE(cancelled.has_value());
+    EXPECT_TRUE(queue.cancel(cancelled->id()));
+    release->set();
+
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+    EXPECT_EQ(returned->get_as<int>(), 1);
+    EXPECT_GT(check.state->checked.load(), 0);
+    EXPECT_EQ(check.state->blocked.load(), 0);
 }
 
 TEST(operation_queue_test, cancel_from_many_threads_while_the_workers_take_tasks)

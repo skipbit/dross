@@ -39,14 +39,17 @@ public:
     {
     }
 
-    // Queues task for the workers; false once the queue has stopped.
+    // Queues task for the workers; false once the queue has stopped. The
+    // task is wrapped before _mutex is taken, and a task not accepted is
+    // destroyed after it is released.
     bool submit(std::function<void()> task, std::vector<thread>& workers)
     {
+        auto held = std::make_unique<std::function<void()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
             return false;
         }
-        queue(std::nullopt, std::move(task), workers);
+        queue(std::nullopt, std::move(held), nullptr, workers);
         return true;
     }
 
@@ -55,15 +58,13 @@ public:
     // the order tasks are accepted in, and a task not accepted takes none.
     std::optional<operation_result> enqueue(std::function<std::any()> task, std::vector<thread>& workers)
     {
+        auto held = std::make_unique<std::function<std::any()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
             return std::nullopt;
         }
         operation_result result = operation_access::make(_source);
-        auto run = [result, task = std::move(task)]() {
-            operation_access::finish(result, task());
-        };
-        queue(result, std::move(run), workers);
+        queue(result, nullptr, std::move(held), workers);
         return result;
     }
 
@@ -134,12 +135,25 @@ public:
     }
 
 private:
-    // A task in the list, with its place in the order tasks were accepted
-    // and, for one from enqueue(), the result it fills in.
+    // A task in the list, with its place in the order tasks were accepted.
+    // A task from submit() is in task; one from enqueue() is in call, and
+    // fills in result. Both are behind a pointer, so moving an entry under
+    // _mutex runs none of the task's own code: a std::function may copy a
+    // small task as it moves.
     struct entry final {
         std::uint64_t order;
         std::optional<operation_result> result;
-        std::function<void()> task;
+        std::unique_ptr<std::function<void()>> task;
+        std::unique_ptr<std::function<std::any()>> call;
+
+        void run() const
+        {
+            if (call) {
+                operation_access::finish(*result, (*call)());
+            } else {
+                (*task)();
+            }
+        }
     };
 
     // Adds a task to the list and hands a sweep to every worker that has
@@ -148,9 +162,12 @@ private:
     // since a worker with no sweep may still be busy running something else
     // on its loop. Whichever gets there first takes the task, and the rest
     // find the list empty. Called with _mutex held.
-    void queue(std::optional<operation_result> result, std::function<void()> task, std::vector<thread>& workers)
+    void queue(std::optional<operation_result> result,
+               std::unique_ptr<std::function<void()>> task,
+               std::unique_ptr<std::function<std::any()>> call,
+               std::vector<thread>& workers)
     {
-        _tasks.push_back(entry{ _accepted++, std::move(result), std::move(task) });
+        _tasks.push_back(entry{ _accepted++, std::move(result), std::move(task), std::move(call) });
 
         for (std::size_t i = 0; i < workers.size(); ++i) {
             if (_sweeping[i]) {
@@ -189,7 +206,7 @@ private:
     void run_until_empty(std::size_t worker)
     {
         while (auto next = take(worker)) {
-            next->task();
+            next->run();
             done(next->order);
         }
     }
