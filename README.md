@@ -194,6 +194,7 @@ if (auto config_dir = app.config_home()) {
 - **`thread`** - A handle to an OS thread, running a loop the library drives, a one-shot body, or one its owner drives
 - **`timer`** - A callback installed on a run loop, firing once or on an interval
 - **`operation_queue`** - A fixed set of worker threads, each running its own loop, taking submitted tasks from one shared queue in the order they were submitted
+- **`operation_result`** - What a task given to `operation_queue::enqueue()` returned, to wait on and read as its own type
 
 
 ## 📖 Documentation
@@ -237,7 +238,7 @@ ctest -V
 ### Current Modules
 - ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
 - ✅ Platform utilities (environment, path, xdg)
-- ✅ Thread utilities (runloop, thread, timer, operation_queue)
+- ✅ Thread utilities (runloop, thread, timer, operation_queue, operation_result)
 
 ### Planned Features
 - **Configuration** - TOML, JSON, XML, YAML parsers

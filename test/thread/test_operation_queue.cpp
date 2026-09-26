@@ -16,7 +16,9 @@
 #include <mutex>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -74,6 +76,18 @@ std::vector<dross::thread> workers_of(dross::operation_queue& queue)
     }
     return gather->await();
 }
+
+// A type only the tests know, so taking it out of a result tells whether the
+// type is recognised across the boundary of a shared library build.
+struct answer {
+    std::string text;
+    int number;
+};
+
+static_assert(dross::operation_task_type<int (*)()>);
+static_assert(dross::operation_task_type<void (*)()>);
+static_assert(! dross::operation_task_type<void (*)(int)>);
+static_assert(! dross::operation_task_type<std::unique_ptr<int> (*)()>);
 
 bool all_end(std::vector<dross::thread>& workers)
 {
@@ -593,4 +607,175 @@ TEST(operation_queue_test, shutdown_on_one_of_its_own_workers_does_not_wait)
     EXPECT_FALSE(queue.submit([]() {
     }));
     EXPECT_TRUE(all_end(workers));
+}
+
+TEST(operation_queue_test, enqueue_gives_back_what_the_task_returned)
+{
+    dross::operation_queue queue{ 2 };
+
+    const auto number = queue.enqueue([]() {
+        return 42;
+    });
+    const auto own_type = queue.enqueue([]() {
+        return answer{ "life", 42 };
+    });
+    ASSERT_TRUE(number.has_value());
+    ASSERT_TRUE(own_type.has_value());
+    ASSERT_TRUE(number->wait_for(kTimeout));
+    ASSERT_TRUE(own_type->wait_for(kTimeout));
+
+    EXPECT_EQ(number->get_as<int>(), 42);
+    const auto taken = own_type->get_as<answer>();
+    ASSERT_TRUE(taken.has_value());
+    EXPECT_EQ(taken->text, "life");
+    EXPECT_EQ(taken->number, 42);
+    const auto wrong = own_type->get_as<int>();
+    ASSERT_FALSE(wrong.has_value());
+    EXPECT_TRUE(wrong.error() == dross::operation_errc::type_mismatch);
+}
+
+TEST(operation_queue_test, enqueue_of_a_task_returning_nothing_is_read_as_void)
+{
+    dross::operation_queue queue{ 1 };
+    auto ran = std::make_shared<std::atomic<bool>>(false);
+
+    const auto result = queue.enqueue([ran]() {
+        ran->store(true);
+    });
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->wait_for(kTimeout));
+
+    EXPECT_TRUE(ran->load());
+    EXPECT_TRUE(result->get_as<void>().has_value());
+}
+
+TEST(operation_queue_test, an_enqueued_result_is_unfinished_while_its_task_runs)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+
+    const auto result = queue.enqueue([release]() {
+        release->wait();
+        return 1;
+    });
+    ASSERT_TRUE(result.has_value());
+
+    EXPECT_FALSE(result->is_finished());
+    EXPECT_FALSE(queue.wait_for(std::chrono::milliseconds{ 1 }));
+    const auto early = result->get_as<int>();
+    ASSERT_FALSE(early.has_value());
+    EXPECT_TRUE(early.error() == dross::operation_errc::not_finished);
+
+    release->set();
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+    EXPECT_TRUE(result->is_finished());
+    EXPECT_EQ(result->get_as<int>(), 1);
+}
+
+TEST(operation_queue_test, enqueue_keeps_one_order_with_submit)
+{
+    struct state {
+        event release;
+        std::mutex mutex;
+        std::vector<int> order;
+    };
+    auto shared = std::make_shared<state>();
+    dross::operation_queue queue{ 1 };
+    const auto record = [shared](int n) {
+        const std::lock_guard<std::mutex> guard{ shared->mutex };
+        shared->order.push_back(n);
+    };
+
+    // The first holds the only worker until every task is queued behind it.
+    ASSERT_TRUE(queue.submit([shared]() {
+        shared->release.wait();
+    }));
+    ASSERT_TRUE(queue.submit([record]() {
+        record(0);
+    }));
+    ASSERT_TRUE(queue.enqueue([record]() {
+        record(1);
+    }));
+    ASSERT_TRUE(queue.submit([record]() {
+        record(2);
+    }));
+    const auto last = queue.enqueue([record]() {
+        record(3);
+    });
+    ASSERT_TRUE(last.has_value());
+    shared->release.set();
+
+    ASSERT_TRUE(last->wait_for(kTimeout));
+    const std::lock_guard<std::mutex> guard{ shared->mutex };
+    EXPECT_EQ(shared->order, (std::vector<int>{ 0, 1, 2, 3 }));
+}
+
+TEST(operation_queue_test, enqueue_from_many_threads_gives_each_task_its_own_result)
+{
+    constexpr int kSubmitters = 4;
+    constexpr int kPerSubmitter = 50;
+
+    dross::operation_queue queue{ 3 };
+    std::vector<std::vector<dross::operation_result>> results(kSubmitters);
+
+    std::vector<std::thread> submitters;
+    submitters.reserve(kSubmitters);
+    for (int submitter = 0; submitter < kSubmitters; ++submitter) {
+        submitters.emplace_back([queue, &mine = results[submitter], submitter]() mutable {
+            for (int n = 0; n < kPerSubmitter; ++n) {
+                const int value = (submitter * kPerSubmitter) + n;
+                if (auto result = queue.enqueue([value]() {
+                    return value;
+                })) {
+                    mine.push_back(*result);
+                }
+            }
+        });
+    }
+    for (auto& submitter : submitters) {
+        submitter.join();
+    }
+
+    std::unordered_set<dross::operation_id> ids;
+    for (int submitter = 0; submitter < kSubmitters; ++submitter) {
+        ASSERT_EQ(results[submitter].size(), static_cast<std::size_t>(kPerSubmitter));
+        for (int n = 0; n < kPerSubmitter; ++n) {
+            const auto& result = results[submitter][n];
+            ASSERT_TRUE(result.wait_for(kTimeout));
+            EXPECT_EQ(result.get_as<int>(), (submitter * kPerSubmitter) + n);
+            ids.insert(result.id());
+        }
+    }
+    EXPECT_EQ(ids.size(), static_cast<std::size_t>(kSubmitters * kPerSubmitter));
+}
+
+TEST(operation_queue_test, a_task_can_wait_for_the_result_of_one_it_enqueued)
+{
+    dross::operation_queue queue{ 2 };
+
+    const auto outer = queue.enqueue([queue]() mutable {
+        const auto inner = queue.enqueue([]() {
+            return 7;
+        });
+        if ((! inner) || (! inner->wait_for(kTimeout))) {
+            return -1;
+        }
+        return inner->get_as<int>().value_or(-1);
+    });
+    ASSERT_TRUE(outer.has_value());
+    ASSERT_TRUE(outer->wait_for(kTimeout * 2));
+
+    EXPECT_EQ(outer->get_as<int>(), 7);
+}
+
+TEST(operation_queue_test, enqueue_after_shutdown_gives_no_result)
+{
+    dross::operation_queue queue{ 1 };
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+
+    const auto result = queue.enqueue([]() {
+        return 1;
+    });
+
+    EXPECT_FALSE(result.has_value());
 }

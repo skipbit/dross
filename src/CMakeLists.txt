@@ -33,6 +33,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation_queue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/runloop.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/thread.cpp
@@ -76,6 +77,7 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/format.h
     ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread.h
+    ${PROJECT_SOURCE_DIR}/include/dross/thread/operation.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread/operation_queue.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread/runloop.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread/thread.h

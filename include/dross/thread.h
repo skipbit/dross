@@ -13,7 +13,9 @@
  *
  * operation_queue covers the other case, work for whichever of a fixed set
  * of workers is free. Its workers keep a loop too, so the way back works
- * from them as well.
+ * from them as well. Where the caller would rather wait for what the work
+ * returns than have it sent back, enqueue() hands back an operation_result
+ * to wait on and read.
  *
  * Usage:
  * @code
@@ -55,6 +57,9 @@
  * - A timer factory call that cannot install, because callback is empty or
  *   loop has already finished, returns a handle that is already invalid
  *   rather than failing outright
+ * - operation_result::get_as() returns an error of operation_errc, rather
+ *   than a value, for a result that is not finished or not of the type
+ *   asked for
  * - An exception thrown by a task or a timer's callback propagates out of
  *   the run() call that was running it. It is not caught, stored or
  *   translated
@@ -65,6 +70,7 @@
 
 #pragma once
 
+#include <dross/thread/operation.h>
 #include <dross/thread/operation_queue.h>
 #include <dross/thread/runloop.h>
 #include <dross/thread/thread.h>
@@ -73,7 +79,7 @@
 /**
  * @brief Threading namespace members live directly in dross.
  *
- * The thread module adds runloop, thread, timer and operation_queue to the
- * dross namespace, alongside the type and platform layers, rather than a
- * namespace of its own.
+ * The thread module adds runloop, thread, timer, operation_queue and
+ * operation_result to the dross namespace, alongside the type and platform
+ * layers, rather than a namespace of its own.
  */
