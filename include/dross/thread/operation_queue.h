@@ -143,8 +143,8 @@ public:
      *
      * Queued in the same list as submit(), so the two keep one order. Returns
      * at once, as submit() does; the result is filled in when the task
-     * returns. A task that throws leaves its result unfinished, besides
-     * propagating the same as one given to submit().
+     * returns. A task that throws propagates the same as one given to
+     * submit().
      */
     template <operation_task_type F>
     std::optional<operation_result> enqueue(F&& task);
