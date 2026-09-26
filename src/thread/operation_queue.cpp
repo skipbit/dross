@@ -138,8 +138,9 @@ private:
     // A task in the list, with its place in the order tasks were accepted.
     // A task from submit() is in task; one from enqueue() is in call, and
     // fills in result. Both are behind a pointer, so moving an entry under
-    // _mutex runs none of the task's own code: a std::function may copy a
-    // small task as it moves.
+    // _mutex runs none of the task's own code, and what the move leaves
+    // behind holds nothing: a std::function may copy a small task as it
+    // moves.
     struct entry final {
         std::uint64_t order;
         std::optional<operation_result> result;

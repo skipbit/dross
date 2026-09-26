@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -1052,8 +1053,8 @@ TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queue
 {
     // Each time it is copied or destroyed, has another thread make a call
     // that takes the queue's lock, and counts the times that call does not
-    // get through. Small enough that a std::function may keep it inline,
-    // and so copy it when it moves.
+    // get through. Small enough, and copied without throwing, that a
+    // std::function may keep it inline, and so copy it when it moves.
     struct lock_check final {
         struct counts final {
             dross::operation_queue queue;
@@ -1089,6 +1090,8 @@ TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queue
             auto through = std::make_shared<event>();
             std::thread{ [queue = std::optional<dross::operation_queue>{ state->queue }, through]() mutable {
                 queue->wait_for(std::chrono::milliseconds::zero());
+                // Drops its handle before it signals, so no handle outlives
+                // the check.
                 queue.reset();
                 through->set();
             } }.detach();
@@ -1097,6 +1100,7 @@ TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queue
             }
         }
     };
+    static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
 
     dross::operation_queue queue{ 1 };
     auto release = std::make_shared<event>();
