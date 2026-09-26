@@ -21,11 +21,14 @@ public:
     static operation_result make(std::shared_ptr<const time_source> source);
 
     // Fills in result with value, an empty one for an operation that returns
-    // nothing, and wakes whatever waits for it. Called once per result.
+    // nothing, and wakes whatever waits for it. Whichever of finish() and
+    // cancel() is called first for a result takes effect; a later call to
+    // either one changes nothing.
     static void finish(const operation_result& result, std::any value);
 
     // Marks result cancelled, which counts as finished, and wakes whatever
-    // waits for it. Called instead of finish(), never as well.
+    // waits for it. Whichever of finish() and cancel() is called first for a
+    // result takes effect; a later call to either one changes nothing.
     static void cancel(const operation_result& result);
 };
 
