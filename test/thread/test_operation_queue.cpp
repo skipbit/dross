@@ -262,6 +262,171 @@ TEST(operation_queue_test, tasks_from_many_threads_all_run)
     EXPECT_EQ(shared->ran.load(), kTotal);
 }
 
+TEST(operation_queue_test, a_higher_priority_task_starts_first_and_one_priority_keeps_its_order)
+{
+    struct state {
+        event release;
+        std::mutex mutex;
+        std::vector<std::string> order;
+    };
+    auto shared = std::make_shared<state>();
+    dross::operation_queue queue{ 1 };
+    const auto record = [shared](std::string name) {
+        return [shared, name]() {
+            const std::lock_guard<std::mutex> guard{ shared->mutex };
+            shared->order.push_back(name);
+        };
+    };
+
+    // The first holds the only worker until every task is queued behind it.
+    ASSERT_TRUE(queue.submit([shared]() {
+        shared->release.wait();
+    }));
+    ASSERT_TRUE(queue.submit(record("low 1"), { .priority = dross::operation_priority::low }));
+    ASSERT_TRUE(queue.enqueue(record("normal 1")).has_value());
+    ASSERT_TRUE(queue.enqueue(record("high 1"), { .priority = dross::operation_priority::high }).has_value());
+    ASSERT_TRUE(queue.enqueue(record("low 2"), { .priority = dross::operation_priority::low }).has_value());
+    ASSERT_TRUE(queue.submit(record("high 2"), { .priority = dross::operation_priority::high }));
+    ASSERT_TRUE(queue.submit(record("normal 2")));
+    shared->release.set();
+
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    const std::lock_guard<std::mutex> guard{ shared->mutex };
+    EXPECT_EQ(shared->order,
+              (std::vector<std::string>{ "high 1", "high 2", "normal 1", "normal 2", "low 1", "low 2" }));
+}
+
+TEST(operation_queue_test, tasks_of_every_priority_from_many_threads_start_by_priority_then_in_order)
+{
+    constexpr int kSubmitters = 4;
+    constexpr int kPerSubmitter = 30;
+    constexpr int kTotal = kSubmitters * kPerSubmitter;
+
+    struct started {
+        int priority;
+        int submitter;
+        int n;
+    };
+    struct state {
+        event release;
+        std::mutex mutex;
+        std::vector<started> order;
+    };
+    auto shared = std::make_shared<state>();
+    dross::operation_queue queue{ 1 };
+
+    // The first holds the only worker until every submitter has finished,
+    // so the order the rest start in comes from the priorities alone.
+    ASSERT_TRUE(queue.submit([shared]() {
+        shared->release.wait();
+    }));
+    std::vector<std::thread> submitters;
+    submitters.reserve(kSubmitters);
+    for (int submitter = 0; submitter < kSubmitters; ++submitter) {
+        submitters.emplace_back([queue, shared, submitter]() mutable {
+            for (int n = 0; n < kPerSubmitter; ++n) {
+                const int priority = (n + submitter) % 3;
+                const auto task = [shared, priority, submitter, n]() {
+                    const std::lock_guard<std::mutex> guard{ shared->mutex };
+                    shared->order.push_back({ priority, submitter, n });
+                };
+                const dross::operation_options options{ .priority = static_cast<dross::operation_priority>(priority) };
+                if ((n % 2) == 0) {
+                    EXPECT_TRUE(queue.submit(task, options));
+                } else {
+                    EXPECT_TRUE(queue.enqueue(task, options).has_value());
+                }
+            }
+        });
+    }
+    for (auto& submitter : submitters) {
+        submitter.join();
+    }
+    shared->release.set();
+
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    const std::lock_guard<std::mutex> guard{ shared->mutex };
+    ASSERT_EQ(shared->order.size(), static_cast<std::size_t>(kTotal));
+    for (std::size_t i = 1; i < shared->order.size(); ++i) {
+        const started& before = shared->order[i - 1];
+        const started& after = shared->order[i];
+        EXPECT_GE(before.priority, after.priority) << "at " << i;
+        if ((before.priority == after.priority) && (before.submitter == after.submitter)) {
+            EXPECT_LT(before.n, after.n) << "at " << i;
+        }
+    }
+}
+
+TEST(operation_queue_test, wait_for_waits_for_a_waiting_task_of_every_priority)
+{
+    for (const auto priority :
+         { dross::operation_priority::low, dross::operation_priority::normal, dross::operation_priority::high }) {
+        dross::operation_queue queue{ 1 };
+        auto release = std::make_shared<event>();
+        auto blocked = std::make_shared<event>();
+
+        // The only worker is held by work on its own loop rather than by a
+        // task from the queue, so the one task waiting is all there is to
+        // wait for.
+        ASSERT_TRUE(queue.submit([release, blocked]() {
+            dross::current_thread().perform([release, blocked]() {
+                blocked->set();
+                release->wait();
+            });
+        }));
+        ASSERT_TRUE(blocked->wait());
+        const auto nothing = []() {
+        };
+        ASSERT_TRUE(queue.submit(nothing, { .priority = priority }));
+
+        const bool while_waiting = queue.wait_for(std::chrono::milliseconds::zero());
+        release->set();
+
+        EXPECT_FALSE(while_waiting) << "priority " << static_cast<int>(priority);
+        EXPECT_TRUE(queue.wait_for(kTimeout)) << "priority " << static_cast<int>(priority);
+    }
+}
+
+TEST(operation_queue_test, cancel_takes_a_waiting_task_of_any_priority_off_the_queue)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    auto blocked = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release, blocked]() {
+        dross::current_thread().perform([release, blocked]() {
+            blocked->set();
+            release->wait();
+        });
+    }));
+    ASSERT_TRUE(blocked->wait());
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    std::vector<dross::operation_result> results;
+    for (const auto priority :
+         { dross::operation_priority::low, dross::operation_priority::normal, dross::operation_priority::high }) {
+        const auto count = [ran]() {
+            ran->fetch_add(1);
+        };
+        const auto result = queue.enqueue(count, { .priority = priority });
+        ASSERT_TRUE(result.has_value());
+        results.push_back(*result);
+    }
+
+    for (const auto& result : results) {
+        EXPECT_TRUE(queue.cancel(result.id()));
+    }
+    const bool settled = queue.wait_for(std::chrono::milliseconds::zero());
+    release->set();
+
+    EXPECT_TRUE(settled);
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_EQ(ran->load(), 0);
+    for (const auto& result : results) {
+        const auto value = result.get_as<void>();
+        ASSERT_FALSE(value.has_value());
+        EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    }
+}
+
 TEST(operation_queue_test, a_task_can_perform_on_its_worker_and_install_a_timer_there)
 {
     struct state {
@@ -948,9 +1113,9 @@ TEST(operation_queue_test, wait_for_settles_when_the_last_earlier_task_is_cancel
     } };
     const bool saw_wait = source->await_timed_waits(1);
     // Accepted after the wait began, so y's order is the wait's target.
-    // Cancelling x leaves y at the front of the list at exactly that order,
-    // so only front().order >= target settles the wait at once;
-    // front().order > target would wait out the deadline instead.
+    // Cancelling x leaves y the first task unfinished, at exactly that
+    // order, so only a first order >= target settles the wait at once; a
+    // first order > target would wait out the deadline instead.
     const auto y = queue.enqueue([]() {
         return 20;
     });
