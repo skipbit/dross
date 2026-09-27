@@ -27,6 +27,9 @@ namespace {
 
 using dross_test::event;
 using dross_test::kTimeout;
+using dross_test::lock_check;
+using dross_test::lock_probe;
+using dross_test::probe_lock;
 
 // Holds each task that arrives until count of them have, so count tasks that
 // all get through were running at once, each on a worker of its own. Keeps
@@ -100,61 +103,6 @@ bool all_end(std::vector<dross::thread>& workers)
     }
     return true;
 }
-
-// Shared by tests that check the queue's own lock is not held while
-// something tied to it is copied or destroyed: what such a check counts,
-// and the check itself.
-struct lock_probe final {
-    dross::operation_queue queue;
-    std::atomic<int> checked{ 0 };
-    std::atomic<int> blocked{ 0 };
-};
-
-// Makes another thread call something that takes the queue's lock, and
-// counts it in state when that call does not get through within a bound.
-void probe_lock(lock_probe& state) noexcept
-{
-    ++state.checked;
-    // One is enough to fail; the rest would each wait out the bound.
-    if (state.blocked.load() > 0) {
-        return;
-    }
-    auto through = std::make_shared<event>();
-    std::thread{ [queue = std::optional<dross::operation_queue>{ state.queue }, through]() mutable {
-        queue->wait_for(std::chrono::milliseconds::zero());
-        // Drops its handle before it signals, so no handle outlives the
-        // check.
-        queue.reset();
-        through->set();
-    } }.detach();
-    if (! through->wait()) {
-        ++state.blocked;
-    }
-}
-
-// Probes the queue's lock each time it is copied or destroyed. Small enough,
-// and copied without throwing, that a std::function may keep it inline, and
-// so copy it when it moves.
-struct lock_check final {
-    std::shared_ptr<lock_probe> state;
-
-    explicit lock_check(std::shared_ptr<lock_probe> shared)
-        : state{ std::move(shared) }
-    {
-    }
-
-    lock_check(const lock_check& other) noexcept
-        : state{ other.state }
-    {
-        probe_lock(*state);
-    }
-
-    ~lock_check()
-    {
-        probe_lock(*state);
-    }
-};
-static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
 
 // A value an enqueued task returns, whose destructor probes the queue's
 // lock the same way, so a result held in options.after is checked when it
@@ -1320,7 +1268,9 @@ TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queue
     ASSERT_TRUE(queue.submit([release]() {
         release->wait();
     }));
-    const lock_check check{ std::make_shared<lock_probe>(queue) };
+    const lock_check check{ std::make_shared<lock_probe>([queue]() mutable {
+        queue.wait_for(std::chrono::milliseconds::zero());
+    }) };
     ASSERT_TRUE(queue.submit([check]() {
     }));
     const auto returned = queue.enqueue([check]() {
@@ -1343,7 +1293,9 @@ TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queue
 TEST(operation_queue_test, a_result_named_in_after_is_let_go_only_outside_the_queues_lock)
 {
     dross::operation_queue queue{ 1 };
-    auto probe = std::make_shared<lock_probe>(queue);
+    auto probe = std::make_shared<lock_probe>([queue]() mutable {
+        queue.wait_for(std::chrono::milliseconds::zero());
+    });
 
     dross::operation_options options;
     {

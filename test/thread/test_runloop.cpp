@@ -22,57 +22,9 @@ namespace {
 
 using dross_test::event;
 using dross_test::kTimeout;
+using dross_test::lock_check;
+using dross_test::lock_probe;
 using dross_test::reset_main_runloop;
-
-// What a check of the loop's own lock counts.
-struct lock_probe final {
-    dross::runloop loop;
-    std::atomic<int> checked{ 0 };
-    std::atomic<int> blocked{ 0 };
-};
-
-// Makes another thread call something that takes the loop's lock, and
-// counts it in state when that call does not get through within a bound.
-void probe_lock(lock_probe& state) noexcept
-{
-    ++state.checked;
-    // One is enough to fail; the rest would each wait out the bound.
-    if (state.blocked.load() > 0) {
-        return;
-    }
-    auto through = std::make_shared<event>();
-    std::thread{ [loop = state.loop, through]() {
-        static_cast<void>(loop.pending_count());
-        through->set();
-    } }.detach();
-    if (! through->wait()) {
-        ++state.blocked;
-    }
-}
-
-// Probes the loop's lock each time it is copied or destroyed. Small enough,
-// and copied without throwing, that a std::function may keep it inline, and
-// so copy it when it moves.
-struct lock_check final {
-    std::shared_ptr<lock_probe> state;
-
-    explicit lock_check(std::shared_ptr<lock_probe> shared)
-        : state{ std::move(shared) }
-    {
-    }
-
-    lock_check(const lock_check& other) noexcept
-        : state{ other.state }
-    {
-        probe_lock(*state);
-    }
-
-    ~lock_check()
-    {
-        probe_lock(*state);
-    }
-};
-static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
 
 // Posts a task to its loop each time it is destroyed. Kept small and copied
 // without throwing, for the same reason as lock_check.
@@ -671,7 +623,9 @@ TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_tha
 TEST(runloop_test, a_task_is_copied_and_destroyed_only_outside_the_loops_lock)
 {
     dross::runloop loop = dross::runloop_access::standalone(dross::time_source::steady());
-    const lock_check check{ std::make_shared<lock_probe>(loop) };
+    const lock_check check{ std::make_shared<lock_probe>([loop]() {
+        static_cast<void>(loop.pending_count());
+    }) };
 
     const auto post_from_another_thread = [&loop, &check](int count) {
         std::atomic<int> queued{ 0 };
