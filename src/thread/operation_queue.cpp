@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <any>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
@@ -18,11 +19,13 @@
 #include <deque>
 #include <expected>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -37,6 +40,13 @@ bool names_a_priority(operation_priority priority)
     return (static_cast<std::size_t>(priority) <= static_cast<std::size_t>(operation_priority::high));
 }
 
+// A number no other queue in this process has, for its results to carry.
+std::uint64_t next_queue_number() noexcept
+{
+    static std::atomic<std::uint64_t> last{ 0 };
+    return last.fetch_add(1, std::memory_order_relaxed) + 1;
+}
+
 // What the workers share with the queue's handles: the tasks waiting to run,
 // the ones running, and which workers already have a sweep on their loop.
 // The workers hold it, not the handles' storage, so the handles going does
@@ -46,22 +56,29 @@ class backlog final : public std::enable_shared_from_this<backlog> {
 public:
     backlog(std::vector<thread> workers, std::shared_ptr<const time_source> source)
         : _source{ std::move(source) }
+        , _number{ next_queue_number() }
         , _workers{ std::move(workers) }
         , _sweeping(_workers.size(), false)
     {
     }
 
-    // Queues task for the workers; false once the queue has stopped. The
-    // task is wrapped before _mutex is taken, and a task not accepted is
-    // destroyed after it is released.
+    // Queues task for the workers; false when it is to run after a result
+    // from another queue, or once the queue has stopped. The task is wrapped
+    // before _mutex is taken, and a task not accepted, or cancelled as it is
+    // accepted, is destroyed after it is released.
     bool submit(std::function<void()> task, operation_options options)
     {
+        if (! all_from_here(options.after)) {
+            return false;
+        }
         auto held = std::make_unique<std::function<void()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
             return false;
         }
-        queue(std::move(options), std::nullopt, std::move(held), nullptr);
+        if (! any_cancelled(options.after)) {
+            queue(std::move(options), std::nullopt, std::move(held), nullptr);
+        }
         return true;
     }
 
@@ -70,40 +87,49 @@ public:
     // the order tasks are accepted in, and a task not accepted takes none.
     std::expected<operation_result, error> enqueue(std::function<std::any()> task, operation_options options)
     {
+        if (! all_from_here(options.after)) {
+            return std::unexpected(error(operation_errc::foreign_dependency));
+        }
         auto held = std::make_unique<std::function<std::any()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
             return std::unexpected(error(operation_errc::queue_stopped));
         }
-        operation_result result = operation_access::make(_source);
-        queue(std::move(options), result, nullptr, std::move(held));
+        operation_result result = operation_access::make(_source, _number);
+        if (any_cancelled(options.after)) {
+            operation_access::cancel(result);
+        } else {
+            queue(std::move(options), result, nullptr, std::move(held));
+        }
         return result;
     }
 
-    // Takes the task whose result has id off its list and marks the result
-    // cancelled. The result is marked under _mutex, so a wait_for() that
-    // sees the task gone also sees its result finished. The task itself is
-    // destroyed only once _mutex is released, as take() leaves a task it
-    // hands out, since what it captured may use the queue as it goes.
+    // Takes the task whose result has id off the queue, whether it is ready
+    // to run or still waiting for what it runs after, and marks its result
+    // cancelled; then does the same for every task that runs after it, and
+    // after those in turn. The results are marked under _mutex, so a
+    // wait_for() that sees the tasks gone also sees their results finished.
+    // The tasks themselves are destroyed only once _mutex is released, as
+    // take() leaves a task it hands out, since what they captured may use
+    // the queue as they go.
     bool cancel(const operation_id& id)
     {
-        std::optional<entry> removed;
+        std::vector<entry> removed;
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
-            for (auto& tasks : _tasks) {
-                const auto found = std::find_if(tasks.begin(), tasks.end(), [&id](const entry& waiting) {
-                    return waiting.result && (waiting.result->id() == id);
-                });
-                if (found != tasks.end()) {
-                    operation_access::cancel(*found->result);
-                    _unfinished.erase(found->order);
-                    removed = std::move(*found);
-                    tasks.erase(found);
-                    break;
-                }
-            }
-            if (! removed) {
+            std::optional<entry> found = take_out(id);
+            if (! found) {
                 return false;
+            }
+            removed.push_back(std::move(*found));
+            for (std::size_t i = 0; i < removed.size(); ++i) {
+                _unfinished.erase(removed[i].order);
+                if (removed[i].result) {
+                    operation_access::cancel(*removed[i].result);
+                    for (entry& after : take_dependents(removed[i].result->id())) {
+                        removed.push_back(std::move(after));
+                    }
+                }
             }
         }
         _settled.notify_all();
@@ -177,12 +203,35 @@ private:
         }
     };
 
-    // Adds a task to the list of its priority and hands a sweep to every
-    // worker that has none; a sweep keeps taking until every list is empty,
-    // so an existing one reaches the task too. Every idle worker gets one,
-    // not just the first, since a worker with no sweep may still be busy
-    // running something else on its loop. Whichever gets there first takes
-    // the task, and the rest find the lists empty. Called with _mutex held.
+    // A task that runs after others, with how many of them have not
+    // returned yet.
+    struct waiting final {
+        entry task;
+        operation_priority priority;
+        std::size_t remaining;
+    };
+
+    // Whether every result in after was made by this queue.
+    bool all_from_here(const std::vector<operation_result>& after) const
+    {
+        return std::all_of(after.begin(), after.end(), [this](const operation_result& before) {
+            return (operation_access::queue_of(before) == _number);
+        });
+    }
+
+    // Whether a result in after was cancelled, so a task to run after it
+    // never runs. Called with _mutex held, under which cancel() marks a
+    // result.
+    static bool any_cancelled(const std::vector<operation_result>& after)
+    {
+        return std::any_of(after.begin(), after.end(), [](const operation_result& before) {
+            return operation_access::is_cancelled(before);
+        });
+    }
+
+    // Accepts a task. One that runs after results not yet finished waits
+    // aside until they have all returned; any other goes straight to the
+    // list of its priority. Called with _mutex held.
     void queue(operation_options options,
                std::optional<operation_result> result,
                std::unique_ptr<std::function<void()>> task,
@@ -190,7 +239,37 @@ private:
     {
         const std::uint64_t order = _accepted++;
         _unfinished.insert(order);
-        _tasks[static_cast<std::size_t>(options.priority)].push_back(entry{ order, std::move(result), std::move(task), std::move(call) });
+        if (result) {
+            _dependents.try_emplace(result->id());
+        }
+        entry accepted{ order, std::move(result), std::move(task), std::move(call) };
+
+        // A result still in _dependents has not finished; any other that
+        // got past any_cancelled() has returned, and is already met.
+        std::size_t remaining = 0;
+        for (const operation_result& before : options.after) {
+            const auto found = _dependents.find(before.id());
+            if (found != _dependents.end()) {
+                found->second.push_back(order);
+                ++remaining;
+            }
+        }
+        if (remaining > 0) {
+            _waiting.emplace(order, waiting{ std::move(accepted), options.priority, remaining });
+        } else {
+            make_ready(std::move(accepted), options.priority);
+        }
+    }
+
+    // Adds a task to the list of its priority and hands a sweep to every
+    // worker that has none; a sweep keeps taking until every list is empty,
+    // so an existing one reaches the task too. Every idle worker gets one,
+    // not just the first, since a worker with no sweep may still be busy
+    // running something else on its loop. Whichever gets there first takes
+    // the task, and the rest find the lists empty. Called with _mutex held.
+    void make_ready(entry task, operation_priority priority)
+    {
+        _tasks[static_cast<std::size_t>(priority)].push_back(std::move(task));
 
         for (std::size_t i = 0; i < _workers.size(); ++i) {
             if (_sweeping[i]) {
@@ -230,7 +309,7 @@ private:
     {
         while (auto next = take(worker)) {
             next->run();
-            done(next->order);
+            done(*next);
         }
     }
 
@@ -251,18 +330,82 @@ private:
         return std::nullopt;
     }
 
-    void done(std::uint64_t order)
+    // Marks a task finished and, for one that returned a result, counts it
+    // off every task that runs after it; those it was the last for become
+    // ready.
+    void done(const entry& finished)
     {
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
-            _unfinished.erase(order);
+            _unfinished.erase(finished.order);
+            if (finished.result) {
+                for (const std::uint64_t order : dependents_of(finished.result->id())) {
+                    const auto found = _waiting.find(order);
+                    // Gone once cancelled.
+                    if ((found != _waiting.end()) && (--found->second.remaining == 0)) {
+                        waiting ready = std::move(found->second);
+                        _waiting.erase(found);
+                        make_ready(std::move(ready.task), ready.priority);
+                    }
+                }
+            }
         }
         _settled.notify_all();
     }
 
-    // Set once, at construction, and never reassigned, so it is read
+    // The task whose result has id, taken off its list or out of those
+    // waiting, or none when neither has it. Called with _mutex held.
+    std::optional<entry> take_out(const operation_id& id)
+    {
+        for (auto& tasks : _tasks) {
+            const auto found = std::find_if(tasks.begin(), tasks.end(), [&id](const entry& ready) {
+                return ready.result && (ready.result->id() == id);
+            });
+            if (found != tasks.end()) {
+                entry task = std::move(*found);
+                tasks.erase(found);
+                return task;
+            }
+        }
+        const auto found = std::find_if(_waiting.begin(), _waiting.end(), [&id](const auto& aside) {
+            return aside.second.task.result && (aside.second.task.result->id() == id);
+        });
+        if (found == _waiting.end()) {
+            return std::nullopt;
+        }
+        entry task = std::move(found->second.task);
+        _waiting.erase(found);
+        return task;
+    }
+
+    // The order of every task waiting to run after the one whose result has
+    // id, which leaves _dependents as it goes; none once it has gone.
+    // Called with _mutex held.
+    std::vector<std::uint64_t> dependents_of(const operation_id& id)
+    {
+        auto node = _dependents.extract(id);
+        return node ? std::move(node.mapped()) : std::vector<std::uint64_t>{};
+    }
+
+    // Takes every task still waiting to run after the one whose result has
+    // id out of those waiting. Called with _mutex held.
+    std::vector<entry> take_dependents(const operation_id& id)
+    {
+        std::vector<entry> taken;
+        for (const std::uint64_t order : dependents_of(id)) {
+            const auto found = _waiting.find(order);
+            if (found != _waiting.end()) {
+                taken.push_back(std::move(found->second.task));
+                _waiting.erase(found);
+            }
+        }
+        return taken;
+    }
+
+    // Set once, at construction, and never reassigned, so they are read
     // without _mutex.
     const std::shared_ptr<const time_source> _source;
+    const std::uint64_t _number;
 
     std::mutex _mutex;
     std::condition_variable _settled;
@@ -276,6 +419,11 @@ private:
     // The order of every task accepted and not yet finished or cancelled,
     // waiting or running, so wait_for() needs only the first.
     std::set<std::uint64_t> _unfinished;
+    // Every task from enqueue() that has not finished, by the id of its
+    // result, with the order of each task waiting to run after it.
+    std::unordered_map<operation_id, std::vector<std::uint64_t>> _dependents;
+    // Every task waiting for results to return before it runs, by order.
+    std::map<std::uint64_t, waiting> _waiting;
     // Empty once the queue has stopped.
     std::vector<thread> _workers;
     std::vector<bool> _sweeping;

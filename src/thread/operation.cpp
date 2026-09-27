@@ -44,6 +44,8 @@ public:
             return "operation queue has stopped";
         case operation_errc::invalid_priority:
             return "operation priority is not one operation_priority names";
+        case operation_errc::foreign_dependency:
+            return "operation is to run after a result from another queue";
         }
         return "unknown operation error";
     }

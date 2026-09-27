@@ -21,11 +21,12 @@ namespace dross {
  * @brief Why an operation's result holds no value.
  */
 enum class operation_errc {
-    cancelled = 1,         ///< The operation was taken off its queue before it ran
-    not_finished = 2,      ///< The operation has not finished yet
-    type_mismatch = 3,     ///< The operation returned a different type from the one asked for
-    queue_stopped = 4,     ///< The queue had stopped and did not take the operation
-    invalid_priority = 5,  ///< The operation was given a priority operation_priority does not name
+    cancelled = 1,           ///< The operation was taken off its queue before it ran
+    not_finished = 2,        ///< The operation has not finished yet
+    type_mismatch = 3,       ///< The operation returned a different type from the one asked for
+    queue_stopped = 4,       ///< The queue had stopped and did not take the operation
+    invalid_priority = 5,    ///< The operation was given a priority operation_priority does not name
+    foreign_dependency = 6,  ///< The operation was to run after a result from another queue
 };
 
 /**
