@@ -1379,3 +1379,388 @@ TEST(operation_queue_test, cancel_from_many_threads_while_the_workers_take_tasks
     EXPECT_EQ(ran->load(), kTotal - cancelled_count);
     EXPECT_TRUE(queue.wait_for(kTimeout));
 }
+
+TEST(operation_queue_test, a_task_starts_only_once_what_it_runs_after_has_returned)
+{
+    dross::operation_queue queue{ 2 };
+    auto release = std::make_shared<event>();
+    auto first_started = std::make_shared<event>();
+    auto other_ran = std::make_shared<event>();
+    auto after_started = std::make_shared<std::atomic<bool>>(false);
+
+    const auto first = queue.enqueue([release, first_started]() {
+        first_started->set();
+        release->wait();
+        return 1;
+    });
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(first_started->wait());
+    // The other worker is free and takes tasks in the order they were
+    // queued, so had the second not waited for the first, it would have
+    // started before the third ran.
+    const auto second = queue.enqueue(
+        [first, after_started]() {
+        after_started->store(true);
+        return first->get_as<int>().value_or(0) + 1;
+    },
+        { .after = { *first } });
+    ASSERT_TRUE(second.has_value());
+    ASSERT_TRUE(queue.submit([other_ran]() {
+        other_ran->set();
+    }));
+    ASSERT_TRUE(other_ran->wait());
+    const bool started_early = after_started->load();
+    release->set();
+
+    EXPECT_FALSE(started_early);
+    ASSERT_TRUE(second->wait_for(kTimeout));
+    EXPECT_EQ(second->get_as<int>(), 2);
+}
+
+TEST(operation_queue_test, tasks_made_ready_together_run_at_once_on_workers_of_their_own)
+{
+    dross::operation_queue queue{ 3 };
+    auto workers = workers_of(queue);
+    ASSERT_EQ(workers.size(), 3U);
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    auto release = std::make_shared<event>();
+    auto started = std::make_shared<event>();
+    auto runner = std::make_shared<std::optional<dross::thread>>();
+    auto gather = std::make_shared<gathering>(2);
+
+    const auto first = queue.enqueue([release, started, runner]() {
+        *runner = dross::current_thread();
+        started->set();
+        release->wait();
+    });
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(started->wait());
+    for (int n = 0; n < 2; ++n) {
+        ASSERT_TRUE(queue.submit(
+            [gather]() {
+            gather->arrive();
+        },
+            { .after = { *first } }));
+    }
+    // A worker's loop runs what it is given in order, so once a mark has run
+    // on each of the other two, whatever sweep was ahead of it has found
+    // nothing to take and they sit idle. Only first returning can then put
+    // them to work; left to its own worker, the second task would wait out
+    // the first.
+    auto marks = std::make_shared<gathering>(2);
+    for (auto& worker : workers) {
+        if (worker == **runner) {
+            continue;
+        }
+        ASSERT_TRUE(worker.perform([marks]() {
+            marks->arrive();
+        }));
+    }
+    ASSERT_EQ(marks->await().size(), 2U);
+    release->set();
+
+    EXPECT_EQ(gather->await().size(), 2U);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, a_task_runs_after_every_result_it_names)
+{
+    struct state {
+        std::mutex mutex;
+        std::vector<std::string> order;
+    };
+    auto shared = std::make_shared<state>();
+    dross::operation_queue queue{ 2 };
+    auto release = std::make_shared<event>();
+    auto load_started = std::make_shared<event>();
+    auto marker_ran = std::make_shared<event>();
+    const auto record = [shared](std::string name) {
+        return [shared, name]() {
+            const std::lock_guard<std::mutex> guard{ shared->mutex };
+            shared->order.push_back(name);
+        };
+    };
+
+    const auto load = queue.enqueue([release, load_started, record]() {
+        load_started->set();
+        release->wait();
+        record("load")();
+    });
+    ASSERT_TRUE(load.has_value());
+    ASSERT_TRUE(load_started->wait());
+    const auto check = queue.enqueue(record("check"));
+    ASSERT_TRUE(check.has_value());
+    const auto save = queue.enqueue(record("save"), { .after = { *load, *check } });
+    ASSERT_TRUE(save.has_value());
+    // The other worker takes tasks in the order they were queued, so had
+    // save not waited for load, it would have run before the marker.
+    ASSERT_TRUE(queue.submit([marker_ran]() {
+        marker_ran->set();
+    }));
+    ASSERT_TRUE(marker_ran->wait());
+    const bool saved_early = save->is_finished();
+    release->set();
+
+    EXPECT_FALSE(saved_early);
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    const std::lock_guard<std::mutex> guard{ shared->mutex };
+    EXPECT_EQ(shared->order, (std::vector<std::string>{ "check", "load", "save" }));
+}
+
+TEST(operation_queue_test, a_result_that_has_returned_counts_as_met)
+{
+    dross::operation_queue queue{ 1 };
+    const auto first = queue.enqueue([]() {
+        return 5;
+    });
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+
+    const auto second = queue.enqueue(
+        [first]() {
+        return first->get_as<int>().value_or(0) * 2;
+    },
+        { .after = { *first } });
+
+    ASSERT_TRUE(second.has_value());
+    ASSERT_TRUE(second->wait_for(kTimeout));
+    EXPECT_EQ(second->get_as<int>(), 10);
+}
+
+TEST(operation_queue_test, a_task_to_run_after_a_cancelled_result_is_cancelled_as_it_is_submitted)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    auto blocked = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release, blocked]() {
+        dross::current_thread().perform([release, blocked]() {
+            blocked->set();
+            release->wait();
+        });
+    }));
+    ASSERT_TRUE(blocked->wait());
+    const auto first = queue.enqueue([]() {
+        return 1;
+    });
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(queue.cancel(first->id()));
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    const auto count = [ran]() {
+        ran->fetch_add(1);
+    };
+
+    const auto second = queue.enqueue(count, { .after = { *first } });
+    const bool submitted = queue.submit(count, { .after = { *first } });
+    const bool settled = queue.wait_for(std::chrono::milliseconds::zero());
+    release->set();
+
+    ASSERT_TRUE(second.has_value());
+    EXPECT_TRUE(submitted);
+    EXPECT_TRUE(settled);
+    const auto value = second->get_as<void>();
+    ASSERT_FALSE(value.has_value());
+    EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    EXPECT_FALSE(queue.cancel(second->id()));
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_EQ(ran->load(), 0);
+}
+
+TEST(operation_queue_test, cancel_takes_off_every_task_that_runs_after_the_one_cancelled)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    auto blocked = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release, blocked]() {
+        dross::current_thread().perform([release, blocked]() {
+            blocked->set();
+            release->wait();
+        });
+    }));
+    ASSERT_TRUE(blocked->wait());
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    const auto count = [ran]() {
+        ran->fetch_add(1);
+    };
+
+    const auto first = queue.enqueue(count);
+    ASSERT_TRUE(first.has_value());
+    const auto second = queue.enqueue(count, { .after = { *first } });
+    ASSERT_TRUE(second.has_value());
+    const auto third = queue.enqueue(count, { .after = { *second } });
+    ASSERT_TRUE(third.has_value());
+    ASSERT_TRUE(queue.submit(count, { .after = { *second } }));
+    const auto unrelated = queue.enqueue(count);
+    ASSERT_TRUE(unrelated.has_value());
+
+    ASSERT_TRUE(queue.cancel(first->id()));
+    release->set();
+
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_EQ(ran->load(), 1);
+    for (const auto& result : { *first, *second, *third }) {
+        const auto value = result.get_as<void>();
+        ASSERT_FALSE(value.has_value());
+        EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    }
+    EXPECT_TRUE(unrelated->get_as<void>().has_value());
+}
+
+TEST(operation_queue_test, cancel_takes_off_a_task_still_waiting_for_what_it_runs_after)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    const auto first = queue.enqueue([release]() {
+        release->wait();
+        return 1;
+    });
+    ASSERT_TRUE(first.has_value());
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    const auto count = [ran]() {
+        ran->fetch_add(1);
+    };
+    const auto second = queue.enqueue(count, { .after = { *first } });
+    ASSERT_TRUE(second.has_value());
+    const auto third = queue.enqueue(count, { .after = { *second } });
+    ASSERT_TRUE(third.has_value());
+
+    ASSERT_TRUE(queue.cancel(second->id()));
+    release->set();
+
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_EQ(first->get_as<int>(), 1);
+    EXPECT_EQ(ran->load(), 0);
+    for (const auto& result : { *second, *third }) {
+        const auto value = result.get_as<void>();
+        ASSERT_FALSE(value.has_value());
+        EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    }
+}
+
+TEST(operation_queue_test, a_result_from_another_queue_is_refused)
+{
+    dross::operation_queue queue{ 1 };
+    dross::operation_queue other{ 1 };
+    const auto elsewhere = other.enqueue([]() {
+        return 1;
+    });
+    ASSERT_TRUE(elsewhere.has_value());
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    const auto count = [ran]() {
+        ran->fetch_add(1);
+    };
+
+    const auto result = queue.enqueue(count, { .after = { *elsewhere } });
+    const bool submitted = queue.submit(count, { .after = { *elsewhere } });
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error() == dross::operation_errc::foreign_dependency);
+    EXPECT_FALSE(submitted);
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_EQ(ran->load(), 0);
+}
+
+TEST(operation_queue_test, wait_for_waits_for_a_task_still_waiting_for_what_it_runs_after)
+{
+    dross::operation_queue queue{ 2 };
+    auto release = std::make_shared<event>();
+    const auto first = queue.enqueue([release]() {
+        release->wait();
+    });
+    ASSERT_TRUE(first.has_value());
+    auto second_ran = std::make_shared<std::atomic<bool>>(false);
+    ASSERT_TRUE(queue.submit(
+        [second_ran]() {
+        second_ran->store(true);
+    },
+        { .after = { *first } }));
+
+    const bool while_first_runs = queue.wait_for(std::chrono::milliseconds::zero());
+    release->set();
+
+    EXPECT_FALSE(while_first_runs);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+    EXPECT_TRUE(second_ran->load());
+}
+
+TEST(operation_queue_test, a_chain_left_when_the_queue_stops_still_runs_to_its_end)
+{
+    dross::operation_queue queue{ 3 };
+    auto release = std::make_shared<event>();
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    const auto first = queue.enqueue([release, ran]() {
+        release->wait();
+        ran->fetch_add(1);
+    });
+    ASSERT_TRUE(first.has_value());
+    std::optional<dross::operation_result> last = *first;
+    for (int n = 0; n < 5; ++n) {
+        const auto next = queue.enqueue(
+            [ran]() {
+            ran->fetch_add(1);
+        },
+            { .after = { *last } });
+        ASSERT_TRUE(next.has_value());
+        last = *next;
+    }
+
+    const bool ended_early = queue.shutdown(std::chrono::milliseconds::zero());
+    release->set();
+
+    EXPECT_FALSE(ended_early);
+    EXPECT_TRUE(queue.shutdown(kTimeout));
+    EXPECT_EQ(ran->load(), 6);
+    EXPECT_TRUE(last->get_as<void>().has_value());
+}
+
+TEST(operation_queue_test, tasks_from_many_threads_each_run_after_the_ones_they_name)
+{
+    constexpr int kSubmitters = 4;
+    constexpr int kPerSubmitter = 40;
+
+    dross::operation_queue queue{ 3 };
+    auto violations = std::make_shared<std::atomic<int>>(0);
+    auto chains = std::make_shared<std::vector<std::vector<dross::operation_result>>>(kSubmitters);
+
+    std::vector<std::thread> submitters;
+    submitters.reserve(kSubmitters);
+    for (int submitter = 0; submitter < kSubmitters; ++submitter) {
+        submitters.emplace_back([queue, violations, chains, submitter]() mutable {
+            std::vector<dross::operation_result>& chain = (*chains)[submitter];
+            for (int n = 0; n < kPerSubmitter; ++n) {
+                // Each task runs after the two before it in its own chain,
+                // and checks they have both returned by the time it starts.
+                std::vector<dross::operation_result> after;
+                for (std::size_t back = 1; (back <= 2) && (back <= chain.size()); ++back) {
+                    after.push_back(chain[chain.size() - back]);
+                }
+                const auto priority = static_cast<dross::operation_priority>(n % 3);
+                const auto result = queue.enqueue(
+                    [after, violations, n]() {
+                    for (const auto& before : after) {
+                        if (! before.get_as<int>().has_value()) {
+                            violations->fetch_add(1);
+                        }
+                    }
+                    return n;
+                },
+                    { .priority = priority, .after = after });
+                EXPECT_TRUE(result.has_value());
+                if (result) {
+                    chain.push_back(*result);
+                }
+            }
+        });
+    }
+    for (auto& submitter : submitters) {
+        submitter.join();
+    }
+
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    EXPECT_EQ(violations->load(), 0);
+    for (const auto& chain : *chains) {
+        ASSERT_EQ(chain.size(), static_cast<std::size_t>(kPerSubmitter));
+        for (int n = 0; n < kPerSubmitter; ++n) {
+            EXPECT_EQ(chain[n].get_as<int>(), n);
+        }
+    }
+}
