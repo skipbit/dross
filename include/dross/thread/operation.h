@@ -24,6 +24,7 @@ enum class operation_errc {
     cancelled = 1,      ///< The operation was taken off its queue before it ran
     not_finished = 2,   ///< The operation has not finished yet
     type_mismatch = 3,  ///< The operation returned a different type from the one asked for
+    queue_stopped = 4,  ///< The queue had stopped and did not take the operation
 };
 
 /**
@@ -45,6 +46,19 @@ template <>
 struct std::is_error_code_enum<dross::operation_errc> : std::true_type { };
 
 namespace dross {
+
+/**
+ * @brief How soon a queue runs an operation, next to the others waiting.
+ *
+ * A queue always takes the waiting operation of the highest priority first,
+ * and among those of one priority, the one it took first. A lower priority
+ * operation waits for as long as higher ones keep coming.
+ */
+enum class operation_priority {
+    low,     ///< Runs once nothing of a higher priority is waiting
+    normal,  ///< The priority an operation has unless given another
+    high,    ///< Runs ahead of every normal and low operation waiting
+};
 
 /**
  * @brief Names one operation, unique within the process.
@@ -136,7 +150,7 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * - Every operation is free of data races when called from any thread
  *
  * @code
- * std::optional<dross::operation_result> result = queue.enqueue([]() {
+ * std::expected<dross::operation_result, dross::error> result = queue.enqueue([]() {
  *     return expensive_work();
  * });
  * if (result && result->wait_for(std::chrono::seconds{ 1 })) {

@@ -10,15 +10,18 @@
 
 #include <algorithm>
 #include <any>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -42,53 +45,59 @@ public:
     // Queues task for the workers; false once the queue has stopped. The
     // task is wrapped before _mutex is taken, and a task not accepted is
     // destroyed after it is released.
-    bool submit(std::function<void()> task, std::vector<thread>& workers)
+    bool submit(std::function<void()> task, operation_options options, std::vector<thread>& workers)
     {
         auto held = std::make_unique<std::function<void()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
             return false;
         }
-        queue(std::nullopt, std::move(held), nullptr, workers);
+        queue(std::move(options), std::nullopt, std::move(held), nullptr, workers);
         return true;
     }
 
     // As submit(), for a task whose return value fills in a result. The
     // result is made under the same lock, so within one queue ids follow
     // the order tasks are accepted in, and a task not accepted takes none.
-    std::optional<operation_result> enqueue(std::function<std::any()> task, std::vector<thread>& workers)
+    std::expected<operation_result, error> enqueue(std::function<std::any()> task,
+                                                   operation_options options,
+                                                   std::vector<thread>& workers)
     {
         auto held = std::make_unique<std::function<std::any()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
-            return std::nullopt;
+            return std::unexpected(error(operation_errc::queue_stopped));
         }
         operation_result result = operation_access::make(_source);
-        queue(result, nullptr, std::move(held), workers);
+        queue(std::move(options), result, nullptr, std::move(held), workers);
         return result;
     }
 
-    // Takes the task whose result has id off the list and marks the result
-    // cancelled. wait_for() looks only at the front of the list and at what
-    // is running, so a task taken out of the middle leaves it right. The
-    // result is marked under _mutex, so a wait_for() that sees the task gone
-    // also sees its result finished. The task itself is destroyed only once
-    // _mutex is released, as take() leaves a task it hands out, since what
-    // it captured may use the queue as it goes.
+    // Takes the task whose result has id off its list and marks the result
+    // cancelled. The result is marked under _mutex, so a wait_for() that
+    // sees the task gone also sees its result finished. The task itself is
+    // destroyed only once _mutex is released, as take() leaves a task it
+    // hands out, since what it captured may use the queue as it goes.
     bool cancel(const operation_id& id)
     {
         std::optional<entry> removed;
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
-            const auto found = std::find_if(_tasks.begin(), _tasks.end(), [&id](const entry& waiting) {
-                return waiting.result && (waiting.result->id() == id);
-            });
-            if (found == _tasks.end()) {
+            for (auto& tasks : _tasks) {
+                const auto found = std::find_if(tasks.begin(), tasks.end(), [&id](const entry& waiting) {
+                    return waiting.result && (waiting.result->id() == id);
+                });
+                if (found != tasks.end()) {
+                    operation_access::cancel(*found->result);
+                    _unfinished.erase(found->order);
+                    removed = std::move(*found);
+                    tasks.erase(found);
+                    break;
+                }
+            }
+            if (! removed) {
                 return false;
             }
-            operation_access::cancel(*found->result);
-            removed = std::move(*found);
-            _tasks.erase(found);
         }
         _settled.notify_all();
         return true;
@@ -118,10 +127,7 @@ public:
         std::unique_lock<std::mutex> lock{ _mutex };
         const std::uint64_t target = _accepted;
         const auto settled = [this, target]() {
-            return (_tasks.empty() || (_tasks.front().order >= target))
-                   && std::none_of(_running.begin(), _running.end(), [target](std::uint64_t order) {
-                return (order < target);
-            });
+            return (_unfinished.empty() || (*_unfinished.begin() >= target));
         };
         if ((! wait) || (timeout <= std::chrono::milliseconds::zero())) {
             return settled();
@@ -157,18 +163,21 @@ private:
         }
     };
 
-    // Adds a task to the list and hands a sweep to every worker that has
-    // none; a sweep keeps taking until the list is empty, so an existing one
-    // reaches the task too. Every idle worker gets one, not just the first,
-    // since a worker with no sweep may still be busy running something else
-    // on its loop. Whichever gets there first takes the task, and the rest
-    // find the list empty. Called with _mutex held.
-    void queue(std::optional<operation_result> result,
+    // Adds a task to the list of its priority and hands a sweep to every
+    // worker that has none; a sweep keeps taking until every list is empty,
+    // so an existing one reaches the task too. Every idle worker gets one,
+    // not just the first, since a worker with no sweep may still be busy
+    // running something else on its loop. Whichever gets there first takes
+    // the task, and the rest find the lists empty. Called with _mutex held.
+    void queue(operation_options options,
+               std::optional<operation_result> result,
                std::unique_ptr<std::function<void()>> task,
                std::unique_ptr<std::function<std::any()>> call,
                std::vector<thread>& workers)
     {
-        _tasks.push_back(entry{ _accepted++, std::move(result), std::move(task), std::move(call) });
+        const std::uint64_t order = _accepted++;
+        _unfinished.insert(order);
+        _tasks[static_cast<std::size_t>(options.priority)].push_back(entry{ order, std::move(result), std::move(task), std::move(call) });
 
         for (std::size_t i = 0; i < workers.size(); ++i) {
             if (_sweeping[i]) {
@@ -212,26 +221,28 @@ private:
         }
     }
 
-    // The next task, or none once the list is empty, which also clears this
-    // worker's sweep so the next submit() hands it another.
+    // The first task of the highest priority waiting, or none once every
+    // list is empty, which also clears this worker's sweep so the next
+    // submit() hands it another.
     std::optional<entry> take(std::size_t worker)
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
-        if (_tasks.empty()) {
-            _sweeping[worker] = false;
-            return std::nullopt;
+        for (auto tasks = _tasks.rbegin(); tasks != _tasks.rend(); ++tasks) {
+            if (! tasks->empty()) {
+                entry next = std::move(tasks->front());
+                tasks->pop_front();
+                return next;
+            }
         }
-        entry next = std::move(_tasks.front());
-        _tasks.pop_front();
-        _running.push_back(next.order);
-        return next;
+        _sweeping[worker] = false;
+        return std::nullopt;
     }
 
     void done(std::uint64_t order)
     {
         {
             const std::lock_guard<std::mutex> guard{ _mutex };
-            std::erase(_running, order);
+            _unfinished.erase(order);
         }
         _settled.notify_all();
     }
@@ -242,13 +253,16 @@ private:
 
     std::mutex _mutex;
     std::condition_variable _settled;
-    // In the order tasks were accepted, so every task accepted before the
-    // front one has left the list; those still running are in _running,
-    // which holds one per worker unless a task runs its worker's loop
-    // itself.
-    std::deque<entry> _tasks;
+    // One list per operation_priority, indexed by its value so the lowest
+    // comes first, each in the order its tasks were accepted.
+    static_assert(static_cast<std::size_t>(operation_priority::low) == 0);
+    static_assert(static_cast<std::size_t>(operation_priority::normal) == 1);
+    static_assert(static_cast<std::size_t>(operation_priority::high) == 2);
+    std::array<std::deque<entry>, static_cast<std::size_t>(operation_priority::high) + 1> _tasks;
     std::uint64_t _accepted{ 0 };
-    std::vector<std::uint64_t> _running;
+    // The order of every task accepted and not yet finished or cancelled,
+    // waiting or running, so wait_for() needs only the first.
+    std::set<std::uint64_t> _unfinished;
     std::vector<bool> _sweeping;
     bool _accepting{ true };
 };
@@ -260,8 +274,8 @@ public:
     storage(std::size_t thread_count, std::shared_ptr<const time_source> source);
     ~storage();
 
-    bool submit(std::function<void()> task);
-    std::optional<operation_result> enqueue_any(std::function<std::any()> task);
+    bool submit(std::function<void()> task, operation_options options);
+    std::expected<operation_result, error> enqueue_any(std::function<std::any()> task, operation_options options);
     bool cancel(const operation_id& id);
     bool wait_for(std::chrono::milliseconds timeout);
     bool shutdown(std::chrono::milliseconds timeout);
@@ -302,17 +316,18 @@ operation_queue::storage::~storage()
     _backlog->stop(_workers);
 }
 
-bool operation_queue::storage::submit(std::function<void()> task)
+bool operation_queue::storage::submit(std::function<void()> task, operation_options options)
 {
     if (! task) {
         return false;
     }
-    return _backlog->submit(std::move(task), _workers);
+    return _backlog->submit(std::move(task), std::move(options), _workers);
 }
 
-std::optional<operation_result> operation_queue::storage::enqueue_any(std::function<std::any()> task)
+std::expected<operation_result, error> operation_queue::storage::enqueue_any(std::function<std::any()> task,
+                                                                             operation_options options)
 {
-    return _backlog->enqueue(std::move(task), _workers);
+    return _backlog->enqueue(std::move(task), std::move(options), _workers);
 }
 
 bool operation_queue::storage::cancel(const operation_id& id)
@@ -371,14 +386,15 @@ operation_queue::~operation_queue() = default;
 
 operation_queue& operation_queue::operator=(const operation_queue& other) = default;
 
-bool operation_queue::submit(std::function<void()> task)
+bool operation_queue::submit(std::function<void()> task, operation_options options)
 {
-    return _store->submit(std::move(task));
+    return _store->submit(std::move(task), std::move(options));
 }
 
-std::optional<operation_result> operation_queue::enqueue_any(std::function<std::any()> task)
+std::expected<operation_result, error> operation_queue::enqueue_any(std::function<std::any()> task,
+                                                                    operation_options options)
 {
-    return _store->enqueue_any(std::move(task));
+    return _store->enqueue_any(std::move(task), std::move(options));
 }
 
 bool operation_queue::cancel(const operation_id& id)

@@ -6,9 +6,9 @@
 #include <chrono>
 #include <concepts>
 #include <cstddef>
+#include <expected>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -23,8 +23,22 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
                               && operation_value_type<std::decay_t<std::invoke_result_t<std::decay_t<F>&>>>;
 
 /**
- * @brief A fixed set of worker threads that run submitted tasks in the order
- * they were submitted.
+ * @brief How a queue runs a task given to operation_queue::submit() or
+ * operation_queue::enqueue().
+ *
+ * Every member has a default, so a task given no options gets them all, and
+ * one given some can name just those:
+ * @code
+ * queue.enqueue(render, { .priority = dross::operation_priority::high });
+ * @endcode
+ */
+struct operation_options final {
+    operation_priority priority{ operation_priority::normal };  ///< How soon it runs, next to the others waiting
+};
+
+/**
+ * @brief A fixed set of worker threads that run submitted tasks, the higher
+ * priority first and otherwise in the order they were submitted.
  *
  * Where runloop and thread aim work at one particular thread, a queue hands
  * it to whichever of its workers is free. Each worker is a dross::thread
@@ -34,9 +48,10 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
  *
  * Workers:
  * - The number of workers is given when the queue is made and never changes
- * - The tasks wait in one first-in, first-out list that every worker takes
- *   from, so they start in the order they were submitted; with more than one
- *   worker, they may finish in any order
+ * - The tasks wait in one list that every worker takes from. A worker takes
+ *   the task of the highest operation_priority waiting, and of those, the
+ *   one submitted first, so tasks of one priority start in the order they
+ *   were submitted; with more than one worker, they may finish in any order
  *
  * Handle semantics:
  * - An operation_queue is a handle to a queue, not the queue itself.
@@ -126,20 +141,22 @@ public:
     /**
      * @brief Add a task for one of the workers to run.
      * @param task The task, which must be callable
+     * @param options How to run it
      * @return true when the task was queued
      *
      * The task is queued and this returns at once; it does not wait for the
      * task to run. Returns false when the task is empty, or once the queue
      * has been shut down.
      */
-    bool submit(std::function<void()> task);
+    bool submit(std::function<void()> task, operation_options options = {});
 
     /**
      * @brief Add a task for one of the workers to run, and get a handle to
      * what it returns.
      * @param task The task
-     * @return The result, not yet filled in, or none once the queue has been
-     * shut down
+     * @param options How to run it
+     * @return The result, not yet filled in, or operation_errc::queue_stopped
+     * once the queue has stopped
      *
      * Queued in the same list as submit(), so the two keep one order. Returns
      * at once, as submit() does; the result is filled in when the task
@@ -147,7 +164,7 @@ public:
      * submit().
      */
     template <operation_task_type F>
-    std::optional<operation_result> enqueue(F&& task);
+    std::expected<operation_result, error> enqueue(F&& task, operation_options options = {});
 
     /**
      * @brief Take a task given to enqueue() off the queue before it starts.
@@ -210,7 +227,7 @@ private:
 
     // enqueue() without its type: task returns what the task returned, or
     // an empty std::any for one that returns nothing.
-    std::optional<operation_result> enqueue_any(std::function<std::any()> task);
+    std::expected<operation_result, error> enqueue_any(std::function<std::any()> task, operation_options options);
 
     std::shared_ptr<storage> _store;
 
@@ -218,7 +235,7 @@ private:
 };
 
 template <operation_task_type F>
-std::optional<operation_result> operation_queue::enqueue(F&& task)
+std::expected<operation_result, error> operation_queue::enqueue(F&& task, operation_options options)
 {
     using value_type = std::decay_t<std::invoke_result_t<std::decay_t<F>&>>;
 
@@ -231,7 +248,7 @@ std::optional<operation_result> operation_queue::enqueue(F&& task)
         } else {
             return std::make_any<value_type>(task());
         }
-    });
+    }, options);
 }
 
 }  // namespace dross
