@@ -4,6 +4,7 @@
 #include "thread/time_source.h"
 
 #include <any>
+#include <cstdint>
 #include <memory>
 
 // What the queue needs from an operation that the public interface does not
@@ -16,9 +17,17 @@ public:
     // one returned before.
     static operation_id next_id() noexcept;
 
-    // A result not yet filled in, for an operation with a new id. Its
-    // wait_for() reads the time and waits through source.
-    static operation_result make(std::shared_ptr<const time_source> source);
+    // A result not yet filled in, for an operation with a new id, made by
+    // the queue numbered queue, or by none for 0. Its wait_for() reads the
+    // time and waits through source.
+    static operation_result make(std::shared_ptr<const time_source> source, std::uint64_t queue = 0);
+
+    // The number of the queue that made result, or 0 for none.
+    static std::uint64_t queue_of(const operation_result& result) noexcept;
+
+    // Whether result was cancelled, as opposed to not finished yet or
+    // filled in.
+    static bool is_cancelled(const operation_result& result);
 
     // Fills in result with value, an empty one for an operation that returns
     // nothing, and wakes whatever waits for it. Whichever of finish() and

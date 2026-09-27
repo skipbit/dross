@@ -11,6 +11,7 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace dross {
 
@@ -30,10 +31,12 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
  * one given some can name just those:
  * @code
  * queue.enqueue(render, { .priority = dross::operation_priority::high });
+ * queue.enqueue(save, { .after = { *loaded, *checked } });
  * @endcode
  */
 struct operation_options final {
     operation_priority priority{ operation_priority::normal };  ///< How soon it runs, next to the others waiting
+    std::vector<operation_result> after{};                      ///< Results of tasks on the same queue to return before it runs
 };
 
 /**
@@ -52,6 +55,19 @@ struct operation_options final {
  *   the task of the highest operation_priority waiting, and of those, the
  *   one submitted first, so tasks of one priority start in the order they
  *   were submitted; with more than one worker, they may finish in any order
+ *
+ * Running after others:
+ * - A task given results in operation_options::after starts only once
+ *   every one of them has returned; until then it waits aside, and its
+ *   priority orders it only from then on
+ * - A result that has already returned by the time the task is submitted
+ *   counts as returned
+ * - Only a result from the same queue can be named, and only once its task
+ *   has been accepted, so tasks cannot run after one another in a circle
+ * - When one of them is cancelled, whether before the task is submitted or
+ *   after, the task is cancelled too and never runs, and so is every task
+ *   that runs after it in turn. A task given to submit() that is cancelled
+ *   this way is dropped without a word, as it has no result to report it
  *
  * Handle semantics:
  * - An operation_queue is a handle to a queue, not the queue itself.
@@ -145,8 +161,9 @@ public:
      * @return true when the task was queued
      *
      * The task is queued and this returns at once; it does not wait for the
-     * task to run. Returns false when the task is empty, or once the queue
-     * has been shut down.
+     * task to run. Returns false when the task is empty, when its priority is
+     * not one operation_priority names, when options.after names a result
+     * from another queue, or once the queue has been shut down.
      */
     bool submit(std::function<void()> task, operation_options options = {});
 
@@ -155,8 +172,11 @@ public:
      * what it returns.
      * @param task The task
      * @param options How to run it
-     * @return The result, not yet filled in, or operation_errc::queue_stopped
-     * once the queue has stopped
+     * @return The result, not yet filled in, or the reason the task was not
+     * queued: operation_errc::invalid_priority for a priority
+     * operation_priority does not name, operation_errc::foreign_dependency
+     * when options.after names a result from another queue, or
+     * operation_errc::queue_stopped once the queue has stopped
      *
      * Queued in the same list as submit(), so the two keep one order. Returns
      * at once, as submit() does; the result is filled in when the task
@@ -173,9 +193,12 @@ public:
      *
      * A task taken off never runs. Its result counts as finished and reports
      * operation_errc::cancelled, whatever waits for it wakes, and wait_for()
-     * no longer waits for it. Returns false, and changes nothing, once the
-     * task has started or been cancelled, and for an id from another queue.
-     * A task that has started is never stopped.
+     * no longer waits for it. Every task that runs after it is taken off the
+     * same way, and every task that runs after those in turn. A task still
+     * waiting for others to return counts as not started. Returns false,
+     * and changes nothing, once the task has started or been cancelled, and
+     * for an id from another queue. A task that has started is never
+     * stopped.
      */
     bool cancel(const operation_id& id);
 
@@ -248,7 +271,7 @@ std::expected<operation_result, error> operation_queue::enqueue(F&& task, operat
         } else {
             return std::make_any<value_type>(task());
         }
-    }, options);
+    }, std::move(options));
 }
 
 }  // namespace dross

@@ -21,10 +21,12 @@ namespace dross {
  * @brief Why an operation's result holds no value.
  */
 enum class operation_errc {
-    cancelled = 1,      ///< The operation was taken off its queue before it ran
-    not_finished = 2,   ///< The operation has not finished yet
-    type_mismatch = 3,  ///< The operation returned a different type from the one asked for
-    queue_stopped = 4,  ///< The queue had stopped and did not take the operation
+    cancelled = 1,           ///< The operation was taken off its queue before it ran
+    not_finished = 2,        ///< The operation has not finished yet
+    type_mismatch = 3,       ///< The operation returned a different type from the one asked for
+    queue_stopped = 4,       ///< The queue had stopped and did not take the operation
+    invalid_priority = 5,    ///< The operation was given a priority operation_priority does not name
+    foreign_dependency = 6,  ///< The operation was to run after a result from another queue
 };
 
 /**
@@ -130,9 +132,10 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * @brief What one operation returned, once it has finished.
  *
  * A queue hands one back when it takes an operation, before the operation
- * runs, and fills it in when the operation returns, or when
- * operation_queue::cancel() takes the operation off the queue before it
- * starts. Either way the operation has finished.
+ * runs, and fills it in when the operation returns, or when the operation
+ * is taken off the queue before it starts, by operation_queue::cancel() or
+ * because an operation it runs after was. Either way the operation has
+ * finished.
  *
  * Handle semantics:
  * - An operation_result is a handle. Copying gives another handle to the same

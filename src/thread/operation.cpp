@@ -42,6 +42,10 @@ public:
             return "operation result is not of the requested type";
         case operation_errc::queue_stopped:
             return "operation queue has stopped";
+        case operation_errc::invalid_priority:
+            return "operation priority is not one operation_priority names";
+        case operation_errc::foreign_dependency:
+            return "operation is to run after a result from another queue";
         }
         return "unknown operation error";
     }
@@ -88,10 +92,16 @@ std::ostream& operator<<(std::ostream& os, const operation_id& id)
 
 class operation_result::storage final {
 public:
-    storage(operation_id id, std::shared_ptr<const time_source> source)
+    storage(operation_id id, std::uint64_t queue, std::shared_ptr<const time_source> source)
         : _id{ id }
+        , _queue{ queue }
         , _source{ std::move(source) }
     {
+    }
+
+    std::uint64_t queue() const noexcept
+    {
+        return _queue;
     }
 
     operation_id id() const noexcept
@@ -168,6 +178,7 @@ private:
     // Set once, at construction, and never reassigned, so they are read
     // without _mutex.
     const operation_id _id;
+    const std::uint64_t _queue;
     const std::shared_ptr<const time_source> _source;
 
     std::mutex _mutex;
@@ -215,9 +226,20 @@ operation_id operation_access::next_id() noexcept
     return operation_id{ last.fetch_add(1, std::memory_order_relaxed) + 1 };
 }
 
-operation_result operation_access::make(std::shared_ptr<const time_source> source)
+operation_result operation_access::make(std::shared_ptr<const time_source> source, std::uint64_t queue)
 {
-    return operation_result{ std::make_shared<operation_result::storage>(next_id(), std::move(source)) };
+    return operation_result{ std::make_shared<operation_result::storage>(next_id(), queue, std::move(source)) };
+}
+
+std::uint64_t operation_access::queue_of(const operation_result& result) noexcept
+{
+    return result._store->queue();
+}
+
+bool operation_access::is_cancelled(const operation_result& result)
+{
+    const auto value = result.held();
+    return (! value) && (value.error() == operation_errc::cancelled);
 }
 
 void operation_access::finish(const operation_result& result, std::any value)
