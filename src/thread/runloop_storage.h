@@ -12,7 +12,6 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <utility>
 #include <vector>
 
 // The state behind a runloop handle, and the timer bookkeeping that shares
@@ -57,6 +56,11 @@ public:
     time_source::time_point now() const;
 
 private:
+    // Each task is behind a pointer, so moving it under _mutex runs none of
+    // its own code, and what the move leaves behind holds nothing: a
+    // std::function may copy a small task as it moves.
+    using held_task = std::unique_ptr<std::function<void()>>;
+
     // Tracks how many running calls are nested on this loop, so a quit() is
     // consumed only by the outermost one and a run from inside a task leaves
     // the outer run's is_running() answer standing when it returns.
@@ -92,9 +96,9 @@ private:
     pass fresh_pass() const;
 
     // Takes the next task or due timer for current_pass, waiting until the
-    // deadline. Returns false when quit() was seen, which consumes the
-    // request only when consume_quit is true, or when the deadline passed
-    // with nothing to run.
+    // deadline. Returns the next task or due timer, or an empty pointer when
+    // quit() was seen, which consumes the request only when consume_quit is
+    // true, or when the deadline passed with nothing to run.
     //
     // Within current_pass, a due timer takes priority over a queued task,
     // and the earliest-due timer not yet taken this pass wins over any
@@ -102,16 +106,15 @@ private:
     // rescheduling itself sooner. Taking a task ends the pass: the caller's
     // next call starts a fresh one. Finding nothing due or queued also ends
     // it, since a fresh boundary may find what a stale one would miss.
-    bool next(std::unique_lock<std::mutex>& lock,
-              std::function<void()>& out,
-              std::chrono::steady_clock::time_point deadline,
-              bool consume_quit,
-              pass& current_pass);
+    held_task next(std::unique_lock<std::mutex>& lock,
+                   std::chrono::steady_clock::time_point deadline,
+                   bool consume_quit,
+                   pass& current_pass);
 
     // Runs one task or timer fire with the lock released, and takes the
     // lock back after. The captures go too, so their own code runs outside
     // the lock as well. If the work throws, the lock stays released.
-    void run_released(std::unique_lock<std::mutex>& lock, std::function<void()>& work);
+    void run_released(std::unique_lock<std::mutex>& lock, held_task& work);
 
     std::size_t run_until(std::chrono::steady_clock::time_point deadline);
 
@@ -119,7 +122,7 @@ private:
     // handled, as timer_schedule::take_due() does, and returns a work item
     // that fires it with the lock released. Empty when none remain. Must
     // hold _mutex.
-    std::function<void()> take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled);
+    held_task take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled);
 
     // Set once, at construction, and never reassigned, so it is read without
     // _mutex.
@@ -127,7 +130,14 @@ private:
 
     mutable std::mutex _mutex;
     std::condition_variable _wake;
-    std::deque<std::pair<std::uint64_t, std::function<void()>>> _pending;
+
+    // A queued task and its place in the order tasks were posted.
+    struct queued final {
+        std::uint64_t sequence;
+        held_task task;
+    };
+
+    std::deque<queued> _pending;
     timer_schedule<std::shared_ptr<timer::storage>> _timers;
     std::uint64_t _next_sequence{ 0 };
     std::size_t _depth{ 0 };

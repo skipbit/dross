@@ -4,6 +4,7 @@
 #include "observed_time_source.h"
 #include "test_support.h"
 #include "thread/runloop_access.h"
+#include "thread/time_source.h"
 
 #include <gtest/gtest.h>
 
@@ -14,12 +15,29 @@
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 namespace {
 
+using dross_test::event;
 using dross_test::kTimeout;
+using dross_test::lock_check;
+using dross_test::lock_probe;
 using dross_test::reset_main_runloop;
+
+// Posts a task to its loop each time it is destroyed. Kept small and copied
+// without throwing, for the same reason as lock_check.
+struct post_on_destroy final {
+    std::shared_ptr<dross::runloop> loop;
+
+    ~post_on_destroy()
+    {
+        loop->perform([]() {
+        });
+    }
+};
+static_assert(std::is_nothrow_copy_constructible_v<post_on_destroy>);
 
 }  // namespace
 
@@ -600,4 +618,59 @@ TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_tha
 
     ASSERT_TRUE(performed.has_value());
     EXPECT_FALSE(*performed);
+}
+
+TEST(runloop_test, a_task_is_copied_and_destroyed_only_outside_the_loops_lock)
+{
+    dross::runloop loop = dross::runloop_access::standalone(dross::time_source::steady());
+    const lock_check check{ std::make_shared<lock_probe>([loop]() {
+        static_cast<void>(loop.pending_count());
+    }) };
+
+    const auto post_from_another_thread = [&loop, &check](int count) {
+        std::atomic<int> queued{ 0 };
+        std::thread poster{ [loop, check, count, &queued]() mutable {
+            for (int n = 0; n < count; ++n) {
+                if (loop.perform([check]() {
+                })) {
+                    queued.fetch_add(1);
+                }
+            }
+        } };
+        poster.join();
+        return queued.load();
+    };
+
+    // Through each way a task leaves the queue: taken by run_one(), which
+    // shares its path with run() and run_for(), taken by run_pending(), and
+    // discarded by clear().
+    ASSERT_EQ(post_from_another_thread(3), 3);
+    EXPECT_TRUE(loop.run_one());
+    EXPECT_EQ(loop.run_pending(), 2U);
+    ASSERT_EQ(post_from_another_thread(1), 1);
+    loop.clear();
+
+    EXPECT_GT(check.state->checked.load(), 0);
+    EXPECT_EQ(check.state->blocked.load(), 0);
+}
+
+TEST(runloop_test, a_task_whose_capture_posts_to_the_loop_as_it_is_destroyed_does_not_deadlock)
+{
+    auto loop = std::make_shared<dross::runloop>(dross::runloop_access::standalone(dross::time_source::steady()));
+    auto posted = std::make_shared<event>();
+    auto ran = std::make_shared<event>();
+
+    // On a thread of its own, so a deadlock fails the test instead of
+    // hanging it.
+    std::thread{ [loop, posted, ran]() {
+        if (loop->perform([capture = post_on_destroy{ loop }]() {
+        })) {
+            posted->set();
+        }
+        loop->run_pending();
+        ran->set();
+    } }.detach();
+
+    EXPECT_TRUE(posted->wait());
+    EXPECT_TRUE(ran->wait());
 }

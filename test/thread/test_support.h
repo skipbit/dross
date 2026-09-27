@@ -3,9 +3,15 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <functional>
+#include <memory>
 #include <mutex>
+#include <optional>
+#include <thread>
+#include <type_traits>
 #include <utility>
 
 namespace dross_test {
@@ -75,5 +81,63 @@ private:
     std::condition_variable _wake;
     bool _set{ false };
 };
+
+// Counts the checks of one lock. take_lock is a call that takes that lock.
+struct lock_probe final {
+    explicit lock_probe(std::function<void()> take)
+        : take_lock{ std::move(take) }
+    {
+    }
+
+    std::function<void()> take_lock;
+    std::atomic<int> checked{ 0 };
+    std::atomic<int> blocked{ 0 };
+};
+
+// Makes another thread call something that takes the lock, and counts it in
+// state when that call does not get through within a bound.
+inline void probe_lock(lock_probe& state) noexcept
+{
+    ++state.checked;
+    // One is enough to fail; the rest would each wait out the bound.
+    if (state.blocked.load() > 0) {
+        return;
+    }
+    auto through = std::make_shared<event>();
+    std::thread{ [take = std::optional<std::function<void()>>{ state.take_lock }, through]() mutable {
+        (*take)();
+        // Drops its copy before it signals, so nothing it holds outlives the
+        // check.
+        take.reset();
+        through->set();
+    } }.detach();
+    if (! through->wait()) {
+        ++state.blocked;
+    }
+}
+
+// Probes the lock each time it is copied or destroyed. Small enough, and
+// copied without throwing, that a std::function may keep it inline, and so
+// copy it when it moves.
+struct lock_check final {
+    std::shared_ptr<lock_probe> state;
+
+    explicit lock_check(std::shared_ptr<lock_probe> shared)
+        : state{ std::move(shared) }
+    {
+    }
+
+    lock_check(const lock_check& other) noexcept
+        : state{ other.state }
+    {
+        probe_lock(*state);
+    }
+
+    ~lock_check()
+    {
+        probe_lock(*state);
+    }
+};
+static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
 
 }  // namespace dross_test
