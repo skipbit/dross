@@ -40,6 +40,8 @@ public:
             return "operation has not finished";
         case operation_errc::type_mismatch:
             return "operation result is not of the requested type";
+        case operation_errc::queue_stopped:
+            return "operation queue has stopped";
         }
         return "unknown operation error";
     }
