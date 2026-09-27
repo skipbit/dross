@@ -101,6 +101,81 @@ bool all_end(std::vector<dross::thread>& workers)
     return true;
 }
 
+// Shared by tests that check the queue's own lock is not held while
+// something tied to it is copied or destroyed: what such a check counts,
+// and the check itself.
+struct lock_probe final {
+    dross::operation_queue queue;
+    std::atomic<int> checked{ 0 };
+    std::atomic<int> blocked{ 0 };
+};
+
+// Makes another thread call something that takes the queue's lock, and
+// counts it in state when that call does not get through within a bound.
+void probe_lock(lock_probe& state) noexcept
+{
+    ++state.checked;
+    // One is enough to fail; the rest would each wait out the bound.
+    if (state.blocked.load() > 0) {
+        return;
+    }
+    auto through = std::make_shared<event>();
+    std::thread{ [queue = std::optional<dross::operation_queue>{ state.queue }, through]() mutable {
+        queue->wait_for(std::chrono::milliseconds::zero());
+        // Drops its handle before it signals, so no handle outlives the
+        // check.
+        queue.reset();
+        through->set();
+    } }.detach();
+    if (! through->wait()) {
+        ++state.blocked;
+    }
+}
+
+// Probes the queue's lock each time it is copied or destroyed. Small enough,
+// and copied without throwing, that a std::function may keep it inline, and
+// so copy it when it moves.
+struct lock_check final {
+    std::shared_ptr<lock_probe> state;
+
+    explicit lock_check(std::shared_ptr<lock_probe> shared)
+        : state{ std::move(shared) }
+    {
+    }
+
+    lock_check(const lock_check& other) noexcept
+        : state{ other.state }
+    {
+        probe_lock(*state);
+    }
+
+    ~lock_check()
+    {
+        probe_lock(*state);
+    }
+};
+static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
+
+// A value an enqueued task returns, whose destructor probes the queue's
+// lock the same way, so a result held in options.after is checked when it
+// is finally let go.
+struct let_go_check final {
+    std::shared_ptr<lock_probe> state;
+
+    explicit let_go_check(std::shared_ptr<lock_probe> shared)
+        : state{ std::move(shared) }
+    {
+    }
+
+    let_go_check(const let_go_check& other) noexcept = default;
+
+    ~let_go_check()
+    {
+        probe_lock(*state);
+    }
+};
+static_assert(std::is_nothrow_copy_constructible_v<let_go_check>);
+
 }  // namespace
 
 TEST(operation_queue_test, zero_workers_is_rejected)
@@ -1240,63 +1315,12 @@ TEST(operation_queue_test, a_cancelled_task_is_destroyed_where_its_captures_may_
 
 TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queues_lock)
 {
-    // Each time it is copied or destroyed, has another thread make a call
-    // that takes the queue's lock, and counts the times that call does not
-    // get through. Small enough, and copied without throwing, that a
-    // std::function may keep it inline, and so copy it when it moves.
-    struct lock_check final {
-        struct counts final {
-            dross::operation_queue queue;
-            std::atomic<int> checked{ 0 };
-            std::atomic<int> blocked{ 0 };
-        };
-
-        std::shared_ptr<counts> state;
-
-        explicit lock_check(std::shared_ptr<counts> shared)
-            : state{ std::move(shared) }
-        {
-        }
-
-        lock_check(const lock_check& other) noexcept
-            : state{ other.state }
-        {
-            check();
-        }
-
-        ~lock_check()
-        {
-            check();
-        }
-
-        void check() const noexcept
-        {
-            ++state->checked;
-            // One is enough to fail; the rest would each wait out the bound.
-            if (state->blocked.load() > 0) {
-                return;
-            }
-            auto through = std::make_shared<event>();
-            std::thread{ [queue = std::optional<dross::operation_queue>{ state->queue }, through]() mutable {
-                queue->wait_for(std::chrono::milliseconds::zero());
-                // Drops its handle before it signals, so no handle outlives
-                // the check.
-                queue.reset();
-                through->set();
-            } }.detach();
-            if (! through->wait()) {
-                ++state->blocked;
-            }
-        }
-    };
-    static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
-
     dross::operation_queue queue{ 1 };
     auto release = std::make_shared<event>();
     ASSERT_TRUE(queue.submit([release]() {
         release->wait();
     }));
-    const lock_check check{ std::make_shared<lock_check::counts>(queue) };
+    const lock_check check{ std::make_shared<lock_probe>(queue) };
     ASSERT_TRUE(queue.submit([check]() {
     }));
     const auto returned = queue.enqueue([check]() {
@@ -1314,6 +1338,42 @@ TEST(operation_queue_test, a_task_is_copied_and_destroyed_only_outside_the_queue
     EXPECT_EQ(returned->get_as<int>(), 1);
     EXPECT_GT(check.state->checked.load(), 0);
     EXPECT_EQ(check.state->blocked.load(), 0);
+}
+
+TEST(operation_queue_test, a_result_named_in_after_is_let_go_only_outside_the_queues_lock)
+{
+    dross::operation_queue queue{ 1 };
+    auto probe = std::make_shared<lock_probe>(queue);
+
+    dross::operation_options options;
+    {
+        const auto first = queue.enqueue([probe]() {
+            return let_go_check{ probe };
+        });
+        ASSERT_TRUE(first.has_value());
+        // A trivial task run after first, once it too has finished, shows
+        // the single worker has already dropped its own copy of first's
+        // result: with one worker, tasks are destroyed strictly in the
+        // order they ran.
+        ASSERT_TRUE(queue.submit([]() {
+        }));
+        ASSERT_TRUE(queue.wait_for(kTimeout));
+        options.after = { *first };
+    }
+    // first, the only other handle to the result, is gone by now; the copy
+    // taken above, inside options.after, is the last one left.
+
+    auto ran = std::make_shared<std::atomic<bool>>(false);
+    ASSERT_TRUE(queue.submit(
+        [ran]() {
+        ran->store(true);
+    },
+        std::move(options)));
+
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    EXPECT_TRUE(ran->load());
+    EXPECT_GT(probe->checked.load(), 0);
+    EXPECT_EQ(probe->blocked.load(), 0);
 }
 
 TEST(operation_queue_test, cancel_from_many_threads_while_the_workers_take_tasks)
@@ -1527,6 +1587,30 @@ TEST(operation_queue_test, a_result_that_has_returned_counts_as_met)
     EXPECT_EQ(second->get_as<int>(), 10);
 }
 
+TEST(operation_queue_test, a_task_that_names_one_result_twice_runs_once_it_has_returned)
+{
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+
+    const auto first = queue.enqueue([release]() {
+        release->wait();
+        return 1;
+    });
+    ASSERT_TRUE(first.has_value());
+    const auto second = queue.enqueue(
+        [first]() {
+        return first->get_as<int>().value_or(0) + 1;
+    },
+        { .after = { *first, *first } });
+    ASSERT_TRUE(second.has_value());
+
+    release->set();
+
+    ASSERT_TRUE(second->wait_for(kTimeout));
+    EXPECT_EQ(second->get_as<int>(), 2);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
 TEST(operation_queue_test, a_task_to_run_after_a_cancelled_result_is_cancelled_as_it_is_submitted)
 {
     dross::operation_queue queue{ 1 };
@@ -1662,24 +1746,30 @@ TEST(operation_queue_test, a_result_from_another_queue_is_refused)
 TEST(operation_queue_test, wait_for_waits_for_a_task_still_waiting_for_what_it_runs_after)
 {
     dross::operation_queue queue{ 2 };
-    auto release = std::make_shared<event>();
-    const auto first = queue.enqueue([release]() {
-        release->wait();
+    auto release_first = std::make_shared<event>();
+    auto second_started = std::make_shared<event>();
+    auto release_second = std::make_shared<event>();
+    const auto first = queue.enqueue([release_first]() {
+        release_first->wait();
     });
     ASSERT_TRUE(first.has_value());
-    auto second_ran = std::make_shared<std::atomic<bool>>(false);
     ASSERT_TRUE(queue.submit(
-        [second_ran]() {
-        second_ran->store(true);
+        [second_started, release_second]() {
+        second_started->set();
+        release_second->wait();
     },
         { .after = { *first } }));
 
-    const bool while_first_runs = queue.wait_for(std::chrono::milliseconds::zero());
-    release->set();
+    release_first->set();
+    ASSERT_TRUE(second_started->wait());
+    // At this point first has finished and second has come out of waiting
+    // to run, so second is the only task left unfinished; the check is
+    // taken here to show wait_for still counts it.
+    const bool while_second_runs = queue.wait_for(std::chrono::milliseconds::zero());
+    release_second->set();
 
-    EXPECT_FALSE(while_first_runs);
+    EXPECT_FALSE(while_second_runs);
     EXPECT_TRUE(queue.wait_for(kTimeout));
-    EXPECT_TRUE(second_ran->load());
 }
 
 TEST(operation_queue_test, a_chain_left_when_the_queue_stops_still_runs_to_its_end)

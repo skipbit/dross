@@ -271,7 +271,7 @@ std::expected<operation_result, error> operation_queue::enqueue(F&& task, operat
         } else {
             return std::make_any<value_type>(task());
         }
-    }, options);
+    }, std::move(options));
 }
 
 }  // namespace dross

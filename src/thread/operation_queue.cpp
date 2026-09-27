@@ -62,12 +62,16 @@ public:
     {
     }
 
-    // Queues task for the workers; false when it is to run after a result
-    // from another queue, or once the queue has stopped. The task is wrapped
-    // before _mutex is taken, and a task not accepted, or cancelled as it is
-    // accepted, is destroyed after it is released.
+    // Queues task for the workers; false for a priority operation_priority
+    // does not name, when it is to run after a result from another queue, or
+    // once the queue has stopped. The task is wrapped before _mutex is
+    // taken, and a task not accepted, or cancelled as it is accepted, is
+    // destroyed after it is released, as is what options holds.
     bool submit(std::function<void()> task, operation_options options)
     {
+        if (! names_a_priority(options.priority)) {
+            return false;
+        }
         if (! all_from_here(options.after)) {
             return false;
         }
@@ -77,7 +81,7 @@ public:
             return false;
         }
         if (! any_cancelled(options.after)) {
-            queue(std::move(options), std::nullopt, std::move(held), nullptr);
+            queue(options, std::nullopt, std::move(held), nullptr);
         }
         return true;
     }
@@ -87,6 +91,9 @@ public:
     // the order tasks are accepted in, and a task not accepted takes none.
     std::expected<operation_result, error> enqueue(std::function<std::any()> task, operation_options options)
     {
+        if (! names_a_priority(options.priority)) {
+            return std::unexpected(error(operation_errc::invalid_priority));
+        }
         if (! all_from_here(options.after)) {
             return std::unexpected(error(operation_errc::foreign_dependency));
         }
@@ -99,7 +106,7 @@ public:
         if (any_cancelled(options.after)) {
             operation_access::cancel(result);
         } else {
-            queue(std::move(options), result, nullptr, std::move(held));
+            queue(options, result, nullptr, std::move(held));
         }
         return result;
     }
@@ -231,8 +238,10 @@ private:
 
     // Accepts a task. One that runs after results not yet finished waits
     // aside until they have all returned; any other goes straight to the
-    // list of its priority. Called with _mutex held.
-    void queue(operation_options options,
+    // list of its priority. Takes options by reference, so the results in
+    // it, which may be the last handles to them, go only once the caller
+    // has released _mutex. Called with _mutex held.
+    void queue(const operation_options& options,
                std::optional<operation_result> result,
                std::unique_ptr<std::function<void()>> task,
                std::unique_ptr<std::function<std::any()>> call)
@@ -245,7 +254,9 @@ private:
         entry accepted{ order, std::move(result), std::move(task), std::move(call) };
 
         // A result still in _dependents has not finished; any other that
-        // got past any_cancelled() has returned, and is already met.
+        // got past any_cancelled() has returned, and is already met. A
+        // result named more than once in options.after is counted each
+        // time, and done() counts it off each time too.
         std::size_t remaining = 0;
         for (const operation_result& before : options.after) {
             const auto found = _dependents.find(before.id());
@@ -267,6 +278,8 @@ private:
     // not just the first, since a worker with no sweep may still be busy
     // running something else on its loop. Whichever gets there first takes
     // the task, and the rest find the lists empty. Called with _mutex held.
+    // After stop() there is no worker to hand one to, so a task made ready
+    // then is taken by the worker whose done() made it ready, as it sweeps.
     void make_ready(entry task, operation_priority priority)
     {
         _tasks[static_cast<std::size_t>(priority)].push_back(std::move(task));
@@ -339,7 +352,7 @@ private:
             const std::lock_guard<std::mutex> guard{ _mutex };
             _unfinished.erase(finished.order);
             if (finished.result) {
-                for (const std::uint64_t order : dependents_of(finished.result->id())) {
+                for (const std::uint64_t order : take_dependent_orders(finished.result->id())) {
                     const auto found = _waiting.find(order);
                     // Gone once cancelled.
                     if ((found != _waiting.end()) && (--found->second.remaining == 0)) {
@@ -378,10 +391,10 @@ private:
         return task;
     }
 
-    // The order of every task waiting to run after the one whose result has
-    // id, which leaves _dependents as it goes; none once it has gone.
-    // Called with _mutex held.
-    std::vector<std::uint64_t> dependents_of(const operation_id& id)
+    // Takes the order of every task waiting to run after the one whose
+    // result has id out of _dependents; none once it has gone. Called with
+    // _mutex held.
+    std::vector<std::uint64_t> take_dependent_orders(const operation_id& id)
     {
         auto node = _dependents.extract(id);
         return node ? std::move(node.mapped()) : std::vector<std::uint64_t>{};
@@ -392,7 +405,7 @@ private:
     std::vector<entry> take_dependents(const operation_id& id)
     {
         std::vector<entry> taken;
-        for (const std::uint64_t order : dependents_of(id)) {
+        for (const std::uint64_t order : take_dependent_orders(id)) {
             const auto found = _waiting.find(order);
             if (found != _waiting.end()) {
                 taken.push_back(std::move(found->second.task));
@@ -481,7 +494,7 @@ operation_queue::storage::~storage()
 
 bool operation_queue::storage::submit(std::function<void()> task, operation_options options)
 {
-    if ((! task) || (! names_a_priority(options.priority))) {
+    if (! task) {
         return false;
     }
     return _backlog->submit(std::move(task), std::move(options));
@@ -490,9 +503,6 @@ bool operation_queue::storage::submit(std::function<void()> task, operation_opti
 std::expected<operation_result, error> operation_queue::storage::enqueue_any(std::function<std::any()> task,
                                                                              operation_options options)
 {
-    if (! names_a_priority(options.priority)) {
-        return std::unexpected(error(operation_errc::invalid_priority));
-    }
     return _backlog->enqueue(std::move(task), std::move(options));
 }
 
