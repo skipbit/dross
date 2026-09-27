@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <utility>
 
@@ -111,12 +112,16 @@ bool runloop::storage::enqueue(std::function<void()>&& task)
         return false;
     }
 
+    // Wrapped before the lock is taken: wrapping may copy a small task.
+    // Declared before the guard, so a task refused below is destroyed after
+    // the lock is released.
+    auto held = std::make_unique<std::function<void()>>(std::move(task));
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (_finished) {
             return false;
         }
-        _pending.push_back({ _next_sequence++, std::move(task) });
+        _pending.emplace_back(_next_sequence++, std::move(held));
     }
 
     _wake.notify_one();
@@ -160,7 +165,7 @@ void runloop::storage::remove_timer(const timer::storage* which)
     _wake.notify_one();
 }
 
-std::function<void()> runloop::storage::take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled)
+std::unique_ptr<std::function<void()>> runloop::storage::take_due_timer(std::chrono::steady_clock::time_point boundary, std::vector<std::uint64_t>& handled)
 {
     auto which = _timers.take_due(boundary, now(), handled);
     if (! which) {
@@ -168,12 +173,12 @@ std::function<void()> runloop::storage::take_due_timer(std::chrono::steady_clock
     }
 
     if (which->repeats()) {
-        return [which]() {
+        return std::make_unique<std::function<void()>>([which]() {
             which->fire();
-        };
+        });
     }
 
-    return [which]() {
+    return std::make_unique<std::function<void()>>([which]() {
         const struct invalidate_after final {
             const std::shared_ptr<timer::storage>& target;
             ~invalidate_after()
@@ -182,11 +187,11 @@ std::function<void()> runloop::storage::take_due_timer(std::chrono::steady_clock
             }
         } guard{ which };
         which->fire();
-    };
+    });
 }
 
 bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
-                            std::function<void()>& out,
+                            std::unique_ptr<std::function<void()>>& out,
                             std::chrono::steady_clock::time_point deadline,
                             bool consume_quit,
                             pass& current_pass)
@@ -262,10 +267,10 @@ bool runloop::storage::next(std::unique_lock<std::mutex>& lock,
     }
 }
 
-void runloop::storage::run_released(std::unique_lock<std::mutex>& lock, std::function<void()>& work)
+void runloop::storage::run_released(std::unique_lock<std::mutex>& lock, std::unique_ptr<std::function<void()>>& work)
 {
     lock.unlock();
-    work();
+    (*work)();
     work = nullptr;  // release the captures outside the lock
     lock.lock();
 }
@@ -276,7 +281,7 @@ std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point de
 
     std::size_t ran = 0;
     std::unique_lock<std::mutex> lock{ _mutex };
-    std::function<void()> work;
+    std::unique_ptr<std::function<void()>> work;
     pass current_pass = fresh_pass();
 
     while (deadline == kNoDeadline || now() < deadline) {
@@ -306,7 +311,7 @@ bool runloop::storage::run_one()
     const running_mark mark{ *this };
 
     std::unique_lock<std::mutex> lock{ _mutex };
-    std::function<void()> work;
+    std::unique_ptr<std::function<void()>> work;
     pass current_pass = fresh_pass();
     if (! next(lock, work, kNoDeadline, mark.outermost(), current_pass)) {
         return false;
@@ -344,7 +349,7 @@ std::size_t runloop::storage::run_pending()
     // keep this call going. A pending quit() is left alone: it belongs to
     // the next run(), not to this drain.
     while ((! _pending.empty()) && (_pending.front().first < limit)) {
-        std::function<void()> work = std::move(_pending.front().second);
+        auto work = std::move(_pending.front().second);
         _pending.pop_front();
 
         run_released(lock, work);
@@ -365,7 +370,7 @@ void runloop::storage::quit()
 
 void runloop::storage::clear()
 {
-    std::deque<std::pair<std::uint64_t, std::function<void()>>> discarded;
+    std::deque<std::pair<std::uint64_t, std::unique_ptr<std::function<void()>>>> discarded;
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
         discarded.swap(_pending);
@@ -375,7 +380,7 @@ void runloop::storage::clear()
 
 void runloop::storage::finish()
 {
-    std::deque<std::pair<std::uint64_t, std::function<void()>>> discarded_tasks;
+    std::deque<std::pair<std::uint64_t, std::unique_ptr<std::function<void()>>>> discarded_tasks;
     std::vector<std::shared_ptr<timer::storage>> discarded_timers;
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
