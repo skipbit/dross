@@ -150,7 +150,7 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * - Every operation is free of data races when called from any thread
  *
  * @code
- * std::optional<dross::operation_result> result = queue.enqueue([]() {
+ * std::expected<dross::operation_result, dross::error> result = queue.enqueue([]() {
  *     return expensive_work();
  * });
  * if (result && result->wait_for(std::chrono::seconds{ 1 })) {

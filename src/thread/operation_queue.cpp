@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -56,12 +57,12 @@ public:
     // As submit(), for a task whose return value fills in a result. The
     // result is made under the same lock, so within one queue ids follow
     // the order tasks are accepted in, and a task not accepted takes none.
-    std::optional<operation_result> enqueue(std::function<std::any()> task, std::vector<thread>& workers)
+    std::expected<operation_result, error> enqueue(std::function<std::any()> task, std::vector<thread>& workers)
     {
         auto held = std::make_unique<std::function<std::any()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
-            return std::nullopt;
+            return std::unexpected(error(operation_errc::queue_stopped));
         }
         operation_result result = operation_access::make(_source);
         queue(result, nullptr, std::move(held), workers);
@@ -261,7 +262,7 @@ public:
     ~storage();
 
     bool submit(std::function<void()> task);
-    std::optional<operation_result> enqueue_any(std::function<std::any()> task);
+    std::expected<operation_result, error> enqueue_any(std::function<std::any()> task);
     bool cancel(const operation_id& id);
     bool wait_for(std::chrono::milliseconds timeout);
     bool shutdown(std::chrono::milliseconds timeout);
@@ -310,7 +311,7 @@ bool operation_queue::storage::submit(std::function<void()> task)
     return _backlog->submit(std::move(task), _workers);
 }
 
-std::optional<operation_result> operation_queue::storage::enqueue_any(std::function<std::any()> task)
+std::expected<operation_result, error> operation_queue::storage::enqueue_any(std::function<std::any()> task)
 {
     return _backlog->enqueue(std::move(task), _workers);
 }
@@ -376,7 +377,7 @@ bool operation_queue::submit(std::function<void()> task)
     return _store->submit(std::move(task));
 }
 
-std::optional<operation_result> operation_queue::enqueue_any(std::function<std::any()> task)
+std::expected<operation_result, error> operation_queue::enqueue_any(std::function<std::any()> task)
 {
     return _store->enqueue_any(std::move(task));
 }

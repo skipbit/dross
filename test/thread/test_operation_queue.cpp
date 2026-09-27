@@ -770,7 +770,7 @@ TEST(operation_queue_test, a_task_can_wait_for_the_result_of_one_it_enqueued)
     EXPECT_EQ(outer->get_as<int>(), 7);
 }
 
-TEST(operation_queue_test, enqueue_after_shutdown_gives_no_result)
+TEST(operation_queue_test, enqueue_after_shutdown_reports_the_queue_stopped)
 {
     dross::operation_queue queue{ 1 };
     ASSERT_TRUE(queue.shutdown(kTimeout));
@@ -779,7 +779,8 @@ TEST(operation_queue_test, enqueue_after_shutdown_gives_no_result)
         return 1;
     });
 
-    EXPECT_FALSE(result.has_value());
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error() == dross::operation_errc::queue_stopped);
 }
 
 TEST(operation_queue_test, cancel_takes_a_waiting_task_off_the_queue)
