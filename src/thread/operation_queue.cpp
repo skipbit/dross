@@ -33,35 +33,35 @@ namespace {
 // What the workers share with the queue's handles: the tasks waiting to run,
 // the ones running, and which workers already have a sweep on their loop.
 // The workers hold it, not the handles' storage, so the handles going does
-// not take it from a worker still sweeping.
+// not take it from a worker still sweeping. It holds handles to the workers
+// in turn until it stops, which is what lets it hand them sweeps.
 class backlog final : public std::enable_shared_from_this<backlog> {
 public:
-    backlog(std::size_t thread_count, std::shared_ptr<const time_source> source)
+    backlog(std::vector<thread> workers, std::shared_ptr<const time_source> source)
         : _source{ std::move(source) }
-        , _sweeping(thread_count, false)
+        , _workers{ std::move(workers) }
+        , _sweeping(_workers.size(), false)
     {
     }
 
     // Queues task for the workers; false once the queue has stopped. The
     // task is wrapped before _mutex is taken, and a task not accepted is
     // destroyed after it is released.
-    bool submit(std::function<void()> task, operation_options options, std::vector<thread>& workers)
+    bool submit(std::function<void()> task, operation_options options)
     {
         auto held = std::make_unique<std::function<void()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
             return false;
         }
-        queue(std::move(options), std::nullopt, std::move(held), nullptr, workers);
+        queue(std::move(options), std::nullopt, std::move(held), nullptr);
         return true;
     }
 
     // As submit(), for a task whose return value fills in a result. The
     // result is made under the same lock, so within one queue ids follow
     // the order tasks are accepted in, and a task not accepted takes none.
-    std::expected<operation_result, error> enqueue(std::function<std::any()> task,
-                                                   operation_options options,
-                                                   std::vector<thread>& workers)
+    std::expected<operation_result, error> enqueue(std::function<std::any()> task, operation_options options)
     {
         auto held = std::make_unique<std::function<std::any()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
@@ -69,7 +69,7 @@ public:
             return std::unexpected(error(operation_errc::queue_stopped));
         }
         operation_result result = operation_access::make(_source);
-        queue(std::move(options), result, nullptr, std::move(held), workers);
+        queue(std::move(options), result, nullptr, std::move(held));
         return result;
     }
 
@@ -105,17 +105,24 @@ public:
 
     // Stops accepting and hands every worker a task that runs what is left
     // and then ends the worker. Under the same lock as submit(), so every
-    // sweep submit() handed out is ahead of it on its worker's loop.
-    void stop(std::vector<thread>& workers)
+    // sweep submit() handed out is ahead of it on its worker's loop. It lets
+    // go of its handles to the workers, since their loops hold it and would
+    // otherwise keep it alive, and drops them once _mutex is released.
+    void stop()
     {
-        const std::lock_guard<std::mutex> guard{ _mutex };
-        if (! _accepting) {
-            return;
-        }
-        _accepting = false;
+        std::vector<thread> workers;
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            if (! _accepting) {
+                return;
+            }
+            _accepting = false;
 
-        for (std::size_t i = 0; i < workers.size(); ++i) {
-            workers[i].perform(finish(i));
+            for (std::size_t i = 0; i < _workers.size(); ++i) {
+                _workers[i].perform(finish(i));
+            }
+            workers = std::move(_workers);
+            _workers.clear();
         }
     }
 
@@ -172,21 +179,20 @@ private:
     void queue(operation_options options,
                std::optional<operation_result> result,
                std::unique_ptr<std::function<void()>> task,
-               std::unique_ptr<std::function<std::any()>> call,
-               std::vector<thread>& workers)
+               std::unique_ptr<std::function<std::any()>> call)
     {
         const std::uint64_t order = _accepted++;
         _unfinished.insert(order);
         _tasks[static_cast<std::size_t>(options.priority)].push_back(entry{ order, std::move(result), std::move(task), std::move(call) });
 
-        for (std::size_t i = 0; i < workers.size(); ++i) {
+        for (std::size_t i = 0; i < _workers.size(); ++i) {
             if (_sweeping[i]) {
                 continue;
             }
             // Marked even when perform() fails: a worker whose loop has
             // ended is never offered a sweep again.
             _sweeping[i] = true;
-            workers[i].perform(sweep(i));
+            _workers[i].perform(sweep(i));
         }
     }
 
@@ -263,6 +269,8 @@ private:
     // The order of every task accepted and not yet finished or cancelled,
     // waiting or running, so wait_for() needs only the first.
     std::set<std::uint64_t> _unfinished;
+    // Empty once the queue has stopped.
+    std::vector<thread> _workers;
     std::vector<bool> _sweeping;
     bool _accepting{ true };
 };
@@ -292,7 +300,6 @@ private:
 
 operation_queue::storage::storage(std::size_t thread_count, std::shared_ptr<const time_source> source)
     : _source{ source }
-    , _backlog{ std::make_shared<backlog>(thread_count, source) }
 {
     if (thread_count == 0) {
         throw std::invalid_argument("operation_queue needs at least one worker");
@@ -303,6 +310,7 @@ operation_queue::storage::storage(std::size_t thread_count, std::shared_ptr<cons
         for (std::size_t i = 0; i < thread_count; ++i) {
             _workers.push_back(thread_access::start(source));
         }
+        _backlog = std::make_shared<backlog>(_workers, source);
     } catch (...) {
         for (auto& worker : _workers) {
             worker.quit();
@@ -313,7 +321,7 @@ operation_queue::storage::storage(std::size_t thread_count, std::shared_ptr<cons
 
 operation_queue::storage::~storage()
 {
-    _backlog->stop(_workers);
+    _backlog->stop();
 }
 
 bool operation_queue::storage::submit(std::function<void()> task, operation_options options)
@@ -321,13 +329,13 @@ bool operation_queue::storage::submit(std::function<void()> task, operation_opti
     if (! task) {
         return false;
     }
-    return _backlog->submit(std::move(task), std::move(options), _workers);
+    return _backlog->submit(std::move(task), std::move(options));
 }
 
 std::expected<operation_result, error> operation_queue::storage::enqueue_any(std::function<std::any()> task,
                                                                              operation_options options)
 {
-    return _backlog->enqueue(std::move(task), std::move(options), _workers);
+    return _backlog->enqueue(std::move(task), std::move(options));
 }
 
 bool operation_queue::storage::cancel(const operation_id& id)
@@ -342,7 +350,7 @@ bool operation_queue::storage::wait_for(std::chrono::milliseconds timeout)
 
 bool operation_queue::storage::shutdown(std::chrono::milliseconds timeout)
 {
-    _backlog->stop(_workers);
+    _backlog->stop();
     if (on_a_worker()) {
         timeout = std::chrono::milliseconds::zero();
     }
