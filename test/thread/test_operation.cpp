@@ -222,6 +222,28 @@ TEST(operation_result_test, a_cancelled_one_counts_as_finished_and_reports_cance
     EXPECT_TRUE(nothing.error() == dross::operation_errc::cancelled);
 }
 
+TEST(operation_result_test, is_cancelled_only_once_cancelled)
+{
+    const dross::operation_result pending = unfinished();
+    const dross::operation_result returned = unfinished();
+    const dross::operation_result cancelled = unfinished();
+    dross::operation_access::finish(returned, std::make_any<int>(1));
+    dross::operation_access::cancel(cancelled);
+
+    EXPECT_FALSE(dross::operation_access::is_cancelled(pending));
+    EXPECT_FALSE(dross::operation_access::is_cancelled(returned));
+    EXPECT_TRUE(dross::operation_access::is_cancelled(cancelled));
+}
+
+TEST(operation_result_test, keeps_the_number_of_the_queue_that_made_it)
+{
+    const dross::operation_result from_a_queue = dross::operation_access::make(dross::time_source::steady(), 7);
+
+    EXPECT_EQ(dross::operation_access::queue_of(from_a_queue), 7U);
+    EXPECT_EQ(dross::operation_access::queue_of(unfinished()), 0U);
+    EXPECT_EQ(dross::operation_access::queue_of(dross::operation_result{ from_a_queue }), 7U);
+}
+
 TEST(operation_result_test, wait_for_returns_once_another_thread_cancels_it)
 {
     const auto source = std::make_shared<dross_test::observed_time_source>();
