@@ -132,9 +132,10 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * @brief What one operation returned, once it has finished.
  *
  * A queue hands one back when it takes an operation, before the operation
- * runs, and fills it in when the operation returns, or when
- * operation_queue::cancel() takes the operation off the queue before it
- * starts. Either way the operation has finished.
+ * runs, and fills it in when the operation returns, or when the operation
+ * is taken off the queue before it starts, by operation_queue::cancel() or
+ * because an operation it runs after was. Either way the operation has
+ * finished.
  *
  * Handle semantics:
  * - An operation_result is a handle. Copying gives another handle to the same
