@@ -42,6 +42,8 @@ public:
             return "operation result is not of the requested type";
         case operation_errc::queue_stopped:
             return "operation queue has stopped";
+        case operation_errc::invalid_priority:
+            return "operation priority is not one operation_priority names";
         }
         return "unknown operation error";
     }

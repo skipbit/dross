@@ -30,6 +30,13 @@ namespace dross {
 
 namespace {
 
+// Whether priority is one of the values operation_priority names, which a
+// cast from an integer need not be.
+bool names_a_priority(operation_priority priority)
+{
+    return (static_cast<std::size_t>(priority) <= static_cast<std::size_t>(operation_priority::high));
+}
+
 // What the workers share with the queue's handles: the tasks waiting to run,
 // the ones running, and which workers already have a sweep on their loop.
 // The workers hold it, not the handles' storage, so the handles going does
@@ -326,7 +333,7 @@ operation_queue::storage::~storage()
 
 bool operation_queue::storage::submit(std::function<void()> task, operation_options options)
 {
-    if (! task) {
+    if ((! task) || (! names_a_priority(options.priority))) {
         return false;
     }
     return _backlog->submit(std::move(task), std::move(options));
@@ -335,6 +342,9 @@ bool operation_queue::storage::submit(std::function<void()> task, operation_opti
 std::expected<operation_result, error> operation_queue::storage::enqueue_any(std::function<std::any()> task,
                                                                              operation_options options)
 {
+    if (! names_a_priority(options.priority)) {
+        return std::unexpected(error(operation_errc::invalid_priority));
+    }
     return _backlog->enqueue(std::move(task), std::move(options));
 }
 

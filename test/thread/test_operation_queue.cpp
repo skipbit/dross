@@ -948,6 +948,29 @@ TEST(operation_queue_test, enqueue_after_shutdown_reports_the_queue_stopped)
     EXPECT_TRUE(result.error() == dross::operation_errc::queue_stopped);
 }
 
+TEST(operation_queue_test, a_priority_operation_priority_does_not_name_is_not_queued)
+{
+    dross::operation_queue queue{ 1 };
+    auto ran = std::make_shared<std::atomic<int>>(0);
+    const auto count = [ran]() {
+        ran->fetch_add(1);
+    };
+
+    for (const int value : { 3, -1 }) {
+        const dross::operation_options options{ .priority = static_cast<dross::operation_priority>(value) };
+        EXPECT_FALSE(queue.submit(count, options)) << "priority " << value;
+        const auto result = queue.enqueue(count, options);
+        ASSERT_FALSE(result.has_value()) << "priority " << value;
+        EXPECT_TRUE(result.error() == dross::operation_errc::invalid_priority) << "priority " << value;
+    }
+    const auto after = queue.enqueue(count);
+    ASSERT_TRUE(after.has_value());
+    ASSERT_TRUE(queue.shutdown(kTimeout));
+
+    EXPECT_EQ(ran->load(), 1);
+    EXPECT_TRUE(after->get_as<void>().has_value());
+}
+
 TEST(operation_queue_test, cancel_takes_a_waiting_task_off_the_queue)
 {
     dross::operation_queue queue{ 1 };

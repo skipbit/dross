@@ -145,8 +145,8 @@ public:
      * @return true when the task was queued
      *
      * The task is queued and this returns at once; it does not wait for the
-     * task to run. Returns false when the task is empty, or once the queue
-     * has been shut down.
+     * task to run. Returns false when the task is empty, when its priority is
+     * not one operation_priority names, or once the queue has been shut down.
      */
     bool submit(std::function<void()> task, operation_options options = {});
 
@@ -155,8 +155,10 @@ public:
      * what it returns.
      * @param task The task
      * @param options How to run it
-     * @return The result, not yet filled in, or operation_errc::queue_stopped
-     * once the queue has stopped
+     * @return The result, not yet filled in, or the reason the task was not
+     * queued: operation_errc::invalid_priority for a priority
+     * operation_priority does not name, or operation_errc::queue_stopped once
+     * the queue has stopped
      *
      * Queued in the same list as submit(), so the two keep one order. Returns
      * at once, as submit() does; the result is filled in when the task

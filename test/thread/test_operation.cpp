@@ -50,6 +50,7 @@ TEST(operation_errc_test, every_value_has_its_own_message)
     EXPECT_EQ(dross::error(dross::operation_errc::not_finished).message(), "operation has not finished");
     EXPECT_EQ(dross::error(dross::operation_errc::type_mismatch).message(), "operation result is not of the requested type");
     EXPECT_EQ(dross::error(dross::operation_errc::queue_stopped).message(), "operation queue has stopped");
+    EXPECT_EQ(dross::error(dross::operation_errc::invalid_priority).message(), "operation priority is not one operation_priority names");
     EXPECT_EQ(dross::operation_category().message(0), "unknown operation error");
 }
 
