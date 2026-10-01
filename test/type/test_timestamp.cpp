@@ -4,7 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
+#include <functional>
 #include <string>
 #include <thread>
 
@@ -268,6 +270,31 @@ TEST(timestamp_test, formatting)
     EXPECT_EQ(ts.format("%Y-%m-%d"), "2024-01-21");
     EXPECT_EQ(ts.format("%H:%M:%S"), "15:30:45");
     EXPECT_EQ(ts.format("%Y-%m-%d %H:%M"), "2024-01-21 15:30");
+}
+
+// A custom format reads the time into a std::tm of its own, so two threads
+// formatting different timestamps each get their own text.
+TEST(timestamp_test, custom_formatting_from_two_threads)
+{
+    const dross::timestamp first(2024, 1, 21, 15, 30, 0);
+    const dross::timestamp second(1990, 12, 25, 1, 2, 3);
+    constexpr int rounds = 20000;
+    std::atomic<int> wrong{ 0 };
+
+    const auto format_repeatedly = [&wrong](const dross::timestamp& ts, const std::string& expected) {
+        for (int i = 0; i < rounds; ++i) {
+            if (ts.format("%Y-%m-%d %H:%M:%S") != expected) {
+                ++wrong;
+            }
+        }
+    };
+
+    std::thread one(format_repeatedly, std::cref(first), "2024-01-21 15:30:00");
+    std::thread two(format_repeatedly, std::cref(second), "1990-12-25 01:02:03");
+    one.join();
+    two.join();
+
+    EXPECT_EQ(wrong.load(), 0);
 }
 
 // Test formatting without timezone
