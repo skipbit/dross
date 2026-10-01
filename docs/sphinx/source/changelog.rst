@@ -38,6 +38,8 @@ Changed
 - ``find_package(dross <version>)`` now requires the same minor version
   while the major version is 0, where it previously accepted any 0.x. A
   consumer asking for ``0.1``, or for ``0``, no longer matches an installed
-  ``0.9``; it has to ask for the minor it was built against. The soname is
-  unchanged, so this is what a build refuses, not what the runtime linker
-  refuses
+  ``0.9``; it has to ask for the minor it was built against
+- The soname carries the minor version while the major version is 0:
+  ``libdross.so.0.1`` rather than ``libdross.so.0``. A program linked
+  against one 0.x no longer loads another 0.x at run time. From 1.0 the
+  soname carries the major version alone
