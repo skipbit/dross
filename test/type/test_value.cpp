@@ -21,8 +21,18 @@ TEST(value_test, init_with_raw_char)
 
 TEST(value_test, init_with_array)
 {
-    dross::value v = { 1, 2, 3 };
+    dross::value v = dross::array{ 1, 2, 3 };
     EXPECT_EQ(v, dross::array({ 1, 2, 3 }));
+}
+
+// Braces around a single argument hold that argument, not a one-element array.
+TEST(value_test, braces_hold_the_enclosed_value)
+{
+    EXPECT_TRUE((dross::value{ 1 }.is<dross::number>()));
+    EXPECT_TRUE((dross::value{ dross::number{ 42 } }.is<dross::number>()));
+    EXPECT_TRUE((dross::value{ dross::string{ "x" } }.is<dross::string>()));
+    EXPECT_TRUE((dross::value{ dross::array{ 1, 2 } }.is<dross::array>()));
+    EXPECT_EQ((dross::value{ dross::array{ 1, 2 } }.as<dross::array>().length()), 2u);
 }
 
 // Constructor tests
@@ -323,7 +333,7 @@ TEST(value_test, bool_conversion)
 // Complex scenarios
 TEST(value_test, nested_array_with_mixed_types)
 {
-    dross::value v = { 42, "hello", dross::array({ 1, 2, 3 }), dross::dictionary() };
+    dross::value v = dross::array{ 42, "hello", dross::array({ 1, 2, 3 }), dross::dictionary() };
 
     EXPECT_TRUE(v.is<dross::array>());
 

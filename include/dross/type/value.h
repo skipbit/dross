@@ -6,7 +6,6 @@
 #include "dross/type/string.h"
 #include "dross/type/timestamp.h"
 
-#include <initializer_list>
 #include <memory>
 
 namespace dross {
@@ -72,8 +71,9 @@ class data;
  *     number n = value_cast<number>(num);
  * }
  *
- * // Initializer list construction
- * value list_val = {value{1}, value{"two"}, value{3.0}};
+ * // Braces hold the value they enclose; a list is built as an array
+ * value one = value{number{42}};
+ * value list_val = array{value{1}, value{"two"}, value{3.0}};
  * @endcode
  */
 class value final {
@@ -130,14 +130,6 @@ public:
      * @param d The data to store
      */
     value(const data& d);
-
-    /**
-     * @brief Construct an array from initializer list.
-     * @param values Initializer list of values to create an array
-     *
-     * Creates an array value from the provided initializer list.
-     */
-    value(const std::initializer_list<value>& values);
 
     /**
      * @brief Destructor.

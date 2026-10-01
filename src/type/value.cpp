@@ -84,11 +84,6 @@ value::value(const data& d)
     _store->value = d;
 }
 
-value::value(const std::initializer_list<value>& v)
-    : value(array(v))
-{
-}
-
 value::~value() = default;
 
 bool value::equals(const value& v) const

@@ -163,8 +163,7 @@ Here's a simple example using the dross type system:
 
         // Create a dictionary with mixed types. Name the dross type on the
         // right-hand side: a bare literal is ambiguous between value's
-        // boolean, number and value assignment operators, and value{x} with
-        // braces builds a one-element array instead of holding x.
+        // boolean, number and value assignment operators.
         dictionary config;
         config["name"] = string("My Application");
         config["version"] = number("1.0");
