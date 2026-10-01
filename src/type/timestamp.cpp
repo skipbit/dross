@@ -1,6 +1,7 @@
 #include <dross/type/timestamp.h>
 
 #include <chrono>
+#include <ctime>
 #include <iomanip>
 #include <locale>
 #include <optional>
@@ -516,14 +517,14 @@ std::string timestamp::format(const std::string& custom_format) const
     // until std::format with chrono support is more widely available
     auto tp = _store->to_time_point();
     auto time_c = std::chrono::system_clock::to_time_t(tp);
-    auto tm_ptr = std::gmtime(&time_c);
-
-    if (! tm_ptr) {
+    // gmtime_r rather than std::gmtime, whose result is shared by every thread.
+    std::tm tm{};
+    if (! ::gmtime_r(&time_c, &tm)) {
         return "";
     }
 
     std::ostringstream oss;
-    oss << std::put_time(tm_ptr, custom_format.c_str());
+    oss << std::put_time(&tm, custom_format.c_str());
     return oss.str();
 }
 
