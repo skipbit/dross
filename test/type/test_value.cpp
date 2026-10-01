@@ -365,11 +365,15 @@ TEST(value_test, bool_conversion)
     dross::value num_val = 0;
     dross::value str_val = "";
     dross::value arr_val = dross::array();
+    dross::value dict_val = dross::dictionary();
+    dross::value false_val = false;
 
     EXPECT_FALSE(empty_val);  // empty should be false
     EXPECT_TRUE(num_val);     // any stored value should be true, even 0
     EXPECT_TRUE(str_val);     // any stored value should be true, even empty string
     EXPECT_TRUE(arr_val);     // any stored value should be true, even empty array
+    EXPECT_TRUE(dict_val);    // any stored value should be true, even empty dictionary
+    EXPECT_TRUE(false_val);   // a null test, not the truth of the held boolean
 }
 
 // Complex scenarios

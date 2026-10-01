@@ -215,11 +215,12 @@ public:
     bool operator!=(const value& other) const;
 
     /**
-     * @brief Convert to boolean for truthiness testing.
-     * @return true if the value is not null/empty, false otherwise
+     * @brief Test whether the value holds anything.
+     * @return false if the value is null, true otherwise
      *
-     * Allows using value in boolean contexts like if statements.
-     * Returns false for null values, empty strings, arrays, and dictionaries.
+     * This is a null test, not the truth of what is held: a value holding
+     * boolean(false), number(0) or an empty string, array or dictionary is
+     * true. Ask the held type for its own value or emptiness.
      */
     explicit operator bool() const;
 
