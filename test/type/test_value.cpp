@@ -7,6 +7,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <type_traits>
+
 TEST(value_test, init_with_raw_int)
 {
     dross::value v = 1;
@@ -33,6 +36,45 @@ TEST(value_test, braces_hold_the_enclosed_value)
     EXPECT_TRUE((dross::value{ dross::string{ "x" } }.is<dross::string>()));
     EXPECT_TRUE((dross::value{ dross::array{ 1, 2 } }.is<dross::array>()));
     EXPECT_EQ((dross::value{ dross::array{ 1, 2 } }.as<dross::array>().length()), 2u);
+}
+
+// bool is held as a boolean, other arithmetic types as a number, and a
+// character is refused rather than read as its code.
+TEST(value_test, bool_holds_a_boolean_and_characters_are_refused)
+{
+    const dross::value flag = true;
+    EXPECT_TRUE(flag.is<dross::boolean>());
+    EXPECT_TRUE(static_cast<bool>(flag.as<dross::boolean>()));
+
+    const dross::value small = std::uint8_t{ 7 };
+    EXPECT_TRUE(small.is<dross::number>());
+
+    static_assert(! std::is_constructible_v<dross::value, char>);
+    static_assert(! std::is_constructible_v<dross::value, char8_t>);
+    static_assert(! std::is_assignable_v<dross::value&, char>);
+}
+
+// Assignment holds a literal the way construction does.
+TEST(value_test, assignment_from_literals)
+{
+    dross::value v;
+    v = true;
+    EXPECT_TRUE(v.is<dross::boolean>());
+    v = 30;
+    EXPECT_TRUE(v.is<dross::number>());
+    EXPECT_EQ(v.as<dross::number>(), dross::number(30));
+    v = 2.5;
+    EXPECT_TRUE(v.is<dross::number>());
+    v = "abc";
+    EXPECT_TRUE(v.is<dross::string>());
+
+    dross::dictionary d;
+    d["age"] = 30;
+    d["active"] = false;
+    d["name"] = "x";
+    EXPECT_TRUE(d["age"].is<dross::number>());
+    EXPECT_TRUE(d["active"].is<dross::boolean>());
+    EXPECT_TRUE(d["name"].is<dross::string>());
 }
 
 // Constructor tests

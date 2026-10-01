@@ -161,9 +161,7 @@ Here's a simple example using the dross type system:
     {
         using namespace dross;
 
-        // Create a dictionary with mixed types. Name the dross type on the
-        // right-hand side: a bare literal is ambiguous between value's
-        // boolean, number and value assignment operators.
+        // Create a dictionary with mixed types
         dictionary config;
         config["name"] = string("My Application");
         config["version"] = number("1.0");

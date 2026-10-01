@@ -338,9 +338,8 @@ The ``dictionary`` class provides key-value storage:
 
     dross::dictionary dict;
 
-    // Name the dross type on the right-hand side. A bare `dict["age"] = 30;`
-    // is ambiguous between value's boolean, number and value assignment
-    // operators.
+    // A literal on the right-hand side is held as its dross type:
+    // `dict["age"] = 30;` holds a number and `dict["active"] = true;` a boolean.
     dict["name"] = dross::string("John Doe");
     dict["age"] = dross::number(30);
     dict["active"] = dross::boolean(true);
