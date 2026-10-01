@@ -84,9 +84,17 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/thread/timer.h
 )
 
+# While the major version is 0, a minor bump can change the ABI, so the soname
+# carries the minor as well. Once 1.0 is out, the major alone names the ABI.
+if (PROJECT_VERSION_MAJOR EQUAL 0)
+    set(DROSS_SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+else()
+    set(DROSS_SOVERSION "${PROJECT_VERSION_MAJOR}")
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES
     VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
+    SOVERSION ${DROSS_SOVERSION}
     PUBLIC_HEADER "${PROJECT_SOURCE_DIR}/include/dross/dross.h"
     POSITION_INDEPENDENT_CODE ON
 )
