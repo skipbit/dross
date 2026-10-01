@@ -1,10 +1,21 @@
 #pragma once
 
+#include <concepts>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 namespace dross {
+
+/**
+ * @brief A pointer other than a C string.
+ *
+ * A pointer converts to bool implicitly, so boolean refuses one where it
+ * would otherwise read it as "not null".
+ */
+template <typename T>
+concept non_string_pointer = std::is_pointer_v<T> && (! std::same_as<std::remove_cv_t<std::remove_pointer_t<T>>, char>);
 
 /**
  * @brief Boolean type with value semantics and type safety.
@@ -105,6 +116,12 @@ public:
     boolean(const char* str);
 
     /**
+     * @brief Refuses a pointer other than a C string.
+     */
+    template <non_string_pointer P>
+    boolean(P) = delete;
+
+    /**
      * @brief Destructor.
      */
     ~boolean();
@@ -128,6 +145,13 @@ public:
      * @return true if this boolean equals the bool value
      */
     bool equals(bool value) const;
+
+    /**
+     * @brief Refuses a pointer, which would otherwise compare as "not null".
+     */
+    template <typename P>
+        requires std::is_pointer_v<P>
+    bool equals(P) const = delete;
 
     /**
      * @brief Equality comparison operator.
@@ -158,6 +182,18 @@ public:
     bool operator!=(bool value) const;
 
     /**
+     * @brief Refuses a pointer, including a C string, which would otherwise
+     * compare as "not null".
+     */
+    template <typename P>
+        requires std::is_pointer_v<P>
+    bool operator==(P) const = delete;
+
+    template <typename P>
+        requires std::is_pointer_v<P>
+    bool operator!=(P) const = delete;
+
+    /**
      * @brief Three-way comparison operator (spaceship operator).
      * @param other The boolean to compare with
      * @return std::strong_ordering result (false < true)
@@ -180,6 +216,14 @@ public:
      * @return Reference to this boolean
      */
     boolean& operator=(bool value);
+
+    /**
+     * @brief Refuses a pointer, including a C string, which would otherwise
+     * assign "not null". Construct a boolean to parse a string.
+     */
+    template <typename P>
+        requires std::is_pointer_v<P>
+    boolean& operator=(P) = delete;
 
     /**
      * @brief Logical NOT operator.

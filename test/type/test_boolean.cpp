@@ -5,6 +5,7 @@
 
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -91,6 +92,37 @@ TEST(boolean_test, const_char_constructor)
 
     EXPECT_TRUE(b_true.value());
     EXPECT_FALSE(b_false.value());
+}
+
+namespace {
+
+template <typename L, typename R>
+concept compares_with = requires(const L l, const R r) { l == r; };
+
+template <typename T>
+concept checks_equality_with = requires(const dross::boolean b, const T t) { b.equals(t); };
+
+}  // namespace
+
+// A pointer would convert to bool and read as "not null". Construction refuses
+// any pointer but a C string, which it parses; assignment and comparison have
+// no string reading, so they refuse a C string as well.
+TEST(boolean_test, pointers_are_refused)
+{
+    static_assert(! std::is_constructible_v<dross::boolean, int*>);
+    static_assert(! std::is_constructible_v<dross::boolean, const void*>);
+    static_assert(! std::is_constructible_v<dross::value, int*>);
+    static_assert(! std::is_assignable_v<dross::boolean&, int*>);
+    static_assert(! std::is_assignable_v<dross::boolean&, const char*>);
+    static_assert(! compares_with<dross::boolean, int*>);
+    static_assert(! compares_with<dross::boolean, const char*>);
+    static_assert(! checks_equality_with<int*>);
+    static_assert(compares_with<dross::boolean, bool>);
+    static_assert(checks_equality_with<bool>);
+
+    char buffer[] = "false";
+    const dross::boolean from_buffer(buffer);
+    EXPECT_FALSE(from_buffer.value());
 }
 
 TEST(boolean_test, copy_constructor)
