@@ -34,8 +34,9 @@
  * string text{"Hello, 世界!"};
  * timestamp meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
  * array list = {value{1}, value{"two"}, value{3.14}};
- * dictionary config = {{"host", value{string{"localhost"}}},
- *                      {"port", value{number{8080}}}};
+ * dictionary config;
+ * config["host"] = "localhost";
+ * config["port"] = 8080;
  *
  * // Seamless string conversion (implicit)
  * std::string b_str = flag;    // "true"
@@ -50,7 +51,7 @@
  * auto d_string = to_string(meeting); // "2024-01-21T15:30:00+09:00"
  *
  * // Stream output
- * std::cout << flag << " " << precise << " " << text << " " << meeting << std::endl;
+ * std::cout << flag << " " << precise << " " << to_string(text) << " " << meeting << std::endl;
  *
  * // Utility functions
  * auto tokens = split("a,b,c", ",");
@@ -206,10 +207,10 @@ std::string to_string(const timestamp& ts);
  * Local timezone returns empty string.
  *
  * @code
- * timezone jst = timezone::offset(9);
+ * auto jst = timezone::offset(9);
  * auto str = to_string(jst);  // "+09:00"
  *
- * timezone utc = timezone::utc();
+ * auto utc = timezone::utc();
  * auto utc_str = to_string(utc);  // "Z"
  * @endcode
  */
