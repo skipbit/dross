@@ -731,6 +731,52 @@ TEST(number_test, scientific_notation_string_conversion)
     EXPECT_EQ(n2, parsed2);
 }
 
+// An exponent is expanded in the text, so every digit that was written survives
+// and the stored form never carries an exponent.
+TEST(number_test, scientific_notation_keeps_every_digit)
+{
+    EXPECT_EQ(dross::number("1.230e0"), dross::number("1.23"));
+    EXPECT_EQ(std::string(dross::number("1.1e0")), "1.1");
+    EXPECT_EQ(std::string(dross::number("1e200")), "1" + std::string(200, '0'));
+    EXPECT_EQ(std::string(dross::number("-2.5e-3")), "-0.0025");
+
+    const dross::number tiny("1e-200");
+    EXPECT_EQ(std::string(tiny), "0." + std::string(199, '0') + "1");
+    EXPECT_FALSE(tiny.is_integer());
+    EXPECT_EQ(static_cast<int>(tiny), 0);
+    EXPECT_DOUBLE_EQ(static_cast<double>(tiny), 1e-200);
+}
+
+// Comparison reads the value, not the shape of the text.
+TEST(number_test, scientific_notation_compares_by_value)
+{
+    EXPECT_LT(dross::number("1e-200"), dross::number("2"));
+    EXPECT_GT(dross::number("1e200"), dross::number("20"));
+    EXPECT_GT(dross::number("1e-200"), dross::number("1e-300"));
+    EXPECT_GT(dross::number("1e101"), dross::number("20"));
+    EXPECT_EQ(dross::number("1e200"), dross::number("1" + std::string(200, '0')));
+}
+
+// Arithmetic on values written with a large or small exponent yields digits.
+TEST(number_test, scientific_notation_arithmetic_beyond_double)
+{
+    EXPECT_EQ(std::string(dross::number("1e-400") + dross::number(1)), "1." + std::string(399, '0') + "1");
+    EXPECT_EQ(std::string(dross::number("1e400") - dross::number(1)), std::string(400, '9'));
+    EXPECT_EQ(std::string(dross::number("1e400") + dross::number(1)), "1" + std::string(399, '0') + "1");
+}
+
+// An expansion longer than 4096 digits is NaN, so a short input cannot ask
+// for an arbitrarily long string.
+TEST(number_test, scientific_notation_beyond_the_digit_limit_is_nan)
+{
+    EXPECT_EQ(std::string(dross::number("1e4095")).length(), 4096u);
+    EXPECT_TRUE(dross::number("1e4096").is_nan());
+    EXPECT_EQ(std::string(dross::number("1e-4095")).length(), 4097u);  // "0." and 4095 digits
+    EXPECT_TRUE(dross::number("1e-4096").is_nan());
+    EXPECT_TRUE(dross::number("1e9999999999").is_nan());
+    EXPECT_EQ(std::string(dross::number("0e9999999999")), "0");
+}
+
 TEST(number_test, scientific_notation_invalid_formats)
 {
     // Test invalid scientific notation formats

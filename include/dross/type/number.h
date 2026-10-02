@@ -86,7 +86,9 @@ public:
      * @param str Null-terminated string representation of the number
      *
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
-     * Invalid strings result in NaN.
+     * An exponent is expanded in the text, keeping every digit: "1e3" is stored
+     * as 1000. An expansion longer than 4096 digits results in NaN, as do
+     * invalid strings.
      */
     number(const char* str);
 
@@ -95,7 +97,9 @@ public:
      * @param str String representation of the number
      *
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
-     * Invalid strings result in NaN.
+     * An exponent is expanded in the text, keeping every digit: "1e3" is stored
+     * as 1000. An expansion longer than 4096 digits results in NaN, as do
+     * invalid strings.
      */
     number(const std::string& str);
 

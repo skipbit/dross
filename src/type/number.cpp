@@ -3,12 +3,9 @@
 #include <algorithm>
 #include <cmath>
 #include <compare>
-#include <iomanip>
 #include <limits>
-#include <locale>
 #include <optional>
 #include <ostream>
-#include <sstream>
 #include <string>
 
 namespace dross {
@@ -111,6 +108,8 @@ struct parsed_number {
     }
 };
 
+std::string normalize_to_decimal(const std::string& str);
+
 /**
  * @brief Unified number parsing function.
  *
@@ -133,33 +132,11 @@ parsed_number parse_number_unified(const std::string& str)
 
     // We'll validate the format as part of the parsing process
 
-    // For scientific notation, we convert to regular decimal first
-    std::string work_str = str;
-
-    // Check for scientific notation
-    size_t exp_pos = work_str.find_first_of("eE");
-    if (exp_pos != std::string::npos) {
-        // Use std::stod to convert scientific notation to regular decimal
-        try {
-            double value = std::stod(work_str);
-
-            // Use stringstream with high precision to preserve accuracy
-            std::ostringstream oss;
-            oss.imbue(std::locale::classic());
-            oss << std::fixed << std::setprecision(17) << value;
-            work_str = oss.str();
-
-            // Remove trailing zeros after decimal point
-            if (work_str.find('.') != std::string::npos) {
-                work_str = work_str.substr(0, work_str.find_last_not_of('0') + 1);
-                if (work_str.back() == '.') {
-                    work_str.pop_back();
-                }
-            }
-        } catch (const std::exception&) {
-            result.is_valid = false;
-            return result;
-        }
+    // An exponent is expanded the way construction expands it.
+    const std::string work_str = normalize_to_decimal(str);
+    if (work_str == NAN_VALUE) {
+        result.is_valid = false;
+        return result;
     }
 
     size_t start = 0;
@@ -337,11 +314,16 @@ bool is_valid_number(const std::string& str)
     return true;
 }
 
+// The most digits a number written with an exponent may expand to. Beyond it
+// the value is NaN, so a short input cannot ask for an arbitrarily long string.
+constexpr std::size_t max_expanded_digits = 4096;
+
 /**
  * @brief Normalize a number string to decimal representation.
  *
- * This function converts scientific notation to decimal representation
- * for internal storage and calculations, ensuring consistent behavior.
+ * Expands an exponent by moving the decimal point in the text, so every digit
+ * that was written survives. An expansion longer than max_expanded_digits
+ * gives NaN. Other strings are returned as they are.
  */
 std::string normalize_to_decimal(const std::string& str)
 {
@@ -349,53 +331,62 @@ std::string normalize_to_decimal(const std::string& str)
         return str;
     }
 
-    // Check for scientific notation
-    size_t exp_pos = str.find_first_of("eE");
-    if (exp_pos != std::string::npos) {
-        try {
-            double value = std::stod(str);
+    const size_t exp_pos = str.find_first_of("eE");
+    if (exp_pos == std::string::npos) {
+        return str;
+    }
 
-            // Check if the value is zero or infinite
-            if (value == 0.0) {
-                return "0";
-            }
-            if (! std::isfinite(value)) {
-                return str;  // Keep original for non-finite values
-            }
+    const bool negative = (str[0] == '-');
+    const size_t start = ((str[0] == '-') || (str[0] == '+')) ? 1 : 0;
+    const std::string mantissa = str.substr(start, exp_pos - start);
 
-            // Use scientific notation format for very small or very large numbers
-            // to maintain precision
-            if ((std::abs(value) < 1e-100) || (std::abs(value) > 1e100)) {
-                std::ostringstream oss;
-                oss.imbue(std::locale::classic());
-                oss << std::scientific << std::setprecision(16) << value;
-                return oss.str();
-            }
-
-            // Use stringstream with high precision to preserve accuracy
-            std::ostringstream oss;
-            oss.imbue(std::locale::classic());
-            oss << std::fixed << std::setprecision(17) << value;
-            std::string result = oss.str();
-
-            // Remove trailing zeros after decimal point
-            if (result.find('.') != std::string::npos) {
-                result = result.substr(0, result.find_last_not_of('0') + 1);
-                if (result.back() == '.') {
-                    result.pop_back();
-                }
-            }
-
-            return result;
-        } catch (const std::out_of_range&) {
-            // Value is outside double range - keep original scientific notation
-            return str;
-        } catch (const std::exception&) {
-            return str;  // Return original if conversion fails
+    std::string digits;
+    size_t point = mantissa.length();
+    for (size_t i = 0; i < mantissa.length(); ++i) {
+        if (mantissa[i] == '.') {
+            point = i;
+        } else {
+            digits += mantissa[i];
         }
     }
 
-    return str;  // Return as-is if not scientific notation
+    const size_t first = digits.find_first_not_of('0');
+    if (first == std::string::npos) {
+        return "0";
+    }
+    digits.erase(0, first);
+    const long long leading = static_cast<long long>(point) - static_cast<long long>(first);
+
+    // An exponent this long cannot stay within max_expanded_digits.
+    std::string exponent = str.substr(exp_pos + 1);
+    const bool exponent_negative = (exponent[0] == '-');
+    if ((exponent[0] == '-') || (exponent[0] == '+')) {
+        exponent.erase(0, 1);
+    }
+    exponent.erase(0, std::min(exponent.find_first_not_of('0'), exponent.length()));
+    if (exponent.length() > 9) {
+        return NAN_VALUE;
+    }
+    const long long shift = exponent.empty() ? 0 : std::stoll(exponent);
+
+    // Digits before the decimal point once the exponent is applied.
+    const long long integer_digits = leading + (exponent_negative ? -shift : shift);
+    const long long length = static_cast<long long>(digits.length());
+    const long long total = (integer_digits <= 0) ? (1 - integer_digits + length) : std::max(integer_digits, length);
+    if (total > static_cast<long long>(max_expanded_digits)) {
+        return NAN_VALUE;
+    }
+
+    std::string result;
+    if (integer_digits <= 0) {
+        result = "0." + std::string(static_cast<size_t>(-integer_digits), '0') + digits;
+    } else if (integer_digits >= length) {
+        result = digits + std::string(static_cast<size_t>(integer_digits - length), '0');
+    } else {
+        result = digits.substr(0, static_cast<size_t>(integer_digits)) + "." + digits.substr(static_cast<size_t>(integer_digits));
+    }
+
+    return negative ? ("-" + result) : result;
 }
 
 // Normalize number string (remove unnecessary zeros, handle decimal point)
