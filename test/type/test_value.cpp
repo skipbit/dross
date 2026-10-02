@@ -52,6 +52,7 @@ TEST(value_test, bool_holds_a_boolean_and_characters_are_refused)
     static_assert(! std::is_constructible_v<dross::value, char>);
     static_assert(! std::is_constructible_v<dross::value, char8_t>);
     static_assert(! std::is_assignable_v<dross::value&, char>);
+    static_assert(! std::is_constructible_v<dross::value, int*>);
 }
 
 // Assignment holds a literal the way construction does.

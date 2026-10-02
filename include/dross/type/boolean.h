@@ -9,13 +9,19 @@
 namespace dross {
 
 /**
+ * @brief A pointer of any type.
+ */
+template <typename T>
+concept pointer_type = std::is_pointer_v<T>;
+
+/**
  * @brief A pointer other than a C string.
  *
  * A pointer converts to bool implicitly, so boolean refuses one where it
  * would otherwise read it as "not null".
  */
 template <typename T>
-concept non_string_pointer = std::is_pointer_v<T> && (! std::same_as<std::remove_cv_t<std::remove_pointer_t<T>>, char>);
+concept non_string_pointer_type = pointer_type<T> && (! std::same_as<std::remove_cv_t<std::remove_pointer_t<T>>, char>);
 
 /**
  * @brief Boolean type with value semantics and type safety.
@@ -118,7 +124,7 @@ public:
     /**
      * @brief Refuses a pointer other than a C string.
      */
-    template <non_string_pointer P>
+    template <non_string_pointer_type P>
     boolean(P) = delete;
 
     /**
@@ -149,8 +155,7 @@ public:
     /**
      * @brief Refuses a pointer, which would otherwise compare as "not null".
      */
-    template <typename P>
-        requires std::is_pointer_v<P>
+    template <pointer_type P>
     bool equals(P) const = delete;
 
     /**
@@ -185,12 +190,10 @@ public:
      * @brief Refuses a pointer, including a C string, which would otherwise
      * compare as "not null".
      */
-    template <typename P>
-        requires std::is_pointer_v<P>
+    template <pointer_type P>
     bool operator==(P) const = delete;
 
-    template <typename P>
-        requires std::is_pointer_v<P>
+    template <pointer_type P>
     bool operator!=(P) const = delete;
 
     /**
@@ -221,8 +224,7 @@ public:
      * @brief Refuses a pointer, including a C string, which would otherwise
      * assign "not null". Construct a boolean to parse a string.
      */
-    template <typename P>
-        requires std::is_pointer_v<P>
+    template <pointer_type P>
     boolean& operator=(P) = delete;
 
     /**

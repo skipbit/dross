@@ -180,6 +180,12 @@ public:
     }
 
     /**
+     * @brief Refuses a character: name number or string instead.
+     */
+    template <character_type T>
+    value(T) = delete;
+
+    /**
      * @brief Construct from any string-like type.
      * @param s The string value to convert to string
      *
@@ -308,6 +314,12 @@ public:
     {
         return *this = boolean(b);
     }
+
+    /**
+     * @brief Refuses a character: name number or string instead.
+     */
+    template <character_type T>
+    value& operator=(T) = delete;
 
     /**
      * @brief Assignment from any string-like type.

@@ -111,7 +111,6 @@ TEST(boolean_test, pointers_are_refused)
 {
     static_assert(! std::is_constructible_v<dross::boolean, int*>);
     static_assert(! std::is_constructible_v<dross::boolean, const void*>);
-    static_assert(! std::is_constructible_v<dross::value, int*>);
     static_assert(! std::is_assignable_v<dross::boolean&, int*>);
     static_assert(! std::is_assignable_v<dross::boolean&, const char*>);
     static_assert(! compares_with<dross::boolean, int*>);
