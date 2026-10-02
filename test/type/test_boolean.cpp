@@ -127,6 +127,13 @@ TEST(boolean_test, pointers_are_refused)
     char buffer[] = "false";
     const dross::boolean from_buffer(buffer);
     EXPECT_FALSE(from_buffer.value());
+
+    // A literal 0 also converts to std::nullptr_t; refusing nullptr must not
+    // take 0 away from the bool overloads.
+    dross::boolean flag(true);
+    flag = 0;
+    EXPECT_FALSE(flag.value());
+    EXPECT_TRUE(flag.equals(0));
 }
 
 TEST(boolean_test, copy_constructor)

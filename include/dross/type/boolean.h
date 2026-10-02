@@ -131,7 +131,8 @@ public:
     /**
      * @brief Refuses nullptr, which would otherwise be read as a null C string.
      */
-    boolean(std::nullptr_t) = delete;
+    template <std::same_as<std::nullptr_t> N>
+    boolean(N) = delete;
 
     /**
      * @brief Destructor.
@@ -165,7 +166,8 @@ public:
     template <pointer_type P>
     bool equals(P) const = delete;
 
-    bool equals(std::nullptr_t) const = delete;
+    template <std::same_as<std::nullptr_t> N>
+    bool equals(N) const = delete;
 
     /**
      * @brief Equality comparison operator.
@@ -208,8 +210,10 @@ public:
     /**
      * @brief Refuses nullptr, which would otherwise be read as a null C string.
      */
-    bool operator==(std::nullptr_t) const = delete;
-    bool operator!=(std::nullptr_t) const = delete;
+    template <std::same_as<std::nullptr_t> N>
+    bool operator==(N) const = delete;
+    template <std::same_as<std::nullptr_t> N>
+    bool operator!=(N) const = delete;
 
     /**
      * @brief Three-way comparison operator (spaceship operator).
@@ -245,7 +249,8 @@ public:
     /**
      * @brief Refuses nullptr, which would otherwise be read as a null C string.
      */
-    boolean& operator=(std::nullptr_t) = delete;
+    template <std::same_as<std::nullptr_t> N>
+    boolean& operator=(N) = delete;
 
     /**
      * @brief Logical NOT operator.
