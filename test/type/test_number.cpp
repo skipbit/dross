@@ -14,6 +14,16 @@ TEST(number_test, default_constructor_is_zero)
     EXPECT_EQ(std::string(n1), "0");
 }
 
+// The remainder is defined for integers only; a fractional operand gives NaN.
+TEST(number_test, modulo_of_a_fraction_is_nan)
+{
+    EXPECT_TRUE((dross::number(7) % dross::number("2.5")).is_nan());
+    EXPECT_TRUE((dross::number("7.5") % dross::number(2)).is_nan());
+    EXPECT_EQ(std::string(dross::number(7) % dross::number(2)), "1");
+    EXPECT_EQ(std::string(dross::number("7.0") % dross::number("2.00")), "1");
+    EXPECT_EQ(std::string(dross::number(-7) % dross::number(2)), "-1");
+}
+
 // A floating-point value is stored as the shortest text that converts back to
 // it, rather than with six fractional digits.
 TEST(number_test, floating_point_keeps_its_shortest_form)

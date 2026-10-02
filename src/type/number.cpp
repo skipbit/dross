@@ -872,7 +872,8 @@ std::string perform_arithmetic(const std::string& a, const std::string& b, char 
         return (a_neg != b_neg) ? "-" + result : result;
     }
     case '%': {
-        if (nb == "0") {
+        // Both are in canonical form, so a decimal point means a fraction.
+        if ((nb == "0") || (na.find('.') != std::string::npos) || (nb.find('.') != std::string::npos)) {
             return NAN_VALUE;
         }
         std::string result = modulo_positive_numbers(a_abs, b_abs);
