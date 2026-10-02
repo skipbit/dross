@@ -6,7 +6,7 @@
 #include "dross/type/string.h"
 #include "dross/type/timestamp.h"
 
-#include <initializer_list>
+#include <concepts>
 #include <memory>
 
 namespace dross {
@@ -18,6 +18,24 @@ class array;
 class dictionary;
 class timestamp;
 class data;
+
+/**
+ * @brief Character types, which value does not read as numbers.
+ *
+ * Whether 'a' means a character or its code is not clear from the call, so
+ * value asks for number or string to be named.
+ */
+template <typename T>
+concept character_type = std::same_as<T, char> || std::same_as<T, wchar_t> || std::same_as<T, char8_t>
+                         || std::same_as<T, char16_t> || std::same_as<T, char32_t>;
+
+/**
+ * @brief Arithmetic types that value holds as a number: all but bool and characters.
+ *
+ * signed char and unsigned char (std::int8_t, std::uint8_t) are numbers, not characters.
+ */
+template <typename T>
+concept value_number_type = number_type<T> && (! std::same_as<T, bool>) && (! character_type<T>);
 
 /**
  * @brief Polymorphic value type that can hold any supported dross type.
@@ -32,7 +50,6 @@ class data;
  * - Value semantics (copyable and assignable)
  * - Convenient construction from any supported type
  * - Template-based type checking and casting
- * - Support for initializer list construction
  * - Thread-safe for read operations
  *
  * Supported types:
@@ -65,6 +82,7 @@ class data;
  *
  * // Automatic type conversion
  * value int_val = 123;      // Creates number
+ * value flag = true;        // Creates boolean
  * value str_val = "text";   // Creates string
  *
  * // Type checking and casting
@@ -72,8 +90,9 @@ class data;
  *     number n = value_cast<number>(num);
  * }
  *
- * // Initializer list construction
- * value list_val = {value{1}, value{"two"}, value{3.0}};
+ * // Braces hold the value they enclose; a list is built as an array
+ * value one = value{number{42}};
+ * value list_val = array{value{1}, value{"two"}, value{3.0}};
  * @endcode
  */
 class value final {
@@ -132,29 +151,40 @@ public:
     value(const data& d);
 
     /**
-     * @brief Construct an array from initializer list.
-     * @param values Initializer list of values to create an array
-     *
-     * Creates an array value from the provided initializer list.
-     */
-    value(const std::initializer_list<value>& values);
-
-    /**
      * @brief Destructor.
      */
     ~value();
 
     /**
-     * @brief Construct from any arithmetic type.
+     * @brief Construct from an arithmetic type other than bool or a character.
      * @param n The arithmetic value to convert to number
      *
      * Automatically converts arithmetic types to number for convenient usage.
+     * A character is not accepted: name number or string instead.
      */
-    template <number_type T>
+    template <value_number_type T>
     value(const T n)
         : value(number(n))
     {
     }
+
+    /**
+     * @brief Construct from bool, holding a boolean.
+     * @param b The bool to hold
+     *
+     * Only bool itself is accepted, so an integer is held as a number.
+     */
+    template <std::same_as<bool> B>
+    value(const B b)
+        : value(boolean(b))
+    {
+    }
+
+    /**
+     * @brief Refuses a character: name number or string instead.
+     */
+    template <character_type T>
+    value(T) = delete;
 
     /**
      * @brief Construct from any string-like type.
@@ -192,11 +222,12 @@ public:
     bool operator!=(const value& other) const;
 
     /**
-     * @brief Convert to boolean for truthiness testing.
-     * @return true if the value is not null/empty, false otherwise
+     * @brief Test whether the value holds anything.
+     * @return false if the value is null, true otherwise
      *
-     * Allows using value in boolean contexts like if statements.
-     * Returns false for null values, empty strings, arrays, and dictionaries.
+     * This is a null test, not the truth of what is held: a value holding
+     * boolean(false), number(0) or an empty string, array or dictionary is
+     * true. Ask the held type for its own value or emptiness.
      */
     explicit operator bool() const;
 
@@ -262,6 +293,45 @@ public:
      * @return Reference to this value
      */
     value& operator=(const data& d);
+
+    /**
+     * @brief Assignment from an arithmetic type other than bool or a character.
+     * @param n The arithmetic value to assign as a number
+     * @return Reference to this value
+     */
+    template <value_number_type T>
+    value& operator=(const T n)
+    {
+        return *this = number(n);
+    }
+
+    /**
+     * @brief Assignment from bool, holding a boolean.
+     * @param b The bool to assign
+     * @return Reference to this value
+     */
+    template <std::same_as<bool> B>
+    value& operator=(const B b)
+    {
+        return *this = boolean(b);
+    }
+
+    /**
+     * @brief Refuses a character: name number or string instead.
+     */
+    template <character_type T>
+    value& operator=(T) = delete;
+
+    /**
+     * @brief Assignment from any string-like type.
+     * @param s The string value to assign
+     * @return Reference to this value
+     */
+    template <string_type T>
+    value& operator=(const T s)
+    {
+        return *this = string(s);
+    }
 
     /**
      * @brief Check if the value contains a specific type.

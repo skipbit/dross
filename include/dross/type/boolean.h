@@ -1,10 +1,28 @@
 #pragma once
 
+#include <concepts>
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 namespace dross {
+
+/**
+ * @brief A pointer of any type.
+ */
+template <typename T>
+concept pointer_type = std::is_pointer_v<T>;
+
+/**
+ * @brief A pointer other than a C string.
+ *
+ * A pointer converts to bool implicitly, so boolean refuses one where it
+ * would otherwise read it as "not null".
+ */
+template <typename T>
+concept non_string_pointer_type = pointer_type<T> && (! std::same_as<std::remove_cv_t<std::remove_pointer_t<T>>, char>);
 
 /**
  * @brief Boolean type with value semantics and type safety.
@@ -105,6 +123,18 @@ public:
     boolean(const char* str);
 
     /**
+     * @brief Refuses a pointer other than a C string.
+     */
+    template <non_string_pointer_type P>
+    boolean(P) = delete;
+
+    /**
+     * @brief Refuses nullptr, which would otherwise be read as a null C string.
+     */
+    template <std::same_as<std::nullptr_t> N>
+    boolean(N) = delete;
+
+    /**
      * @brief Destructor.
      */
     ~boolean();
@@ -128,6 +158,16 @@ public:
      * @return true if this boolean equals the bool value
      */
     bool equals(bool value) const;
+
+    /**
+     * @brief Refuses a pointer, including a C string, which would otherwise
+     * compare as "not null".
+     */
+    template <pointer_type P>
+    bool equals(P) const = delete;
+
+    template <std::same_as<std::nullptr_t> N>
+    bool equals(N) const = delete;
 
     /**
      * @brief Equality comparison operator.
@@ -158,6 +198,24 @@ public:
     bool operator!=(bool value) const;
 
     /**
+     * @brief Refuses a pointer, including a C string, which would otherwise
+     * compare as "not null".
+     */
+    template <pointer_type P>
+    bool operator==(P) const = delete;
+
+    template <pointer_type P>
+    bool operator!=(P) const = delete;
+
+    /**
+     * @brief Refuses nullptr, which would otherwise be read as a null C string.
+     */
+    template <std::same_as<std::nullptr_t> N>
+    bool operator==(N) const = delete;
+    template <std::same_as<std::nullptr_t> N>
+    bool operator!=(N) const = delete;
+
+    /**
      * @brief Three-way comparison operator (spaceship operator).
      * @param other The boolean to compare with
      * @return std::strong_ordering result (false < true)
@@ -180,6 +238,19 @@ public:
      * @return Reference to this boolean
      */
     boolean& operator=(bool value);
+
+    /**
+     * @brief Refuses a pointer, including a C string, which would otherwise
+     * assign "not null". Construct a boolean to parse a string.
+     */
+    template <pointer_type P>
+    boolean& operator=(P) = delete;
+
+    /**
+     * @brief Refuses nullptr, which would otherwise be read as a null C string.
+     */
+    template <std::same_as<std::nullptr_t> N>
+    boolean& operator=(N) = delete;
 
     /**
      * @brief Logical NOT operator.
