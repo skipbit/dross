@@ -153,7 +153,8 @@ public:
     bool equals(bool value) const;
 
     /**
-     * @brief Refuses a pointer, which would otherwise compare as "not null".
+     * @brief Refuses a pointer, including a C string, which would otherwise
+     * compare as "not null".
      */
     template <pointer_type P>
     bool equals(P) const = delete;

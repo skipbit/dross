@@ -31,6 +31,8 @@ concept character_type = std::same_as<T, char> || std::same_as<T, wchar_t> || st
 
 /**
  * @brief Arithmetic types that value holds as a number: all but bool and characters.
+ *
+ * signed char and unsigned char (std::int8_t, std::uint8_t) are numbers, not characters.
  */
 template <typename T>
 concept value_number_type = number_type<T> && (! std::same_as<T, bool>) && (! character_type<T>);
@@ -48,7 +50,6 @@ concept value_number_type = number_type<T> && (! std::same_as<T, bool>) && (! ch
  * - Value semantics (copyable and assignable)
  * - Convenient construction from any supported type
  * - Template-based type checking and casting
- * - Support for initializer list construction
  * - Thread-safe for read operations
  *
  * Supported types:
