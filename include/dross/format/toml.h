@@ -101,7 +101,9 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Arrays are formatted with proper spacing
  * - Nested tables use dotted notation when appropriate
  * - Strings are properly escaped according to TOML rules
- * - Numbers maintain precision without unnecessary trailing zeros
+ * - Numbers are written in number's canonical form, without trailing zeros.
+ *   number does not record whether it was a TOML integer or float, so a
+ *   float whose fraction is all zeros (1.0) is written as an integer (1).
  *
  * @note The serializer produces clean, readable TOML output
  *       suitable for human editing and version control.

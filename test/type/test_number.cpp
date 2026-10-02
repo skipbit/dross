@@ -616,7 +616,7 @@ TEST(number_test, leading_zeros)
     const dross::number n2{ "123" };
 
     EXPECT_EQ(n1, n2);
-    EXPECT_EQ(std::string(n1), "00123");  // Leading zeros are preserved
+    EXPECT_EQ(std::string(n1), "123");  // Leading zeros are dropped
 }
 
 TEST(number_test, whitespace_handling)
@@ -844,6 +844,43 @@ TEST(number_test, trailing_zeros_decimal)
     EXPECT_EQ(n1, n2);
 }
 
+// Construction and arithmetic store the same canonical form, so equal values
+// print alike: no '+', no leading zeros, no trailing fractional zeros, an
+// integer part of at least "0", and zero without a sign.
+TEST(number_test, equal_values_have_equal_text)
+{
+    const auto text = [](const char* s) {
+        return std::string(dross::number(s));
+    };
+    EXPECT_EQ(text("1.2500"), "1.25");
+    EXPECT_EQ(text("1.2500e0"), "1.25");
+    EXPECT_EQ(text("007"), "7");
+    EXPECT_EQ(text("+5"), "5");
+    EXPECT_EQ(text(".5"), "0.5");
+    EXPECT_EQ(text("-.5"), "-0.5");
+    EXPECT_EQ(text("5."), "5");
+    EXPECT_EQ(text("-0.0"), "0");
+    EXPECT_EQ(text("1.0"), "1");
+
+    EXPECT_EQ(std::string(dross::number("2.5") * dross::number(2)), "5");
+    EXPECT_EQ(std::string(dross::number("0.5") * dross::number(4)), "2");
+    EXPECT_EQ(std::string(dross::number(-1) % dross::number(1)), "0");
+    EXPECT_EQ(std::string(dross::number("1.2500") + dross::number(0)), "1.25");
+    EXPECT_EQ(std::string(dross::number(42.5)), "42.5");
+}
+
+// A leading '+' or '.' is read as the value it writes.
+TEST(number_test, leading_sign_and_point_compare_by_value)
+{
+    EXPECT_EQ(dross::number("+5"), dross::number("5"));
+    EXPECT_LT(dross::number("+5"), dross::number("6"));
+    EXPECT_EQ(std::string(dross::number("+5") * dross::number(2)), "10");
+    EXPECT_EQ(std::string(dross::number("+5") + dross::number(1)), "6");
+    EXPECT_EQ(dross::number(".5"), dross::number("0.5"));
+    EXPECT_GT(dross::number(".5"), dross::number("0.4"));
+    EXPECT_LT(dross::number("-.5"), dross::number("-0.4"));
+}
+
 TEST(number_test, very_small_decimals)
 {
     const dross::number n1{ "0.000000000000000001" };
@@ -855,7 +892,7 @@ TEST(number_test, very_small_decimals)
 
     // Check that arithmetic preserves precision
     std::string sum_str = std::string(sum);
-    EXPECT_TRUE(sum_str == "0.000000000000000003" || sum_str == "3e-18" || sum.is_nan());  // Implementation-dependent
+    EXPECT_EQ(sum_str, "0.000000000000000003");
 }
 
 // =============================================================================
@@ -1082,7 +1119,7 @@ TEST(number_test, unified_parsing_fractional_precision)
     EXPECT_TRUE(hp_str.find("0.123456789") == 0);
 
     // Should normalize trailing zeros
-    EXPECT_TRUE(tz_str == "1.23" || tz_str == "1.23000000000000000000");
+    EXPECT_EQ(tz_str, "1.23");
 }
 
 TEST(number_test, unified_parsing_consistency_with_legacy)

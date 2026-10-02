@@ -389,53 +389,45 @@ std::string normalize_to_decimal(const std::string& str)
     return negative ? ("-" + result) : result;
 }
 
-// Normalize number string (remove unnecessary zeros, handle decimal point)
+/**
+ * @brief The canonical form of a number string.
+ *
+ * Expands an exponent, drops a leading '+', leading zeros of the integer part
+ * and trailing zeros of the fraction, supplies "0" for an empty integer part,
+ * and writes zero without a sign. Equal values therefore have equal text.
+ * Strings that are not numbers are returned as they are.
+ */
 std::string normalize_number(const std::string& str)
 {
-    if (! is_valid_number(str)) {
-        return str;
+    const std::string expanded = normalize_to_decimal(str);
+    if (! is_valid_number(expanded)) {
+        return expanded;
     }
 
-    bool negative = (str[0] == '-');
-    std::string s = negative ? str.substr(1) : str;
+    const bool negative = (expanded[0] == '-');
+    const size_t start = ((expanded[0] == '-') || (expanded[0] == '+')) ? 1 : 0;
+    const std::string unsigned_part = expanded.substr(start);
 
-    // Find decimal point
-    size_t dot_pos = s.find('.');
-    bool has_decimal = (dot_pos != std::string::npos);
+    const size_t dot = unsigned_part.find('.');
+    std::string integer = (dot == std::string::npos) ? unsigned_part : unsigned_part.substr(0, dot);
+    std::string fraction = (dot == std::string::npos) ? "" : unsigned_part.substr(dot + 1);
 
-    if (has_decimal) {
-        // Remove trailing zeros after decimal point
-        size_t last_nonzero = s.find_last_not_of('0');
-        if ((last_nonzero != std::string::npos) && (last_nonzero > dot_pos)) {
-            s = s.substr(0, last_nonzero + 1);
-        }
-        // Remove decimal point if no fractional part
-        if (s.back() == '.') {
-            s.pop_back();
-            has_decimal = false;
-        }
+    integer.erase(0, std::min(integer.find_first_not_of('0'), integer.length()));
+    if (integer.empty()) {
+        integer = "0";
     }
+    const size_t last = fraction.find_last_not_of('0');
+    fraction.erase((last == std::string::npos) ? 0 : (last + 1));
 
-    // Remove leading zeros
-    size_t first_nonzero = 0;
-    while ((first_nonzero < (s.length() - 1)) && (s[first_nonzero] == '0') && (s[first_nonzero + 1] != '.')) {
-        first_nonzero++;
-    }
-    s = s.substr(first_nonzero);
-
-    // Handle zero
-    if (s.empty() || s == "." || s == "0") {
-        return "0";
-    }
-
-    return negative && s != "0" ? "-" + s : s;
+    const std::string result = fraction.empty() ? integer : (integer + "." + fraction);
+    return (negative && (result != "0")) ? ("-" + result) : result;
 }
 
 // Compare two number strings (handles both integers and decimals)
 int compare_numbers(const std::string& a, const std::string& b)
 {
-    std::string na = normalize_number(normalize_to_decimal(a));
-    std::string nb = normalize_number(normalize_to_decimal(b));
+    std::string na = normalize_number(a);
+    std::string nb = normalize_number(b);
 
     if (na == nb) {
         return 0;
@@ -810,8 +802,8 @@ std::string perform_arithmetic(const std::string& a, const std::string& b, char 
         return NAN_VALUE;
     }
 
-    std::string na = normalize_number(normalize_to_decimal(a));
-    std::string nb = normalize_number(normalize_to_decimal(b));
+    std::string na = normalize_number(a);
+    std::string nb = normalize_number(b);
 
     bool a_neg = (na[0] == '-');
     bool b_neg = (nb[0] == '-');
@@ -902,17 +894,17 @@ public:
 
     storage() = default;
     storage(const char* s)
-        : number(normalize_to_decimal(s))
+        : number(normalize_number(s))
     {
     }
     storage(const std::string& s)
-        : number(normalize_to_decimal(s))
+        : number(normalize_number(s))
     {
     }
 
     template <number_type T>
     storage(const T& n)
-        : number(std::to_string(n))
+        : number(normalize_number(std::to_string(n)))
     {
     }
 };
@@ -1013,13 +1005,13 @@ number& number::operator=(const number& n)
 
 number& number::operator=(const char* s)
 {
-    _store->number = normalize_to_decimal(s);
+    _store->number = normalize_number(s);
     return *this;
 }
 
 number& number::operator=(const std::string& s)
 {
-    _store->number = normalize_to_decimal(s);
+    _store->number = normalize_number(s);
     return *this;
 }
 

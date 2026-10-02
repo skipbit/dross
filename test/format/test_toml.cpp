@@ -276,7 +276,8 @@ TEST(toml_test, serialize_simple)
 
     std::string output = result.value();
     EXPECT_TRUE(output.find("title = \"Example\"") != std::string::npos);
-    EXPECT_TRUE(output.find("version = 1.0") != std::string::npos);
+    // number keeps no record of a float, so 1.0 is written as 1.
+    EXPECT_TRUE(output.find("version = 1\n") != std::string::npos);
     EXPECT_TRUE(output.find("enabled = true") != std::string::npos);
 }
 
