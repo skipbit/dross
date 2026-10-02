@@ -8,10 +8,11 @@ namespace dross {
 /**
  * @brief Concept that defines string-like types for string construction.
  *
- * Accepts const char* and std::string for convenient string creation.
+ * Accepts const char*, char* (what a char array becomes when passed by value)
+ * and std::string for convenient string creation.
  */
 template <typename T>
-concept string_type = std::same_as<T, const char*> || std::same_as<T, std::string>;
+concept string_type = std::same_as<T, const char*> || std::same_as<T, char*> || std::same_as<T, std::string>;
 
 /**
  * @brief UTF-8 string class with value semantics.

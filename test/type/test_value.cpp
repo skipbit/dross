@@ -69,6 +69,12 @@ TEST(value_test, assignment_from_literals)
     v = "abc";
     EXPECT_TRUE(v.is<dross::string>());
 
+    char buffer[] = "xyz";
+    v = buffer;
+    EXPECT_TRUE(v.is<dross::string>());
+    const dross::value from_buffer = buffer;
+    EXPECT_EQ(std::string(from_buffer.as<dross::string>()), "xyz");
+
     dross::dictionary d;
     d["age"] = 30;
     d["active"] = false;
