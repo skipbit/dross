@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -116,6 +117,10 @@ TEST(boolean_test, pointers_are_refused)
     static_assert(! compares_with<dross::boolean, int*>);
     static_assert(! compares_with<dross::boolean, const char*>);
     static_assert(! checks_equality_with<int*>);
+    static_assert(! std::is_constructible_v<dross::boolean, std::nullptr_t>);
+    static_assert(! std::is_assignable_v<dross::boolean&, std::nullptr_t>);
+    static_assert(! compares_with<dross::boolean, std::nullptr_t>);
+    static_assert(! checks_equality_with<std::nullptr_t>);
     static_assert(compares_with<dross::boolean, bool>);
     static_assert(checks_equality_with<bool>);
 

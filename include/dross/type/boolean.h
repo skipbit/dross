@@ -1,6 +1,7 @@
 #pragma once
 
 #include <concepts>
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -128,6 +129,11 @@ public:
     boolean(P) = delete;
 
     /**
+     * @brief Refuses nullptr, which would otherwise be read as a null C string.
+     */
+    boolean(std::nullptr_t) = delete;
+
+    /**
      * @brief Destructor.
      */
     ~boolean();
@@ -158,6 +164,8 @@ public:
      */
     template <pointer_type P>
     bool equals(P) const = delete;
+
+    bool equals(std::nullptr_t) const = delete;
 
     /**
      * @brief Equality comparison operator.
@@ -198,6 +206,12 @@ public:
     bool operator!=(P) const = delete;
 
     /**
+     * @brief Refuses nullptr, which would otherwise be read as a null C string.
+     */
+    bool operator==(std::nullptr_t) const = delete;
+    bool operator!=(std::nullptr_t) const = delete;
+
+    /**
      * @brief Three-way comparison operator (spaceship operator).
      * @param other The boolean to compare with
      * @return std::strong_ordering result (false < true)
@@ -227,6 +241,11 @@ public:
      */
     template <pointer_type P>
     boolean& operator=(P) = delete;
+
+    /**
+     * @brief Refuses nullptr, which would otherwise be read as a null C string.
+     */
+    boolean& operator=(std::nullptr_t) = delete;
 
     /**
      * @brief Logical NOT operator.
