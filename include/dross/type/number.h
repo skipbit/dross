@@ -27,7 +27,8 @@ concept number_type = std::is_arithmetic_v<T>;
  * cryptographic operations, and scientific computing where precision is critical.
  *
  * Key features:
- * - Arbitrary precision arithmetic (no overflow)
+ * - Arbitrary precision arithmetic (no overflow); a quotient that does not
+ *   terminate keeps 34 significant digits
  * - String-based storage for maximum precision
  * - Support for integers and floating-point numbers
  * - Full set of arithmetic and comparison operators
@@ -340,6 +341,9 @@ public:
      * @return Result of division
      *
      * Returns NaN if either operand is NaN or if dividing by zero.
+     * The integer part of the quotient is exact. A quotient that does not
+     * terminate keeps 34 significant digits, as IEEE decimal128 does, and the
+     * digits after them are truncated: 1 / 3 is 0.3333333333333333333333333333333333.
      */
     number operator/(const number& other) const;
 

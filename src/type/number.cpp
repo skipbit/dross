@@ -675,8 +675,14 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
     return normalize_number(result);
 }
 
-// Divide two positive number strings (supports decimals) with precision control
-std::string divide_positive_numbers(const std::string& a, const std::string& b, int max_decimal_places = 10)
+// Significant digits a quotient keeps, as IEEE decimal128 does; the digits
+// after them are truncated.
+constexpr std::size_t quotient_significant_digits = 34;
+
+// Divide two positive number strings (supports decimals). The integer part of
+// the quotient is exact; the fraction stops once the quotient holds
+// significant_digits significant digits, so 0 gives integer division.
+std::string divide_positive_numbers(const std::string& a, const std::string& b, std::size_t significant_digits = quotient_significant_digits)
 {
     if (b == "0") {
         return NAN_VALUE;
@@ -736,22 +742,25 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
         quotient = quotient.substr(1);
     }
 
-    // Handle decimal places if needed
+    // Fraction digits until the quotient holds enough significant digits.
+    // Zeros before the first non-zero digit are not significant.
     std::string decimal_part = "";
-    if (remainder != "0" && (max_decimal_places > 0)) {
-        for (int i = 0; (i < max_decimal_places) && remainder != "0"; i++) {
-            remainder = remainder + "0";  // Add a zero for next decimal place
+    std::size_t significant = (quotient == "0") ? 0 : quotient.length();
+    while ((remainder != "0") && (significant < significant_digits)) {
+        remainder = remainder + "0";  // Add a zero for next decimal place
 
-            int count = 0;
-            std::string temp_remainder = remainder;
+        int count = 0;
+        std::string temp_remainder = remainder;
 
-            while (compare_numbers(temp_remainder, divisor) >= 0) {
-                temp_remainder = subtract_positive_numbers(temp_remainder, divisor);
-                count++;
-            }
+        while (compare_numbers(temp_remainder, divisor) >= 0) {
+            temp_remainder = subtract_positive_numbers(temp_remainder, divisor);
+            count++;
+        }
 
-            decimal_part = decimal_part + std::to_string(count);
-            remainder = temp_remainder;
+        decimal_part = decimal_part + std::to_string(count);
+        remainder = temp_remainder;
+        if ((significant > 0) || (count != 0)) {
+            significant++;
         }
     }
 
@@ -778,7 +787,7 @@ std::string modulo_positive_numbers(const std::string& a, const std::string& b)
     }
 
     // For modulo, we need integer division (floor division)
-    std::string quotient = divide_positive_numbers(a, b, 0);  // No decimal places for integer division
+    std::string quotient = divide_positive_numbers(a, b, 0);  // Integer division
 
     // Handle case where quotient might have decimal (shouldn't happen with precision 0, but safety check)
     size_t dot_pos = quotient.find('.');

@@ -87,7 +87,9 @@ number
    :protected-members:
    :undoc-members:
 
-The ``number`` class provides arbitrary precision numeric values:
+The ``number`` class provides arbitrary precision numeric values. Addition,
+subtraction and multiplication are exact; a quotient that does not terminate
+keeps 34 significant digits, and the digits after them are truncated:
 
 .. code-block:: cpp
 

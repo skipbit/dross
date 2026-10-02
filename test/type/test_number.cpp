@@ -347,7 +347,26 @@ TEST(number_test, decimal_division_precision)
     const dross::number n2{ "3.14" };
     const dross::number result = n1 / n2;
 
-    EXPECT_EQ(std::string(result), "7.229299363");
+    EXPECT_EQ(std::string(result), "7.229299363057324840764331210191082");
+}
+
+// A quotient that does not terminate keeps 34 significant digits, truncated.
+// Zeros before the first significant digit do not count, and the integer part
+// is always exact.
+TEST(number_test, division_keeps_34_significant_digits)
+{
+    const auto quotient = [](const char* a, const char* b) {
+        return std::string(dross::number(a) / dross::number(b));
+    };
+    EXPECT_EQ(quotient("1", "3"), "0." + std::string(34, '3'));
+    EXPECT_EQ(quotient("2", "3"), "0." + std::string(34, '6'));
+    EXPECT_EQ(quotient("1", "300000"), "0.00000" + std::string(34, '3'));
+    EXPECT_EQ(quotient("1", "100000000000"), "0.00000000001");
+    EXPECT_EQ(quotient("10", "3"), "3." + std::string(33, '3'));
+
+    const dross::number large("1" + std::string(40, '0'));
+    EXPECT_EQ(std::string(large / dross::number(3)), std::string(40, '3'));
+    EXPECT_EQ(std::string(dross::number(1) / dross::number(3) * dross::number(3)), "0." + std::string(34, '9'));
 }
 
 TEST(number_test, division_with_equal_decimal_places)
@@ -368,7 +387,7 @@ TEST(number_test, division_with_more_decimal_places_in_the_dividend)
 {
     const dross::number result = dross::number{ "3.14" } / dross::number{ "22.7" };
 
-    EXPECT_EQ(std::string(result), "0.1383259911");
+    EXPECT_EQ(std::string(result), "0.1383259911894273127753303964757709");
 }
 
 TEST(number_test, division_that_moves_the_result_below_one)
@@ -397,7 +416,7 @@ TEST(number_test, exact_division_drops_the_decimal_point)
 
 TEST(number_test, division_keeps_its_digits_when_the_divisor_is_near_one)
 {
-    EXPECT_EQ(std::string(dross::number{ "5" } / dross::number{ "1.0000000001" }), "4.9999999995");
+    EXPECT_EQ(std::string(dross::number{ "5" } / dross::number{ "1.0000000001" }), "4.999999999500000000049999999995");
 }
 
 TEST(number_test, one_third_precision)
