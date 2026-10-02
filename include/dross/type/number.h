@@ -10,11 +10,11 @@ namespace dross {
 /**
  * @brief Concept that defines arithmetic types suitable for number construction.
  *
- * Accepts all arithmetic types except const char* to avoid ambiguity
- * with string constructors.
+ * Accepts every arithmetic type. A character is read as its code and bool as
+ * 0 or 1: number('a') is 97 and number(true) is 1.
  */
 template <typename T>
-concept number_type = std::is_arithmetic_v<T> && (! std::same_as<T, const char*>);
+concept number_type = std::is_arithmetic_v<T>;
 
 /**
  * @brief Arbitrary precision number class with string-based storage.
@@ -104,7 +104,8 @@ public:
      * @param n The arithmetic value to convert
      *
      * Converts standard arithmetic types (int, float, double, etc.) to number.
-     * The conversion preserves the full precision of the input type.
+     * The conversion preserves the full precision of the input type. A
+     * character is read as its code and bool as 0 or 1.
      */
     template <number_type T>
     number(const T n)

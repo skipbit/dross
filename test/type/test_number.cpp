@@ -14,6 +14,14 @@ TEST(number_test, default_constructor_is_zero)
     EXPECT_EQ(std::string(n1), "0");
 }
 
+// A character is read as its code and bool as 0 or 1, as number.h documents.
+TEST(number_test, characters_and_bool_are_read_as_numbers)
+{
+    EXPECT_EQ(std::string(dross::number('a')), "97");
+    EXPECT_EQ(std::string(dross::number(true)), "1");
+    EXPECT_EQ(std::string(dross::number(false)), "0");
+}
+
 TEST(number_test, alphabet_is_not_a_number)
 {
     const dross::number n1{ "a" };
