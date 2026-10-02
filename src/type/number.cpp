@@ -395,13 +395,13 @@ std::string normalize_to_decimal(const std::string& str)
  * Expands an exponent, drops a leading '+', leading zeros of the integer part
  * and trailing zeros of the fraction, supplies "0" for an empty integer part,
  * and writes zero without a sign. Equal values therefore have equal text.
- * Strings that are not numbers are returned as they are.
+ * Every string that is not a number becomes the one NaN.
  */
 std::string normalize_number(const std::string& str)
 {
     const std::string expanded = normalize_to_decimal(str);
     if (! is_valid_number(expanded)) {
-        return expanded;
+        return NAN_VALUE;
     }
 
     const bool negative = (expanded[0] == '-');
@@ -945,16 +945,7 @@ bool number::is_integer() const
 
 bool number::equals(const number& n) const
 {
-    // Both must be valid numbers
-    if ((! is_valid_number(_store->number)) || (! is_valid_number(n._store->number))) {
-        // If both are invalid, they're equal if strings match
-        if ((! is_valid_number(_store->number)) && (! is_valid_number(n._store->number))) {
-            return _store->number == n._store->number;
-        }
-        return false;
-    }
-
-    return (compare_numbers(_store->number, n._store->number) == 0);
+    return (compare(n) == std::strong_ordering::equal);
 }
 
 std::strong_ordering number::compare(const number& n) const noexcept
@@ -963,12 +954,11 @@ std::strong_ordering number::compare(const number& n) const noexcept
     const bool valid1 = is_valid_number(_store->number);
     const bool valid2 = is_valid_number(n._store->number);
 
+    // NaN is one value, below every number.
     if ((! valid1) || (! valid2)) {
         if ((! valid1) && (! valid2)) {
-            // Both invalid - compare as strings
-            return _store->number <=> n._store->number;
+            return std::strong_ordering::equal;
         }
-        // Valid numbers are always greater than invalid ones
         return valid1 ? std::strong_ordering::greater : std::strong_ordering::less;
     }
 
@@ -1018,7 +1008,7 @@ number& number::operator=(const std::string& s)
 
 number::operator std::string() const
 {
-    return _store->number;
+    return is_nan() ? "NaN" : _store->number;
 }
 
 number::operator int() const

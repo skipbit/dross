@@ -1,3 +1,4 @@
+#include "dross/type.h"
 #include "dross/type/number.h"
 
 #include <gtest/gtest.h>
@@ -12,6 +13,32 @@ TEST(number_test, default_constructor_is_zero)
     EXPECT_FALSE(n1.is_nan());
     EXPECT_EQ(static_cast<int>(n1), 0);
     EXPECT_EQ(std::string(n1), "0");
+}
+
+// Every NaN prints as "NaN", whatever it was made from.
+TEST(number_test, nan_prints_as_nan)
+{
+    for (const dross::number& n : { dross::number::nan(), dross::number("abc"), dross::number("0.0.1"), dross::number(1) / dross::number(0) }) {
+        EXPECT_TRUE(n.is_nan());
+        EXPECT_EQ(std::string(n), "NaN");
+        EXPECT_EQ(dross::to_string(n), "NaN");
+        std::ostringstream os;
+        os << n;
+        EXPECT_EQ(os.str(), "NaN");
+    }
+}
+
+// NaN is one value: equal to every NaN, unequal to every number, and ordered
+// below every number.
+TEST(number_test, nan_is_one_value_below_every_number)
+{
+    const dross::number nan = dross::number::nan();
+    EXPECT_EQ(nan, dross::number("abc"));
+    EXPECT_EQ(dross::number("abc"), dross::number("xyz"));
+    EXPECT_NE(nan, dross::number(0));
+    EXPECT_LT(nan, dross::number("-1e300"));
+    EXPECT_TRUE((nan <=> nan) == 0);
+    EXPECT_TRUE(nan.equals(dross::number("xyz")));
 }
 
 // The remainder is defined for integers only; a fractional operand gives NaN.
@@ -608,7 +635,7 @@ TEST(number_test, stream_output_operator)
 
     std::ostringstream oss3;
     oss3 << n3;
-    EXPECT_EQ(oss3.str(), "__invalid__");
+    EXPECT_EQ(oss3.str(), "NaN");
 }
 
 TEST(number_test, stream_output_chaining)

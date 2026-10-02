@@ -148,7 +148,7 @@ public:
      * @param other The number to compare with
      * @return true if both numbers represent the same value, false otherwise
      *
-     * NaN is not equal to any value, including itself.
+     * NaN is one value: every NaN equals every other NaN and no number.
      */
     bool equals(const number& other) const;
 
@@ -166,16 +166,17 @@ public:
     /**
      * @brief Three-way comparison with another number.
      * @param other The number to compare with
-     * @return std::strong_ordering result (less, equal, greater, or unordered)
+     * @return std::strong_ordering result (less, equal or greater)
      *
-     * Returns std::strong_ordering::unordered if either number is NaN.
+     * NaN is one value, ordered below every number, so numbers that hold NaN
+     * can be sorted and used as keys.
      */
     std::strong_ordering compare(const number& other) const noexcept;
 
     /**
      * @brief Three-way comparison with an arithmetic value.
      * @param n The arithmetic value to compare with
-     * @return std::strong_ordering result (less, equal, greater, or unordered)
+     * @return std::strong_ordering result (less, equal or greater)
      */
     template <number_type T>
     std::strong_ordering compare(const T n) const noexcept
