@@ -1,8 +1,10 @@
 #pragma once
 
+#include <charconv>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <type_traits>
 
 namespace dross {
@@ -108,12 +110,14 @@ public:
      * @param n The arithmetic value to convert
      *
      * Converts standard arithmetic types (int, float, double, etc.) to number.
-     * The conversion preserves the full precision of the input type. A
-     * character is read as its code and bool as 0 or 1.
+     * A floating-point value is written as the shortest text that converts back
+     * to the same value, so 0.1 is stored as 0.1 and 1e-7 as 0.0000001. A
+     * value whose expansion is longer than 4096 digits, or that is not finite,
+     * results in NaN. A character is read as its code and bool as 0 or 1.
      */
     template <number_type T>
     number(const T n)
-        : number(std::to_string(n))
+        : number(arithmetic_text(n))
     {
     }
 
@@ -393,6 +397,18 @@ public:
     static number nan();
 
 private:
+    template <number_type T>
+    static std::string arithmetic_text(const T n)
+    {
+        if constexpr (std::is_floating_point_v<T>) {
+            char buffer[64];
+            const auto written = std::to_chars(buffer, buffer + sizeof(buffer), n);
+            return (written.ec == std::errc{}) ? std::string(buffer, written.ptr) : std::string();
+        } else {
+            return std::to_string(n);
+        }
+    }
+
     class storage;
     std::unique_ptr<storage> _store;
 };

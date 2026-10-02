@@ -14,6 +14,23 @@ TEST(number_test, default_constructor_is_zero)
     EXPECT_EQ(std::string(n1), "0");
 }
 
+// A floating-point value is stored as the shortest text that converts back to
+// it, rather than with six fractional digits.
+TEST(number_test, floating_point_keeps_its_shortest_form)
+{
+    EXPECT_EQ(std::string(dross::number(0.1)), "0.1");
+    EXPECT_EQ(std::string(dross::number(0.1f)), "0.1");
+    EXPECT_EQ(std::string(dross::number(42.5)), "42.5");
+    EXPECT_EQ(std::string(dross::number(1e-7)), "0.0000001");
+    EXPECT_EQ(std::string(dross::number(-2.5e-10)), "-0.00000000025");
+    EXPECT_EQ(std::string(dross::number(1e20)), "100000000000000000000");
+    EXPECT_NE(dross::number(1e-7), dross::number(0));
+    EXPECT_EQ(static_cast<double>(dross::number(0.30000000000000004)), 0.30000000000000004);
+
+    EXPECT_TRUE(dross::number(std::numeric_limits<double>::infinity()).is_nan());
+    EXPECT_TRUE(dross::number(std::numeric_limits<double>::quiet_NaN()).is_nan());
+}
+
 // A character is read as its code and bool as 0 or 1, as number.h documents.
 TEST(number_test, characters_and_bool_are_read_as_numbers)
 {
