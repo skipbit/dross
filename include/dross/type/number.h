@@ -111,10 +111,12 @@ public:
      * @param n The arithmetic value to convert
      *
      * Converts standard arithmetic types (int, float, double, etc.) to number.
-     * A floating-point value is written as the shortest text that converts back
-     * to the same value, so 0.1 is stored as 0.1 and 1e-7 as 0.0000001. A
-     * value whose expansion is longer than 4096 digits, or that is not finite,
-     * results in NaN. A character is read as its code and bool as 0 or 1.
+     * A float or double is written as the shortest text that converts back to
+     * the same value, so 0.1 is stored as 0.1 and 1e-7 as 0.0000001. A long
+     * double follows the standard library's std::to_chars, which in libc++
+     * writes it at double precision. A value whose expansion is longer than
+     * 4096 digits, or that is not finite, results in NaN. A character is read
+     * as its code and bool as 0 or 1.
      */
     template <number_type T>
     number(const T n)
