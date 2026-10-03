@@ -358,8 +358,8 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
     // Support formats:
     // - 2024-01-21T15:30:00+09:00 (offset timestamp)
     // - 2024-01-21T15:30:00Z (UTC timestamp)
-    // - 2024-01-21T15:30:00 (local timestamp)
-    // - 2024-01-21 (local date)
+    // - 2024-01-21T15:30:00 (no offset, read as UTC)
+    // - 2024-01-21 (date only, read as midnight UTC)
     std::regex timestamp_regex(R"(^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})?)?$)");
 
     std::smatch match;

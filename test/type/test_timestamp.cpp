@@ -64,7 +64,7 @@ TEST(timestamp_test, time_point_constructor)
 }
 
 // Test component constructor without timezone
-TEST(timestamp_test, component_constructor_local)
+TEST(timestamp_test, component_constructor_without_timezone_is_utc)
 {
     dross::timestamp ts(2024, 12, 25, 10, 30, 45);
 
@@ -139,8 +139,8 @@ TEST(timestamp_test, string_constructor_utc_timestamp)
     EXPECT_EQ(ts.timezone().offset().count(), 0);
 }
 
-// Test string constructor - local timestamp
-TEST(timestamp_test, string_constructor_local_timestamp)
+// Test string constructor - no offset
+TEST(timestamp_test, string_constructor_without_offset_is_utc)
 {
     dross::timestamp ts("2024-01-21T15:30:00");
 

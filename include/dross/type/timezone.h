@@ -13,8 +13,8 @@ namespace dross {
  * @brief Timezone representation with offset and formatting support.
  *
  * The timezone class provides a type-safe and intuitive way to handle
- * timezone information in datetime objects. It supports UTC, local time,
- * and fixed offset timezones with clear, readable API.
+ * timezone information in datetime objects. It supports UTC and fixed
+ * offsets with clear, readable API.
  *
  * Key features:
  * - Type-safe timezone representation

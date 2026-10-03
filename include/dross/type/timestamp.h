@@ -34,8 +34,8 @@ namespace dross {
  * - Offset timestamp: 2024-01-21T15:30:00+09:00
  * - Fractional seconds: 2024-01-21T15:30:00.5+09:00 (kept to nanoseconds)
  * - UTC timestamp: 2024-01-21T15:30:00Z
- * - Local timestamp: 2024-01-21T15:30:00
- * - Local date: 2024-01-21
+ * - Timestamp without an offset, read as UTC: 2024-01-21T15:30:00
+ * - Date, read as midnight UTC: 2024-01-21
  *
  * Performance characteristics:
  * - Construction: O(1) for time_point, O(n) for string parsing
@@ -316,8 +316,8 @@ public:
      *
      * Supports various ISO 8601 formats:
      * - 2024-01-21T15:30:00+09:00 (offset timestamp)
-     * - 2024-01-21T15:30:00 (timestamp without timezone)
-     * - 2024-01-21 (date only)
+     * - 2024-01-21T15:30:00 (no offset, read as UTC)
+     * - 2024-01-21 (date only, read as midnight UTC)
      *
      * Input that from_string() rejects results in epoch time.
      */
@@ -340,7 +340,8 @@ public:
      * @param minute Minute (0-59, default 0)
      * @param second Second (0-59, default 0)
      *
-     * Components that from_components() rejects result in epoch time.
+     * The timezone is UTC. Components that from_components() rejects result
+     * in epoch time.
      */
     timestamp(int year, int month, int day, int hour = 0, int minute = 0, int second = 0);
 
