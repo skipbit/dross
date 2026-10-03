@@ -539,28 +539,18 @@ std::string timestamp::format_iso8601() const
     std::ostringstream oss;
     oss.imbue(std::locale::classic());
 
-    // Check if time is midnight (00:00:00) to decide format
-    bool is_midnight = ((_store->time_value.hour() == 0) && (_store->time_value.minute() == 0) && (_store->time_value.second() == 0));
+    oss << std::setfill('0') << std::setw(4) << _store->date_value.year() << "-" << std::setw(2) << _store->date_value.month() << "-"
+        << std::setw(2) << _store->date_value.day() << "T" << std::setw(2) << _store->time_value.hour() << ":" << std::setw(2)
+        << _store->time_value.minute() << ":" << std::setw(2) << _store->time_value.second();
 
-    if ((! is_midnight) || (_store->tz.offset().count() != 0)) {
-        // Full timestamp (if time is not midnight or timezone is specified)
-        oss << std::setfill('0') << std::setw(4) << _store->date_value.year() << "-" << std::setw(2) << _store->date_value.month() << "-"
-            << std::setw(2) << _store->date_value.day() << "T" << std::setw(2) << _store->time_value.hour() << ":" << std::setw(2)
-            << _store->time_value.minute() << ":" << std::setw(2) << _store->time_value.second();
-
-        if (auto fraction = _store->subseconds().count(); fraction != 0) {
-            std::string digits = std::to_string(fraction);
-            digits.insert(0, 9 - digits.size(), '0');
-            digits.erase(digits.find_last_not_of('0') + 1);
-            oss << "." << digits;
-        }
-
-        // Add timezone information (always present now)
-        oss << _store->tz.format();
-    } else {
-        // Date only (when time is midnight and no timezone)
-        oss << static_cast<std::string>(_store->date_value);
+    if (auto fraction = _store->subseconds().count(); fraction != 0) {
+        std::string digits = std::to_string(fraction);
+        digits.insert(0, 9 - digits.size(), '0');
+        digits.erase(digits.find_last_not_of('0') + 1);
+        oss << "." << digits;
     }
+
+    oss << _store->tz.format();
 
     return oss.str();
 }

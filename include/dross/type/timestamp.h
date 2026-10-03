@@ -26,7 +26,7 @@ namespace dross {
  * - Integration with std::chrono for duration arithmetic
  * - Value semantics (copyable and assignable)
  * - Thread-safe for read operations
- * - Support for date-only and full timestamp values
+ * - A date alone is read as midnight and written in full
  * - Factory methods for common timestamp patterns
  * - Compositional design with separate date and time components
  *
@@ -382,6 +382,9 @@ public:
     /**
      * @brief Implicit conversion to std::string in ISO 8601 format.
      * @return ISO 8601 formatted string representation
+     *
+     * Always writes the date, the time and the offset, so the string reads
+     * back as the same timestamp.
      */
     operator std::string() const;
 

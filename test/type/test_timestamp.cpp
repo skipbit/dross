@@ -539,3 +539,10 @@ TEST(timestamp_test, fractional_seconds_are_kept)
     const dross::timestamp now{ std::chrono::system_clock::now() };
     EXPECT_EQ(dross::timestamp(std::string(now)), now);
 }
+
+TEST(timestamp_test, midnight_utc_is_written_in_full)
+{
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T00:00:00Z")), "2024-01-21T00:00:00Z");
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21")), "2024-01-21T00:00:00Z");
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T23:59:59.5Z") + std::chrono::seconds(1)), "2024-01-22T00:00:00.5Z");
+}
