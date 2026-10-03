@@ -322,60 +322,8 @@ timestamp::timestamp(const std::chrono::system_clock::time_point& tp)
 }
 
 timestamp::timestamp(const std::string& iso8601_str)
-    : _store(std::make_unique<storage>())
+    : timestamp(from_string(iso8601_str).value_or(timestamp()))
 {
-    // Parse ISO 8601 format
-    // Support formats:
-    // - 2024-01-21T15:30:00+09:00 (offset timestamp)
-    // - 2024-01-21T15:30:00Z (UTC timestamp)
-    // - 2024-01-21T15:30:00 (local timestamp)
-    // - 2024-01-21 (local date)
-
-    std::regex timestamp_regex(R"(^(?:(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:(Z)|([+-])(\d{2}):(\d{2}))?)?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)$)");
-
-    std::smatch match;
-    if (std::regex_match(iso8601_str, match, timestamp_regex)) {
-        int year = 1970, month = 1, day = 1;
-        int hour = 0, minute = 0, second = 0;
-
-        if (match[1].matched) {  // Full date
-            year = std::stoi(match[1].str());
-            month = std::stoi(match[2].str());
-            day = std::stoi(match[3].str());
-
-            if (match[4].matched) {  // Time component
-                hour = std::stoi(match[4].str());
-                minute = std::stoi(match[5].str());
-                second = std::stoi(match[6].str());
-
-                // Handle timezone
-                if (match[8].matched) {  // Z (UTC)
-                    _store->tz = dross::timezone::utc();
-                } else if (match[9].matched) {  // +/- offset
-                    int tz_hour = std::stoi(match[10].str());
-                    int tz_minute = std::stoi(match[11].str());
-                    int offset = (tz_hour * 60 + tz_minute);
-                    if (match[9].str() == "-") {
-                        offset = -offset;
-                    }
-                    _store->tz = dross::timezone::offset(std::chrono::minutes{ offset });
-                } else {
-                    // No timezone specified, keep default UTC
-                }
-
-                // Store both date and time
-                _store->date_value = timestamp::date_part{ year, month, day };
-                _store->time_value = timestamp::time_part{ hour, minute, second };
-            } else {
-                // Date without time component (time defaults to 00:00:00)
-                _store->date_value = timestamp::date_part{ year, month, day };
-                // time remains default 00:00:00
-                // No timezone specified
-            }
-        }
-        // Reject time-only format
-    }
-    // If parsing fails, leave as epoch time
 }
 
 timestamp::timestamp(const char* iso8601_str)
@@ -384,19 +332,68 @@ timestamp::timestamp(const char* iso8601_str)
 }
 
 timestamp::timestamp(int year, int month, int day, int hour, int minute, int second)
-    : _store(std::make_unique<storage>())
+    : timestamp(from_components(year, month, day, hour, minute, second).value_or(timestamp()))
 {
-    _store->date_value = timestamp::date_part{ year, month, day };
-    _store->time_value = timestamp::time_part{ hour, minute, second };
-    // No timezone
 }
 
 timestamp::timestamp(int year, int month, int day, int hour, int minute, int second, const dross::timezone& tz)
-    : _store(std::make_unique<storage>())
+    : timestamp(from_components(year, month, day, hour, minute, second, tz).value_or(timestamp()))
 {
-    _store->tz = tz;
-    _store->date_value = timestamp::date_part{ year, month, day };
-    _store->time_value = timestamp::time_part{ hour, minute, second };
+}
+
+std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
+{
+    // Support formats:
+    // - 2024-01-21T15:30:00+09:00 (offset timestamp)
+    // - 2024-01-21T15:30:00Z (UTC timestamp)
+    // - 2024-01-21T15:30:00 (local timestamp)
+    // - 2024-01-21 (local date)
+    std::regex timestamp_regex(R"(^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})?)?$)");
+
+    std::smatch match;
+    if (! std::regex_match(iso8601_str, match, timestamp_regex)) {
+        return std::nullopt;
+    }
+
+    int year = std::stoi(match[1].str());
+    int month = std::stoi(match[2].str());
+    int day = std::stoi(match[3].str());
+    int hour = 0, minute = 0, second = 0;
+    if (match[4].matched) {
+        hour = std::stoi(match[4].str());
+        minute = std::stoi(match[5].str());
+        second = std::stoi(match[6].str());
+    }
+
+    auto tz = dross::timezone::utc();
+    if (match[8].matched) {
+        auto parsed = dross::timezone::from_string(match[8].str());
+        if (! parsed) {
+            return std::nullopt;
+        }
+        tz = *parsed;
+    }
+
+    return from_components(year, month, day, hour, minute, second, tz);
+}
+
+std::optional<timestamp> timestamp::from_components(int year, int month, int day, int hour, int minute, int second, const dross::timezone& tz)
+{
+    if ((year < 0) || (year > 9999) || (month < 1) || (month > 12) || (day < 1) || (day > 31)) {
+        return std::nullopt;
+    }
+    if ((hour < 0) || (hour > 23) || (minute < 0) || (minute > 59) || (second < 0) || (second > 59)) {
+        return std::nullopt;
+    }
+
+    timestamp result;
+    result._store->date_value = timestamp::date_part{ year, month, day };
+    if (! static_cast<std::chrono::year_month_day>(result._store->date_value).ok()) {
+        return std::nullopt;
+    }
+    result._store->time_value = timestamp::time_part{ hour, minute, second };
+    result._store->tz = tz;
+    return result;
 }
 
 timestamp::~timestamp() = default;

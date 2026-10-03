@@ -266,6 +266,30 @@ public:
     static timestamp now();
 
     /**
+     * @brief Parse an ISO 8601 string, reporting input it cannot represent.
+     * @param iso8601_str The ISO 8601 formatted string
+     * @return The timestamp, or nullopt if the string does not parse, names a
+     *         date or time that does not exist, or has an offset outside
+     *         -23:59..+23:59
+     *
+     * Accepts the forms listed for the string constructor.
+     */
+    static std::optional<timestamp> from_string(const std::string& iso8601_str);
+
+    /**
+     * @brief Build a timestamp from components, reporting values out of range.
+     * @param year Year (0-9999)
+     * @param month Month (1-12)
+     * @param day Day of month (1 to the last day of the month)
+     * @param hour Hour (0-23)
+     * @param minute Minute (0-59)
+     * @param second Second (0-59)
+     * @param tz Timezone information
+     * @return The timestamp, or nullopt if any component is out of range
+     */
+    static std::optional<timestamp> from_components(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, const dross::timezone& tz = dross::timezone::utc());
+
+    /**
      * @brief Default constructor creating epoch time (1970-01-01T00:00:00Z).
      */
     timestamp();
@@ -293,13 +317,15 @@ public:
      * - 2024-01-21T15:30:00 (timestamp without timezone)
      * - 2024-01-21 (date only)
      *
-     * Invalid formats will result in epoch time.
+     * Input that from_string() rejects results in epoch time.
      */
     timestamp(const std::string& iso8601_str);
 
     /**
      * @brief Construct from const char*.
      * @param iso8601_str The ISO 8601 formatted string
+     *
+     * Input that from_string() rejects results in epoch time.
      */
     timestamp(const char* iso8601_str);
 
@@ -311,6 +337,8 @@ public:
      * @param hour Hour (0-23, default 0)
      * @param minute Minute (0-59, default 0)
      * @param second Second (0-59, default 0)
+     *
+     * Components that from_components() rejects result in epoch time.
      */
     timestamp(int year, int month, int day, int hour = 0, int minute = 0, int second = 0);
 
@@ -323,6 +351,8 @@ public:
      * @param minute Minute (0-59)
      * @param second Second (0-59)
      * @param tz Timezone information
+     *
+     * Components that from_components() rejects result in epoch time.
      */
     timestamp(int year, int month, int day, int hour, int minute, int second, const timezone& tz);
 

@@ -433,3 +433,72 @@ TEST(timestamp_test, time_component_access)
     std::string time_str = time_ref;
     EXPECT_EQ(time_str, "15:30:45");
 }
+
+TEST(timestamp_test, from_string_rejects_what_it_cannot_represent)
+{
+    const char* const inputs[] = {
+        "garbage",
+        "",
+        "15:30:00",
+        "2024-13-01",
+        "2024-00-01",
+        "2024-01-32",
+        "2023-02-29",
+        "2024-04-31",
+        "2024-01-21T24:00:00Z",
+        "2024-01-21T15:60:00Z",
+        "2024-01-21T15:30:60Z",
+        "2024-13-45T99:99:99Z",
+        "2024-01-21T15:30:00+24:00",
+        "2024-01-21T15:30:00+09:60",
+    };
+    for (const char* s : inputs) {
+        EXPECT_FALSE(dross::timestamp::from_string(s).has_value()) << s;
+        EXPECT_EQ(dross::timestamp(s), dross::timestamp()) << s;
+    }
+}
+
+TEST(timestamp_test, from_string_keeps_every_offset_rfc3339_allows)
+{
+    for (const char* s : { "2024-01-21T15:30:00+14:30", "2024-01-21T15:30:00-13:00", "2024-01-21T15:30:00+23:59" }) {
+        auto ts = dross::timestamp::from_string(s);
+        ASSERT_TRUE(ts.has_value()) << s;
+        EXPECT_EQ(std::string(*ts), s);
+    }
+}
+
+TEST(timestamp_test, from_string_accepts_valid_input)
+{
+    auto ts = dross::timestamp::from_string("2024-02-29T23:59:59-05:30");
+    ASSERT_TRUE(ts.has_value());
+    EXPECT_EQ(std::string(*ts), "2024-02-29T23:59:59-05:30");
+
+    auto date = dross::timestamp::from_string("0000-01-01");
+    ASSERT_TRUE(date.has_value());
+    EXPECT_EQ(date->date().year(), 0);
+}
+
+TEST(timestamp_test, from_components_rejects_values_out_of_range)
+{
+    EXPECT_FALSE(dross::timestamp::from_components(-1, 1, 1).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(10000, 1, 1).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 0, 1).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 13, 1).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 1, 0).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2023, 2, 29).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 1, 21, 24).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 1, 21, -1).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 1, 21, 15, 60).has_value());
+    EXPECT_FALSE(dross::timestamp::from_components(2024, 1, 21, 15, 30, 60).has_value());
+
+    EXPECT_EQ(dross::timestamp(2024, 13, 45, 99, 99, 99), dross::timestamp());
+    EXPECT_EQ(dross::timestamp(2023, 2, 29, 0, 0, 0, dross::timezone::offset(9)), dross::timestamp());
+}
+
+TEST(timestamp_test, from_components_accepts_valid_values)
+{
+    auto ts = dross::timestamp::from_components(2024, 2, 29, 23, 59, 59, dross::timezone::offset(9));
+    ASSERT_TRUE(ts.has_value());
+    EXPECT_EQ(std::string(*ts), "2024-02-29T23:59:59+09:00");
+    EXPECT_EQ(dross::timestamp::from_components(2024, 1, 21)->timezone(), dross::timezone::utc());
+}
