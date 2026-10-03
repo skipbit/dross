@@ -37,19 +37,19 @@ namespace dross {
  *
  * // Get configuration directory
  * if (auto config_dir = app_dirs.config_home()) {
- *     path config_file = path{*config_dir} / "config.toml";
+ *     path config_file = path{*config_dir}.append("config.toml");
  *     // Store configuration in ~/.config/myapp/config.toml
  * }
  *
  * // Get data directory
  * if (auto data_dir = app_dirs.data_home()) {
- *     path db_file = path{*data_dir} / "database.sqlite";
+ *     path db_file = path{*data_dir}.append("database.sqlite");
  *     // Store data in ~/.local/share/myapp/database.sqlite
  * }
  *
  * // Get cache directory
  * if (auto cache_dir = app_dirs.cache_home()) {
- *     path cache_file = path{*cache_dir} / "thumbnails";
+ *     path cache_file = path{*cache_dir}.append("thumbnails");
  *     // Store cache in ~/.cache/myapp/thumbnails
  * }
  * @endcode
