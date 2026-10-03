@@ -88,8 +88,9 @@ number
    :undoc-members:
 
 The ``number`` class provides arbitrary precision numeric values. Addition,
-subtraction and multiplication are exact; a quotient that does not terminate
-keeps 34 significant digits, and the digits after them are truncated:
+subtraction and multiplication are exact, and so is a quotient that terminates
+within 4096 digits; any other quotient keeps 34 significant digits, and the
+digits after them are truncated:
 
 .. code-block:: cpp
 

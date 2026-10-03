@@ -350,6 +350,40 @@ TEST(number_test, decimal_division_precision)
     EXPECT_EQ(std::string(result), "7.229299363057324840764331210191082");
 }
 
+// A quotient that terminates is exact, whatever its length up to 4096 digits.
+TEST(number_test, division_that_terminates_is_exact)
+{
+    const std::string long_fraction = "0.12345678901234567890123456789012345678";
+    EXPECT_EQ(std::string(dross::number(long_fraction) / dross::number(1)), long_fraction);
+    EXPECT_EQ(std::string(dross::number("12345678901234567890123456789012345") / dross::number(2)),
+              "6172839450617283945061728394506172.5");
+    EXPECT_EQ(std::string(dross::number(1) / dross::number(1024)), "0.0009765625");
+    EXPECT_EQ(std::string(dross::number(3) / dross::number("0.0003")), "10000");
+
+    // 1 / 2^256 has 256 fraction digits, within the limit, so all of them.
+    dross::number power(2);
+    for (int i = 0; i < 8; ++i) {
+        power = power * power;
+    }
+    const std::string exact = std::string(dross::number(1) / power);
+    EXPECT_EQ(exact.length(), 258u);  // "0." and 256 digits
+    EXPECT_EQ(exact.back(), '5');
+}
+
+// A terminating quotient longer than 4096 digits is kept to 34 significant
+// digits, as one that does not terminate is.
+TEST(number_test, division_beyond_the_digit_limit_keeps_34_significant_digits)
+{
+    // Exactly, (10^4090 + 1) / 1024 has 4087 integer digits and 10 fraction
+    // digits. The integer part already holds more than 34 significant digits,
+    // so no fraction is kept, and the integer part stays exact.
+    const dross::number dividend("1" + std::string(4089, '0') + "1");
+    const std::string text = std::string(dividend / dross::number(1024));
+    EXPECT_EQ(text.find('.'), std::string::npos);
+    EXPECT_EQ(text.length(), 4087u);
+    EXPECT_EQ(dross::number(text) * dross::number(1024) + dross::number(dividend % dross::number(1024)), dividend);
+}
+
 // A quotient that does not terminate keeps 34 significant digits, truncated.
 // Zeros before the first significant digit do not count, and the integer part
 // is always exact.

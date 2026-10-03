@@ -548,13 +548,41 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
     return canonical_text(result);
 }
 
-// Significant digits a quotient keeps, as IEEE decimal128 does; the digits
+// Divides canonical integer digits by 2 or 5, which must divide them exactly.
+std::string divide_exactly(const std::string& digits, int divisor)
+{
+    std::string result;
+    int carry = 0;
+    for (char c : digits) {
+        const int current = (carry * 10) + (c - '0');
+        result += static_cast<char>('0' + (current / divisor));
+        carry = current % divisor;
+    }
+    result.erase(0, std::min(result.find_first_not_of('0'), result.length() - 1));
+    return result;
+}
+
+// Whether integer digits are a multiple of a canonical integer divisor.
+bool is_multiple_of(const std::string& digits, const std::string& divisor)
+{
+    std::string remainder = "0";
+    for (char digit : digits) {
+        remainder = (remainder == "0") ? std::string(1, digit) : (remainder + digit);
+        while (compare_numbers(remainder, divisor) >= 0) {
+            remainder = subtract_positive_numbers(remainder, divisor);
+        }
+    }
+    return remainder == "0";
+}
+
+// Significant digits a quotient that does not terminate, or whose exact form
+// exceeds max_expanded_digits, keeps, as IEEE decimal128 does; the digits
 // after them are truncated.
 constexpr std::size_t quotient_significant_digits = 34;
 
-// Divide two positive number strings (supports decimals). The integer part of
-// the quotient is exact; the fraction stops once the quotient holds
-// significant_digits significant digits, so 0 gives integer division.
+// Divide two positive number strings (supports decimals). A quotient that
+// terminates within max_expanded_digits digits is exact. Any other keeps
+// significant_digits significant digits, and 0 gives integer division.
 std::string divide_positive_numbers(const std::string& a, const std::string& b, std::size_t significant_digits = quotient_significant_digits)
 {
     if (b == "0") {
@@ -615,11 +643,32 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
         quotient = quotient.substr(1);
     }
 
-    // Fraction digits until the quotient holds enough significant digits.
+    // The quotient terminates when the divisor without its factors 2 and 5
+    // divides the dividend, and then needs as many fraction digits as the
+    // larger of their exponents. An exact quotient longer than
+    // max_expanded_digits is treated as one that does not terminate.
+    bool terminates = (remainder == "0");
+    std::size_t fraction_digits = 0;
+    if ((! terminates) && (significant_digits > 0)) {
+        std::string rest = divisor;
+        std::size_t twos = 0;
+        std::size_t fives = 0;
+        while (((rest.back() - '0') % 2) == 0) {
+            rest = divide_exactly(rest, 2);
+            ++twos;
+        }
+        while ((rest.back() == '0') || (rest.back() == '5')) {
+            rest = divide_exactly(rest, 5);
+            ++fives;
+        }
+        fraction_digits = std::max(twos, fives);
+        terminates = ((quotient.length() + fraction_digits) <= max_expanded_digits) && is_multiple_of(dividend, rest);
+    }
+
     // Zeros before the first non-zero digit are not significant.
     std::string decimal_part = "";
     std::size_t significant = (quotient == "0") ? 0 : quotient.length();
-    while ((remainder != "0") && (significant < significant_digits)) {
+    while ((remainder != "0") && (terminates ? (decimal_part.length() < fraction_digits) : (significant < significant_digits))) {
         remainder = remainder + "0";  // Add a zero for next decimal place
 
         int count = 0;
@@ -635,6 +684,14 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
         if ((significant > 0) || (count != 0)) {
             significant++;
         }
+    }
+
+    // A quotient that does not terminate keeps significant_digits digits.
+    if (remainder != "0") {
+        const std::size_t integer_significant = (quotient == "0") ? 0 : quotient.length();
+        const std::size_t leading_zeros = (quotient == "0") ? std::min(decimal_part.find_first_not_of('0'), decimal_part.length()) : 0;
+        const std::size_t keep = (integer_significant >= significant_digits) ? 0 : (leading_zeros + significant_digits - integer_significant);
+        decimal_part.resize(std::min(keep, decimal_part.length()));
     }
 
     // Combine integer and decimal parts
