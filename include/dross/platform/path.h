@@ -77,6 +77,9 @@ public:
      * actual error. See the std::filesystem::path overload for the
      * failure and safety notes.
      *
+     * A bare string literal also matches the std::filesystem::path overload
+     * and is ambiguous, so name std::string.
+     *
      * @code
      * if (auto result = path::mkdir(std::string{"/tmp/myapp/data"})) {
      *     std::cout << "Ready: " << result->string() << std::endl;
@@ -156,6 +159,10 @@ public:
      *
      * Creates a path object from the given string. The string is interpreted
      * using the native path format for the current platform.
+     *
+     * A bare string literal also matches the std::filesystem::path
+     * constructor and is ambiguous, so name std::string:
+     * path{std::string{"/tmp"}}.
      */
     path(const std::string& path_str);
 

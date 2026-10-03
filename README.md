@@ -83,7 +83,7 @@ cmake --build build
 sudo cmake --install build
 
 # Run tests (optional)
-cd build && ctest -V
+ctest --test-dir build -V
 ```
 
 #### Library Types
@@ -156,9 +156,9 @@ int main()
     config["name"] = string("Dross");
     config["version"] = string("0.1.0");
     config["features"] = array{string{"fast"}, string{"safe"}};
-    config["release_date"] = timestamp{2024, 1, 21, 15, 30, 0, dross::timezone::utc()};
+    config["release_date"] = timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()};
 
-    value data = config;
+    value root = config;
 
     // Platform utilities. The XDG accessors are instance methods, and the
     // application name is already part of what they return.

@@ -61,10 +61,10 @@ The ``path`` class provides filesystem path operations:
         // Create the directory, including any missing parents. mkdir() is
         // idempotent: it succeeds whether it creates the directory or
         // finds it already there.
-        if (auto created = dross::path::mkdir(config_path.string())) {
-            std::cout << "Created: " << created->string() << std::endl;
+        if (auto result = dross::path::mkdir(config_path.string())) {
+            std::cout << "Ready: " << result->string() << std::endl;
         } else {
-            std::cerr << "mkdir: " << created.error().what() << std::endl;
+            std::cerr << "mkdir: " << result.error().what() << std::endl;
         }
     }
 
@@ -234,8 +234,8 @@ Creating application directories:
     // here is a real problem.
     if (auto config_home = app.config_home()) {
         const dross::path config_dir{*config_home};
-        if (auto created = dross::path::mkdir(*config_home); !created) {
-            std::cerr << "mkdir: " << created.error().what() << std::endl;
+        if (auto result = dross::path::mkdir(*config_home); !result) {
+            std::cerr << "mkdir: " << result.error().what() << std::endl;
         }
         dross::path config_file = config_dir.append("settings.toml");
         std::cout << "Config file: " << config_file.string() << std::endl;
