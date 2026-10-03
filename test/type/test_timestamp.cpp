@@ -523,3 +523,19 @@ TEST(timestamp_test, arithmetic_holds_far_from_1970)
     EXPECT_EQ(std::string(dross::timestamp("1600-03-01T00:30:00Z") - std::chrono::hours(1)), "1600-02-29T23:30:00Z");
     EXPECT_EQ(dross::timestamp("9999-12-31T23:59:59Z").format("%Y-%m-%d %H:%M:%S"), "9999-12-31 23:59:59");
 }
+
+TEST(timestamp_test, fractional_seconds_are_kept)
+{
+    const dross::timestamp with("2024-01-21T15:30:00.75Z");
+    EXPECT_EQ(std::string(with), "2024-01-21T15:30:00.75Z");
+    EXPECT_NE(with, dross::timestamp("2024-01-21T15:30:00Z"));
+    EXPECT_EQ(with - dross::timestamp("2024-01-21T15:30:00Z"), std::chrono::milliseconds(750));
+
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T15:30:00.000000001+09:00")), "2024-01-21T15:30:00.000000001+09:00");
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T15:30:00.1234567899Z")), "2024-01-21T15:30:00.123456789Z");
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T15:30:00.000Z")), "2024-01-21T15:30:00Z");
+    EXPECT_EQ(std::string(dross::timestamp("2024-01-21T23:59:59.5Z") + std::chrono::seconds(2)), "2024-01-22T00:00:01.5Z");
+
+    const dross::timestamp now{ std::chrono::system_clock::now() };
+    EXPECT_EQ(dross::timestamp(std::string(now)), now);
+}

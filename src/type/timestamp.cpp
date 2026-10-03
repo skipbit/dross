@@ -386,7 +386,15 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
         tz = *parsed;
     }
 
-    return from_components(year, month, day, hour, minute, second, tz);
+    auto result = from_components(year, month, day, hour, minute, second, tz);
+    if (result && match[7].matched) {
+        // Digits below a nanosecond are dropped.
+        std::string digits = match[7].str().substr(0, 9);
+        digits.resize(9, '0');
+        auto time_of_day = result->_store->time_value.to_hh_mm_ss().to_duration() + std::chrono::nanoseconds(std::stoll(digits));
+        result->_store->time_value = timestamp::time_part{ std::chrono::hh_mm_ss{ time_of_day } };
+    }
+    return result;
 }
 
 std::optional<timestamp> timestamp::from_components(int year, int month, int day, int hour, int minute, int second, const dross::timezone& tz)
@@ -539,6 +547,13 @@ std::string timestamp::format_iso8601() const
         oss << std::setfill('0') << std::setw(4) << _store->date_value.year() << "-" << std::setw(2) << _store->date_value.month() << "-"
             << std::setw(2) << _store->date_value.day() << "T" << std::setw(2) << _store->time_value.hour() << ":" << std::setw(2)
             << _store->time_value.minute() << ":" << std::setw(2) << _store->time_value.second();
+
+        if (auto fraction = _store->subseconds().count(); fraction != 0) {
+            std::string digits = std::to_string(fraction);
+            digits.insert(0, 9 - digits.size(), '0');
+            digits.erase(digits.find_last_not_of('0') + 1);
+            oss << "." << digits;
+        }
 
         // Add timezone information (always present now)
         oss << _store->tz.format();

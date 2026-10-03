@@ -32,6 +32,7 @@ namespace dross {
  *
  * Supported timestamp formats (ISO 8601 standard):
  * - Offset timestamp: 2024-01-21T15:30:00+09:00
+ * - Fractional seconds: 2024-01-21T15:30:00.5+09:00 (kept to nanoseconds)
  * - UTC timestamp: 2024-01-21T15:30:00Z
  * - Local timestamp: 2024-01-21T15:30:00
  * - Local date: 2024-01-21
@@ -272,7 +273,8 @@ public:
      *         date or time that does not exist, or has an offset outside
      *         -23:59..+23:59
      *
-     * Accepts the forms listed for the string constructor.
+     * Accepts the forms listed for the string constructor. Fractional
+     * seconds are kept to the nanosecond; further digits are dropped.
      */
     static std::optional<timestamp> from_string(const std::string& iso8601_str);
 
