@@ -26,15 +26,16 @@ namespace dross {
  * - Integration with std::chrono for duration arithmetic
  * - Value semantics (copyable and assignable)
  * - Thread-safe for read operations
- * - Support for date-only and full timestamp values
+ * - A date alone is read as midnight and written in full
  * - Factory methods for common timestamp patterns
  * - Compositional design with separate date and time components
  *
  * Supported timestamp formats (ISO 8601 standard):
  * - Offset timestamp: 2024-01-21T15:30:00+09:00
+ * - Fractional seconds: 2024-01-21T15:30:00.5+09:00 (kept to nanoseconds)
  * - UTC timestamp: 2024-01-21T15:30:00Z
- * - Local timestamp: 2024-01-21T15:30:00
- * - Local date: 2024-01-21
+ * - Timestamp without an offset, read as UTC: 2024-01-21T15:30:00
+ * - Date, read as midnight UTC: 2024-01-21
  *
  * Performance characteristics:
  * - Construction: O(1) for time_point, O(n) for string parsing
@@ -103,7 +104,6 @@ public:
         date_part();
         date_part(int year, int month, int day);
         date_part(const std::chrono::year_month_day& ymd);
-        date_part(const std::string& iso8601_date);
 
     public:
         /**
@@ -183,7 +183,6 @@ public:
         // Private constructors - only timestamp can create time objects
         time_part();
         time_part(int hour, int minute, int second);
-        time_part(const std::string& iso8601_time);
         template <typename Duration>
         time_part(const std::chrono::hh_mm_ss<Duration>& hms);
 
@@ -266,6 +265,31 @@ public:
     static timestamp now();
 
     /**
+     * @brief Parse an ISO 8601 string, reporting input it cannot represent.
+     * @param iso8601_str The ISO 8601 formatted string
+     * @return The timestamp, or nullopt if the string does not parse, names a
+     *         date or time that does not exist, or has an offset outside
+     *         -23:59..+23:59
+     *
+     * Accepts the forms listed for the string constructor. Fractional
+     * seconds are kept to the nanosecond; further digits are dropped.
+     */
+    static std::optional<timestamp> from_string(const std::string& iso8601_str);
+
+    /**
+     * @brief Build a timestamp from components, reporting values out of range.
+     * @param year Year (0-9999)
+     * @param month Month (1-12)
+     * @param day Day of month (1 to the last day of the month)
+     * @param hour Hour (0-23)
+     * @param minute Minute (0-59)
+     * @param second Second (0-59)
+     * @param tz Timezone information
+     * @return The timestamp, or nullopt if any component is out of range
+     */
+    static std::optional<timestamp> from_components(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, const dross::timezone& tz = dross::timezone::utc());
+
+    /**
      * @brief Default constructor creating epoch time (1970-01-01T00:00:00Z).
      */
     timestamp();
@@ -290,39 +314,46 @@ public:
      *
      * Supports various ISO 8601 formats:
      * - 2024-01-21T15:30:00+09:00 (offset timestamp)
-     * - 2024-01-21T15:30:00 (timestamp without timezone)
-     * - 2024-01-21 (date only)
+     * - 2024-01-21T15:30:00 (no offset, read as UTC)
+     * - 2024-01-21 (date only, read as midnight UTC)
      *
-     * Invalid formats will result in epoch time.
+     * Input that from_string() rejects results in epoch time.
      */
     timestamp(const std::string& iso8601_str);
 
     /**
      * @brief Construct from const char*.
      * @param iso8601_str The ISO 8601 formatted string
+     *
+     * Input that from_string() rejects results in epoch time.
      */
     timestamp(const char* iso8601_str);
 
     /**
      * @brief Construct from individual date and time components.
-     * @param year Year (e.g., 2024)
+     * @param year Year (0-9999)
      * @param month Month (1-12)
-     * @param day Day of month (1-31)
+     * @param day Day of month (1 to the last day of the month)
      * @param hour Hour (0-23, default 0)
      * @param minute Minute (0-59, default 0)
      * @param second Second (0-59, default 0)
+     *
+     * The timezone is UTC. Components that from_components() rejects result
+     * in epoch time.
      */
     timestamp(int year, int month, int day, int hour = 0, int minute = 0, int second = 0);
 
     /**
      * @brief Construct from individual date and time components with timezone.
-     * @param year Year (e.g., 2024)
+     * @param year Year (0-9999)
      * @param month Month (1-12)
-     * @param day Day of month (1-31)
+     * @param day Day of month (1 to the last day of the month)
      * @param hour Hour (0-23)
      * @param minute Minute (0-59)
      * @param second Second (0-59)
      * @param tz Timezone information
+     *
+     * Components that from_components() rejects result in epoch time.
      */
     timestamp(int year, int month, int day, int hour, int minute, int second, const timezone& tz);
 
@@ -339,12 +370,22 @@ public:
     /**
      * @brief Implicit conversion to std::chrono::system_clock::time_point.
      * @return The time point representation (always in UTC)
+     *
+     * Comparison and duration arithmetic work for every year from 0 to 9999,
+     * but this conversion is limited to the range of system_clock, which is
+     * about 292 years either side of 1970 where its duration counts
+     * nanoseconds.
      */
     operator std::chrono::system_clock::time_point() const;
 
     /**
      * @brief Implicit conversion to std::string in ISO 8601 format.
      * @return ISO 8601 formatted string representation
+     *
+     * Always writes the date, the time and the offset, so the string reads
+     * back as the same timestamp for any year from 0 to 9999. Arithmetic can
+     * move a timestamp outside those years; it still compares and computes
+     * correctly, but its string does not read back.
      */
     operator std::string() const;
 
@@ -408,6 +449,9 @@ public:
      * @brief Calculate the duration between two timestamps.
      * @param other The other timestamp
      * @return Duration from other to this timestamp
+     *
+     * Limited to what system_clock::duration can hold, which is about 292
+     * years where it counts nanoseconds.
      */
     std::chrono::system_clock::duration operator-(const timestamp& other) const;
 

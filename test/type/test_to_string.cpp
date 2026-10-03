@@ -53,7 +53,7 @@ TEST(to_string_test, timestamp_conversion)
 
     EXPECT_EQ(to_string(ts1), "2024-01-21T15:30:45+09:00");
     EXPECT_EQ(to_string(ts2), "2024-12-31T23:59:59Z");
-    EXPECT_EQ(to_string(ts3), "1970-01-01");  // Default constructor creates epoch timestamp
+    EXPECT_EQ(to_string(ts3), "1970-01-01T00:00:00Z");  // Default constructor creates epoch timestamp
 }
 
 TEST(to_string_test, consistency_with_operator)

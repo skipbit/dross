@@ -204,7 +204,6 @@ std::string to_string(const timestamp& ts);
  *
  * Provides STL-style explicit string conversion for consistency with
  * other types. Returns the timezone in ISO 8601 format (e.g., "+09:00", "Z").
- * Local timezone returns empty string.
  *
  * @code
  * auto jst = timezone::offset(9);

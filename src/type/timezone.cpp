@@ -10,6 +10,18 @@
 
 namespace dross {
 
+namespace {
+
+// RFC 3339 allows offsets up to 23:59 either side of UTC.
+constexpr std::chrono::minutes max_offset = std::chrono::hours(23) + std::chrono::minutes(59);
+
+bool in_range(std::chrono::minutes offset)
+{
+    return (-max_offset <= offset) && (offset <= max_offset);
+}
+
+}  // namespace
+
 class timezone::storage {
 public:
     int offset_minutes;
@@ -37,30 +49,18 @@ timezone timezone::utc()
 
 timezone timezone::offset(int hours, int minutes)
 {
-    // Validate input ranges
-    if ((hours < -12) || (hours > 14)) {
-        return timezone::utc();  // Invalid hours, fallback to UTC
-    }
     if ((minutes < 0) || (minutes > 59)) {
         return timezone::utc();  // Invalid minutes, fallback to UTC
     }
 
-    // Calculate total offset in minutes
-    int total_minutes = (std::abs(hours) * 60 + minutes);
-    if (hours < 0) {
-        total_minutes = -total_minutes;
-    }
-
-    return timezone(std::chrono::minutes(total_minutes));
+    // The minutes extend the hours away from UTC.
+    std::chrono::minutes total = std::chrono::abs(std::chrono::hours(hours)) + std::chrono::minutes(minutes);
+    return offset((hours < 0) ? -total : total);
 }
 
 timezone timezone::offset(std::chrono::minutes offset_duration)
 {
-    // Validate range: -12 hours to +14 hours
-    const auto min_offset = std::chrono::minutes(-12 * 60);
-    const auto max_offset = std::chrono::minutes(14 * 60);
-
-    if (offset_duration < min_offset || offset_duration > max_offset) {
+    if (! in_range(offset_duration)) {
         return timezone::utc();  // Invalid offset, fallback to UTC
     }
 
@@ -75,7 +75,7 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
     }
 
     // Parse offset format: [+-]HH:MM or [+-]HHMM
-    std::regex offset_regex(R"(^([+-])(\d{1,2}):?(\d{2})$)");
+    static const std::regex offset_regex(R"(^([+-])(\d{1,2}):?(\d{2})$)");
     std::smatch match;
 
     if (std::regex_match(tz_str, match, offset_regex)) {
@@ -83,8 +83,7 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
         int hours = std::stoi(match[2].str());
         int minutes = std::stoi(match[3].str());
 
-        // Validate ranges
-        if ((hours > 14) || (minutes > 59)) {
+        if (minutes > 59) {
             return std::nullopt;  // Invalid format
         }
 
@@ -94,6 +93,9 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
             total_minutes = -total_minutes;
         }
 
+        if (! in_range(std::chrono::minutes(total_minutes))) {
+            return std::nullopt;
+        }
         return timezone(std::chrono::minutes(total_minutes));
     }
 

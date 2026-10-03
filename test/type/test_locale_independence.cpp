@@ -80,7 +80,7 @@ TEST(locale_independence_test, timestamp_is_written_without_the_global_locale)
     const dross::timestamp tokyo{ 2024, 1, 21, 15, 30, 0, dross::timezone::offset(9) };
 
     EXPECT_EQ(std::string(afternoon), "2024-01-21T15:30:00Z");
-    EXPECT_EQ(std::string(midnight), "2024-01-21");
+    EXPECT_EQ(std::string(midnight), "2024-01-21T00:00:00Z");
     EXPECT_EQ(std::string(afternoon.date()), "2024-01-21");
     EXPECT_EQ(std::string(afternoon.time()), "15:30:00");
     EXPECT_EQ(std::string(tokyo), "2024-01-21T15:30:00+09:00");
