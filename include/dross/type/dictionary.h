@@ -198,10 +198,22 @@ public:
     using iterator_category = std::forward_iterator_tag;
 
     /**
+     * @brief Default constructor. Default-constructed iterators compare equal.
+     */
+    iterator();
+
+    /**
      * @brief Copy constructor.
      * @param other The iterator to copy from
      */
     iterator(const iterator& other);
+
+    /**
+     * @brief Copy assignment operator.
+     * @param other The iterator to copy from
+     * @return Reference to this iterator
+     */
+    iterator& operator=(const iterator& other);
 
     /**
      * @brief Destructor.
@@ -213,6 +225,12 @@ public:
      * @return Reference to this iterator after incrementing
      */
     iterator& operator++();
+
+    /**
+     * @brief Post-increment operator.
+     * @return Copy of this iterator before incrementing
+     */
+    iterator operator++(int);
 
     /**
      * @brief Dereference operator.
@@ -258,10 +276,22 @@ public:
     using iterator_category = std::forward_iterator_tag;
 
     /**
+     * @brief Default constructor. Default-constructed iterators compare equal.
+     */
+    const_iterator();
+
+    /**
      * @brief Copy constructor.
      * @param other The const_iterator to copy from
      */
     const_iterator(const const_iterator& other);
+
+    /**
+     * @brief Copy assignment operator.
+     * @param other The const_iterator to copy from
+     * @return Reference to this iterator
+     */
+    const_iterator& operator=(const const_iterator& other);
 
     /**
      * @brief Destructor.
@@ -273,6 +303,12 @@ public:
      * @return Reference to this iterator after incrementing
      */
     const_iterator& operator++();
+
+    /**
+     * @brief Post-increment operator.
+     * @return Copy of this iterator before incrementing
+     */
+    const_iterator operator++(int);
 
     /**
      * @brief Dereference operator.

@@ -56,7 +56,12 @@ size_t array::index_of(const value& v) const
     return (i != _store->contents.end()) ? std::distance(_store->contents.begin(), i) : -1;
 }
 
-value& array::value_at(const size_t i) const
+value& array::value_at(const size_t i)
+{
+    return _store->contents.at(i);
+}
+
+const value& array::value_at(const size_t i) const
 {
     return _store->contents.at(i);
 }
@@ -131,7 +136,7 @@ array& array::operator=(const array& a)
     return *this;
 }
 
-value& array::operator[](const size_t i) const&
+const value& array::operator[](const size_t i) const&
 {
     return value_at(i);
 }
@@ -156,9 +161,20 @@ array::iterator::iterator(const std::any& a)
 {
 }
 
+array::iterator::iterator()
+    : _impl(std::make_unique<impl>(std::vector<value>::iterator{}))
+{
+}
+
 array::iterator::iterator(const iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
 {
+}
+
+array::iterator& array::iterator::operator=(const iterator& i)
+{
+    *_impl = *(i._impl);
+    return *this;
 }
 
 array::iterator::~iterator() = default;
@@ -169,7 +185,14 @@ array::iterator& array::iterator::operator++()
     return *this;
 }
 
-value& array::iterator::operator*()
+array::iterator array::iterator::operator++(int)
+{
+    iterator previous(*this);
+    ++*this;
+    return previous;
+}
+
+value& array::iterator::operator*() const
 {
     return *(_impl->cursor);
 }
@@ -199,9 +222,20 @@ array::const_iterator::const_iterator(const std::any& a)
 {
 }
 
+array::const_iterator::const_iterator()
+    : _impl(std::make_unique<impl>(std::vector<value>::const_iterator{}))
+{
+}
+
 array::const_iterator::const_iterator(const const_iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
 {
+}
+
+array::const_iterator& array::const_iterator::operator=(const const_iterator& i)
+{
+    *_impl = *(i._impl);
+    return *this;
 }
 
 array::const_iterator::~const_iterator() = default;
@@ -210,6 +244,13 @@ array::const_iterator& array::const_iterator::operator++()
 {
     ++(_impl->cursor);
     return *this;
+}
+
+array::const_iterator array::const_iterator::operator++(int)
+{
+    const_iterator previous(*this);
+    ++*this;
+    return previous;
 }
 
 const value& array::const_iterator::operator*() const

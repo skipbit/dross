@@ -115,7 +115,15 @@ public:
      * @return Reference to the value at the given index
      * @throws std::out_of_range if index is out of bounds
      */
-    value& value_at(const size_t index) const;
+    value& value_at(const size_t index);
+
+    /**
+     * @brief Get a const reference to the value at the specified index.
+     * @param index The index to access
+     * @return Const reference to the value at the given index
+     * @throws std::out_of_range if index is out of bounds
+     */
+    const value& value_at(const size_t index) const;
 
     /**
      * @brief Append a value to the end of the array.
@@ -206,10 +214,10 @@ public:
     /**
      * @brief Access element by index (const version).
      * @param index The index to access
-     * @return Reference to the value at the given index
+     * @return Const reference to the value at the given index
      * @throws std::out_of_range if index is out of bounds
      */
-    value& operator[](const size_t index) const&;
+    const value& operator[](const size_t index) const&;
 
     /**
      * @brief Access element by index (non-const version).
@@ -239,10 +247,22 @@ public:
     using iterator_category = std::forward_iterator_tag;
 
     /**
+     * @brief Default constructor. Default-constructed iterators compare equal.
+     */
+    iterator();
+
+    /**
      * @brief Copy constructor.
      * @param other The iterator to copy from
      */
     iterator(const iterator& other);
+
+    /**
+     * @brief Copy assignment operator.
+     * @param other The iterator to copy from
+     * @return Reference to this iterator
+     */
+    iterator& operator=(const iterator& other);
 
     /**
      * @brief Destructor.
@@ -256,10 +276,16 @@ public:
     iterator& operator++();
 
     /**
+     * @brief Post-increment operator.
+     * @return Copy of this iterator before incrementing
+     */
+    iterator operator++(int);
+
+    /**
      * @brief Dereference operator.
      * @return Reference to the current element
      */
-    value& operator*();
+    value& operator*() const;
 
     /**
      * @brief Equality comparison operator.
@@ -299,10 +325,22 @@ public:
     using iterator_category = std::forward_iterator_tag;
 
     /**
+     * @brief Default constructor. Default-constructed iterators compare equal.
+     */
+    const_iterator();
+
+    /**
      * @brief Copy constructor.
      * @param other The const_iterator to copy from
      */
     const_iterator(const const_iterator& other);
+
+    /**
+     * @brief Copy assignment operator.
+     * @param other The const_iterator to copy from
+     * @return Reference to this iterator
+     */
+    const_iterator& operator=(const const_iterator& other);
 
     /**
      * @brief Destructor.
@@ -314,6 +352,12 @@ public:
      * @return Reference to this iterator after incrementing
      */
     const_iterator& operator++();
+
+    /**
+     * @brief Post-increment operator.
+     * @return Copy of this iterator before incrementing
+     */
+    const_iterator operator++(int);
 
     /**
      * @brief Dereference operator.

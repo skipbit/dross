@@ -6,6 +6,11 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <iterator>
+#include <ranges>
+#include <string>
+
 // =============================================================================
 // Basic Construction and Properties
 // =============================================================================
@@ -354,6 +359,47 @@ TEST(dictionary_test, const_range_based_for_loop)
         (void)pair;  // Suppress unused variable warning
     }
     EXPECT_EQ(count, 2);
+}
+
+static_assert(std::forward_iterator<dross::dictionary::iterator>);
+static_assert(std::forward_iterator<dross::dictionary::const_iterator>);
+static_assert(std::ranges::forward_range<dross::dictionary>);
+static_assert(std::ranges::forward_range<const dross::dictionary>);
+
+TEST(dictionary_test, iterators_assign_and_post_increment)
+{
+    dross::dictionary d;
+    d["a"] = dross::value(1);
+    d["b"] = dross::value(2);
+
+    auto it = d.begin();
+    auto previous = it++;
+    EXPECT_EQ((*previous).first, "a");
+    EXPECT_EQ((*it).first, "b");
+    it = d.end();
+    EXPECT_EQ(it, d.end());
+    EXPECT_EQ(dross::dictionary::iterator(), dross::dictionary::iterator());
+
+    const dross::dictionary& c = d;
+    auto cit = c.begin();
+    auto cprevious = cit++;
+    EXPECT_EQ((*cprevious).first, "a");
+    cit = c.end();
+    EXPECT_EQ(cit, c.end());
+    EXPECT_EQ(dross::dictionary::const_iterator(), dross::dictionary::const_iterator());
+}
+
+TEST(dictionary_test, ranges_algorithms_accept_a_dictionary)
+{
+    dross::dictionary d;
+    d["a"] = dross::value(1);
+    d["b"] = dross::value(2);
+
+    const auto found = std::ranges::find_if(d, [](const auto& entry) {
+        return entry.first == "b";
+    });
+    ASSERT_NE(found, d.end());
+    EXPECT_EQ((*found).second, dross::value(2));
 }
 
 // =============================================================================
