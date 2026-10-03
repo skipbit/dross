@@ -118,10 +118,11 @@ public:
     data(const uint8_t* buffer, size_t length);
 
     /**
-     * @brief Construct from string (UTF-8 encoded).
+     * @brief Construct from string.
      * @param str String to convert to byte data
      *
-     * Stores the UTF-8 byte representation of the string.
+     * Stores the bytes of the string unchanged; nothing is encoded or
+     * validated.
      */
     data(const std::string& str);
 
