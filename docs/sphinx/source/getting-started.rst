@@ -164,7 +164,7 @@ Here's a simple example using the dross type system:
         // Create a dictionary with mixed types
         dictionary config;
         config["name"] = string("My Application");
-        config["version"] = number("1.0");
+        config["version"] = string("1.0");
         config["debug"] = boolean(true);
 
         // Create an array of features

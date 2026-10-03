@@ -14,15 +14,14 @@
  * // Use any dross functionality
  * number big_num{"12345678901234567890"};
  * string text{"Hello, world!"};
- * array data = {value{1}, value{"two"}, value{3.0}};
+ * array list = {value{1}, value{"two"}, value{3.0}};
  * @endcode
  *
  * Modules included:
- * - Type System: boolean, number, string, array, dictionary, value
+ * - Type System: boolean, number, string, timestamp, timezone, array, dictionary, data, value, error
  * - Platform Layer: environment, path, xdg utilities
  * - Format Layer: TOML parsing with type-safe dictionary API (dross::toml)
  * - Thread Layer: per-thread run loops that other threads can hand work to, and thread, a handle to an OS thread
- * - Configuration: Structured data format support
  *
  * @author Yuma Endo
  * @date 2025

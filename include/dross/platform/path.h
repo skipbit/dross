@@ -41,15 +41,15 @@ namespace dross {
  *
  * @code
  * // Basic path operations
- * path config_path{"~/.config/myapp"};
+ * path config_path{std::string{"~/.config/myapp"}};
  * if (auto expanded = config_path.expand()) {
  *     std::cout << "Expanded path: " << expanded->string() << std::endl;
  * }
  *
  * // Directory creation
- * path new_dir{"/tmp/myapp/data"};
+ * path new_dir{std::string{"/tmp/myapp/data"}};
  * if (auto result = path::mkdir(new_dir.string())) {
- *     std::cout << "Directory created: " << result->string() << std::endl;
+ *     std::cout << "Directory ready: " << result->string() << std::endl;
  * } else {
  *     std::cerr << "Failed to create directory: " << result.error().what() << std::endl;
  * }
@@ -68,7 +68,7 @@ public:
     /**
      * @brief Create a directory from a string path.
      * @param dir_path The directory path to create as a string
-     * @return Expected containing the created path on success, or filesystem_error on failure
+     * @return Expected containing the directory path on success, or filesystem_error on failure
      *
      * Creates the specified directory and any necessary parent directories.
      * Succeeds both when it creates the directory and when dir_path is
@@ -77,9 +77,12 @@ public:
      * actual error. See the std::filesystem::path overload for the
      * failure and safety notes.
      *
+     * A bare string literal also matches the std::filesystem::path overload
+     * and is ambiguous, so name std::string.
+     *
      * @code
-     * if (auto result = path::mkdir("/tmp/myapp/data")) {
-     *     std::cout << "Created: " << result->string() << std::endl;
+     * if (auto result = path::mkdir(std::string{"/tmp/myapp/data"})) {
+     *     std::cout << "Ready: " << result->string() << std::endl;
      * } else {
      *     std::cerr << "Error: " << result.error().what() << std::endl;
      * }
@@ -90,7 +93,7 @@ public:
     /**
      * @brief Create a directory from a filesystem::path.
      * @param dir_path The directory path to create as a filesystem::path
-     * @return Expected containing the created path on success, or filesystem_error on failure
+     * @return Expected containing the directory path on success, or filesystem_error on failure
      *
      * Creates the specified directory and any necessary parent
      * directories. Succeeds both when it creates the directory and
@@ -156,6 +159,10 @@ public:
      *
      * Creates a path object from the given string. The string is interpreted
      * using the native path format for the current platform.
+     *
+     * A bare string literal also matches the std::filesystem::path
+     * constructor and is ambiguous, so name std::string:
+     * path{std::string{"/tmp"}}.
      */
     path(const std::string& path_str);
 
@@ -196,7 +203,7 @@ public:
      * platform-appropriate path separator. Does not modify this path object.
      *
      * @code
-     * path base{"/usr/local"};
+     * path base{std::string{"/usr/local"}};
      * path full = base.append("bin").append("myapp");
      * // Result: "/usr/local/bin/myapp"
      * @endcode
@@ -243,7 +250,7 @@ public:
      * "." and ".." components. The resulting path is in canonical form.
      *
      * @code
-     * path relative{"../config/../data/file.txt"};
+     * path relative{std::string{"../config/../data/file.txt"}};
      * if (auto resolved = relative.resolve()) {
      *     // resolved contains the canonical absolute path
      * }

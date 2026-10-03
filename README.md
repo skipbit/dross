@@ -61,12 +61,6 @@
 #### Package Managers
 
 ```bash
-# vcpkg (coming soon)
-vcpkg install dross
-
-# Conan (coming soon)
-conan install dross/0.0.1@
-
 # CPM (CMake Package Manager)
 CPMAddPackage("gh:skipbit/dross#main")
 ```
@@ -89,7 +83,7 @@ cmake --build build
 sudo cmake --install build
 
 # Run tests (optional)
-cd build && ctest -V
+ctest --test-dir build -V
 ```
 
 #### Library Types
@@ -150,25 +144,28 @@ g++ -std=c++23 -I/usr/local/include main.cpp -L/usr/local/lib -ldross
 #include <dross/dross.h>
 using namespace dross;
 
-// Arbitrary precision arithmetic
-number big_num{"99999999999999999999999999999999999999"};
-number result = big_num * big_num;  // No overflow!
+int main()
+{
+    // Arbitrary precision arithmetic
+    number big_num{"99999999999999999999999999999999999999"};
+    number result = big_num * big_num;  // No overflow!
 
-// Dynamic typing. dictionary has no initializer-list constructor, so
-// entries are assigned after construction.
-dictionary config;
-config["name"] = string("Dross");
-config["version"] = number("0.0.1");
-config["features"] = array{string{"fast"}, string{"safe"}};
-config["release_date"] = timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()};
+    // Dynamic typing. dictionary has no initializer-list constructor, so
+    // entries are assigned after construction.
+    dictionary config;
+    config["name"] = string("Dross");
+    config["version"] = string("0.1.0");
+    config["features"] = array{string{"fast"}, string{"safe"}};
+    config["release_date"] = timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()};
 
-value data = config;
+    value root = config;
 
-// Platform utilities. The XDG accessors are instance methods, and the
-// application name is already part of what they return.
-xdg app{"myapp"};
-if (auto config_dir = app.config_home()) {
-    path app_config = path{*config_dir}.append("config.toml");
+    // Platform utilities. The XDG accessors are instance methods, and the
+    // application name is already part of what they return.
+    xdg app{"myapp"};
+    if (auto config_dir = app.config_home()) {
+        path app_config = path{*config_dir}.append("config.toml");
+    }
 }
 ```
 
@@ -182,7 +179,12 @@ if (auto config_dir = app.config_home()) {
 - **`timezone`** - Type-safe timezone representation with ISO 8601 support
 - **`array`** - Dynamic arrays with value semantics
 - **`dictionary`** - Key-value containers
+- **`data`** - Byte buffer, converted to and from strings byte for byte
 - **`value`** - Polymorphic type holding any supported type
+- **`error`** - A `std::error_code` with its category, returned through `std::expected`
+
+### Format Layer
+- **`toml`** - TOML parsing into a `dictionary` and serialization back to TOML
 
 ### Platform Layer
 - **`environment`** - Environment variable access
@@ -201,11 +203,10 @@ if (auto config_dir = app.config_home()) {
 
 **[📘 API Reference & User Guide](https://skipbit.github.io/dross/)**
 
-Complete documentation including:
-- 🔍 **API Reference** - Detailed documentation of all classes and functions
-- 📚 **User Guide** - Tutorials and best practices
-- 💡 **Examples** - Practical code examples and use cases
-- 🏗️ **Architecture** - Design patterns and implementation details
+The documentation includes:
+- 🔍 **API Reference** - The type system and the platform layer
+- 📚 **User Guide** - An overview of the library's conventions
+- 💡 **Examples** - Code examples across the modules
 
 ## 🏗️ Architecture
 
@@ -222,26 +223,27 @@ Dross follows modern C++ best practices:
 Comprehensive test suite using GoogleTest:
 
 ```bash
-# Run all tests
-ctest
+# Run all tests, in the build directory configured above
+ctest --test-dir build
 
 # Run specific test patterns
-ctest -R number
-./build/debug/test/dross_test --gtest_filter="number_test.*"
+ctest --test-dir build -R number
+./build/test/dross_test --gtest_filter="number_test.*"
 
 # Verbose output
-ctest -V
+ctest --test-dir build -V
 ```
 
 ## 🗺️ Roadmap
 
 ### Current Modules
-- ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, value)
+- ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, data, value, error)
 - ✅ Platform utilities (environment, path, xdg)
 - ✅ Thread utilities (runloop, thread, timer, operation_queue, operation_result)
+- ✅ Format (TOML)
 
 ### Planned Features
-- **Configuration** - TOML, JSON, XML, YAML parsers
+- **Configuration** - JSON, XML, YAML parsers
 - **Concurrency** - Coroutines
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
