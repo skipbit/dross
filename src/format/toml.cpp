@@ -60,8 +60,7 @@ private:
     {
         std::ostringstream oss;
         oss << "TOML parse error at line " << _line << ", column " << _column << ": " << message;
-        // Use the error constructor that takes error code and category
-        return error{ static_cast<int>(std::errc::invalid_argument), std::generic_category() };
+        return error{ std::errc::invalid_argument };
     }
 
     char current_char() const
@@ -571,7 +570,7 @@ public:
 
             return data{ _output };
         } catch (const std::exception& e) {
-            return std::unexpected(error{ static_cast<int>(std::errc::operation_not_supported), std::generic_category() });
+            return std::unexpected(error{ std::errc::operation_not_supported });
         }
     }
 
