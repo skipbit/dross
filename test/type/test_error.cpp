@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <compare>
 #include <ios>
 #include <sstream>
@@ -179,4 +180,32 @@ TEST(error_test, constructed_from_an_error_code_enum_declared_outside_std)
     EXPECT_EQ(&e.category(), &library_errors::failure_category());
     EXPECT_EQ(e.message(), "second failure");
     EXPECT_EQ(e.domain(), "library_errors");
+}
+
+TEST(error_test, constructed_from_std_errc)
+{
+    const dross::error e = std::errc::invalid_argument;
+
+    EXPECT_TRUE(static_cast<bool>(e));
+    EXPECT_EQ(e.code(), EINVAL);
+    EXPECT_EQ(e.category(), std::generic_category());
+    EXPECT_EQ(e, dross::error(EINVAL, std::generic_category()));
+}
+
+TEST(error_test, equality_operator_compares_against_std_errc)
+{
+    const dross::error e(std::errc::invalid_argument);
+
+    EXPECT_TRUE(e == std::errc::invalid_argument);
+    EXPECT_FALSE(e != std::errc::invalid_argument);
+    EXPECT_TRUE(e != std::errc::io_error);
+    EXPECT_FALSE(e == std::errc::io_error);
+}
+
+TEST(error_test, a_system_code_equals_the_std_errc_it_maps_to)
+{
+    const dross::error e(ENOENT, std::system_category());
+
+    EXPECT_TRUE(e == std::errc::no_such_file_or_directory);
+    EXPECT_FALSE(e == std::errc::permission_denied);
 }
