@@ -81,8 +81,8 @@ TEST(timezone_test, offset_factory_chrono_invalid)
     using namespace std::chrono;
 
     // Test out-of-range values
-    dross::timezone invalid1 = dross::timezone::offset(minutes(15 * 60));   // +15:00
-    dross::timezone invalid2 = dross::timezone::offset(minutes(-13 * 60));  // -13:00
+    dross::timezone invalid1 = dross::timezone::offset(minutes(24 * 60));   // +24:00
+    dross::timezone invalid2 = dross::timezone::offset(minutes(-24 * 60));  // -24:00
 
     // Should fallback to UTC
     EXPECT_TRUE(invalid1.is_utc());
@@ -91,12 +91,28 @@ TEST(timezone_test, offset_factory_chrono_invalid)
 
 TEST(timezone_test, offset_factory_invalid_hours)
 {
-    dross::timezone invalid1 = dross::timezone::offset(15);   // Too large
-    dross::timezone invalid2 = dross::timezone::offset(-13);  // Too small
+    dross::timezone invalid1 = dross::timezone::offset(24);   // Too large
+    dross::timezone invalid2 = dross::timezone::offset(-24);  // Too small
 
     // Should fallback to UTC
     EXPECT_TRUE(invalid1.is_utc());
     EXPECT_TRUE(invalid2.is_utc());
+}
+
+TEST(timezone_test, offset_factories_agree_on_the_range)
+{
+    using namespace std::chrono;
+
+    // RFC 3339 allows any offset up to 23:59 either side of UTC.
+    EXPECT_EQ(dross::timezone::offset(-23, 59).offset(), -minutes(23 * 60 + 59));
+    EXPECT_EQ(dross::timezone::offset(minutes(23 * 60 + 59)).offset(), minutes(23 * 60 + 59));
+    EXPECT_EQ(dross::timezone::from_string("-23:59")->offset(), -minutes(23 * 60 + 59));
+    EXPECT_EQ(dross::timezone::offset(15).offset(), hours(15));
+    EXPECT_EQ(dross::timezone::from_string("-13:00")->offset(), -hours(13));
+
+    EXPECT_TRUE(dross::timezone::offset(-24, 0).is_utc());
+    EXPECT_TRUE(dross::timezone::offset(minutes(24 * 60)).is_utc());
+    EXPECT_FALSE(dross::timezone::from_string("+24:00").has_value());
 }
 
 TEST(timezone_test, offset_factory_invalid_minutes)

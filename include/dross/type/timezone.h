@@ -48,9 +48,9 @@ public:
 
     /**
      * @brief Create timezone with fixed offset.
-     * @param hours Offset hours from UTC (-12 to +14)
+     * @param hours Offset hours from UTC (-23 to +23)
      * @param minutes Offset minutes from UTC (0 to 59)
-     * @return timezone with specified offset
+     * @return timezone with specified offset, or UTC if either is out of range
      *
      * Positive values are east of UTC, negative values are west of UTC.
      * The minutes parameter is always added to the absolute value of hours.
@@ -60,7 +60,7 @@ public:
     /**
      * @brief Create timezone with chrono-based offset.
      * @param offset_duration Offset from UTC as chrono::minutes
-     * @return timezone with specified offset
+     * @return timezone with specified offset, or UTC if it is outside -23:59..+23:59
      *
      * Positive values are east of UTC, negative values are west of UTC.
      * @code
@@ -74,6 +74,7 @@ public:
      * @brief Parse timezone from ISO 8601 offset string.
      * @param tz_str Timezone string (e.g., "+09:00", "-05:30", "Z")
      * @return optional timezone parsed from string, nullopt if parsing fails
+     *         or the offset is outside -23:59..+23:59
      *
      * @code
      * auto tz = timezone::from_string("+09:00");
