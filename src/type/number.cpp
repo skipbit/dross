@@ -7,6 +7,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 
 namespace dross {
 
@@ -108,126 +109,30 @@ struct parsed_number {
     }
 };
 
-std::string normalize_to_decimal(const std::string& str);
-
 /**
- * @brief Unified number parsing function.
+ * @brief Split canonical number text into its components.
  *
- * This function provides a single point for parsing number strings,
- * replacing the multiple specialized parsing functions. It handles
- * all number formats including scientific notation and provides
- * comprehensive error checking.
- *
- * @param str The string to parse
- * @return parsed_number struct containing all components
+ * @param str Canonical text or NAN_VALUE
+ * @return parsed_number, invalid for NAN_VALUE
  */
 parsed_number parse_number_unified(const std::string& str)
 {
     parsed_number result;
 
-    if (str.empty()) {
+    if (str == NAN_VALUE) {
         result.is_valid = false;
         return result;
     }
 
-    // We'll validate the format as part of the parsing process
+    const size_t start = (str[0] == '-') ? 1 : 0;
+    result.is_negative = (start == 1);
 
-    // An exponent is expanded the way construction expands it.
-    const std::string work_str = normalize_to_decimal(str);
-    if (work_str == NAN_VALUE) {
-        result.is_valid = false;
-        return result;
-    }
-
-    size_t start = 0;
-
-    // Handle sign
-    if (work_str[0] == '-') {
-        result.is_negative = true;
-        start = 1;
-    } else if (work_str[0] == '+') {
-        start = 1;
-    }
-
-    if (start >= work_str.length()) {
-        result.is_valid = false;
-        return result;
-    }
-
-    // Find decimal point
-    size_t decimal_pos = work_str.find('.', start);
-    bool has_decimal = (decimal_pos != std::string::npos);
-
-    // Extract integer part
-    std::string integer_str;
-    if (has_decimal) {
-        integer_str = work_str.substr(start, decimal_pos - start);
+    const size_t dot = str.find('.', start);
+    if (dot == std::string::npos) {
+        result.integer_part = str.substr(start);
     } else {
-        integer_str = work_str.substr(start);
-    }
-
-    // Validate integer part
-    if (integer_str.empty()) {
-        // Handle cases like ".5" or "-.5"
-        if (has_decimal && ((decimal_pos + 1) < work_str.length())) {
-            integer_str = "0";
-        } else {
-            result.is_valid = false;
-            return result;
-        }
-    }
-
-    // Check if integer part contains only digits
-    for (char c : integer_str) {
-        if (! std::isdigit(c)) {
-            result.is_valid = false;
-            return result;
-        }
-    }
-
-    result.integer_part = integer_str;
-
-    // Extract fractional part if present
-    if (has_decimal) {
-        if ((decimal_pos + 1) >= work_str.length()) {
-            // Handle trailing decimal point like "5."
-            result.fractional_part = std::nullopt;
-        } else {
-            std::string frac_str = work_str.substr(decimal_pos + 1);
-
-            // Validate fractional part
-            for (char c : frac_str) {
-                if (! std::isdigit(c)) {
-                    result.is_valid = false;
-                    return result;
-                }
-            }
-
-            // Remove trailing zeros from fractional part
-            while ((! frac_str.empty()) && (frac_str.back() == '0')) {
-                frac_str.pop_back();
-            }
-
-            if (! frac_str.empty()) {
-                result.fractional_part = frac_str;
-            }
-        }
-    }
-
-    // Remove leading zeros from integer part (but keep at least one digit)
-    while ((result.integer_part.length() > 1) && (result.integer_part[0] == '0')) {
-        result.integer_part = result.integer_part.substr(1);
-    }
-
-    // Handle special case of zero
-    if (result.integer_part == "0" && (! result.fractional_part.has_value())) {
-        result.is_negative = false;  // Zero is always positive
-    }
-
-    // Also handle case where fractional part is present but all zeros
-    if (result.integer_part == "0" && result.fractional_part.has_value() && result.fractional_part->empty()) {
-        result.is_negative = false;             // Zero is always positive
-        result.fractional_part = std::nullopt;  // Remove empty fractional part
+        result.integer_part = str.substr(start, dot - start);
+        result.fractional_part = str.substr(dot + 1);
     }
 
     return result;
@@ -319,18 +224,16 @@ bool is_valid_number(const std::string& str)
 constexpr std::size_t max_expanded_digits = 4096;
 
 /**
- * @brief Normalize a number string to decimal representation.
+ * @brief Expand the exponent of a valid number string into decimal notation.
  *
- * Expands an exponent by moving the decimal point in the text, so every digit
- * that was written survives. An expansion longer than max_expanded_digits
- * gives NaN. Other strings are returned as they are.
+ * Moves the decimal point in the text, so every digit that was written
+ * survives. A string without an exponent is returned as it is. An expansion
+ * longer than max_expanded_digits gives NAN_VALUE, the only failure signal.
+ *
+ * @param str A string for which is_valid_number is true
  */
-std::string normalize_to_decimal(const std::string& str)
+std::string expand_exponent(const std::string& str)
 {
-    if (! is_valid_number(str)) {
-        return str;
-    }
-
     const size_t exp_pos = str.find_first_of("eE");
     if (exp_pos == std::string::npos) {
         return str;
@@ -395,12 +298,17 @@ std::string normalize_to_decimal(const std::string& str)
  * Expands an exponent, drops a leading '+', leading zeros of the integer part
  * and trailing zeros of the fraction, supplies "0" for an empty integer part,
  * and writes zero without a sign. Equal values therefore have equal text.
- * Every string that is not a number becomes the one NaN.
+ * Every string that is not a number, or whose exponent expands beyond
+ * max_expanded_digits, becomes the one NaN.
  */
-std::string normalize_number(const std::string& str)
+std::string canonical_text(const std::string& str)
 {
-    const std::string expanded = normalize_to_decimal(str);
-    if (! is_valid_number(expanded)) {
+    if (! is_valid_number(str)) {
+        return NAN_VALUE;
+    }
+
+    const std::string expanded = expand_exponent(str);
+    if (expanded == NAN_VALUE) {
         return NAN_VALUE;
     }
 
@@ -423,62 +331,42 @@ std::string normalize_number(const std::string& str)
     return (negative && (result != "0")) ? ("-" + result) : result;
 }
 
-// Compare two number strings (handles both integers and decimals)
-int compare_numbers(const std::string& a, const std::string& b)
+// Compare two number strings (handles both integers and decimals).
+// Both arguments are canonical, non-NaN text. Allocation-free.
+int compare_numbers(std::string_view a, std::string_view b)
 {
-    std::string na = normalize_number(a);
-    std::string nb = normalize_number(b);
+    const bool a_neg = (a[0] == '-');
+    const bool b_neg = (b[0] == '-');
 
-    if (na == nb) {
-        return 0;
-    }
-
-    bool a_neg = (na[0] == '-');
-    bool b_neg = (nb[0] == '-');
-
-    // Different signs
     if (a_neg != b_neg) {
         return a_neg ? -1 : 1;
     }
 
-    // Both positive or both negative
-    std::string a_abs = a_neg ? na.substr(1) : na;
-    std::string b_abs = b_neg ? nb.substr(1) : nb;
-
-    // Split into integer and fractional parts
-    size_t a_dot = a_abs.find('.');
-    size_t b_dot = b_abs.find('.');
-
-    std::string a_int = (a_dot == std::string::npos) ? a_abs : a_abs.substr(0, a_dot);
-    std::string b_int = (b_dot == std::string::npos) ? b_abs : b_abs.substr(0, b_dot);
-
-    std::string a_frac = (a_dot == std::string::npos) ? "" : a_abs.substr(a_dot + 1);
-    std::string b_frac = (b_dot == std::string::npos) ? "" : b_abs.substr(b_dot + 1);
-
-    // Compare integer parts (inline comparison)
-    int int_cmp = (a_int.length() != b_int.length()) ? (a_int.length() < b_int.length() ? -1 : 1) : a_int.compare(b_int);
-    if (int_cmp != 0) {
-        return a_neg ? -int_cmp : int_cmp;
+    if (a_neg) {
+        a.remove_prefix(1);
+        b.remove_prefix(1);
     }
 
-    // Integer parts are equal, compare fractional parts
-    // Pad with zeros to make same length
-    size_t max_frac = std::max(a_frac.length(), b_frac.length());
-    a_frac.resize(max_frac, '0');
-    b_frac.resize(max_frac, '0');
+    const size_t a_dot = std::min(a.find('.'), a.size());
+    const size_t b_dot = std::min(b.find('.'), b.size());
+    const std::string_view a_int = a.substr(0, a_dot);
+    const std::string_view b_int = b.substr(0, b_dot);
 
-    int frac_cmp = a_frac.compare(b_frac);
-    if (frac_cmp < 0) {
-        return a_neg ? 1 : -1;
-    }
-    if (frac_cmp > 0) {
-        return a_neg ? -1 : 1;
+    // More integer digits means a larger magnitude; the fraction has no trailing zeros,
+    // so a fraction that is a prefix of the other is the smaller one.
+    int cmp = 0;
+    if (a_int.size() != b_int.size()) {
+        cmp = (a_int.size() < b_int.size()) ? -1 : 1;
+    } else if (int c = a_int.compare(b_int); c != 0) {
+        cmp = (c < 0) ? -1 : 1;
+    } else if (int c = a.substr(a_dot).compare(b.substr(b_dot)); c != 0) {
+        cmp = (c < 0) ? -1 : 1;
     }
 
-    return 0;
+    return a_neg ? -cmp : cmp;
 }
 
-// Parse number into integer and fractional parts
+// Parse canonical number text into integer and fractional parts
 struct NumberParts {
     bool negative;
     std::string integer;
@@ -486,9 +374,8 @@ struct NumberParts {
 
     NumberParts(const std::string& num)
     {
-        std::string normalized = normalize_number(num);
-        negative = (normalized[0] == '-');
-        std::string abs_num = negative ? normalized.substr(1) : normalized;
+        negative = (num[0] == '-');
+        std::string abs_num = negative ? num.substr(1) : num;
 
         size_t dot_pos = abs_num.find('.');
         if (dot_pos == std::string::npos) {
@@ -556,7 +443,7 @@ std::string add_positive_numbers(const std::string& a, const std::string& b)
         }
     }
 
-    return normalize_number(result);
+    return canonical_text(result);
 }
 
 // Subtract two positive number strings (a >= b, supports decimals)
@@ -618,7 +505,7 @@ std::string subtract_positive_numbers(const std::string& a, const std::string& b
         }
     }
 
-    return normalize_number(result);
+    return canonical_text(result);
 }
 
 // Multiply two positive number strings (supports decimals)
@@ -672,7 +559,7 @@ std::string multiply_positive_numbers(const std::string& a, const std::string& b
         }
     }
 
-    return normalize_number(result);
+    return canonical_text(result);
 }
 
 // Significant digits a quotient keeps, as IEEE decimal128 does; the digits
@@ -776,7 +663,7 @@ std::string divide_positive_numbers(const std::string& a, const std::string& b, 
         }
     }
 
-    return normalize_number(result);
+    return canonical_text(result);
 }
 
 // Modulo operation for positive numbers (a % b = a - floor(a/b) * b)
@@ -801,18 +688,15 @@ std::string modulo_positive_numbers(const std::string& a, const std::string& b)
     // Calculate a - (b * quotient)
     std::string result = subtract_positive_numbers(a, product);
 
-    return normalize_number(result);
+    return canonical_text(result);
 }
 
-// Perform string-based arithmetic
-std::string perform_arithmetic(const std::string& a, const std::string& b, char operation)
+// Perform string-based arithmetic on stored text (canonical or NAN_VALUE)
+std::string perform_arithmetic(const std::string& na, const std::string& nb, char operation)
 {
-    if ((! is_valid_number(a)) || (! is_valid_number(b))) {
+    if ((na == NAN_VALUE) || (nb == NAN_VALUE)) {
         return NAN_VALUE;
     }
-
-    std::string na = normalize_number(a);
-    std::string nb = normalize_number(b);
 
     bool a_neg = (na[0] == '-');
     bool b_neg = (nb[0] == '-');
@@ -900,21 +784,16 @@ std::string perform_arithmetic(const std::string& a, const std::string& b, char 
 
 class number::storage {
 public:
+    // Holds only the canonical form or NAN_VALUE.
     std::string number{ "0" };
 
     storage() = default;
     storage(const char* s)
-        : number(normalize_number(s))
+        : number(canonical_text(s))
     {
     }
     storage(const std::string& s)
-        : number(normalize_number(s))
-    {
-    }
-
-    template <number_type T>
-    storage(const T& n)
-        : number(normalize_number(std::to_string(n)))
+        : number(canonical_text(s))
     {
     }
 };
@@ -948,8 +827,7 @@ bool number::is_nan() const
 
 bool number::is_integer() const
 {
-    auto parsed = parse_number_unified(_store->number);
-    return parsed.is_integer();
+    return (! is_nan()) && (_store->number.find('.') == std::string::npos);
 }
 
 bool number::equals(const number& n) const
@@ -1005,13 +883,13 @@ number& number::operator=(const number& n)
 
 number& number::operator=(const char* s)
 {
-    _store->number = normalize_number(s);
+    _store->number = canonical_text(s);
     return *this;
 }
 
 number& number::operator=(const std::string& s)
 {
-    _store->number = normalize_number(s);
+    _store->number = canonical_text(s);
     return *this;
 }
 
@@ -1028,18 +906,6 @@ number::operator int() const
 
 number::operator double() const
 {
-    // If the stored string is in scientific notation, try direct conversion first
-    if (_store->number.find_first_of("eE") != std::string::npos) {
-        try {
-            return std::stod(_store->number);
-        } catch (const std::out_of_range&) {
-            // Value is outside double range - return 0
-            return 0.0;
-        } catch (const std::exception&) {
-            // Fall through to parsed approach
-        }
-    }
-
     auto parsed = parse_number_unified(_store->number);
     auto val = parsed.to_double();
     return val ? *val : 0.0;
