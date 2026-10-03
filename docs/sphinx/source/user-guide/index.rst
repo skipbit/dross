@@ -102,11 +102,11 @@ Type System
     root["users"] = array{alice, bob};
     root["count"] = number(2);
 
-    value data = root;
+    value doc = root;
 
     // Safe access: ask contains() before reading, is<T>() before casting
-    if (data.is<dictionary>()) {
-        dictionary top = data.as<dictionary>();
+    if (doc.is<dictionary>()) {
+        dictionary top = doc.as<dictionary>();
         if (top.contains("users") && top["users"].is<array>()) {
             for (const auto& user : top["users"].as<array>()) {
                 // Process each user

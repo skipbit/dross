@@ -156,13 +156,13 @@ Running Tests
 .. code-block:: bash
 
     # Run all tests
-    cd build/debug && ctest
+    ctest --test-dir build/debug
 
     # Run specific test
-    ./build/debug/dross_test --gtest_filter="ValueTest.*"
+    ./build/debug/test/dross_test --gtest_filter="value_test.*"
 
-    # Run with detailed output
-    ./build/debug/dross_test --gtest_list_tests
+    # List the tests
+    ./build/debug/test/dross_test --gtest_list_tests
 
 Test Coverage
 ~~~~~~~~~~~~~

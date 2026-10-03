@@ -14,7 +14,7 @@
  * // Use any dross functionality
  * number big_num{"12345678901234567890"};
  * string text{"Hello, world!"};
- * array data = {value{1}, value{"two"}, value{3.0}};
+ * array list = {value{1}, value{"two"}, value{3.0}};
  * @endcode
  *
  * Modules included:
