@@ -1,8 +1,10 @@
 #pragma once
 
+#include <charconv>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <type_traits>
 
 namespace dross {
@@ -25,7 +27,8 @@ concept number_type = std::is_arithmetic_v<T>;
  * cryptographic operations, and scientific computing where precision is critical.
  *
  * Key features:
- * - Arbitrary precision arithmetic (no overflow)
+ * - Arbitrary precision arithmetic (no overflow); a quotient that does not
+ *   terminate within 4096 digits keeps 34 significant digits
  * - String-based storage for maximum precision
  * - Support for integers and floating-point numbers
  * - Full set of arithmetic and comparison operators
@@ -86,7 +89,9 @@ public:
      * @param str Null-terminated string representation of the number
      *
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
-     * Invalid strings result in NaN.
+     * An exponent is expanded in the text, keeping every digit: "1e3" is stored
+     * as 1000. An expansion longer than 4096 digits, and longer than the
+     * number as written, results in NaN, as do invalid strings.
      */
     number(const char* str);
 
@@ -95,7 +100,9 @@ public:
      * @param str String representation of the number
      *
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
-     * Invalid strings result in NaN.
+     * An exponent is expanded in the text, keeping every digit: "1e3" is stored
+     * as 1000. An expansion longer than 4096 digits, and longer than the
+     * number as written, results in NaN, as do invalid strings.
      */
     number(const std::string& str);
 
@@ -104,12 +111,16 @@ public:
      * @param n The arithmetic value to convert
      *
      * Converts standard arithmetic types (int, float, double, etc.) to number.
-     * The conversion preserves the full precision of the input type. A
-     * character is read as its code and bool as 0 or 1.
+     * A float or double is written as the shortest text that converts back to
+     * the same value, so 0.1 is stored as 0.1 and 1e-7 as 0.0000001. A long
+     * double follows the standard library's std::to_chars, which in libc++
+     * writes it at double precision. A value whose expansion is longer than
+     * 4096 digits, or that is not finite, results in NaN. A character is read
+     * as its code and bool as 0 or 1.
      */
     template <number_type T>
     number(const T n)
-        : number(std::to_string(n))
+        : number(arithmetic_text(n))
     {
     }
 
@@ -140,7 +151,7 @@ public:
      * @param other The number to compare with
      * @return true if both numbers represent the same value, false otherwise
      *
-     * NaN is not equal to any value, including itself.
+     * NaN is one value: every NaN equals every other NaN and no number.
      */
     bool equals(const number& other) const;
 
@@ -158,16 +169,17 @@ public:
     /**
      * @brief Three-way comparison with another number.
      * @param other The number to compare with
-     * @return std::strong_ordering result (less, equal, greater, or unordered)
+     * @return std::strong_ordering result (less, equal or greater)
      *
-     * Returns std::strong_ordering::unordered if either number is NaN.
+     * NaN is one value, ordered below every number, so numbers that hold NaN
+     * can be sorted and used as keys.
      */
     std::strong_ordering compare(const number& other) const noexcept;
 
     /**
      * @brief Three-way comparison with an arithmetic value.
      * @param n The arithmetic value to compare with
-     * @return std::strong_ordering result (less, equal, greater, or unordered)
+     * @return std::strong_ordering result (less, equal or greater)
      */
     template <number_type T>
     std::strong_ordering compare(const T n) const noexcept
@@ -331,6 +343,11 @@ public:
      * @return Result of division
      *
      * Returns NaN if either operand is NaN or if dividing by zero.
+     * A quotient that terminates within 4096 digits is exact: 1 / 1024 is
+     * 0.0009765625. Any other keeps 34 significant digits, as IEEE decimal128
+     * does, and the digits after them are truncated:
+     * 1 / 3 is 0.3333333333333333333333333333333333. The integer part is
+     * always exact.
      */
     number operator/(const number& other) const;
 
@@ -389,6 +406,18 @@ public:
     static number nan();
 
 private:
+    template <number_type T>
+    static std::string arithmetic_text(const T n)
+    {
+        if constexpr (std::is_floating_point_v<T>) {
+            char buffer[64];
+            const auto written = std::to_chars(buffer, buffer + sizeof(buffer), n);
+            return (written.ec == std::errc{}) ? std::string(buffer, written.ptr) : std::string();
+        } else {
+            return std::to_string(n);
+        }
+    }
+
     class storage;
     std::unique_ptr<storage> _store;
 };

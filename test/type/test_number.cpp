@@ -1,3 +1,4 @@
+#include "dross/type.h"
 #include "dross/type/number.h"
 
 #include <gtest/gtest.h>
@@ -12,6 +13,59 @@ TEST(number_test, default_constructor_is_zero)
     EXPECT_FALSE(n1.is_nan());
     EXPECT_EQ(static_cast<int>(n1), 0);
     EXPECT_EQ(std::string(n1), "0");
+}
+
+// Every NaN prints as "NaN", whatever it was made from.
+TEST(number_test, nan_prints_as_nan)
+{
+    for (const dross::number& n : { dross::number::nan(), dross::number("abc"), dross::number("0.0.1"), dross::number(1) / dross::number(0) }) {
+        EXPECT_TRUE(n.is_nan());
+        EXPECT_EQ(std::string(n), "NaN");
+        EXPECT_EQ(dross::to_string(n), "NaN");
+        std::ostringstream os;
+        os << n;
+        EXPECT_EQ(os.str(), "NaN");
+    }
+}
+
+// NaN is one value: equal to every NaN, unequal to every number, and ordered
+// below every number.
+TEST(number_test, nan_is_one_value_below_every_number)
+{
+    const dross::number nan = dross::number::nan();
+    EXPECT_EQ(nan, dross::number("abc"));
+    EXPECT_EQ(dross::number("abc"), dross::number("xyz"));
+    EXPECT_NE(nan, dross::number(0));
+    EXPECT_LT(nan, dross::number("-1e300"));
+    EXPECT_TRUE((nan <=> nan) == 0);
+    EXPECT_TRUE(nan.equals(dross::number("xyz")));
+}
+
+// The remainder is defined for integers only; a fractional operand gives NaN.
+TEST(number_test, modulo_of_a_fraction_is_nan)
+{
+    EXPECT_TRUE((dross::number(7) % dross::number("2.5")).is_nan());
+    EXPECT_TRUE((dross::number("7.5") % dross::number(2)).is_nan());
+    EXPECT_EQ(std::string(dross::number(7) % dross::number(2)), "1");
+    EXPECT_EQ(std::string(dross::number("7.0") % dross::number("2.00")), "1");
+    EXPECT_EQ(std::string(dross::number(-7) % dross::number(2)), "-1");
+}
+
+// A floating-point value is stored as the shortest text that converts back to
+// it, rather than with six fractional digits.
+TEST(number_test, floating_point_keeps_its_shortest_form)
+{
+    EXPECT_EQ(std::string(dross::number(0.1)), "0.1");
+    EXPECT_EQ(std::string(dross::number(0.1f)), "0.1");
+    EXPECT_EQ(std::string(dross::number(42.5)), "42.5");
+    EXPECT_EQ(std::string(dross::number(1e-7)), "0.0000001");
+    EXPECT_EQ(std::string(dross::number(-2.5e-10)), "-0.00000000025");
+    EXPECT_EQ(std::string(dross::number(1e20)), "100000000000000000000");
+    EXPECT_NE(dross::number(1e-7), dross::number(0));
+    EXPECT_EQ(static_cast<double>(dross::number(0.30000000000000004)), 0.30000000000000004);
+
+    EXPECT_TRUE(dross::number(std::numeric_limits<double>::infinity()).is_nan());
+    EXPECT_TRUE(dross::number(std::numeric_limits<double>::quiet_NaN()).is_nan());
 }
 
 // A character is read as its code and bool as 0 or 1, as number.h documents.
@@ -293,7 +347,60 @@ TEST(number_test, decimal_division_precision)
     const dross::number n2{ "3.14" };
     const dross::number result = n1 / n2;
 
-    EXPECT_EQ(std::string(result), "7.229299363");
+    EXPECT_EQ(std::string(result), "7.229299363057324840764331210191082");
+}
+
+// A quotient that terminates is exact, whatever its length up to 4096 digits.
+TEST(number_test, division_that_terminates_is_exact)
+{
+    const std::string long_fraction = "0.12345678901234567890123456789012345678";
+    EXPECT_EQ(std::string(dross::number(long_fraction) / dross::number(1)), long_fraction);
+    EXPECT_EQ(std::string(dross::number("12345678901234567890123456789012345") / dross::number(2)),
+              "6172839450617283945061728394506172.5");
+    EXPECT_EQ(std::string(dross::number(1) / dross::number(1024)), "0.0009765625");
+    EXPECT_EQ(std::string(dross::number(3) / dross::number("0.0003")), "10000");
+
+    // 1 / 2^256 has 256 fraction digits, within the limit, so all of them.
+    dross::number power(2);
+    for (int i = 0; i < 8; ++i) {
+        power = power * power;
+    }
+    const std::string exact = std::string(dross::number(1) / power);
+    EXPECT_EQ(exact.length(), 258u);  // "0." and 256 digits
+    EXPECT_EQ(exact.back(), '5');
+}
+
+// A terminating quotient longer than 4096 digits is kept to 34 significant
+// digits, as one that does not terminate is.
+TEST(number_test, division_beyond_the_digit_limit_keeps_34_significant_digits)
+{
+    // Exactly, (10^4090 + 1) / 1024 has 4087 integer digits and 10 fraction
+    // digits. The integer part already holds more than 34 significant digits,
+    // so no fraction is kept, and the integer part stays exact.
+    const dross::number dividend("1" + std::string(4089, '0') + "1");
+    const std::string text = std::string(dividend / dross::number(1024));
+    EXPECT_EQ(text.find('.'), std::string::npos);
+    EXPECT_EQ(text.length(), 4087u);
+    EXPECT_EQ(dross::number(text) * dross::number(1024) + dross::number(dividend % dross::number(1024)), dividend);
+}
+
+// A quotient that does not terminate keeps 34 significant digits, truncated.
+// Zeros before the first significant digit do not count, and the integer part
+// is always exact.
+TEST(number_test, division_keeps_34_significant_digits)
+{
+    const auto quotient = [](const char* a, const char* b) {
+        return std::string(dross::number(a) / dross::number(b));
+    };
+    EXPECT_EQ(quotient("1", "3"), "0." + std::string(34, '3'));
+    EXPECT_EQ(quotient("2", "3"), "0." + std::string(34, '6'));
+    EXPECT_EQ(quotient("1", "300000"), "0.00000" + std::string(34, '3'));
+    EXPECT_EQ(quotient("1", "100000000000"), "0.00000000001");
+    EXPECT_EQ(quotient("10", "3"), "3." + std::string(33, '3'));
+
+    const dross::number large("1" + std::string(40, '0'));
+    EXPECT_EQ(std::string(large / dross::number(3)), std::string(40, '3'));
+    EXPECT_EQ(std::string(dross::number(1) / dross::number(3) * dross::number(3)), "0." + std::string(34, '9'));
 }
 
 TEST(number_test, division_with_equal_decimal_places)
@@ -314,7 +421,7 @@ TEST(number_test, division_with_more_decimal_places_in_the_dividend)
 {
     const dross::number result = dross::number{ "3.14" } / dross::number{ "22.7" };
 
-    EXPECT_EQ(std::string(result), "0.1383259911");
+    EXPECT_EQ(std::string(result), "0.1383259911894273127753303964757709");
 }
 
 TEST(number_test, division_that_moves_the_result_below_one)
@@ -343,7 +450,7 @@ TEST(number_test, exact_division_drops_the_decimal_point)
 
 TEST(number_test, division_keeps_its_digits_when_the_divisor_is_near_one)
 {
-    EXPECT_EQ(std::string(dross::number{ "5" } / dross::number{ "1.0000000001" }), "4.9999999995");
+    EXPECT_EQ(std::string(dross::number{ "5" } / dross::number{ "1.0000000001" }), "4.999999999500000000049999999995");
 }
 
 TEST(number_test, one_third_precision)
@@ -581,7 +688,7 @@ TEST(number_test, stream_output_operator)
 
     std::ostringstream oss3;
     oss3 << n3;
-    EXPECT_EQ(oss3.str(), "__invalid__");
+    EXPECT_EQ(oss3.str(), "NaN");
 }
 
 TEST(number_test, stream_output_chaining)
@@ -616,7 +723,7 @@ TEST(number_test, leading_zeros)
     const dross::number n2{ "123" };
 
     EXPECT_EQ(n1, n2);
-    EXPECT_EQ(std::string(n1), "00123");  // Leading zeros are preserved
+    EXPECT_EQ(std::string(n1), "123");  // Leading zeros are dropped
 }
 
 TEST(number_test, whitespace_handling)
@@ -731,6 +838,60 @@ TEST(number_test, scientific_notation_string_conversion)
     EXPECT_EQ(n2, parsed2);
 }
 
+// An exponent is expanded in the text, so every digit that was written survives
+// and the stored form never carries an exponent.
+TEST(number_test, scientific_notation_keeps_every_digit)
+{
+    EXPECT_EQ(dross::number("1.230e0"), dross::number("1.23"));
+    EXPECT_EQ(std::string(dross::number("1.1e0")), "1.1");
+    EXPECT_EQ(std::string(dross::number("1e200")), "1" + std::string(200, '0'));
+    EXPECT_EQ(std::string(dross::number("-2.5e-3")), "-0.0025");
+
+    const dross::number tiny("1e-200");
+    EXPECT_EQ(std::string(tiny), "0." + std::string(199, '0') + "1");
+    EXPECT_FALSE(tiny.is_integer());
+    EXPECT_EQ(static_cast<int>(tiny), 0);
+    EXPECT_DOUBLE_EQ(static_cast<double>(tiny), 1e-200);
+}
+
+// Comparison reads the value, not the shape of the text.
+TEST(number_test, scientific_notation_compares_by_value)
+{
+    EXPECT_LT(dross::number("1e-200"), dross::number("2"));
+    EXPECT_GT(dross::number("1e200"), dross::number("20"));
+    EXPECT_GT(dross::number("1e-200"), dross::number("1e-300"));
+    EXPECT_GT(dross::number("1e101"), dross::number("20"));
+    EXPECT_EQ(dross::number("1e200"), dross::number("1" + std::string(200, '0')));
+}
+
+// Arithmetic on values written with a large or small exponent yields digits.
+TEST(number_test, scientific_notation_arithmetic_beyond_double)
+{
+    EXPECT_EQ(std::string(dross::number("1e-400") + dross::number(1)), "1." + std::string(399, '0') + "1");
+    EXPECT_EQ(std::string(dross::number("1e400") - dross::number(1)), std::string(400, '9'));
+    EXPECT_EQ(std::string(dross::number("1e400") + dross::number(1)), "1" + std::string(399, '0') + "1");
+}
+
+// An expansion longer than 4096 digits is NaN, so a short input cannot ask
+// for an arbitrarily long string.
+TEST(number_test, scientific_notation_beyond_the_digit_limit_is_nan)
+{
+    EXPECT_EQ(std::string(dross::number("1e4095")).length(), 4096u);
+    EXPECT_TRUE(dross::number("1e4096").is_nan());
+    EXPECT_EQ(std::string(dross::number("1e-4095")).length(), 4097u);  // "0." and 4095 digits
+    EXPECT_TRUE(dross::number("1e-4096").is_nan());
+    EXPECT_TRUE(dross::number("1e9999999999").is_nan());
+    EXPECT_EQ(std::string(dross::number("0e9999999999")), "0");
+
+    // The limit counts the digits an exponent adds, so a number written with
+    // more digits than the limit is read the same with or without e0.
+    const std::string long_mantissa = "1." + std::string(5000, '0') + "1";
+    EXPECT_EQ(dross::number(long_mantissa + "e0"), dross::number(long_mantissa));
+    EXPECT_EQ(std::string(dross::number("1." + std::string(5000, '0') + "e0")), "1");
+    EXPECT_FALSE(dross::number(long_mantissa + "e5000").is_nan());  // moves the point within the written digits
+    EXPECT_TRUE(dross::number(long_mantissa + "e10000").is_nan());
+}
+
 TEST(number_test, scientific_notation_invalid_formats)
 {
     // Test invalid scientific notation formats
@@ -798,6 +959,43 @@ TEST(number_test, trailing_zeros_decimal)
     EXPECT_EQ(n1, n2);
 }
 
+// Construction and arithmetic store the same canonical form, so equal values
+// print alike: no '+', no leading zeros, no trailing fractional zeros, an
+// integer part of at least "0", and zero without a sign.
+TEST(number_test, equal_values_have_equal_text)
+{
+    const auto text = [](const char* s) {
+        return std::string(dross::number(s));
+    };
+    EXPECT_EQ(text("1.2500"), "1.25");
+    EXPECT_EQ(text("1.2500e0"), "1.25");
+    EXPECT_EQ(text("007"), "7");
+    EXPECT_EQ(text("+5"), "5");
+    EXPECT_EQ(text(".5"), "0.5");
+    EXPECT_EQ(text("-.5"), "-0.5");
+    EXPECT_EQ(text("5."), "5");
+    EXPECT_EQ(text("-0.0"), "0");
+    EXPECT_EQ(text("1.0"), "1");
+
+    EXPECT_EQ(std::string(dross::number("2.5") * dross::number(2)), "5");
+    EXPECT_EQ(std::string(dross::number("0.5") * dross::number(4)), "2");
+    EXPECT_EQ(std::string(dross::number(-1) % dross::number(1)), "0");
+    EXPECT_EQ(std::string(dross::number("1.2500") + dross::number(0)), "1.25");
+    EXPECT_EQ(std::string(dross::number(42.5)), "42.5");
+}
+
+// A leading '+' or '.' is read as the value it writes.
+TEST(number_test, leading_sign_and_point_compare_by_value)
+{
+    EXPECT_EQ(dross::number("+5"), dross::number("5"));
+    EXPECT_LT(dross::number("+5"), dross::number("6"));
+    EXPECT_EQ(std::string(dross::number("+5") * dross::number(2)), "10");
+    EXPECT_EQ(std::string(dross::number("+5") + dross::number(1)), "6");
+    EXPECT_EQ(dross::number(".5"), dross::number("0.5"));
+    EXPECT_GT(dross::number(".5"), dross::number("0.4"));
+    EXPECT_LT(dross::number("-.5"), dross::number("-0.4"));
+}
+
 TEST(number_test, very_small_decimals)
 {
     const dross::number n1{ "0.000000000000000001" };
@@ -809,7 +1007,7 @@ TEST(number_test, very_small_decimals)
 
     // Check that arithmetic preserves precision
     std::string sum_str = std::string(sum);
-    EXPECT_TRUE(sum_str == "0.000000000000000003" || sum_str == "3e-18" || sum.is_nan());  // Implementation-dependent
+    EXPECT_EQ(sum_str, "0.000000000000000003");
 }
 
 // =============================================================================
@@ -1036,7 +1234,7 @@ TEST(number_test, unified_parsing_fractional_precision)
     EXPECT_TRUE(hp_str.find("0.123456789") == 0);
 
     // Should normalize trailing zeros
-    EXPECT_TRUE(tz_str == "1.23" || tz_str == "1.23000000000000000000");
+    EXPECT_EQ(tz_str, "1.23");
 }
 
 TEST(number_test, unified_parsing_consistency_with_legacy)
