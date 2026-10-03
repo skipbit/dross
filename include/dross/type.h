@@ -168,11 +168,12 @@ std::string to_string(const string& s);
 /**
  * @brief Convert binary data to string representation (STL-style).
  * @param d The data to convert
- * @return String representation of the byte data (UTF-8 interpretation)
+ * @return The bytes, unchanged, as a std::string
  *
  * Provides STL-style explicit string conversion for consistency with
- * other types. Treats the byte data as UTF-8 encoded text.
- * Invalid UTF-8 sequences may result in replacement characters.
+ * other types. The bytes are copied as they are: nothing is decoded,
+ * validated or replaced, so the result is valid UTF-8 only when the
+ * data is.
  *
  * @code
  * data binary_data{"Hello, 世界!"};

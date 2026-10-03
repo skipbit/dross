@@ -2,6 +2,9 @@
 
 #include <gtest/gtest.h>
 
+#include <sstream>
+#include <string>
+
 // =============================================================================
 // STL-style to_string Function Tests
 // =============================================================================
@@ -103,4 +106,16 @@ TEST(to_string_test, template_usage)
     EXPECT_EQ(convert_to_string(n), "123");
     EXPECT_EQ(convert_to_string(s), "generic");
     EXPECT_EQ(convert_to_string(ts), "2024-03-15T14:45:30Z");
+}
+
+TEST(to_string_test, data_bytes_are_returned_unchanged)
+{
+    const std::string bytes("\xff\xfe", 2);
+    const dross::data d(bytes);
+
+    EXPECT_EQ(dross::to_string(d), bytes);
+    EXPECT_EQ(static_cast<std::string>(d), bytes);
+    std::ostringstream out;
+    out << d;
+    EXPECT_EQ(out.str(), bytes);
 }

@@ -71,7 +71,7 @@ namespace dross {
  * }
  *
  * // String conversion
- * std::string text = binary_data; // Implicit conversion (UTF-8 interpretation)
+ * std::string text = binary_data; // Implicit conversion (the bytes, unchanged)
  * // or explicit conversion:
  * std::string explicit_text = to_string(binary_data);
  * @endcode
@@ -288,8 +288,8 @@ public:
     data& operator+=(const data& other);
 
     /**
-     * @brief Implicit conversion to string (UTF-8 interpretation).
-     * @return String representation of the byte data
+     * @brief Implicit conversion to string.
+     * @return The bytes, unchanged, as a std::string; nothing is decoded or validated
      */
     operator std::string() const;
 
@@ -438,7 +438,7 @@ private:
  * @param d The data to output
  * @return Reference to the output stream
  *
- * Outputs the data as UTF-8 string to the stream.
+ * Writes the bytes to the stream unchanged.
  */
 std::ostream& operator<<(std::ostream& os, const data& d);
 
