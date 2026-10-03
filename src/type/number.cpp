@@ -98,15 +98,6 @@ struct parsed_number {
         // Clamp to int range to prevent overflow
         return static_cast<int>(std::clamp(rounded, static_cast<double>(std::numeric_limits<int>::min()), static_cast<double>(std::numeric_limits<int>::max())));
     }
-
-    /**
-     * @brief Check if this represents an integer (no fractional part).
-     * @return true if the number has no fractional component
-     */
-    bool is_integer() const
-    {
-        return (is_valid && (! fractional_part.has_value()));
-    }
 };
 
 /**
@@ -384,11 +375,6 @@ struct NumberParts {
         } else {
             integer = abs_num.substr(0, dot_pos);
             fractional = abs_num.substr(dot_pos + 1);
-        }
-
-        // Ensure integer part is not empty
-        if (integer.empty()) {
-            integer = "0";
         }
     }
 };
@@ -822,7 +808,7 @@ number::~number() = default;
 
 bool number::is_nan() const
 {
-    return (! is_valid_number(_store->number));
+    return (_store->number == NAN_VALUE);
 }
 
 bool number::is_integer() const
