@@ -75,7 +75,7 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
     }
 
     // Parse offset format: [+-]HH:MM or [+-]HHMM
-    std::regex offset_regex(R"(^([+-])(\d{1,2}):?(\d{2})$)");
+    static const std::regex offset_regex(R"(^([+-])(\d{1,2}):?(\d{2})$)");
     std::smatch match;
 
     if (std::regex_match(tz_str, match, offset_regex)) {

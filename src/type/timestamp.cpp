@@ -54,27 +54,6 @@ timestamp::date_part::date_part(const std::chrono::year_month_day& ymd)
 {
 }
 
-timestamp::date_part::date_part(const std::string& iso8601_date)
-    : _impl(std::make_unique<impl>())
-{
-    // Parse ISO 8601 date format: YYYY-MM-DD
-    std::regex date_regex(R"(^(\d{4})-(\d{2})-(\d{2})$)");
-    std::smatch match;
-
-    if (std::regex_match(iso8601_date, match, date_regex)) {
-        int year = std::stoi(match[1].str());
-        int month = std::stoi(match[2].str());
-        int day = std::stoi(match[3].str());
-
-        _impl->ymd = std::chrono::year_month_day{
-            std::chrono::year{ year },
-            std::chrono::month{ static_cast<unsigned>(month) },
-            std::chrono::day{ static_cast<unsigned>(day) }
-        };
-    }
-    // If parsing fails, leave as epoch date
-}
-
 timestamp::date_part::date_part(const date_part& other)
     : _impl(std::make_unique<impl>(*other._impl))
 {
@@ -169,24 +148,6 @@ timestamp::time_part::time_part()
 timestamp::time_part::time_part(int hour, int minute, int second)
     : _impl(std::make_unique<impl>(hour, minute, second))
 {
-}
-
-timestamp::time_part::time_part(const std::string& iso8601_time)
-    : _impl(std::make_unique<impl>())
-{
-    // Parse ISO 8601 time format: HH:MM:SS
-    std::regex time_regex(R"(^(\d{2}):(\d{2}):(\d{2})$)");
-    std::smatch match;
-
-    if (std::regex_match(iso8601_time, match, time_regex)) {
-        int hour = std::stoi(match[1].str());
-        int minute = std::stoi(match[2].str());
-        int second = std::stoi(match[3].str());
-
-        auto duration = std::chrono::hours{ hour } + std::chrono::minutes{ minute } + std::chrono::seconds{ second };
-        _impl->hms = std::chrono::hh_mm_ss{ std::chrono::duration_cast<std::chrono::nanoseconds>(duration) };
-    }
-    // If parsing fails, leave as midnight
 }
 
 template <typename Duration>
@@ -292,6 +253,14 @@ public:
         return time_of_day - std::chrono::floor<std::chrono::seconds>(time_of_day);
     }
 
+    // Splits wall-clock seconds and a fraction into the date and time parts.
+    void set_local(std::chrono::sys_seconds local, std::chrono::nanoseconds subseconds)
+    {
+        auto days = std::chrono::floor<std::chrono::days>(local);
+        date_value = timestamp::date_part{ std::chrono::year_month_day{ days } };
+        time_value = timestamp::time_part{ std::chrono::hh_mm_ss{ std::chrono::duration_cast<std::chrono::nanoseconds>(local - days) + subseconds } };
+    }
+
     // The instant in UTC, kept in seconds so that no year from 0 to 9999 overflows.
     std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> instant() const
     {
@@ -318,24 +287,17 @@ timestamp::timestamp(const timestamp& other)
 timestamp::timestamp(const std::chrono::system_clock::time_point& tp)
     : _store(std::make_unique<storage>())
 {
-    // Convert time_point to date and time parts
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(tp);
-    auto ymd = std::chrono::year_month_day{ std::chrono::sys_days{ days_since_epoch } };
-    auto time_of_day = tp - days_since_epoch;
-
-    _store->date_value = timestamp::date_part{ ymd };
-
-    // Always store time part (even if it's midnight)
-    auto time_of_day_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(time_of_day);
-    auto hms = std::chrono::hh_mm_ss{ time_of_day_ns };
-    _store->time_value = timestamp::time_part{ hms };
-
-    // time_point has no timezone info
+    auto seconds = std::chrono::floor<std::chrono::seconds>(tp);
+    _store->set_local(seconds, std::chrono::duration_cast<std::chrono::nanoseconds>(tp - seconds));
 }
 
 timestamp::timestamp(const std::string& iso8601_str)
-    : timestamp(from_string(iso8601_str).value_or(timestamp()))
 {
+    if (auto parsed = from_string(iso8601_str)) {
+        _store = std::move(parsed->_store);
+    } else {
+        _store = std::make_unique<storage>();
+    }
 }
 
 timestamp::timestamp(const char* iso8601_str)
@@ -344,13 +306,21 @@ timestamp::timestamp(const char* iso8601_str)
 }
 
 timestamp::timestamp(int year, int month, int day, int hour, int minute, int second)
-    : timestamp(from_components(year, month, day, hour, minute, second).value_or(timestamp()))
 {
+    if (auto parsed = from_components(year, month, day, hour, minute, second)) {
+        _store = std::move(parsed->_store);
+    } else {
+        _store = std::make_unique<storage>();
+    }
 }
 
 timestamp::timestamp(int year, int month, int day, int hour, int minute, int second, const dross::timezone& tz)
-    : timestamp(from_components(year, month, day, hour, minute, second, tz).value_or(timestamp()))
 {
+    if (auto parsed = from_components(year, month, day, hour, minute, second, tz)) {
+        _store = std::move(parsed->_store);
+    } else {
+        _store = std::make_unique<storage>();
+    }
 }
 
 std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
@@ -360,7 +330,7 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
     // - 2024-01-21T15:30:00Z (UTC timestamp)
     // - 2024-01-21T15:30:00 (no offset, read as UTC)
     // - 2024-01-21 (date only, read as midnight UTC)
-    std::regex timestamp_regex(R"(^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})?)?$)");
+    static const std::regex timestamp_regex(R"(^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})?)?$)");
 
     std::smatch match;
     if (! std::regex_match(iso8601_str, match, timestamp_regex)) {
@@ -391,8 +361,7 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
         // Digits below a nanosecond are dropped.
         std::string digits = match[7].str().substr(0, 9);
         digits.resize(9, '0');
-        auto time_of_day = result->_store->time_value.to_hh_mm_ss().to_duration() + std::chrono::nanoseconds(std::stoll(digits));
-        result->_store->time_value = timestamp::time_part{ std::chrono::hh_mm_ss{ time_of_day } };
+        result->_store->set_local(result->_store->local_seconds(), std::chrono::nanoseconds(std::stoll(digits)));
     }
     return result;
 }
@@ -479,12 +448,7 @@ timestamp timestamp::operator-(const std::chrono::hours& duration) const
 timestamp timestamp::operator+(const std::chrono::seconds& duration) const
 {
     timestamp result(*this);
-    auto local = _store->local_seconds() + duration;
-    auto days = std::chrono::floor<std::chrono::days>(local);
-    auto time_of_day = std::chrono::duration_cast<std::chrono::nanoseconds>(local - days) + _store->subseconds();
-
-    result._store->date_value = timestamp::date_part{ std::chrono::year_month_day{ days } };
-    result._store->time_value = timestamp::time_part{ std::chrono::hh_mm_ss{ time_of_day } };
+    result._store->set_local(_store->local_seconds() + duration, _store->subseconds());
     return result;
 }
 
