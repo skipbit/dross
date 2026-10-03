@@ -275,7 +275,6 @@ timestamp timestamp::now()
 timestamp::timestamp()
     : _store(std::make_unique<storage>())
 {
-    // Default to epoch date (1970-01-01) with no explicit time
 }
 
 timestamp::timestamp(const timestamp& other)
@@ -468,8 +467,6 @@ std::string timestamp::format(format_type fmt) const
 
 std::string timestamp::format(const std::string& custom_format) const
 {
-    // For custom formatting, we still need to use the legacy API temporarily
-    // until std::format with chrono support is more widely available
     auto time_c = static_cast<std::time_t>(_store->local_seconds().time_since_epoch().count());
     // gmtime_r rather than std::gmtime, whose result is shared by every thread.
     std::tm tm{};

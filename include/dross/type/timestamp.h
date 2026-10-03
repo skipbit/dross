@@ -331,9 +331,9 @@ public:
 
     /**
      * @brief Construct from individual date and time components.
-     * @param year Year (e.g., 2024)
+     * @param year Year (0-9999)
      * @param month Month (1-12)
-     * @param day Day of month (1-31)
+     * @param day Day of month (1 to the last day of the month)
      * @param hour Hour (0-23, default 0)
      * @param minute Minute (0-59, default 0)
      * @param second Second (0-59, default 0)
@@ -345,9 +345,9 @@ public:
 
     /**
      * @brief Construct from individual date and time components with timezone.
-     * @param year Year (e.g., 2024)
+     * @param year Year (0-9999)
      * @param month Month (1-12)
-     * @param day Day of month (1-31)
+     * @param day Day of month (1 to the last day of the month)
      * @param hour Hour (0-23)
      * @param minute Minute (0-59)
      * @param second Second (0-59)
@@ -383,7 +383,9 @@ public:
      * @return ISO 8601 formatted string representation
      *
      * Always writes the date, the time and the offset, so the string reads
-     * back as the same timestamp.
+     * back as the same timestamp for any year from 0 to 9999. Arithmetic can
+     * move a timestamp outside those years; it still compares and computes
+     * correctly, but its string does not read back.
      */
     operator std::string() const;
 
