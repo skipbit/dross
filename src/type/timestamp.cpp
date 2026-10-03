@@ -156,8 +156,7 @@ timestamp::time_part::time_part(const std::chrono::hh_mm_ss<Duration>& hms)
 {
 }
 
-// Explicit instantiations for common durations
-template timestamp::time_part::time_part(const std::chrono::hh_mm_ss<std::chrono::seconds>&);
+// Explicit instantiation for nanoseconds, the only duration in use
 template timestamp::time_part::time_part(const std::chrono::hh_mm_ss<std::chrono::nanoseconds>&);
 
 timestamp::time_part::time_part(const time_part& other)
