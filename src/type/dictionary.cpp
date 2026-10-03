@@ -113,7 +113,7 @@ dictionary::iterator& dictionary::iterator::operator++()
 dictionary::iterator dictionary::iterator::operator++(int)
 {
     iterator previous(*this);
-    ++(_impl->cursor);
+    ++*this;
     return previous;
 }
 
@@ -174,7 +174,7 @@ dictionary::const_iterator& dictionary::const_iterator::operator++()
 dictionary::const_iterator dictionary::const_iterator::operator++(int)
 {
     const_iterator previous(*this);
-    ++(_impl->cursor);
+    ++*this;
     return previous;
 }
 

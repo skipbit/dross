@@ -129,6 +129,20 @@ TEST(array_test, value_at_method)
     EXPECT_EQ(a.value_at(2), dross::value(300));
 }
 
+TEST(array_test, a_const_array_gives_const_references)
+{
+    static_assert(std::is_same_v<decltype(std::declval<const dross::array&>().value_at(0)), const dross::value&>);
+    static_assert(std::is_same_v<decltype(std::declval<const dross::array&>()[0]), const dross::value&>);
+    static_assert(std::is_same_v<decltype(std::declval<dross::array&>().value_at(0)), dross::value&>);
+    static_assert(std::is_same_v<decltype(std::declval<dross::array&>()[0]), dross::value&>);
+
+    dross::array a{ 1, 2 };
+    a.value_at(1) = dross::value(8);
+    a[0] = dross::value(9);
+    EXPECT_EQ(std::as_const(a).value_at(0), dross::value(9));
+    EXPECT_EQ(std::as_const(a)[1], dross::value(8));
+}
+
 TEST(array_test, index_of_found)
 {
     dross::array a = { 10, 20, 30, 20, 40 };
@@ -307,6 +321,32 @@ TEST(array_test, iterator_copy)
     EXPECT_EQ(*it1, *it2);
 }
 
+static_assert(std::forward_iterator<dross::array::iterator>);
+static_assert(std::forward_iterator<dross::array::const_iterator>);
+static_assert(std::ranges::forward_range<dross::array>);
+static_assert(std::ranges::forward_range<const dross::array>);
+
+TEST(array_test, iterators_assign_and_post_increment)
+{
+    dross::array a{ 1, 2, 3 };
+
+    auto it = a.begin();
+    auto previous = it++;
+    EXPECT_EQ(*previous, dross::value(1));
+    EXPECT_EQ(*it, dross::value(2));
+    it = a.end();
+    EXPECT_EQ(it, a.end());
+    EXPECT_EQ(dross::array::iterator(), dross::array::iterator());
+
+    const dross::array& c = a;
+    auto cit = c.begin();
+    auto cprevious = cit++;
+    EXPECT_EQ(*cprevious, dross::value(1));
+    cit = c.end();
+    EXPECT_EQ(cit, c.end());
+    EXPECT_EQ(dross::array::const_iterator(), dross::array::const_iterator());
+}
+
 // =============================================================================
 // Range-based for Loop Tests
 // =============================================================================
@@ -333,6 +373,14 @@ TEST(array_test, range_for_const)
     }
 
     EXPECT_EQ(sum, 60);
+}
+
+TEST(array_test, ranges_algorithms_accept_an_array)
+{
+    dross::array a{ 1, 2, 3 };
+
+    EXPECT_EQ(std::ranges::count(a, dross::value(2)), 1);
+    EXPECT_EQ(*std::ranges::find(std::as_const(a), dross::value(3)), dross::value(3));
 }
 
 // =============================================================================
@@ -437,52 +485,4 @@ TEST(array_test, many_operations)
         int val = static_cast<int>(dross::value_cast<dross::number>(a[i]));
         EXPECT_EQ(val % 2, 1);  // Only odd numbers remain
     }
-}
-
-TEST(array_test, a_const_array_gives_const_references)
-{
-    static_assert(std::is_same_v<decltype(std::declval<const dross::array&>().value_at(0)), const dross::value&>);
-    static_assert(std::is_same_v<decltype(std::declval<const dross::array&>()[0]), const dross::value&>);
-    static_assert(std::is_same_v<decltype(std::declval<dross::array&>().value_at(0)), dross::value&>);
-    static_assert(std::is_same_v<decltype(std::declval<dross::array&>()[0]), dross::value&>);
-
-    dross::array a{ 1, 2 };
-    a.value_at(1) = dross::value(8);
-    a[0] = dross::value(9);
-    EXPECT_EQ(std::as_const(a).value_at(0), dross::value(9));
-    EXPECT_EQ(std::as_const(a)[1], dross::value(8));
-}
-
-static_assert(std::forward_iterator<dross::array::iterator>);
-static_assert(std::forward_iterator<dross::array::const_iterator>);
-static_assert(std::ranges::forward_range<dross::array>);
-static_assert(std::ranges::forward_range<const dross::array>);
-
-TEST(array_test, iterators_assign_and_post_increment)
-{
-    dross::array a{ 1, 2, 3 };
-
-    auto it = a.begin();
-    auto previous = it++;
-    EXPECT_EQ(*previous, dross::value(1));
-    EXPECT_EQ(*it, dross::value(2));
-    it = a.end();
-    EXPECT_EQ(it, a.end());
-    EXPECT_EQ(dross::array::iterator(), dross::array::iterator());
-
-    const dross::array& c = a;
-    auto cit = c.begin();
-    auto cprevious = cit++;
-    EXPECT_EQ(*cprevious, dross::value(1));
-    cit = c.end();
-    EXPECT_EQ(cit, c.end());
-    EXPECT_EQ(dross::array::const_iterator(), dross::array::const_iterator());
-}
-
-TEST(array_test, ranges_algorithms_accept_an_array)
-{
-    dross::array a{ 1, 2, 3 };
-
-    EXPECT_EQ(std::ranges::count(a, dross::value(2)), 1);
-    EXPECT_EQ(*std::ranges::find(std::as_const(a), dross::value(3)), dross::value(3));
 }

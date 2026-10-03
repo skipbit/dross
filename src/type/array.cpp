@@ -188,7 +188,7 @@ array::iterator& array::iterator::operator++()
 array::iterator array::iterator::operator++(int)
 {
     iterator previous(*this);
-    ++(_impl->cursor);
+    ++*this;
     return previous;
 }
 
@@ -249,7 +249,7 @@ array::const_iterator& array::const_iterator::operator++()
 array::const_iterator array::const_iterator::operator++(int)
 {
     const_iterator previous(*this);
-    ++(_impl->cursor);
+    ++*this;
     return previous;
 }
 
