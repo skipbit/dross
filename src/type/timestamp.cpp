@@ -7,6 +7,7 @@
 #include <optional>
 #include <regex>
 #include <sstream>
+#include <utility>
 
 namespace dross {
 
@@ -277,13 +278,24 @@ public:
     {
     }
 
-    std::chrono::system_clock::time_point to_time_point() const
+    // Wall-clock seconds since the epoch, before the offset is applied.
+    std::chrono::sys_seconds local_seconds() const
     {
         auto ymd = static_cast<std::chrono::year_month_day>(date_value);
-        auto days_since_epoch = std::chrono::sys_days{ ymd }.time_since_epoch();
+        auto time_of_day = std::chrono::floor<std::chrono::seconds>(time_value.to_hh_mm_ss().to_duration());
+        return std::chrono::sys_days{ ymd } + time_of_day;
+    }
+
+    std::chrono::nanoseconds subseconds() const
+    {
         auto time_of_day = time_value.to_hh_mm_ss().to_duration();
-        auto total_duration = days_since_epoch + time_of_day;
-        return std::chrono::time_point_cast<std::chrono::system_clock::duration>(std::chrono::sys_time<std::chrono::nanoseconds>{ total_duration });
+        return time_of_day - std::chrono::floor<std::chrono::seconds>(time_of_day);
+    }
+
+    // The instant in UTC, kept in seconds so that no year from 0 to 9999 overflows.
+    std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> instant() const
+    {
+        return { local_seconds() - tz.offset(), subseconds() };
     }
 };
 
@@ -408,13 +420,9 @@ timestamp& timestamp::operator=(const timestamp& other)
 
 timestamp::operator std::chrono::system_clock::time_point() const
 {
-    auto tp = _store->to_time_point();
-    // Convert to UTC time point using timezone offset
-    int offset = _store->tz.offset().count();
-    if (offset != 0) {
-        return tp - std::chrono::minutes(offset);
-    }
-    return tp;
+    auto [seconds, subseconds] = _store->instant();
+    return std::chrono::time_point_cast<std::chrono::system_clock::duration>(seconds)
+           + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds);
 }
 
 timestamp::operator std::string() const
@@ -424,42 +432,25 @@ timestamp::operator std::string() const
 
 std::strong_ordering timestamp::operator<=>(const timestamp& other) const
 {
-    // Compare UTC time points
-    auto this_utc = static_cast<std::chrono::system_clock::time_point>(*this);
-    auto other_utc = static_cast<std::chrono::system_clock::time_point>(other);
-    return this_utc <=> other_utc;
+    return _store->instant() <=> other._store->instant();
 }
 
 bool timestamp::operator==(const timestamp& other) const
 {
-    // Compare UTC time points
-    auto this_utc = static_cast<std::chrono::system_clock::time_point>(*this);
-    auto other_utc = static_cast<std::chrono::system_clock::time_point>(other);
-    return this_utc == other_utc;
+    return _store->instant() == other._store->instant();
 }
 
 std::chrono::system_clock::duration timestamp::operator-(const timestamp& other) const
 {
-    // Calculate difference using UTC time points
-    auto this_utc = static_cast<std::chrono::system_clock::time_point>(*this);
-    auto other_utc = static_cast<std::chrono::system_clock::time_point>(other);
-    return this_utc - other_utc;
+    auto [seconds, subseconds] = _store->instant();
+    auto [other_seconds, other_subseconds] = other._store->instant();
+    return std::chrono::duration_cast<std::chrono::system_clock::duration>(seconds - other_seconds)
+           + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds - other_subseconds);
 }
 
 timestamp timestamp::operator+(const std::chrono::minutes& duration) const
 {
-    timestamp result(*this);
-    auto tp = result._store->to_time_point();
-    tp += duration;
-    // Re-extract date and time parts
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(tp);
-    auto ymd = std::chrono::year_month_day{ std::chrono::sys_days{ days_since_epoch } };
-    auto time_of_day = tp - days_since_epoch;
-    auto hms = std::chrono::hh_mm_ss{ std::chrono::duration_cast<std::chrono::nanoseconds>(time_of_day) };
-
-    result._store->date_value = timestamp::date_part{ ymd };
-    result._store->time_value = timestamp::time_part{ hms };
-    return result;
+    return *this + std::chrono::seconds(duration);
 }
 
 timestamp timestamp::operator-(const std::chrono::minutes& duration) const
@@ -480,16 +471,12 @@ timestamp timestamp::operator-(const std::chrono::hours& duration) const
 timestamp timestamp::operator+(const std::chrono::seconds& duration) const
 {
     timestamp result(*this);
-    auto tp = result._store->to_time_point();
-    tp += duration;
-    // Re-extract date and time parts
-    auto days_since_epoch = std::chrono::floor<std::chrono::days>(tp);
-    auto ymd = std::chrono::year_month_day{ std::chrono::sys_days{ days_since_epoch } };
-    auto time_of_day = tp - days_since_epoch;
-    auto hms = std::chrono::hh_mm_ss{ std::chrono::duration_cast<std::chrono::nanoseconds>(time_of_day) };
+    auto local = _store->local_seconds() + duration;
+    auto days = std::chrono::floor<std::chrono::days>(local);
+    auto time_of_day = std::chrono::duration_cast<std::chrono::nanoseconds>(local - days) + _store->subseconds();
 
-    result._store->date_value = timestamp::date_part{ ymd };
-    result._store->time_value = timestamp::time_part{ hms };
+    result._store->date_value = timestamp::date_part{ std::chrono::year_month_day{ days } };
+    result._store->time_value = timestamp::time_part{ std::chrono::hh_mm_ss{ time_of_day } };
     return result;
 }
 
@@ -512,8 +499,7 @@ std::string timestamp::format(const std::string& custom_format) const
 {
     // For custom formatting, we still need to use the legacy API temporarily
     // until std::format with chrono support is more widely available
-    auto tp = _store->to_time_point();
-    auto time_c = std::chrono::system_clock::to_time_t(tp);
+    auto time_c = static_cast<std::time_t>(_store->local_seconds().time_since_epoch().count());
     // gmtime_r rather than std::gmtime, whose result is shared by every thread.
     std::tm tm{};
     if (! ::gmtime_r(&time_c, &tm)) {

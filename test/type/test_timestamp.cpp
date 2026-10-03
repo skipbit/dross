@@ -502,3 +502,24 @@ TEST(timestamp_test, from_components_accepts_valid_values)
     EXPECT_EQ(std::string(*ts), "2024-02-29T23:59:59+09:00");
     EXPECT_EQ(dross::timestamp::from_components(2024, 1, 21)->timezone(), dross::timezone::utc());
 }
+
+TEST(timestamp_test, arithmetic_holds_far_from_1970)
+{
+    const dross::timestamp ref("2024-01-01T00:00:00Z");
+    for (const char* s : { "2262-04-11T23:47:17Z", "2300-01-01T00:00:00Z", "9999-12-31T23:59:59+09:00" }) {
+        const dross::timestamp ts(s);
+        EXPECT_GT(ts, ref) << s;
+        EXPECT_EQ(ts + std::chrono::hours(1) - std::chrono::hours(1), ts) << s;
+    }
+    for (const char* s : { "1677-09-21T00:12:43Z", "1600-01-01T00:00:00Z", "0000-01-01T00:00:00-09:00" }) {
+        const dross::timestamp ts(s);
+        EXPECT_LT(ts, ref) << s;
+        EXPECT_EQ(ts + std::chrono::hours(1) - std::chrono::hours(1), ts) << s;
+    }
+
+    EXPECT_EQ(dross::timestamp("2300-01-01T09:00:00+09:00"), dross::timestamp("2300-01-01T00:00:00Z"));
+    EXPECT_EQ(std::string(dross::timestamp("2300-01-01T00:00:00Z") + std::chrono::hours(1)), "2300-01-01T01:00:00Z");
+    EXPECT_EQ(std::string(dross::timestamp("9999-12-31T23:00:00Z") + std::chrono::minutes(59)), "9999-12-31T23:59:00Z");
+    EXPECT_EQ(std::string(dross::timestamp("1600-03-01T00:30:00Z") - std::chrono::hours(1)), "1600-02-29T23:30:00Z");
+    EXPECT_EQ(dross::timestamp("9999-12-31T23:59:59Z").format("%Y-%m-%d %H:%M:%S"), "9999-12-31 23:59:59");
+}

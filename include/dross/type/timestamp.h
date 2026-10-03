@@ -369,6 +369,11 @@ public:
     /**
      * @brief Implicit conversion to std::chrono::system_clock::time_point.
      * @return The time point representation (always in UTC)
+     *
+     * Comparison and duration arithmetic work for every year from 0 to 9999,
+     * but this conversion is limited to the range of system_clock, which is
+     * about 292 years either side of 1970 where its duration counts
+     * nanoseconds.
      */
     operator std::chrono::system_clock::time_point() const;
 
@@ -438,6 +443,9 @@ public:
      * @brief Calculate the duration between two timestamps.
      * @param other The other timestamp
      * @return Duration from other to this timestamp
+     *
+     * Limited to what system_clock::duration can hold, which is about 292
+     * years where it counts nanoseconds.
      */
     std::chrono::system_clock::duration operator-(const timestamp& other) const;
 
