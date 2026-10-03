@@ -115,7 +115,15 @@ public:
      * @return Reference to the value at the given index
      * @throws std::out_of_range if index is out of bounds
      */
-    value& value_at(const size_t index) const;
+    value& value_at(const size_t index);
+
+    /**
+     * @brief Get a const reference to the value at the specified index.
+     * @param index The index to access
+     * @return Const reference to the value at the given index
+     * @throws std::out_of_range if index is out of bounds
+     */
+    const value& value_at(const size_t index) const;
 
     /**
      * @brief Append a value to the end of the array.
@@ -206,10 +214,10 @@ public:
     /**
      * @brief Access element by index (const version).
      * @param index The index to access
-     * @return Reference to the value at the given index
+     * @return Const reference to the value at the given index
      * @throws std::out_of_range if index is out of bounds
      */
-    value& operator[](const size_t index) const&;
+    const value& operator[](const size_t index) const&;
 
     /**
      * @brief Access element by index (non-const version).

@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -432,4 +434,18 @@ TEST(array_test, many_operations)
         int val = static_cast<int>(dross::value_cast<dross::number>(a[i]));
         EXPECT_EQ(val % 2, 1);  // Only odd numbers remain
     }
+}
+
+TEST(array_test, a_const_array_gives_const_references)
+{
+    static_assert(std::is_same_v<decltype(std::declval<const dross::array&>().value_at(0)), const dross::value&>);
+    static_assert(std::is_same_v<decltype(std::declval<const dross::array&>()[0]), const dross::value&>);
+    static_assert(std::is_same_v<decltype(std::declval<dross::array&>().value_at(0)), dross::value&>);
+    static_assert(std::is_same_v<decltype(std::declval<dross::array&>()[0]), dross::value&>);
+
+    dross::array a{ 1, 2 };
+    a.value_at(1) = dross::value(8);
+    a[0] = dross::value(9);
+    EXPECT_EQ(std::as_const(a).value_at(0), dross::value(9));
+    EXPECT_EQ(std::as_const(a)[1], dross::value(8));
 }

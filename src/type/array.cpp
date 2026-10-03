@@ -56,7 +56,12 @@ size_t array::index_of(const value& v) const
     return (i != _store->contents.end()) ? std::distance(_store->contents.begin(), i) : -1;
 }
 
-value& array::value_at(const size_t i) const
+value& array::value_at(const size_t i)
+{
+    return _store->contents.at(i);
+}
+
+const value& array::value_at(const size_t i) const
 {
     return _store->contents.at(i);
 }
@@ -131,7 +136,7 @@ array& array::operator=(const array& a)
     return *this;
 }
 
-value& array::operator[](const size_t i) const&
+const value& array::operator[](const size_t i) const&
 {
     return value_at(i);
 }
