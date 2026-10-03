@@ -882,6 +882,14 @@ TEST(number_test, scientific_notation_beyond_the_digit_limit_is_nan)
     EXPECT_TRUE(dross::number("1e-4096").is_nan());
     EXPECT_TRUE(dross::number("1e9999999999").is_nan());
     EXPECT_EQ(std::string(dross::number("0e9999999999")), "0");
+
+    // The limit counts the digits an exponent adds, so a number written with
+    // more digits than the limit is read the same with or without e0.
+    const std::string long_mantissa = "1." + std::string(5000, '0') + "1";
+    EXPECT_EQ(dross::number(long_mantissa + "e0"), dross::number(long_mantissa));
+    EXPECT_EQ(std::string(dross::number("1." + std::string(5000, '0') + "e0")), "1");
+    EXPECT_FALSE(dross::number(long_mantissa + "e5000").is_nan());  // moves the point within the written digits
+    EXPECT_TRUE(dross::number(long_mantissa + "e10000").is_nan());
 }
 
 TEST(number_test, scientific_notation_invalid_formats)

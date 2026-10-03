@@ -90,8 +90,8 @@ public:
      *
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
      * An exponent is expanded in the text, keeping every digit: "1e3" is stored
-     * as 1000. An expansion longer than 4096 digits results in NaN, as do
-     * invalid strings.
+     * as 1000. An expansion longer than 4096 digits, and longer than the
+     * number as written, results in NaN, as do invalid strings.
      */
     number(const char* str);
 
@@ -101,8 +101,8 @@ public:
      *
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
      * An exponent is expanded in the text, keeping every digit: "1e3" is stored
-     * as 1000. An expansion longer than 4096 digits results in NaN, as do
-     * invalid strings.
+     * as 1000. An expansion longer than 4096 digits, and longer than the
+     * number as written, results in NaN, as do invalid strings.
      */
     number(const std::string& str);
 

@@ -210,8 +210,9 @@ bool is_valid_number(const std::string& str)
     return true;
 }
 
-// The most digits a number written with an exponent may expand to. Beyond it
-// the value is NaN, so a short input cannot ask for an arbitrarily long string.
+// The most digits an exponent may expand a number to, unless the number was
+// written with more digits than that. Beyond it the value is NaN, so a short
+// input cannot ask for an arbitrarily long string.
 constexpr std::size_t max_expanded_digits = 4096;
 
 /**
@@ -219,7 +220,8 @@ constexpr std::size_t max_expanded_digits = 4096;
  *
  * Moves the decimal point in the text, so every digit that was written
  * survives. A string without an exponent is returned as it is. An expansion
- * longer than max_expanded_digits gives NAN_VALUE, the only failure signal.
+ * longer than both max_expanded_digits and the digits that were written gives
+ * NAN_VALUE, the only failure signal.
  *
  * @param str A string for which is_valid_number is true
  */
@@ -244,6 +246,7 @@ std::string expand_exponent(const std::string& str)
         }
     }
 
+    const size_t written_digits = digits.length();
     const size_t first = digits.find_first_not_of('0');
     if (first == std::string::npos) {
         return "0";
@@ -267,7 +270,7 @@ std::string expand_exponent(const std::string& str)
     const long long integer_digits = leading + (exponent_negative ? -shift : shift);
     const long long length = static_cast<long long>(digits.length());
     const long long total = (integer_digits <= 0) ? (1 - integer_digits + length) : std::max(integer_digits, length);
-    if (total > static_cast<long long>(max_expanded_digits)) {
+    if (total > static_cast<long long>(std::max(max_expanded_digits, written_digits))) {
         return NAN_VALUE;
     }
 
