@@ -5,6 +5,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <iterator>
+#include <ranges>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -448,4 +451,38 @@ TEST(array_test, a_const_array_gives_const_references)
     a[0] = dross::value(9);
     EXPECT_EQ(std::as_const(a).value_at(0), dross::value(9));
     EXPECT_EQ(std::as_const(a)[1], dross::value(8));
+}
+
+static_assert(std::forward_iterator<dross::array::iterator>);
+static_assert(std::forward_iterator<dross::array::const_iterator>);
+static_assert(std::ranges::forward_range<dross::array>);
+static_assert(std::ranges::forward_range<const dross::array>);
+
+TEST(array_test, iterators_assign_and_post_increment)
+{
+    dross::array a{ 1, 2, 3 };
+
+    auto it = a.begin();
+    auto previous = it++;
+    EXPECT_EQ(*previous, dross::value(1));
+    EXPECT_EQ(*it, dross::value(2));
+    it = a.end();
+    EXPECT_EQ(it, a.end());
+    EXPECT_EQ(dross::array::iterator(), dross::array::iterator());
+
+    const dross::array& c = a;
+    auto cit = c.begin();
+    auto cprevious = cit++;
+    EXPECT_EQ(*cprevious, dross::value(1));
+    cit = c.end();
+    EXPECT_EQ(cit, c.end());
+    EXPECT_EQ(dross::array::const_iterator(), dross::array::const_iterator());
+}
+
+TEST(array_test, ranges_algorithms_accept_an_array)
+{
+    dross::array a{ 1, 2, 3 };
+
+    EXPECT_EQ(std::ranges::count(a, dross::value(2)), 1);
+    EXPECT_EQ(*std::ranges::find(std::as_const(a), dross::value(3)), dross::value(3));
 }

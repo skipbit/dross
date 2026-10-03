@@ -86,9 +86,20 @@ dictionary::iterator::iterator(const std::any& a)
 {
 }
 
+dictionary::iterator::iterator()
+    : _impl(std::make_unique<impl>(std::map<std::string, dross::value>::iterator{}))
+{
+}
+
 dictionary::iterator::iterator(const iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
 {
+}
+
+dictionary::iterator& dictionary::iterator::operator=(const iterator& i)
+{
+    *_impl = *(i._impl);
+    return *this;
 }
 
 dictionary::iterator::~iterator() = default;
@@ -97,6 +108,13 @@ dictionary::iterator& dictionary::iterator::operator++()
 {
     ++(_impl->cursor);
     return *this;
+}
+
+dictionary::iterator dictionary::iterator::operator++(int)
+{
+    iterator previous(*this);
+    ++(_impl->cursor);
+    return previous;
 }
 
 dictionary::iterator::value_type dictionary::iterator::operator*() const
@@ -129,9 +147,20 @@ dictionary::const_iterator::const_iterator(const std::any& a)
 {
 }
 
+dictionary::const_iterator::const_iterator()
+    : _impl(std::make_unique<impl>(std::map<std::string, dross::value>::const_iterator{}))
+{
+}
+
 dictionary::const_iterator::const_iterator(const const_iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
 {
+}
+
+dictionary::const_iterator& dictionary::const_iterator::operator=(const const_iterator& i)
+{
+    *_impl = *(i._impl);
+    return *this;
 }
 
 dictionary::const_iterator::~const_iterator() = default;
@@ -140,6 +169,13 @@ dictionary::const_iterator& dictionary::const_iterator::operator++()
 {
     ++(_impl->cursor);
     return *this;
+}
+
+dictionary::const_iterator dictionary::const_iterator::operator++(int)
+{
+    const_iterator previous(*this);
+    ++(_impl->cursor);
+    return previous;
 }
 
 dictionary::const_iterator::value_type dictionary::const_iterator::operator*() const

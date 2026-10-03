@@ -161,9 +161,20 @@ array::iterator::iterator(const std::any& a)
 {
 }
 
+array::iterator::iterator()
+    : _impl(std::make_unique<impl>(std::vector<value>::iterator{}))
+{
+}
+
 array::iterator::iterator(const iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
 {
+}
+
+array::iterator& array::iterator::operator=(const iterator& i)
+{
+    *_impl = *(i._impl);
+    return *this;
 }
 
 array::iterator::~iterator() = default;
@@ -174,7 +185,14 @@ array::iterator& array::iterator::operator++()
     return *this;
 }
 
-value& array::iterator::operator*()
+array::iterator array::iterator::operator++(int)
+{
+    iterator previous(*this);
+    ++(_impl->cursor);
+    return previous;
+}
+
+value& array::iterator::operator*() const
 {
     return *(_impl->cursor);
 }
@@ -204,9 +222,20 @@ array::const_iterator::const_iterator(const std::any& a)
 {
 }
 
+array::const_iterator::const_iterator()
+    : _impl(std::make_unique<impl>(std::vector<value>::const_iterator{}))
+{
+}
+
 array::const_iterator::const_iterator(const const_iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
 {
+}
+
+array::const_iterator& array::const_iterator::operator=(const const_iterator& i)
+{
+    *_impl = *(i._impl);
+    return *this;
 }
 
 array::const_iterator::~const_iterator() = default;
@@ -215,6 +244,13 @@ array::const_iterator& array::const_iterator::operator++()
 {
     ++(_impl->cursor);
     return *this;
+}
+
+array::const_iterator array::const_iterator::operator++(int)
+{
+    const_iterator previous(*this);
+    ++(_impl->cursor);
+    return previous;
 }
 
 const value& array::const_iterator::operator*() const
