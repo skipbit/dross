@@ -17,6 +17,11 @@ error::error(int value, const std::error_category& category)
 {
 }
 
+error::error(std::errc e)
+    : _code(std::make_error_code(e))
+{
+}
+
 error::~error() = default;
 
 std::string error::domain() const
@@ -47,6 +52,16 @@ std::error_condition error::condition() const noexcept
 error::operator bool() const noexcept
 {
     return _code.operator bool();
+}
+
+bool error::operator==(std::errc e) const noexcept
+{
+    return (_code.default_error_condition() == e);
+}
+
+bool error::operator!=(std::errc e) const noexcept
+{
+    return (_code.default_error_condition() != e);
 }
 
 bool error::operator==(const std::error_category& c) const noexcept

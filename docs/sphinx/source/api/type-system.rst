@@ -402,10 +402,8 @@ The ``error`` class provides structured error information:
     #include <dross/type/error.h>
 
     // error wraps a std::error_code: a numeric value plus its category.
-    // std::errc is an error *condition* enum, so it is converted explicitly
-    // rather than passed to the error_enum_type constructor.
-    dross::error err{static_cast<int>(std::errc::invalid_argument),
-                     std::generic_category()};
+    // A std::errc is stored in generic_category().
+    dross::error err{std::errc::invalid_argument};
 
     std::cout << "Domain: " << err.domain() << std::endl;
     std::cout << "Code: " << err.code() << std::endl;

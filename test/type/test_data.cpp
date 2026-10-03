@@ -208,7 +208,7 @@ TEST(data_test, at_access)
 
     auto at5 = d.at(5);
     EXPECT_FALSE(at5.has_value());
-    EXPECT_EQ(at5.error().code(), static_cast<int>(std::errc::result_out_of_range));
+    EXPECT_TRUE(at5.error() == std::errc::result_out_of_range);
 }
 
 TEST(data_test, bytes_access)

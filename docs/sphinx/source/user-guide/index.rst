@@ -134,9 +134,7 @@ Error Handling
     {
         std::ifstream input{file.string(), std::ios::binary};
         if (!input) {
-            return std::unexpected(
-                error{static_cast<int>(std::errc::no_such_file_or_directory),
-                      std::generic_category()});
+            return std::unexpected(error{std::errc::no_such_file_or_directory});
         }
 
         const std::string text{std::istreambuf_iterator<char>{input},

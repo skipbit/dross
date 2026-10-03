@@ -15,6 +15,9 @@ public:
     error();
     error(const error&);
     error(int, const std::error_category&);
+    // std::errc names error conditions rather than codes, so it gets its own
+    // constructor; the code is std::make_error_code(e), in generic_category().
+    error(std::errc);
     virtual ~error();
 
     // std::error_code's own constructor finds make_error_code by
@@ -45,6 +48,11 @@ public:
     {
         return (_code.default_error_condition() != e);
     }
+
+    // True when the code's default condition is e, so a system_category()
+    // code matches the std::errc it maps to.
+    bool operator==(std::errc) const noexcept;
+    bool operator!=(std::errc) const noexcept;
 
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;

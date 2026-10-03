@@ -227,9 +227,7 @@ produces.
             const std::string text = *serialized;
             output << text;
             if (!output) {
-                return std::unexpected(
-                    error{static_cast<int>(std::errc::io_error),
-                          std::generic_category()});
+                return std::unexpected(error{std::errc::io_error});
             }
 
             return {};

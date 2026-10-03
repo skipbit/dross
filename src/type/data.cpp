@@ -111,8 +111,7 @@ std::optional<uint8_t*> data::bytes() noexcept
 std::expected<std::reference_wrapper<const uint8_t>, error> data::at(size_t index) const noexcept
 {
     if (index >= _store->bytes.size()) {
-        auto ec = std::make_error_code(std::errc::result_out_of_range);
-        return std::unexpected(error(ec.value(), ec.category()));
+        return std::unexpected(error{ std::errc::result_out_of_range });
     }
     return std::cref(_store->bytes[index]);
 }
@@ -120,8 +119,7 @@ std::expected<std::reference_wrapper<const uint8_t>, error> data::at(size_t inde
 std::expected<std::reference_wrapper<uint8_t>, error> data::at(size_t index) noexcept
 {
     if (index >= _store->bytes.size()) {
-        auto ec = std::make_error_code(std::errc::result_out_of_range);
-        return std::unexpected(error(ec.value(), ec.category()));
+        return std::unexpected(error{ std::errc::result_out_of_range });
     }
     return std::ref(_store->bytes[index]);
 }
