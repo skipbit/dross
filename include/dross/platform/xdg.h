@@ -16,6 +16,7 @@ namespace dross {
  * Key features:
  * - XDG Base Directory Specification compliance
  * - Automatic fallback to standard directories when XDG variables are unset
+ *   or empty
  * - Application-specific subdirectory creation
  * - Cross-platform compatibility (Unix-like systems primarily)
  *
@@ -87,7 +88,7 @@ public:
      *
      * Returns the application-specific configuration directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_CONFIG_HOME/app_name if XDG_CONFIG_HOME is set
+     * - Uses $XDG_CONFIG_HOME/app_name if XDG_CONFIG_HOME is set and not empty
      * - Falls back to $HOME/.config/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -113,7 +114,7 @@ public:
      *
      * Returns the application-specific data directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_DATA_HOME/app_name if XDG_DATA_HOME is set
+     * - Uses $XDG_DATA_HOME/app_name if XDG_DATA_HOME is set and not empty
      * - Falls back to $HOME/.local/share/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -127,7 +128,7 @@ public:
      *
      * Returns the application-specific cache directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_CACHE_HOME/app_name if XDG_CACHE_HOME is set
+     * - Uses $XDG_CACHE_HOME/app_name if XDG_CACHE_HOME is set and not empty
      * - Falls back to $HOME/.cache/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -142,7 +143,7 @@ public:
      *
      * Returns the application-specific state directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_STATE_HOME/app_name if XDG_STATE_HOME is set
+     * - Uses $XDG_STATE_HOME/app_name if XDG_STATE_HOME is set and not empty
      * - Falls back to $HOME/.local/state/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
