@@ -94,7 +94,7 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Unsupported value types (only basic types and containers supported)
  * - Circular references in nested structures
  * - Invalid characters in table keys
- * - Values that cannot be represented in TOML format
+ * - Values that cannot be represented in TOML format, such as a NaN number
  * - Strings or keys that are not valid UTF-8
  *
  * Serialization rules:

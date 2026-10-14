@@ -3,7 +3,9 @@
 
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 using namespace dross;
@@ -530,6 +532,50 @@ TEST(toml_test, serialize_rejects_invalid_utf8)
         EXPECT_FALSE(result.has_value());
         if (! result.has_value()) {
             EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+        }
+    }
+}
+
+TEST(toml_test, serialize_rejects_nan)
+{
+    const std::vector<std::pair<std::string, std::function<dictionary(const number&)>>> shapes = {
+        { "value",
+          [](const number& n) {
+        dictionary d;
+        d["n"] = value(n);
+        return d;
+    } },
+        { "array element",
+          [](const number& n) {
+        array items;
+        items.append(value(number{ "1" }));
+        items.append(value(n));
+        dictionary d;
+        d["items"] = value(items);
+        return d;
+    } },
+        { "nested table",
+          [](const number& n) {
+        dictionary nested;
+        nested["n"] = value(n);
+        dictionary d;
+        d["table"] = value(nested);
+        return d;
+    } },
+    };
+
+    for (const auto& [shape, make] : shapes) {
+        SCOPED_TRACE(shape);
+
+        // The same shape with a number in place of the NaN is written.
+        EXPECT_TRUE(toml::serialize(make(number{ "2" })).has_value());
+
+        for (const auto& nan : { number::nan(), number{ "abc" } }) {
+            auto result = toml::serialize(make(nan));
+            EXPECT_FALSE(result.has_value());
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+            }
         }
     }
 }
