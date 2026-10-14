@@ -534,6 +534,34 @@ TEST(toml_test, serialize_rejects_invalid_utf8)
     }
 }
 
+TEST(toml_test, serialize_rejects_nan)
+{
+    dictionary as_value;
+    as_value["n"] = value(number::nan());
+
+    dictionary from_text;
+    from_text["n"] = value(number{ "abc" });
+
+    dictionary in_array;
+    array items;
+    items.append(value(number{ "1" }));
+    items.append(value(number::nan()));
+    in_array["items"] = value(items);
+
+    dictionary in_table;
+    dictionary nested;
+    nested["n"] = value(number::nan());
+    in_table["table"] = value(nested);
+
+    for (const auto* dict : { &as_value, &from_text, &in_array, &in_table }) {
+        auto result = toml::serialize(*dict);
+        EXPECT_FALSE(result.has_value());
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+        }
+    }
+}
+
 // Performance and Large Data Tests
 TEST(toml_test, large_document)
 {

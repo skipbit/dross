@@ -667,6 +667,9 @@ private:
         if (val.is<string>()) {
             _output += "\"" + escape_string(val.as<string>()) + "\"";
         } else if (val.is<number>()) {
+            if (val.as<number>().is_nan()) {
+                throw std::runtime_error("NaN cannot be written as a TOML value");
+            }
             _output += std::string(val.as<number>());
         } else if (val.is<boolean>()) {
             _output += val.as<boolean>() ? "true" : "false";
