@@ -505,6 +505,35 @@ TEST(toml_test, serialize_empty_dictionary)
     EXPECT_TRUE(result.value().empty());
 }
 
+TEST(toml_test, serialize_rejects_invalid_utf8)
+{
+    const std::string bad = "\xff";
+
+    dictionary in_value;
+    in_value["key"] = value(string{ bad });
+
+    dictionary in_key;
+    in_key[bad] = value(number{ "1" });
+
+    dictionary in_array;
+    array items;
+    items.append(value(string{ bad }));
+    in_array["items"] = value(items);
+
+    dictionary in_table;
+    dictionary nested;
+    nested["key"] = value(number{ "1" });
+    in_table[bad] = value(nested);
+
+    for (const auto* dict : { &in_value, &in_key, &in_array, &in_table }) {
+        auto result = toml::serialize(*dict);
+        EXPECT_FALSE(result.has_value());
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+        }
+    }
+}
+
 // Performance and Large Data Tests
 TEST(toml_test, large_document)
 {
