@@ -416,17 +416,23 @@ TEST(toml_test, invalid_utf8)
 {
     const std::vector<std::string> invalid = {
         "key = \"\xff\xfe\"",          // bytes that never appear in UTF-8
-        "key = \"\xe4\xb8\"",          // truncated sequence
+        "key = \"\x80\"",              // continuation byte without a lead
+        "key = \"\xe4\xb8\"",          // sequence cut short by the quote
+        "key = 1 # \xe4\xb8",          // sequence cut short by the end of input
         "key = \"\xc0\xaf\"",          // overlong encoding of '/'
+        "key = \"\xc1\xbf\"",          // overlong encoding of U+007F
+        "key = \"\xe0\x9f\xbf\"",      // overlong encoding of U+07FF
+        "key = \"\xf0\x8f\xbf\xbf\"",  // overlong encoding of U+FFFF
         "key = \"\xed\xa0\x80\"",      // surrogate U+D800
         "key = \"\xf4\x90\x80\x80\"",  // beyond U+10FFFF
+        "key = \"\xf5\x80\x80\x80\"",  // lead byte beyond U+10FFFF
         "key = 1 # \xff\n",            // in a comment
     };
     for (const auto& content : invalid) {
         auto result = toml::deserialize(make_data(content));
         EXPECT_FALSE(result.has_value()) << content;
         if (! result.has_value()) {
-            EXPECT_TRUE(result.error() == std::errc::invalid_argument) << content;
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << content;
         }
     }
 }
