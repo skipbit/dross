@@ -3,7 +3,9 @@
 
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 using namespace dross;
@@ -536,28 +538,44 @@ TEST(toml_test, serialize_rejects_invalid_utf8)
 
 TEST(toml_test, serialize_rejects_nan)
 {
-    dictionary as_value;
-    as_value["n"] = value(number::nan());
+    const std::vector<std::pair<std::string, std::function<dictionary(const number&)>>> shapes = {
+        { "value",
+          [](const number& n) {
+        dictionary d;
+        d["n"] = value(n);
+        return d;
+    } },
+        { "array element",
+          [](const number& n) {
+        array items;
+        items.append(value(number{ "1" }));
+        items.append(value(n));
+        dictionary d;
+        d["items"] = value(items);
+        return d;
+    } },
+        { "nested table",
+          [](const number& n) {
+        dictionary nested;
+        nested["n"] = value(n);
+        dictionary d;
+        d["table"] = value(nested);
+        return d;
+    } },
+    };
 
-    dictionary from_text;
-    from_text["n"] = value(number{ "abc" });
+    for (const auto& [shape, make] : shapes) {
+        SCOPED_TRACE(shape);
 
-    dictionary in_array;
-    array items;
-    items.append(value(number{ "1" }));
-    items.append(value(number::nan()));
-    in_array["items"] = value(items);
+        // The same shape with a number in place of the NaN is written.
+        EXPECT_TRUE(toml::serialize(make(number{ "2" })).has_value());
 
-    dictionary in_table;
-    dictionary nested;
-    nested["n"] = value(number::nan());
-    in_table["table"] = value(nested);
-
-    for (const auto* dict : { &as_value, &from_text, &in_array, &in_table }) {
-        auto result = toml::serialize(*dict);
-        EXPECT_FALSE(result.has_value());
-        if (! result.has_value()) {
-            EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+        for (const auto& nan : { number::nan(), number{ "abc" } }) {
+            auto result = toml::serialize(make(nan));
+            EXPECT_FALSE(result.has_value());
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+            }
         }
     }
 }
