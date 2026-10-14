@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <sstream>
+#include <vector>
 
 using namespace dross;
 
@@ -411,6 +412,50 @@ TEST(toml_test, invalid_array)
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(toml_test, invalid_utf8)
+{
+    const std::vector<std::string> invalid = {
+        "key = \"\xff\xfe\"",          // bytes that never appear in UTF-8
+        "key = \"\x80\"",              // continuation byte without a lead
+        "key = \"\xe4\xb8\"",          // sequence cut short by the quote
+        "key = 1 # \xe4\xb8",          // sequence cut short by the end of input
+        "key = \"\xc0\xaf\"",          // overlong encoding of '/'
+        "key = \"\xc1\xbf\"",          // overlong encoding of U+007F
+        "key = \"\xe0\x9f\xbf\"",      // overlong encoding of U+07FF
+        "key = \"\xf0\x8f\xbf\xbf\"",  // overlong encoding of U+FFFF
+        "key = \"\xed\xa0\x80\"",      // surrogate U+D800
+        "key = \"\xf4\x90\x80\x80\"",  // beyond U+10FFFF
+        "key = \"\xf5\x80\x80\x80\"",  // lead byte beyond U+10FFFF
+        "key = 1 # \xff\n",            // in a comment
+    };
+    for (const auto& content : invalid) {
+        auto result = toml::deserialize(make_data(content));
+        EXPECT_FALSE(result.has_value()) << content;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << content;
+        }
+    }
+}
+
+TEST(toml_test, utf8_boundaries)
+{
+    // U+0080, U+0800, U+D7FF, U+E000, U+10000 and U+10FFFF: the edges of
+    // the ranges the check narrows.
+    const std::vector<std::string> valid = {
+        "\xc2\x80",
+        "\xe0\xa0\x80",
+        "\xed\x9f\xbf",
+        "\xee\x80\x80",
+        "\xf0\x90\x80\x80",
+        "\xf4\x8f\xbf\xbf",
+    };
+    for (const auto& text : valid) {
+        auto result = toml::deserialize(make_data("key = \"" + text + "\""));
+        ASSERT_TRUE(result.has_value()) << text;
+        EXPECT_EQ(std::string(result.value()["key"].as<string>()), text);
+    }
+}
+
 // Edge Cases
 TEST(toml_test, whitespace_handling)
 {
@@ -458,6 +503,35 @@ TEST(toml_test, serialize_empty_dictionary)
     auto result = toml::serialize(empty_dict);
     EXPECT_TRUE(result.has_value());
     EXPECT_TRUE(result.value().empty());
+}
+
+TEST(toml_test, serialize_rejects_invalid_utf8)
+{
+    const std::string bad = "\xff";
+
+    dictionary in_value;
+    in_value["key"] = value(string{ bad });
+
+    dictionary in_key;
+    in_key[bad] = value(number{ "1" });
+
+    dictionary in_array;
+    array items;
+    items.append(value(string{ bad }));
+    in_array["items"] = value(items);
+
+    dictionary in_table;
+    dictionary nested;
+    nested["key"] = value(number{ "1" });
+    in_table[bad] = value(nested);
+
+    for (const auto* dict : { &in_value, &in_key, &in_array, &in_table }) {
+        auto result = toml::serialize(*dict);
+        EXPECT_FALSE(result.has_value());
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+        }
+    }
 }
 
 // Performance and Large Data Tests
