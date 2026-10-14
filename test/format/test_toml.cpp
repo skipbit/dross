@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <sstream>
+#include <vector>
 
 using namespace dross;
 
@@ -409,6 +410,44 @@ TEST(toml_test, invalid_array)
 {
     auto result = toml::deserialize(make_data("arr = [1, 2,"));
     EXPECT_FALSE(result.has_value());
+}
+
+TEST(toml_test, invalid_utf8)
+{
+    const std::vector<std::string> invalid = {
+        "key = \"\xff\xfe\"",          // bytes that never appear in UTF-8
+        "key = \"\xe4\xb8\"",          // truncated sequence
+        "key = \"\xc0\xaf\"",          // overlong encoding of '/'
+        "key = \"\xed\xa0\x80\"",      // surrogate U+D800
+        "key = \"\xf4\x90\x80\x80\"",  // beyond U+10FFFF
+        "key = 1 # \xff\n",            // in a comment
+    };
+    for (const auto& content : invalid) {
+        auto result = toml::deserialize(make_data(content));
+        EXPECT_FALSE(result.has_value()) << content;
+        if (! result.has_value()) {
+            EXPECT_TRUE(result.error() == std::errc::invalid_argument) << content;
+        }
+    }
+}
+
+TEST(toml_test, utf8_boundaries)
+{
+    // U+0080, U+0800, U+D7FF, U+E000, U+10000 and U+10FFFF: the edges of
+    // the ranges the check narrows.
+    const std::vector<std::string> valid = {
+        "\xc2\x80",
+        "\xe0\xa0\x80",
+        "\xed\x9f\xbf",
+        "\xee\x80\x80",
+        "\xf0\x90\x80\x80",
+        "\xf4\x8f\xbf\xbf",
+    };
+    for (const auto& text : valid) {
+        auto result = toml::deserialize(make_data("key = \"" + text + "\""));
+        ASSERT_TRUE(result.has_value()) << text;
+        EXPECT_EQ(std::string(result.value()["key"].as<string>()), text);
+    }
 }
 
 // Edge Cases
