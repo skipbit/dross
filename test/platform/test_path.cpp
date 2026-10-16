@@ -210,6 +210,7 @@ TEST(path_test, home_uses_the_password_database_when_home_is_empty)
     const struct passwd* pw = getpwuid(getuid());
     ASSERT_NE(pw, nullptr);
     ASSERT_NE(pw->pw_dir, nullptr);
+    ASSERT_NE(pw->pw_dir[0], '\0');
 
     const auto result = dross::path::home();
 

@@ -33,7 +33,7 @@ std::optional<path> path::home()
         return home.empty() ? std::nullopt : std::make_optional(path(home));
     }).or_else([]() {
         struct passwd* pw = getpwuid(getuid());
-        if (pw && pw->pw_dir) {
+        if (pw && pw->pw_dir && pw->pw_dir[0] != '\0') {
             const std::string p = pw->pw_dir;
             return std::make_optional(path{ p });
         }
