@@ -32,6 +32,10 @@ namespace dross {
  * - XDG_CACHE_HOME (default: ~/.cache)
  * - XDG_STATE_HOME (default: ~/.local/state)
  *
+ * A relative path in these variables, or in HOME, is used as it is rather
+ * than ignored as the specification asks, so the result is relative to the
+ * working directory.
+ *
  * @code
  * // Application-specific XDG directories
  * xdg app_dirs{"myapp"};
