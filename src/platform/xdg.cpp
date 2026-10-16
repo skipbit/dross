@@ -5,6 +5,18 @@
 
 namespace dross {
 
+namespace {
+
+// The XDG Base Directory specification treats an empty variable as unset.
+std::optional<std::string> variable(const std::string& name)
+{
+    return environment::value(name).and_then([](const std::string& v) {
+        return v.empty() ? std::nullopt : std::make_optional(v);
+    });
+}
+
+}  // namespace
+
 xdg::xdg(const std::string& name)
     : _name(name)
 {
@@ -12,7 +24,7 @@ xdg::xdg(const std::string& name)
 
 std::optional<std::string> xdg::config_home() const
 {
-    const auto directory = environment::value("XDG_CONFIG_HOME").or_else([]() {
+    const auto directory = variable("XDG_CONFIG_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".config").string());
         });
@@ -25,7 +37,7 @@ std::optional<std::string> xdg::config_home() const
 
 std::optional<std::string> xdg::data_home() const
 {
-    const auto directory = environment::value("XDG_DATA_HOME").or_else([]() {
+    const auto directory = variable("XDG_DATA_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".local").append("share").string());
         });
@@ -38,7 +50,7 @@ std::optional<std::string> xdg::data_home() const
 
 std::optional<std::string> xdg::cache_home() const
 {
-    const auto directory = environment::value("XDG_CACHE_HOME").or_else([]() {
+    const auto directory = variable("XDG_CACHE_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".cache").string());
         });
@@ -51,7 +63,7 @@ std::optional<std::string> xdg::cache_home() const
 
 std::optional<std::string> xdg::state_home() const
 {
-    const auto directory = environment::value("XDG_STATE_HOME").or_else([]() {
+    const auto directory = variable("XDG_STATE_HOME").or_else([]() {
         return path::home().and_then([](const path& home) {
             return std::make_optional<std::string>(home.append(".local").append("state").string());
         });

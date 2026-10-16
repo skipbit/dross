@@ -16,7 +16,8 @@ namespace dross {
  * Key features:
  * - XDG Base Directory Specification compliance
  * - Automatic fallback to standard directories when XDG variables are unset
- * - Application-specific subdirectory creation
+ *   or empty
+ * - Application-specific subdirectory paths
  * - Cross-platform compatibility (Unix-like systems primarily)
  *
  * XDG directories:
@@ -30,6 +31,10 @@ namespace dross {
  * - XDG_DATA_HOME (default: ~/.local/share)
  * - XDG_CACHE_HOME (default: ~/.cache)
  * - XDG_STATE_HOME (default: ~/.local/state)
+ *
+ * A relative path in these variables, or in HOME, is used as it is rather
+ * than ignored as the specification asks, so the result is relative to the
+ * working directory.
  *
  * @code
  * // Application-specific XDG directories
@@ -63,11 +68,11 @@ class xdg {
 public:
     /**
      * @brief Construct XDG directory helper for a specific application.
-     * @param app_name The name of the application for directory creation
+     * @param app_name The name of the application, used as the subdirectory name
      *
-     * Creates an XDG directory helper that will create application-specific
-     * subdirectories within the standard XDG base directories. The application
-     * name is used as the subdirectory name.
+     * Creates an XDG directory helper that returns application-specific
+     * subdirectory paths within the standard XDG base directories. It does
+     * not create them. The application name is used as the subdirectory name.
      *
      * The application name should be:
      * - A valid directory name (no path separators)
@@ -76,7 +81,7 @@ public:
      *
      * @code
      * xdg app_dirs{"my-awesome-app"};
-     * // Will create directories like ~/.config/my-awesome-app/
+     * // Names directories like ~/.config/my-awesome-app/
      * @endcode
      */
     xdg(const std::string& app_name);
@@ -87,7 +92,7 @@ public:
      *
      * Returns the application-specific configuration directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_CONFIG_HOME/app_name if XDG_CONFIG_HOME is set
+     * - Uses $XDG_CONFIG_HOME/app_name if XDG_CONFIG_HOME is set and not empty
      * - Falls back to $HOME/.config/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -113,7 +118,7 @@ public:
      *
      * Returns the application-specific data directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_DATA_HOME/app_name if XDG_DATA_HOME is set
+     * - Uses $XDG_DATA_HOME/app_name if XDG_DATA_HOME is set and not empty
      * - Falls back to $HOME/.local/share/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -127,7 +132,7 @@ public:
      *
      * Returns the application-specific cache directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_CACHE_HOME/app_name if XDG_CACHE_HOME is set
+     * - Uses $XDG_CACHE_HOME/app_name if XDG_CACHE_HOME is set and not empty
      * - Falls back to $HOME/.cache/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -142,7 +147,7 @@ public:
      *
      * Returns the application-specific state directory according to
      * XDG Base Directory Specification:
-     * - Uses $XDG_STATE_HOME/app_name if XDG_STATE_HOME is set
+     * - Uses $XDG_STATE_HOME/app_name if XDG_STATE_HOME is set and not empty
      * - Falls back to $HOME/.local/state/app_name
      * - Returns std::nullopt if HOME cannot be determined
      *
@@ -152,7 +157,7 @@ public:
     std::optional<std::string> state_home() const;
 
 private:
-    std::string _name;  ///< Application name for directory creation
+    std::string _name;  ///< Application name used as the subdirectory name
 };
 
 }  // namespace dross
