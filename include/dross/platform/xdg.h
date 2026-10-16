@@ -17,7 +17,7 @@ namespace dross {
  * - XDG Base Directory Specification compliance
  * - Automatic fallback to standard directories when XDG variables are unset
  *   or empty
- * - Application-specific subdirectory creation
+ * - Application-specific subdirectory paths
  * - Cross-platform compatibility (Unix-like systems primarily)
  *
  * XDG directories:
@@ -68,11 +68,11 @@ class xdg {
 public:
     /**
      * @brief Construct XDG directory helper for a specific application.
-     * @param app_name The name of the application for directory creation
+     * @param app_name The name of the application, used as the subdirectory name
      *
-     * Creates an XDG directory helper that will create application-specific
-     * subdirectories within the standard XDG base directories. The application
-     * name is used as the subdirectory name.
+     * Creates an XDG directory helper that returns application-specific
+     * subdirectory paths within the standard XDG base directories. It does
+     * not create them. The application name is used as the subdirectory name.
      *
      * The application name should be:
      * - A valid directory name (no path separators)
@@ -81,7 +81,7 @@ public:
      *
      * @code
      * xdg app_dirs{"my-awesome-app"};
-     * // Will create directories like ~/.config/my-awesome-app/
+     * // Names directories like ~/.config/my-awesome-app/
      * @endcode
      */
     xdg(const std::string& app_name);
@@ -157,7 +157,7 @@ public:
     std::optional<std::string> state_home() const;
 
 private:
-    std::string _name;  ///< Application name for directory creation
+    std::string _name;  ///< Application name used as the subdirectory name
 };
 
 }  // namespace dross
