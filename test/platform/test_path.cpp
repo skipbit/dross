@@ -208,14 +208,15 @@ TEST(path_test, home_uses_the_password_database_when_home_is_empty)
     scoped_env_var home("HOME");
     home.set("");
     const struct passwd* pw = getpwuid(getuid());
-    ASSERT_NE(pw, nullptr);
-    ASSERT_NE(pw->pw_dir, nullptr);
-    ASSERT_NE(pw->pw_dir[0], '\0');
+    if (pw == nullptr || pw->pw_dir == nullptr || pw->pw_dir[0] == '\0') {
+        GTEST_SKIP() << "the password database has no home directory for this user";
+    }
+    const std::string pw_dir = pw->pw_dir;
 
     const auto result = dross::path::home();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->string(), dross::path{ std::string{ pw->pw_dir } }.string());
+    EXPECT_EQ(result->string(), dross::path{ pw_dir }.string());
 }
 
 // --- path::expand --------------------------------------------------------
