@@ -22,9 +22,10 @@ Fixed
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
   directory
-- ``path::expand()`` expands only ``~`` alone or a leading ``~/``. A path
-  such as ``~backup.txt`` or ``~user/x`` is returned unchanged instead of
-  being joined to the current user's home directory
+- ``path::expand()`` and ``path::resolve()`` expand only ``~`` alone or a
+  leading ``~/``. A path such as ``~backup.txt`` or ``~user/x`` is no
+  longer joined to the current user's home directory: ``expand()`` returns
+  it unchanged and ``resolve()`` resolves it against the working directory
 
 0.1.0 - 2026-10-04
 ------------------

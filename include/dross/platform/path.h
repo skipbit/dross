@@ -250,6 +250,9 @@ public:
      *
      * Converts the path to an absolute path and resolves any symbolic links,
      * "." and ".." components. The resulting path is in canonical form.
+     * It first expands "~" alone or a leading "~/" as expand() does, so any
+     * other path starting with "~" is resolved against the working
+     * directory.
      *
      * @code
      * path relative{std::string{"../config/../data/file.txt"}};
