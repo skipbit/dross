@@ -270,6 +270,38 @@ TEST(path_test, expand_of_a_tilde_path_to_a_nonexistent_target_does_not_terminat
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(path_test, expand_of_a_tilde_slash_path_joins_the_home_directory)
+{
+    const scoped_temp_dir base;
+    std::filesystem::create_directories(base.path() / "x");
+    scoped_env_var home("HOME");
+    home.set(base.path().string());
+
+    const auto result = dross::path{ std::string{ "~/x" } }.expand();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->string(), std::filesystem::canonical(base.path() / "x").string());
+}
+
+TEST(path_test, expand_of_a_name_starting_with_a_tilde_is_returned_unchanged)
+{
+    // The home directory holds the target the old rule produced, so the
+    // test fails on the expansion itself and not on a missing file.
+    const scoped_temp_dir base;
+    std::filesystem::create_directories(base.path() / "backup.txt");
+    std::filesystem::create_directories(base.path() / "root" / "x");
+    scoped_env_var home("HOME");
+    home.set(base.path().string());
+
+    for (const std::string original : { "~backup.txt", "~root/x" }) {
+        SCOPED_TRACE(original);
+        const auto result = dross::path{ original }.expand();
+
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ(result->string(), original);
+    }
+}
+
 TEST(path_test, expand_of_a_non_tilde_path_is_returned_unchanged)
 {
     const std::string original = "relative/does/not/exist";

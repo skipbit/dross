@@ -90,7 +90,8 @@ std::string path::string() const
 
 std::expected<path, std::filesystem::filesystem_error> path::expand() const
 {
-    if (_path.string().substr(0, 1) == "~") {
+    const auto text = _path.string();
+    if (text == "~" || text.starts_with("~/")) {
         const auto expanded = path::home().and_then([&](const path& p) {
             return std::make_optional(p.append(_path.string().replace(0, 1, "")).string());
         });

@@ -227,7 +227,8 @@ public:
      * canonicalises the result — the returned path has symbolic links
      * resolved. Because canonicalisation requires the target to exist,
      * expand() returns unexpected when the expanded path does not (yet)
-     * exist. A path that does not start with "~" is returned unchanged
+     * exist. Only "~" alone or a path starting with "~/" is expanded. Any
+     * other path, including "~name" and "~user/...", is returned unchanged
      * and always succeeds.
      *
      * @code
