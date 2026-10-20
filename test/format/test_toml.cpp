@@ -580,6 +580,27 @@ TEST(toml_test, serialize_rejects_nan)
     }
 }
 
+TEST(toml_test, serialize_rejects_integers_outside_64_bits)
+{
+    for (const auto& text : { "9223372036854775807", "-9223372036854775808" }) {
+        SCOPED_TRACE(text);
+        dictionary d;
+        d["n"] = value(number{ text });
+        EXPECT_TRUE(toml::serialize(d).has_value());
+    }
+
+    for (const auto& text : { "9223372036854775808", "-9223372036854775809", "1e30" }) {
+        SCOPED_TRACE(text);
+        dictionary d;
+        d["n"] = value(number{ text });
+        auto result = toml::serialize(d);
+        EXPECT_FALSE(result.has_value());
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::operation_not_supported);
+        }
+    }
+}
+
 // Performance and Large Data Tests
 TEST(toml_test, large_document)
 {

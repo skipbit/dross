@@ -667,10 +667,14 @@ private:
         if (val.is<string>()) {
             _output += "\"" + escape_string(val.as<string>()) + "\"";
         } else if (val.is<number>()) {
-            if (val.as<number>().is_nan()) {
+            const auto& n = val.as<number>();
+            if (n.is_nan()) {
                 throw std::runtime_error("NaN cannot be written as a TOML value");
             }
-            _output += std::string(val.as<number>());
+            if (n.is_integer() && (n > number{ "9223372036854775807" } || n < number{ "-9223372036854775808" })) {
+                throw std::runtime_error("TOML integers are limited to 64 bits");
+            }
+            _output += std::string(n);
         } else if (val.is<boolean>()) {
             _output += val.as<boolean>() ? "true" : "false";
         } else if (val.is<array>()) {

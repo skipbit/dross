@@ -95,6 +95,7 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Circular references in nested structures
  * - Invalid characters in table keys
  * - Values that cannot be represented in TOML format, such as a NaN number
+ *   or an integer outside the 64-bit range
  * - Strings or keys that are not valid UTF-8
  *
  * Serialization rules:

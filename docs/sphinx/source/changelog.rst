@@ -18,6 +18,8 @@ Fixed
   valid UTF-8
 - ``toml::serialize()`` fails with ``std::errc::operation_not_supported``
   on a NaN number instead of writing ``NaN``, which is not a TOML value
+- ``toml::serialize()`` fails with ``std::errc::operation_not_supported``
+  on an integer outside the 64-bit range, which TOML integers cannot hold
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
