@@ -227,7 +227,8 @@ public:
      * canonicalises the result — the returned path has symbolic links
      * resolved. Because canonicalisation requires the target to exist,
      * expand() returns unexpected when the expanded path does not (yet)
-     * exist. A path that does not start with "~" is returned unchanged
+     * exist. Only "~" alone or a path starting with "~/" is expanded. Any
+     * other path, including "~name" and "~user/...", is returned unchanged
      * and always succeeds.
      *
      * @code
@@ -249,6 +250,9 @@ public:
      *
      * Converts the path to an absolute path and resolves any symbolic links,
      * "." and ".." components. The resulting path is in canonical form.
+     * It first expands "~" alone or a leading "~/" as expand() does, so any
+     * other path starting with "~" is resolved against the working
+     * directory.
      *
      * @code
      * path relative{std::string{"../config/../data/file.txt"}};

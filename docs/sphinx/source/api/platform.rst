@@ -84,12 +84,12 @@ The ``path`` class provides filesystem path operations:
         std::cout << "The relative path exists" << std::endl;
     }
 
-    // Expand a leading ~ to the home directory. For a ~ path, expand()
-    // canonicalises and turns any failure the standard library reports as
-    // a std::filesystem::filesystem_error -- a missing target, a
-    // permission problem, a symlink loop -- into the returned
-    // std::expected instead of letting it escape. A path that does not
-    // begin with ~ is returned unchanged.
+    // Expand ~ alone or a leading ~/ to the home directory. For such a
+    // path, expand() canonicalises and turns any failure the standard
+    // library reports as a std::filesystem::filesystem_error -- a missing
+    // target, a permission problem, a symlink loop -- into the returned
+    // std::expected instead of letting it escape. Any other path,
+    // including ~name, is returned unchanged.
     dross::path user_config{std::string{"~/.config/app"}};
     if (auto expanded = user_config.expand()) {
         std::cout << "Expanded: " << expanded->string() << std::endl;
@@ -112,7 +112,7 @@ Filesystem Operations
 Operations that consult the filesystem:
 
 - **exists()** - Check whether the path exists
-- **expand()** - Expand a leading ``~`` to the home directory
+- **expand()** - Expand ``~`` alone or a leading ``~/`` to the home directory
 - **resolve()** - Convert to an absolute, canonical path
 - **mkdir()** - Create a directory and any missing parents (static)
 - **home()** - Get the user's home directory (static)
@@ -142,11 +142,12 @@ Some caveats apply to the current implementation:
   group- or world-writable. A caller who needs any of that has to arrange
   it separately.
 - ``expand()`` routes canonicalisation failures through its return type.
-  For a path beginning with ``~`` it canonicalises and converts any error
-  the standard library reports as a ``std::filesystem::filesystem_error``
-  — a missing target, a permission problem, a symlink loop, an invalid
-  component — into the returned ``std::expected`` rather than letting it
-  escape. A path that does not begin with ``~`` is returned unchanged.
+  For ``~`` alone or a path beginning with ``~/`` it canonicalises and
+  converts any error the standard library reports as a
+  ``std::filesystem::filesystem_error`` — a missing target, a permission
+  problem, a symlink loop, an invalid component — into the returned
+  ``std::expected`` rather than letting it escape. Any other path,
+  including ``~name`` and ``~user/...``, is returned unchanged.
   Home directory resolution failing (``path::home()`` returning
   ``std::nullopt``) is reported the same way.
 - ``exists()`` calls the throwing form of ``std::filesystem::exists``. An
@@ -214,6 +215,12 @@ Every accessor returns ``std::optional<std::string>`` and yields
 ``std::nullopt`` when the home directory cannot be determined. The directory
 itself is not created for you — pass the result to ``path::mkdir()``, which
 accepts an already-present directory as success.
+
+An ``XDG_*`` variable set to the empty string is treated as unset, and the
+default under the home directory is used. A relative path in an ``XDG_*``
+variable is used as it is rather than ignored as the specification asks,
+and so is a relative ``HOME``. Either way the result is relative to the
+working directory.
 
 Example Usage
 ~~~~~~~~~~~~~

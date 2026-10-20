@@ -9,6 +9,27 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Unreleased
 ----------
 
+Fixed
+~~~~~
+
+- ``toml::deserialize()`` rejects input that is not valid UTF-8 with
+  ``std::errc::invalid_argument``, and ``toml::serialize()`` fails with
+  ``std::errc::operation_not_supported`` on a string or key that is not
+  valid UTF-8
+- ``toml::serialize()`` fails with ``std::errc::operation_not_supported``
+  on a NaN number instead of writing ``NaN``, which is not a TOML value
+- ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
+  ``XDG_*`` variable as unset, and ``path::home()`` returns
+  ``std::nullopt`` when the password database entry has an empty home
+  directory
+- ``path::expand()`` and ``path::resolve()`` expand only ``~`` alone or a
+  leading ``~/``. A path such as ``~backup.txt`` or ``~user/x`` is no
+  longer joined to the current user's home directory: ``expand()`` returns
+  it unchanged and ``resolve()`` resolves it against the working directory
+
+0.1.0 - 2026-10-04
+------------------
+
 Added
 ~~~~~
 
