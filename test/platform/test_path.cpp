@@ -362,6 +362,20 @@ TEST(path_test, resolve_of_a_tilde_path_to_a_missing_target_returns_unexpected)
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(path_test, resolve_of_a_name_starting_with_a_tilde_does_not_use_home)
+{
+    const scoped_temp_dir base;
+    std::filesystem::create_directories(base.path() / "backup.txt");
+
+    scoped_env_var home("HOME");
+    home.set(base.path().string());
+
+    const auto result = dross::path{ std::string{ "~backup.txt" } }.resolve();
+
+    const auto under_home = std::filesystem::canonical(base.path() / "backup.txt").string();
+    EXPECT_FALSE(result.has_value() && result->string() == under_home);
+}
+
 // --- path::exists / default constructor (pinning current, unmodified behavior) ---
 
 TEST(path_test, exists_is_false_for_a_missing_path)
