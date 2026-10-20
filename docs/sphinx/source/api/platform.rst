@@ -218,8 +218,9 @@ accepts an already-present directory as success.
 
 An ``XDG_*`` variable set to the empty string is treated as unset, and the
 default under the home directory is used. A relative path in an ``XDG_*``
-variable or in ``HOME`` is used as it is rather than ignored as the
-specification asks, so the result is relative to the working directory.
+variable is used as it is rather than ignored as the specification asks,
+and so is a relative ``HOME``. Either way the result is relative to the
+working directory.
 
 Example Usage
 ~~~~~~~~~~~~~
