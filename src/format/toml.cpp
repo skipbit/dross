@@ -667,10 +667,17 @@ private:
         if (val.is<string>()) {
             _output += "\"" + escape_string(val.as<string>()) + "\"";
         } else if (val.is<number>()) {
-            if (val.as<number>().is_nan()) {
+            const auto& n = val.as<number>();
+            if (n.is_nan()) {
                 throw std::runtime_error("NaN cannot be written as a TOML value");
             }
-            _output += std::string(val.as<number>());
+            _output += std::string(n);
+            // TOML integers are 64-bit, so a larger integral value is written as a float.
+            static const number int64_max{ "9223372036854775807" };
+            static const number int64_min{ "-9223372036854775808" };
+            if (n.is_integer() && (n > int64_max || n < int64_min)) {
+                _output += ".0";
+            }
         } else if (val.is<boolean>()) {
             _output += val.as<boolean>() ? "true" : "false";
         } else if (val.is<array>()) {

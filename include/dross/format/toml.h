@@ -105,6 +105,9 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Numbers are written in number's canonical form, without trailing zeros.
  *   number does not record whether it was a TOML integer or float, so a
  *   float whose fraction is all zeros (1.0) is written as an integer (1).
+ *   An integral value outside the 64-bit range of TOML integers is written
+ *   as a float (9223372036854775808.0). dross reads it back exactly, but a
+ *   reader that holds floats as 64-bit doubles may round it.
  *
  * @note The serializer produces clean, readable TOML output
  *       suitable for human editing and version control.
