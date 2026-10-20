@@ -216,6 +216,11 @@ Every accessor returns ``std::optional<std::string>`` and yields
 itself is not created for you — pass the result to ``path::mkdir()``, which
 accepts an already-present directory as success.
 
+An ``XDG_*`` variable set to the empty string is treated as unset, and the
+default under the home directory is used. A relative path in an ``XDG_*``
+variable or in ``HOME`` is used as it is rather than ignored as the
+specification asks, so the result is relative to the working directory.
+
 Example Usage
 ~~~~~~~~~~~~~
 
