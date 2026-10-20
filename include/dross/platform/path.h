@@ -125,6 +125,7 @@ public:
      *
      * Reads the $HOME environment variable, and falls back to the password
      * database entry of the current user when it is not set or is empty.
+     * A relative HOME is returned as it is, not resolved or ignored.
      *
      * @code
      * if (auto home = path::home()) {
