@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <pwd.h>
 #include <stdlib.h>
 #include <string>
 #include <system_error>
@@ -198,6 +199,24 @@ TEST(path_test, mkdir_on_a_symlink_that_resolves_to_a_directory_succeeds)
     const auto result = dross::path::mkdir(link.string());
 
     ASSERT_TRUE(result.has_value());
+}
+
+// --- path::home ----------------------------------------------------------
+
+TEST(path_test, home_uses_the_password_database_when_home_is_empty)
+{
+    scoped_env_var home("HOME");
+    home.set("");
+    const struct passwd* pw = getpwuid(getuid());
+    if (pw == nullptr || pw->pw_dir == nullptr || pw->pw_dir[0] == '\0') {
+        GTEST_SKIP() << "the password database has no home directory for this user";
+    }
+    const std::string pw_dir = pw->pw_dir;
+
+    const auto result = dross::path::home();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->string(), dross::path{ pw_dir }.string());
 }
 
 // --- path::expand --------------------------------------------------------
