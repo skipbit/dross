@@ -439,6 +439,40 @@ TEST(toml_test, invalid_utf8)
     }
 }
 
+TEST(toml_test, control_characters)
+{
+    // '@' marks where the character goes in each form.
+    const std::vector<std::pair<std::string, std::string>> forms = {
+        { "string", "key = \"a@b\"\n" },
+        { "quoted key", "\"a@b\" = 1\n" },
+        { "comment", "key = 1 # a@b\n" },
+    };
+    const auto with = [](std::string form, char c) {
+        form[form.find('@')] = c;
+        return form;
+    };
+
+    for (const auto& [name, form] : forms) {
+        SCOPED_TRACE(name);
+
+        EXPECT_TRUE(toml::deserialize(make_data(with(form, '\t'))).has_value());
+
+        for (const char c : { '\x00', '\x01', '\x08', '\n', '\x0b', '\r', '\x1f', '\x7f' }) {
+            if ((name == "comment") && (c == '\n')) {
+                continue;  // a newline ends a comment
+            }
+            SCOPED_TRACE(static_cast<int>(c));
+            auto result = toml::deserialize(make_data(with(form, c)));
+            EXPECT_FALSE(result.has_value());
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::invalid_argument);
+            }
+        }
+    }
+
+    EXPECT_TRUE(toml::deserialize(make_data("key = 1 # a\r\n")).has_value());
+}
+
 TEST(toml_test, utf8_boundaries)
 {
     // U+0080, U+0800, U+D7FF, U+E000, U+10000 and U+10FFFF: the edges of

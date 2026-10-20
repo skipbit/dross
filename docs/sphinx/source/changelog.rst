@@ -16,6 +16,9 @@ Fixed
   ``std::errc::invalid_argument``, and ``toml::serialize()`` fails with
   ``std::errc::operation_not_supported`` on a string or key that is not
   valid UTF-8
+- ``toml::deserialize()`` rejects a control character other than tab in a
+  string, a quoted key or a comment with ``std::errc::invalid_argument``,
+  as TOML requires, instead of keeping it
 - ``toml::serialize()`` fails with ``std::errc::operation_not_supported``
   on a NaN number instead of writing ``NaN``, which is not a TOML value
 - ``toml::serialize()`` writes an integral value outside the 64-bit range

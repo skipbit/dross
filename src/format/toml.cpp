@@ -64,6 +64,13 @@ bool is_valid_utf8(const std::string& text)
     return true;
 }
 
+// TOML allows no control character other than tab in strings and comments.
+bool is_forbidden_control(char c)
+{
+    const auto byte = static_cast<unsigned char>(c);
+    return ((byte < 0x20) && (byte != '\t')) || (byte == 0x7F);
+}
+
 /**
  * @brief TOML parser implementation using recursive descent parsing.
  *
@@ -152,6 +159,9 @@ private:
             if (current_char() == '#') {
                 // Skip comment to end of line
                 while ((_pos < _input.size()) && (current_char() != '\n')) {
+                    if (is_forbidden_control(current_char()) && ! ((current_char() == '\r') && (peek_char() == '\n'))) {
+                        throw std::runtime_error("Control character in comment");
+                    }
                     advance();
                 }
             }
@@ -354,6 +364,8 @@ private:
                 default:
                     return std::unexpected(create_error("Invalid escape sequence"));
                 }
+            } else if (is_forbidden_control(current_char())) {
+                return std::unexpected(create_error("Control character in quoted key"));
             } else {
                 result += current_char();
             }
@@ -429,6 +441,8 @@ private:
                 default:
                     return std::unexpected(create_error("Invalid escape sequence"));
                 }
+            } else if (is_forbidden_control(current_char())) {
+                return std::unexpected(create_error("Control character in string"));
             } else {
                 result += current_char();
             }
