@@ -580,25 +580,42 @@ TEST(toml_test, serialize_rejects_nan)
     }
 }
 
-TEST(toml_test, serialize_rejects_integers_outside_64_bits)
+TEST(toml_test, serialize_writes_integers_outside_64_bits_as_floats)
 {
-    for (const auto& text : { "9223372036854775807", "-9223372036854775808" }) {
-        SCOPED_TRACE(text);
-        dictionary d;
-        d["n"] = value(number{ text });
-        EXPECT_TRUE(toml::serialize(d).has_value());
-    }
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "9223372036854775807", "n = 9223372036854775807\n" },
+        { "-9223372036854775808", "n = -9223372036854775808\n" },
+        { "9223372036854775808", "n = 9223372036854775808.0\n" },
+        { "-9223372036854775809", "n = -9223372036854775809.0\n" },
+        { "1e30", "n = 1000000000000000000000000000000.0\n" },
+        { "9223372036854775808.5", "n = 9223372036854775808.5\n" },
+    };
 
-    for (const auto& text : { "9223372036854775808", "-9223372036854775809", "1e30" }) {
+    for (const auto& [text, expected] : cases) {
         SCOPED_TRACE(text);
         dictionary d;
         d["n"] = value(number{ text });
-        auto result = toml::serialize(d);
-        EXPECT_FALSE(result.has_value());
-        if (! result.has_value()) {
-            EXPECT_EQ(result.error(), std::errc::operation_not_supported);
-        }
+
+        auto written = toml::serialize(d);
+        ASSERT_TRUE(written.has_value());
+        EXPECT_EQ(std::string(*written), expected);
+
+        auto read = toml::deserialize(*written);
+        ASSERT_TRUE(read.has_value());
+        EXPECT_EQ((*read)["n"].as<number>(), number{ text });
     }
+}
+
+TEST(toml_test, serialize_writes_back_a_large_float_it_read)
+{
+    const std::string document = "x = 10000000000000000000.0\n";
+
+    auto read = toml::deserialize(data{ document });
+    ASSERT_TRUE(read.has_value());
+
+    auto written = toml::serialize(*read);
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(std::string(*written), document);
 }
 
 // Performance and Large Data Tests
