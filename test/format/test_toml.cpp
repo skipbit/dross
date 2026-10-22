@@ -74,6 +74,16 @@ TEST(toml_test, quoted_keys)
     EXPECT_EQ(std::string(dict["special key"].as<string>()), "value");
 }
 
+TEST(toml_test, quoted_keys_read_the_same_escapes_as_strings)
+{
+    auto result = toml::deserialize(make_data(R"("a\bb\fc" = "a\bb\fc")"));
+    ASSERT_TRUE(result.has_value());
+
+    auto& dict = result.value();
+    ASSERT_TRUE(dict.contains("a\bb\fc"));
+    EXPECT_EQ(std::string(dict["a\bb\fc"].as<string>()), "a\bb\fc");
+}
+
 // Number Tests
 TEST(toml_test, integer_values)
 {

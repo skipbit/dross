@@ -332,6 +332,12 @@ private:
 
     std::expected<std::string, error> parse_quoted_key()
     {
+        return parse_basic_string("quoted key");
+    }
+
+    // Reads a double-quoted string, which TOML uses for both values and keys.
+    std::expected<std::string, error> parse_basic_string(const std::string& kind)
+    {
         if (current_char() != '"') {
             return std::unexpected(create_error("Expected '\"'"));
         }
@@ -342,7 +348,7 @@ private:
             if (current_char() == '\\') {
                 advance();
                 if (_pos >= _input.size()) {
-                    return std::unexpected(create_error("Unterminated quoted key"));
+                    return std::unexpected(create_error("Unterminated " + kind));
                 }
                 // Handle escape sequences
                 switch (current_char()) {
@@ -361,11 +367,17 @@ private:
                 case 'r':
                     result += '\r';
                     break;
+                case 'b':
+                    result += '\b';
+                    break;
+                case 'f':
+                    result += '\f';
+                    break;
                 default:
                     return std::unexpected(create_error("Invalid escape sequence"));
                 }
             } else if (is_forbidden_control(current_char())) {
-                return std::unexpected(create_error("Control character in quoted key"));
+                return std::unexpected(create_error("Control character in " + kind));
             } else {
                 result += current_char();
             }
@@ -373,7 +385,7 @@ private:
         }
 
         if (current_char() != '"') {
-            return std::unexpected(create_error("Unterminated quoted key"));
+            return std::unexpected(create_error("Unterminated " + kind));
         }
         advance();  // skip closing quote
 
@@ -403,58 +415,9 @@ private:
 
     std::expected<value, error> parse_string()
     {
-        if (current_char() != '"') {
-            return std::unexpected(create_error("Expected '\"'"));
-        }
-        advance();  // skip opening quote
-
-        std::string result;
-        while ((_pos < _input.size()) && (current_char() != '"')) {
-            if (current_char() == '\\') {
-                advance();
-                if (_pos >= _input.size()) {
-                    return std::unexpected(create_error("Unterminated string"));
-                }
-                // Handle escape sequences
-                switch (current_char()) {
-                case '"':
-                    result += '"';
-                    break;
-                case '\\':
-                    result += '\\';
-                    break;
-                case 'n':
-                    result += '\n';
-                    break;
-                case 't':
-                    result += '\t';
-                    break;
-                case 'r':
-                    result += '\r';
-                    break;
-                case 'b':
-                    result += '\b';
-                    break;
-                case 'f':
-                    result += '\f';
-                    break;
-                default:
-                    return std::unexpected(create_error("Invalid escape sequence"));
-                }
-            } else if (is_forbidden_control(current_char())) {
-                return std::unexpected(create_error("Control character in string"));
-            } else {
-                result += current_char();
-            }
-            advance();
-        }
-
-        if (current_char() != '"') {
-            return std::unexpected(create_error("Unterminated string"));
-        }
-        advance();  // skip closing quote
-
-        return value(string{ result });
+        return parse_basic_string("string").transform([](const std::string& text) {
+            return value(string{ text });
+        });
     }
 
     std::expected<value, error> parse_array()

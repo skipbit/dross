@@ -19,6 +19,9 @@ Fixed
 - ``toml::deserialize()`` rejects a control character other than tab in a
   string, a quoted key or a comment with ``std::errc::invalid_argument``,
   as TOML requires, instead of keeping it
+- ``toml::deserialize()`` reads the ``\b`` and ``\f`` escapes in a quoted
+  key as it does in a string, so a key that ``toml::serialize()`` wrote
+  with them reads back
 - ``toml::serialize()`` fails with ``std::errc::operation_not_supported``
   on a NaN number instead of writing ``NaN``, which is not a TOML value
 - ``toml::serialize()`` writes an integral value outside the 64-bit range
