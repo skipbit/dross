@@ -84,6 +84,39 @@ TEST(toml_test, quoted_keys_read_the_same_escapes_as_strings)
     EXPECT_EQ(std::string(dict["a\bb\fc"].as<string>()), "a\bb\fc");
 }
 
+TEST(toml_test, unicode_escapes)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { R"(\u0041)", "A" },
+        { R"(\u00e9)", "\xC3\xA9" },
+        { R"(\u3042)", "\xE3\x81\x82" },
+        { R"(\U0001F600)", "\xF0\x9F\x98\x80" },
+        { R"(\u0001)", "\x01" },
+        { R"(\u007F)", "\x7F" },
+    };
+    for (const auto& [escape, expected] : cases) {
+        auto result = toml::deserialize(make_data("\"k" + escape + "\" = \"v" + escape + "\""));
+        ASSERT_TRUE(result.has_value()) << escape;
+
+        auto& dict = result.value();
+        ASSERT_TRUE(dict.contains("k" + expected)) << escape;
+        EXPECT_EQ(std::string(dict["k" + expected].as<string>()), "v" + expected) << escape;
+    }
+}
+
+TEST(toml_test, invalid_unicode_escapes)
+{
+    for (const std::string escape : { R"(\u004)", R"(\u12G4)", R"(\uD800)", R"(\uDFFF)", R"(\U00110000)", R"(\U0000D800)" }) {
+        for (const auto& text : { "k = \"" + escape + "\"", "\"" + escape + "\" = 1" }) {
+            auto result = toml::deserialize(make_data(text));
+            EXPECT_FALSE(result.has_value()) << text;
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+            }
+        }
+    }
+}
+
 // Number Tests
 TEST(toml_test, integer_values)
 {

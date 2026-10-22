@@ -22,6 +22,9 @@ Fixed
 - ``toml::deserialize()`` reads the ``\b`` and ``\f`` escapes in a quoted
   key as it does in a string, so a key that ``toml::serialize()`` wrote
   with them reads back
+- ``toml::deserialize()`` reads the ``\uXXXX`` and ``\UXXXXXXXX`` escapes
+  in strings and quoted keys, and rejects one that does not name a Unicode
+  scalar value with ``std::errc::invalid_argument``
 - ``toml::serialize()`` fails with ``std::errc::operation_not_supported``
   on a NaN number instead of writing ``NaN``, which is not a TOML value
 - ``toml::serialize()`` writes an integral value outside the 64-bit range

@@ -71,6 +71,26 @@ bool is_forbidden_control(char c)
     return ((byte < 0x20) && (byte != '\t')) || (byte == 0x7F);
 }
 
+// Appends a Unicode scalar value (no surrogates, at most U+10FFFF) as UTF-8.
+void append_utf8(std::string& text, char32_t code_point)
+{
+    if (code_point <= 0x7F) {
+        text += static_cast<char>(code_point);
+    } else if (code_point <= 0x7FF) {
+        text += static_cast<char>(0xC0 | (code_point >> 6));
+        text += static_cast<char>(0x80 | (code_point & 0x3F));
+    } else if (code_point <= 0xFFFF) {
+        text += static_cast<char>(0xE0 | (code_point >> 12));
+        text += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
+        text += static_cast<char>(0x80 | (code_point & 0x3F));
+    } else {
+        text += static_cast<char>(0xF0 | (code_point >> 18));
+        text += static_cast<char>(0x80 | ((code_point >> 12) & 0x3F));
+        text += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
+        text += static_cast<char>(0x80 | (code_point & 0x3F));
+    }
+}
+
 /**
  * @brief TOML parser implementation using recursive descent parsing.
  *
@@ -373,6 +393,25 @@ private:
                 case 'f':
                     result += '\f';
                     break;
+                case 'u':
+                case 'U': {
+                    // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
+                    const size_t digits = (current_char() == 'u') ? 4 : 8;
+                    for (size_t k = 1; k <= digits; ++k) {
+                        if (! std::isxdigit(static_cast<unsigned char>(peek_char(k)))) {
+                            return std::unexpected(create_error("Invalid unicode escape"));
+                        }
+                    }
+                    const auto code_point = static_cast<char32_t>(std::stoul(_input.substr(_pos + 1, digits), nullptr, 16));
+                    if (((code_point >= 0xD800) && (code_point <= 0xDFFF)) || (code_point > 0x10FFFF)) {
+                        return std::unexpected(create_error("Invalid unicode escape"));
+                    }
+                    append_utf8(result, code_point);
+                    for (size_t k = 0; k < digits; ++k) {
+                        advance();
+                    }
+                    break;
+                }
                 default:
                     return std::unexpected(create_error("Invalid escape sequence"));
                 }
