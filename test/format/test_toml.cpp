@@ -541,6 +541,57 @@ TEST(toml_test, control_characters)
     EXPECT_TRUE(toml::deserialize(make_data("key = 1 # a\r\n")).has_value());
 }
 
+TEST(toml_test, control_characters_outside_strings)
+{
+    // '@' marks where the character goes in each form. Tab is whitespace in
+    // all of them.
+    const std::vector<std::pair<std::string, std::string>> forms = {
+        { "before equals", "key@= 1\n" },
+        { "after equals", "key =@1\n" },
+        { "after value", "key = 1@\n" },
+        { "own line", "@\nkey = 1\n" },
+        { "after table header", "[t]@\nkey = 1\n" },
+        { "in array", "key = [1,@2]\n" },
+        { "in inline table", "key = { a = 1,@b = 2 }\n" },
+        { "end of document", "key = 1\n@" },
+        { "comment line", "# a@b\nkey = 1\n" },
+        { "comment in array", "key = [1, # a@b\n2]\n" },
+        { "comment at end of document", "key = 1 # a@b" },
+    };
+    const auto with = [](std::string form, char c) {
+        form[form.find('@')] = c;
+        return form;
+    };
+
+    for (const auto& [name, form] : forms) {
+        SCOPED_TRACE(name);
+
+        EXPECT_TRUE(toml::deserialize(make_data(with(form, '\t'))).has_value());
+
+        for (const char c : { '\x00', '\x01', '\x08', '\x0b', '\x0c', '\r', '\x1f', '\x7f' }) {
+            if ((c == '\r') && (form[form.find('@') + 1] == '\n')) {
+                continue;  // a CRLF line ending
+            }
+            SCOPED_TRACE(static_cast<int>(c));
+            auto result = toml::deserialize(make_data(with(form, c)));
+            EXPECT_FALSE(result.has_value());
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::invalid_argument);
+            }
+        }
+    }
+}
+
+TEST(toml_test, crlf_line_endings)
+{
+    auto result = toml::deserialize(make_data("# head\r\nkey = 1 # tail\r\n\r\n[t]\r\nitems = [\r\n  1,\r\n  2\r\n]\r\n"));
+    ASSERT_TRUE(result.has_value());
+
+    auto& dict = result.value();
+    EXPECT_EQ(dict["key"].as<number>(), number{ "1" });
+    EXPECT_EQ(dict["t"].as<dictionary>()["items"].as<array>().length(), 2u);
+}
+
 TEST(toml_test, utf8_boundaries)
 {
     // U+0080, U+0800, U+D7FF, U+E000, U+10000 and U+10FFFF: the edges of

@@ -165,9 +165,11 @@ private:
         }
     }
 
+    // TOML whitespace is space and tab, and a CR may only start a CRLF.
+    // A control character is left in place for the caller to reject.
     void skip_whitespace()
     {
-        while ((_pos < _input.size()) && std::isspace(current_char()) && (current_char() != '\n')) {
+        while ((current_char() == ' ') || (current_char() == '\t') || ((current_char() == '\r') && (peek_char() == '\n'))) {
             advance();
         }
     }
@@ -180,7 +182,7 @@ private:
                 // Skip comment to end of line
                 while ((_pos < _input.size()) && (current_char() != '\n')) {
                     if (is_forbidden_control(current_char()) && ! ((current_char() == '\r') && (peek_char() == '\n'))) {
-                        throw std::runtime_error("Control character in comment");
+                        break;  // left for the caller to reject
                     }
                     advance();
                 }

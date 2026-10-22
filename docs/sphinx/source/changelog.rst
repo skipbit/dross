@@ -16,9 +16,10 @@ Fixed
   ``std::errc::invalid_argument``, and ``toml::serialize()`` fails with
   ``std::errc::operation_not_supported`` on a string or key that is not
   valid UTF-8
-- ``toml::deserialize()`` rejects a control character other than tab in a
-  string, a quoted key or a comment with ``std::errc::invalid_argument``,
-  as TOML requires, instead of keeping it
+- ``toml::deserialize()`` rejects a control character other than tab with
+  ``std::errc::invalid_argument``, as TOML requires, instead of keeping it
+  in a string, a quoted key or a comment or skipping it as whitespace. A CR
+  is accepted only as part of a CRLF line ending
 - ``toml::deserialize()`` reads the ``\b`` and ``\f`` escapes in a quoted
   key as it does in a string, so a key that ``toml::serialize()`` wrote
   with them reads back
