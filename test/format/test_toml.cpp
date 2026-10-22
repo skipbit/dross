@@ -74,6 +74,49 @@ TEST(toml_test, quoted_keys)
     EXPECT_EQ(std::string(dict["special key"].as<string>()), "value");
 }
 
+TEST(toml_test, quoted_keys_read_the_same_escapes_as_strings)
+{
+    auto result = toml::deserialize(make_data(R"("a\bb\fc" = "a\bb\fc")"));
+    ASSERT_TRUE(result.has_value());
+
+    auto& dict = result.value();
+    ASSERT_TRUE(dict.contains("a\bb\fc"));
+    EXPECT_EQ(std::string(dict["a\bb\fc"].as<string>()), "a\bb\fc");
+}
+
+TEST(toml_test, unicode_escapes)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { R"(\u0041)", "A" },
+        { R"(\u00e9)", "\xC3\xA9" },
+        { R"(\u3042)", "\xE3\x81\x82" },
+        { R"(\U0001F600)", "\xF0\x9F\x98\x80" },
+        { R"(\u0001)", "\x01" },
+        { R"(\u007F)", "\x7F" },
+    };
+    for (const auto& [escape, expected] : cases) {
+        auto result = toml::deserialize(make_data("\"k" + escape + "\" = \"v" + escape + "\""));
+        ASSERT_TRUE(result.has_value()) << escape;
+
+        auto& dict = result.value();
+        ASSERT_TRUE(dict.contains("k" + expected)) << escape;
+        EXPECT_EQ(std::string(dict["k" + expected].as<string>()), "v" + expected) << escape;
+    }
+}
+
+TEST(toml_test, invalid_unicode_escapes)
+{
+    for (const std::string escape : { R"(\u004)", R"(\u12G4)", R"(\uD800)", R"(\uDFFF)", R"(\U00110000)", R"(\U0000D800)" }) {
+        for (const auto& text : { "k = \"" + escape + "\"", "\"" + escape + "\" = 1" }) {
+            auto result = toml::deserialize(make_data(text));
+            EXPECT_FALSE(result.has_value()) << text;
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+            }
+        }
+    }
+}
+
 // Number Tests
 TEST(toml_test, integer_values)
 {
@@ -383,6 +426,31 @@ ports = [8080, 8443]
     EXPECT_EQ(orig_db["port"].as<number>(), rt_db["port"].as<number>());
 }
 
+TEST(toml_test, roundtrip_of_control_characters)
+{
+    std::string controls;
+    for (int c = 0x00; c <= 0x1F; ++c) {
+        controls += static_cast<char>(c);
+    }
+    controls += '\x7f';
+
+    dictionary dict;
+    dict["k" + controls] = value(string{ "v" + controls });
+    dict["plain"] = value(string{ "a\001b" });
+
+    auto serialized = toml::serialize(dict);
+    ASSERT_TRUE(serialized.has_value());
+    std::string output = serialized.value();
+    EXPECT_TRUE(output.find(R"(plain = "a\u0001b")") != std::string::npos) << output;
+
+    auto reparsed = toml::deserialize(serialized.value());
+    ASSERT_TRUE(reparsed.has_value()) << output;
+
+    auto& result = reparsed.value();
+    ASSERT_TRUE(result.contains("k" + controls));
+    EXPECT_EQ(std::string(result["k" + controls].as<string>()), "v" + controls);
+}
+
 // Error Handling Tests
 TEST(toml_test, invalid_syntax)
 {
@@ -437,6 +505,91 @@ TEST(toml_test, invalid_utf8)
             EXPECT_EQ(result.error(), std::errc::invalid_argument) << content;
         }
     }
+}
+
+TEST(toml_test, control_characters)
+{
+    // '@' marks where the character goes in each form.
+    const std::vector<std::pair<std::string, std::string>> forms = {
+        { "string", "key = \"a@b\"\n" },
+        { "quoted key", "\"a@b\" = 1\n" },
+        { "comment", "key = 1 # a@b\n" },
+    };
+    const auto with = [](std::string form, char c) {
+        form[form.find('@')] = c;
+        return form;
+    };
+
+    for (const auto& [name, form] : forms) {
+        SCOPED_TRACE(name);
+
+        EXPECT_TRUE(toml::deserialize(make_data(with(form, '\t'))).has_value());
+
+        for (const char c : { '\x00', '\x01', '\x08', '\n', '\x0b', '\r', '\x1f', '\x7f' }) {
+            if ((name == "comment") && (c == '\n')) {
+                continue;  // a newline ends a comment
+            }
+            SCOPED_TRACE(static_cast<int>(c));
+            auto result = toml::deserialize(make_data(with(form, c)));
+            EXPECT_FALSE(result.has_value());
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::invalid_argument);
+            }
+        }
+    }
+
+    EXPECT_TRUE(toml::deserialize(make_data("key = 1 # a\r\n")).has_value());
+}
+
+TEST(toml_test, control_characters_outside_strings)
+{
+    // '@' marks where the character goes in each form. Tab is whitespace in
+    // all of them.
+    const std::vector<std::pair<std::string, std::string>> forms = {
+        { "before equals", "key@= 1\n" },
+        { "after equals", "key =@1\n" },
+        { "after value", "key = 1@\n" },
+        { "own line", "@\nkey = 1\n" },
+        { "after table header", "[t]@\nkey = 1\n" },
+        { "in array", "key = [1,@2]\n" },
+        { "in inline table", "key = { a = 1,@b = 2 }\n" },
+        { "end of document", "key = 1\n@" },
+        { "comment line", "# a@b\nkey = 1\n" },
+        { "comment in array", "key = [1, # a@b\n2]\n" },
+        { "comment at end of document", "key = 1 # a@b" },
+    };
+    const auto with = [](std::string form, char c) {
+        form[form.find('@')] = c;
+        return form;
+    };
+
+    for (const auto& [name, form] : forms) {
+        SCOPED_TRACE(name);
+
+        EXPECT_TRUE(toml::deserialize(make_data(with(form, '\t'))).has_value());
+
+        for (const char c : { '\x00', '\x01', '\x08', '\x0b', '\x0c', '\r', '\x1f', '\x7f' }) {
+            if ((c == '\r') && (form[form.find('@') + 1] == '\n')) {
+                continue;  // a CRLF line ending
+            }
+            SCOPED_TRACE(static_cast<int>(c));
+            auto result = toml::deserialize(make_data(with(form, c)));
+            EXPECT_FALSE(result.has_value());
+            if (! result.has_value()) {
+                EXPECT_EQ(result.error(), std::errc::invalid_argument);
+            }
+        }
+    }
+}
+
+TEST(toml_test, crlf_line_endings)
+{
+    auto result = toml::deserialize(make_data("# head\r\nkey = 1 # tail\r\n\r\n[t]\r\nitems = [\r\n  1,\r\n  2\r\n]\r\n"));
+    ASSERT_TRUE(result.has_value());
+
+    auto& dict = result.value();
+    EXPECT_EQ(dict["key"].as<number>(), number{ "1" });
+    EXPECT_EQ(dict["t"].as<dictionary>()["items"].as<array>().length(), 2u);
 }
 
 TEST(toml_test, utf8_boundaries)

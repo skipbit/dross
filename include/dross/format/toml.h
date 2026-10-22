@@ -69,6 +69,8 @@ namespace dross::toml {
  * Error conditions:
  * - Invalid TOML syntax
  * - Encoding errors (non-UTF-8 content)
+ * - Control characters other than tab, except a CR that ends a line as CRLF
+ * - Unicode escapes that do not name a Unicode scalar value
  * - Duplicate keys in tables
  * - Invalid datetime formats
  * - Array type inconsistencies

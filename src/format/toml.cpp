@@ -64,6 +64,33 @@ bool is_valid_utf8(const std::string& text)
     return true;
 }
 
+// TOML allows no control character other than tab in strings and comments.
+bool is_forbidden_control(char c)
+{
+    const auto byte = static_cast<unsigned char>(c);
+    return ((byte < 0x20) && (byte != '\t')) || (byte == 0x7F);
+}
+
+// Appends a Unicode scalar value (no surrogates, at most U+10FFFF) as UTF-8.
+void append_utf8(std::string& text, char32_t code_point)
+{
+    if (code_point <= 0x7F) {
+        text += static_cast<char>(code_point);
+    } else if (code_point <= 0x7FF) {
+        text += static_cast<char>(0xC0 | (code_point >> 6));
+        text += static_cast<char>(0x80 | (code_point & 0x3F));
+    } else if (code_point <= 0xFFFF) {
+        text += static_cast<char>(0xE0 | (code_point >> 12));
+        text += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
+        text += static_cast<char>(0x80 | (code_point & 0x3F));
+    } else {
+        text += static_cast<char>(0xF0 | (code_point >> 18));
+        text += static_cast<char>(0x80 | ((code_point >> 12) & 0x3F));
+        text += static_cast<char>(0x80 | ((code_point >> 6) & 0x3F));
+        text += static_cast<char>(0x80 | (code_point & 0x3F));
+    }
+}
+
 /**
  * @brief TOML parser implementation using recursive descent parsing.
  *
@@ -138,9 +165,11 @@ private:
         }
     }
 
+    // TOML whitespace is space and tab, and a CR may only start a CRLF.
+    // A control character is left in place for the caller to reject.
     void skip_whitespace()
     {
-        while ((_pos < _input.size()) && std::isspace(current_char()) && (current_char() != '\n')) {
+        while ((current_char() == ' ') || (current_char() == '\t') || ((current_char() == '\r') && (peek_char() == '\n'))) {
             advance();
         }
     }
@@ -152,6 +181,9 @@ private:
             if (current_char() == '#') {
                 // Skip comment to end of line
                 while ((_pos < _input.size()) && (current_char() != '\n')) {
+                    if (is_forbidden_control(current_char()) && ! ((current_char() == '\r') && (peek_char() == '\n'))) {
+                        break;  // left for the caller to reject
+                    }
                     advance();
                 }
             }
@@ -322,6 +354,12 @@ private:
 
     std::expected<std::string, error> parse_quoted_key()
     {
+        return parse_basic_string("quoted key");
+    }
+
+    // Reads a double-quoted string, which TOML uses for both values and keys.
+    std::expected<std::string, error> parse_basic_string(const std::string& kind)
+    {
         if (current_char() != '"') {
             return std::unexpected(create_error("Expected '\"'"));
         }
@@ -332,7 +370,7 @@ private:
             if (current_char() == '\\') {
                 advance();
                 if (_pos >= _input.size()) {
-                    return std::unexpected(create_error("Unterminated quoted key"));
+                    return std::unexpected(create_error("Unterminated " + kind));
                 }
                 // Handle escape sequences
                 switch (current_char()) {
@@ -351,9 +389,36 @@ private:
                 case 'r':
                     result += '\r';
                     break;
+                case 'b':
+                    result += '\b';
+                    break;
+                case 'f':
+                    result += '\f';
+                    break;
+                case 'u':
+                case 'U': {
+                    // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
+                    const size_t digits = (current_char() == 'u') ? 4 : 8;
+                    for (size_t k = 1; k <= digits; ++k) {
+                        if (! std::isxdigit(static_cast<unsigned char>(peek_char(k)))) {
+                            return std::unexpected(create_error("Invalid unicode escape"));
+                        }
+                    }
+                    const auto code_point = static_cast<char32_t>(std::stoul(_input.substr(_pos + 1, digits), nullptr, 16));
+                    if (((code_point >= 0xD800) && (code_point <= 0xDFFF)) || (code_point > 0x10FFFF)) {
+                        return std::unexpected(create_error("Invalid unicode escape"));
+                    }
+                    append_utf8(result, code_point);
+                    for (size_t k = 0; k < digits; ++k) {
+                        advance();
+                    }
+                    break;
+                }
                 default:
                     return std::unexpected(create_error("Invalid escape sequence"));
                 }
+            } else if (is_forbidden_control(current_char())) {
+                return std::unexpected(create_error("Control character in " + kind));
             } else {
                 result += current_char();
             }
@@ -361,7 +426,7 @@ private:
         }
 
         if (current_char() != '"') {
-            return std::unexpected(create_error("Unterminated quoted key"));
+            return std::unexpected(create_error("Unterminated " + kind));
         }
         advance();  // skip closing quote
 
@@ -391,56 +456,9 @@ private:
 
     std::expected<value, error> parse_string()
     {
-        if (current_char() != '"') {
-            return std::unexpected(create_error("Expected '\"'"));
-        }
-        advance();  // skip opening quote
-
-        std::string result;
-        while ((_pos < _input.size()) && (current_char() != '"')) {
-            if (current_char() == '\\') {
-                advance();
-                if (_pos >= _input.size()) {
-                    return std::unexpected(create_error("Unterminated string"));
-                }
-                // Handle escape sequences
-                switch (current_char()) {
-                case '"':
-                    result += '"';
-                    break;
-                case '\\':
-                    result += '\\';
-                    break;
-                case 'n':
-                    result += '\n';
-                    break;
-                case 't':
-                    result += '\t';
-                    break;
-                case 'r':
-                    result += '\r';
-                    break;
-                case 'b':
-                    result += '\b';
-                    break;
-                case 'f':
-                    result += '\f';
-                    break;
-                default:
-                    return std::unexpected(create_error("Invalid escape sequence"));
-                }
-            } else {
-                result += current_char();
-            }
-            advance();
-        }
-
-        if (current_char() != '"') {
-            return std::unexpected(create_error("Unterminated string"));
-        }
-        advance();  // skip closing quote
-
-        return value(string{ result });
+        return parse_basic_string("string").transform([](const std::string& text) {
+            return value(string{ text });
+        });
     }
 
     std::expected<value, error> parse_array()
@@ -761,7 +779,16 @@ private:
                 result += "\\f";
                 break;
             default:
-                result += ch;
+                if (is_forbidden_control(ch)) {
+                    // These have no short escape, so they are written as \u00XX.
+                    static constexpr char hex[] = "0123456789ABCDEF";
+                    const auto byte = static_cast<unsigned char>(ch);
+                    result += "\\u00";
+                    result += hex[byte >> 4];
+                    result += hex[byte & 0x0F];
+                } else {
+                    result += ch;
+                }
                 break;
             }
         }
