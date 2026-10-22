@@ -426,6 +426,31 @@ ports = [8080, 8443]
     EXPECT_EQ(orig_db["port"].as<number>(), rt_db["port"].as<number>());
 }
 
+TEST(toml_test, roundtrip_of_control_characters)
+{
+    std::string controls;
+    for (int c = 0x00; c <= 0x1F; ++c) {
+        controls += static_cast<char>(c);
+    }
+    controls += '\x7f';
+
+    dictionary dict;
+    dict["k" + controls] = value(string{ "v" + controls });
+    dict["plain"] = value(string{ "a\001b" });
+
+    auto serialized = toml::serialize(dict);
+    ASSERT_TRUE(serialized.has_value());
+    std::string output = serialized.value();
+    EXPECT_TRUE(output.find(R"(plain = "a\u0001b")") != std::string::npos) << output;
+
+    auto reparsed = toml::deserialize(serialized.value());
+    ASSERT_TRUE(reparsed.has_value()) << output;
+
+    auto& result = reparsed.value();
+    ASSERT_TRUE(result.contains("k" + controls));
+    EXPECT_EQ(std::string(result["k" + controls].as<string>()), "v" + controls);
+}
+
 // Error Handling Tests
 TEST(toml_test, invalid_syntax)
 {

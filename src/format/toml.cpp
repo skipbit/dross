@@ -777,7 +777,16 @@ private:
                 result += "\\f";
                 break;
             default:
-                result += ch;
+                if (is_forbidden_control(ch)) {
+                    // These have no short escape, so they are written as \u00XX.
+                    static constexpr char hex[] = "0123456789ABCDEF";
+                    const auto byte = static_cast<unsigned char>(ch);
+                    result += "\\u00";
+                    result += hex[byte >> 4];
+                    result += hex[byte & 0x0F];
+                } else {
+                    result += ch;
+                }
                 break;
             }
         }
