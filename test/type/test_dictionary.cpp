@@ -10,6 +10,7 @@
 #include <iterator>
 #include <ranges>
 #include <string>
+#include <type_traits>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -365,6 +366,14 @@ static_assert(std::forward_iterator<dross::dictionary::iterator>);
 static_assert(std::forward_iterator<dross::dictionary::const_iterator>);
 static_assert(std::ranges::forward_range<dross::dictionary>);
 static_assert(std::ranges::forward_range<const dross::dictionary>);
+
+// Dereferencing returns a pair by value, which the C++17 forward iterator
+// requirements do not allow, so the category stops at input and there is no
+// pointer to the pair.
+static_assert(std::is_same_v<std::iterator_traits<dross::dictionary::iterator>::iterator_category, std::input_iterator_tag>);
+static_assert(std::is_same_v<std::iterator_traits<dross::dictionary::const_iterator>::iterator_category, std::input_iterator_tag>);
+static_assert(std::is_void_v<std::iterator_traits<dross::dictionary::iterator>::pointer>);
+static_assert(std::is_void_v<std::iterator_traits<dross::dictionary::const_iterator>::pointer>);
 
 TEST(dictionary_test, iterators_assign_and_post_increment)
 {

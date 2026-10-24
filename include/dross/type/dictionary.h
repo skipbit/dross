@@ -188,14 +188,19 @@ private:
  *
  * Provides iterator interface for traversing dictionary entries.
  * Each dereferenced iterator returns a pair of key and value references.
+ *
+ * The pair is returned by value, so the iterator models std::forward_iterator
+ * but declares std::input_iterator_tag as its iterator_category, and has no
+ * pointer type, as the standard range adaptors do.
  */
 class dictionary::iterator final {
 public:
     using value_type = std::pair<const std::string&, value&>;
     using difference_type = std::ptrdiff_t;
-    using pointer = value_type*;
+    using pointer = void;
     using reference = value_type;
-    using iterator_category = std::forward_iterator_tag;
+    using iterator_concept = std::forward_iterator_tag;
+    using iterator_category = std::input_iterator_tag;
 
     /**
      * @brief Default constructor. Default-constructed iterators compare equal.
@@ -266,14 +271,19 @@ private:
  *
  * Provides read-only iterator interface for traversing dictionary entries.
  * Each dereferenced iterator returns a pair of const key and value references.
+ *
+ * The pair is returned by value, so the iterator models std::forward_iterator
+ * but declares std::input_iterator_tag as its iterator_category, and has no
+ * pointer type, as the standard range adaptors do.
  */
 class dictionary::const_iterator final {
 public:
     using value_type = std::pair<const std::string&, const value&>;
     using difference_type = std::ptrdiff_t;
-    using pointer = const value_type*;
+    using pointer = void;
     using reference = value_type;
-    using iterator_category = std::forward_iterator_tag;
+    using iterator_concept = std::forward_iterator_tag;
+    using iterator_category = std::input_iterator_tag;
 
     /**
      * @brief Default constructor. Default-constructed iterators compare equal.
