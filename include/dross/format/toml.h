@@ -71,6 +71,8 @@ namespace dross::toml {
  * - Unicode escapes that do not name a Unicode scalar value
  * - Numbers that number cannot hold: an exponent that expands the number
  *   past 4096 digits, such as 1e5000
+ * - A key or table defined twice, including a table header that names a
+ *   key already set by a key/value pair or an inline table
  *
  * Valid TOML that fails to read:
  * - Literal strings and multi-line strings
@@ -79,18 +81,14 @@ namespace dross::toml {
  * - Integers in hexadecimal, octal or binary
  * - Integers and floats with underscores, such as 1_000 or 1e1_0
  * - The floats inf and nan, with or without a sign
+ * - Arrays of tables, written with [[name]] headers
  *
  * Invalid TOML that is read without an error:
- * - A key or table defined twice keeps only the last definition
- * - A key followed by a table of the same name keeps only the table
  * - Numbers with a leading zero or without a digit on one side of the
  *   decimal point, such as 01, 1. and -.5
  * - A newline before a comma in an inline table
  *
- * @note Each [[name]] array of tables header is read as a [name] table,
- *       so only the last table of the array is kept. A [a] table header
- *       that follows a [a.b] header replaces table a, so a.b is lost.
- *       Comments are skipped and are not kept in the result.
+ * @note Comments are skipped and are not kept in the result.
  */
 std::expected<dictionary, error> deserialize(const data& input);
 

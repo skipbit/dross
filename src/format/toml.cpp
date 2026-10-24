@@ -6,6 +6,7 @@
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 
+#include <set>
 #include <sstream>
 
 namespace dross::toml {
@@ -158,6 +159,10 @@ private:
     size_t _pos;
     size_t _line;
     size_t _column;
+    // Tables that headers created, either named or as the parent of a named one
+    std::set<std::vector<std::string>> _header_tables;
+    // Tables that a header named
+    std::set<std::vector<std::string>> _defined_tables;
 
     error create_error(const std::string& message) const
     {
@@ -257,8 +262,10 @@ private:
                     return std::unexpected(table_content.error());
                 }
 
-                // Insert nested table into result
-                set_nested_value(result, key_path, table_content.value());
+                auto inserted = insert_table(result, key_path, 0, table_content.value());
+                if (! inserted) {
+                    return std::unexpected(inserted.error());
+                }
             } else {
                 auto kv_result = parse_key_value();
                 if (! kv_result) {
@@ -270,7 +277,10 @@ private:
                 }
 
                 auto [key, val] = kv_result.value();
-                result[key] = val;
+                auto added = add_key(result, key, val);
+                if (! added) {
+                    return std::unexpected(added.error());
+                }
             }
         }
 
@@ -284,10 +294,8 @@ private:
         }
         advance();  // skip '['
 
-        bool is_array_table = false;
         if (current_char() == '[') {
-            is_array_table = true;
-            advance();  // skip second '['
+            return std::unexpected(create_error("Arrays of tables are not supported"));
         }
 
         std::vector<std::string> key_path;
@@ -307,12 +315,6 @@ private:
                 continue;
             } else if (current_char() == ']') {
                 advance();
-                if (is_array_table) {
-                    if (current_char() != ']') {
-                        return std::unexpected(create_error("Expected ']]' for array table"));
-                    }
-                    advance();
-                }
                 break;
             } else {
                 return std::unexpected(create_error("Expected '.' or ']'"));
@@ -342,10 +344,58 @@ private:
             }
 
             auto [key, val] = kv_result.value();
-            result[key] = val;
+            auto added = add_key(result, key, val);
+            if (! added) {
+                return std::unexpected(added.error());
+            }
         }
 
         return result;
+    }
+
+    std::expected<void, error> add_key(dictionary& table, const std::string& key, const value& val)
+    {
+        if (table.contains(key)) {
+            return std::unexpected(create_error("Key defined twice"));
+        }
+        table[key] = val;
+        return {};
+    }
+
+    // Only a table that headers created can take a header, and only one header can name it.
+    std::expected<void, error> insert_table(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const dictionary& content)
+    {
+        const std::vector<std::string> path(key_path.begin(), key_path.begin() + index + 1);
+        const std::string& current_key = key_path[index];
+
+        dictionary table;
+        if (current_dict.contains(current_key)) {
+            if (! _header_tables.contains(path)) {
+                return std::unexpected(create_error("Key defined twice"));
+            }
+            table = current_dict[current_key].as<dictionary>();
+        }
+        _header_tables.insert(path);
+
+        if (index == (key_path.size() - 1)) {
+            if (! _defined_tables.insert(path).second) {
+                return std::unexpected(create_error("Table defined twice"));
+            }
+            for (const auto& [key, val] : content) {
+                auto added = add_key(table, key, val);
+                if (! added) {
+                    return added;
+                }
+            }
+        } else {
+            auto inserted = insert_table(table, key_path, index + 1, content);
+            if (! inserted) {
+                return inserted;
+            }
+        }
+
+        current_dict[current_key] = value(table);
+        return {};
     }
 
     std::expected<std::pair<std::string, value>, error> parse_key_value()
@@ -568,7 +618,10 @@ private:
             }
 
             auto [key, val] = kv_result.value();
-            result[key] = val;
+            auto added = add_key(result, key, val);
+            if (! added) {
+                return std::unexpected(added.error());
+            }
 
             skip_whitespace_and_comments();
             if (current_char() == ',') {
@@ -646,41 +699,6 @@ private:
             return std::unexpected(create_error("Invalid number format"));
         }
         return value(n);
-    }
-
-    void set_nested_value(dictionary& root, const std::vector<std::string>& key_path, const value& val)
-    {
-        set_nested_value_recursive(root, key_path, 0, val);
-    }
-
-    void set_nested_value_recursive(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const value& val)
-    {
-        if (key_path.empty() || (index >= key_path.size())) {
-            return;
-        }
-
-        const std::string& current_key = key_path[index];
-
-        if (index == (key_path.size() - 1)) {
-            // This is the final key, set the value
-            current_dict[current_key] = val;
-            return;
-        }
-
-        // This is an intermediate key, ensure it's a dictionary
-        if (! current_dict.contains(current_key)) {
-            current_dict[current_key] = value(dictionary{});
-        } else if (! current_dict[current_key].is<dictionary>()) {
-            // Key exists but is not a dictionary - replace it
-            current_dict[current_key] = value(dictionary{});
-        }
-
-        // Get the nested dictionary and continue recursively
-        dictionary nested_dict = current_dict[current_key].as<dictionary>();
-        set_nested_value_recursive(nested_dict, key_path, index + 1, val);
-
-        // Put the modified dictionary back
-        current_dict[current_key] = value(nested_dict);
     }
 };
 
