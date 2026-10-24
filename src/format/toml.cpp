@@ -220,6 +220,16 @@ private:
         }
     }
 
+    // A key/value pair or a table header ends its line, before an optional comment.
+    std::expected<void, error> expect_line_end()
+    {
+        skip_whitespace();
+        if ((_pos < _input.size()) && (current_char() != '\n') && (current_char() != '#')) {
+            return std::unexpected(create_error("Expected a newline"));
+        }
+        return {};
+    }
+
     std::expected<dictionary, error> parse_document()
     {
         dictionary result;
@@ -236,6 +246,11 @@ private:
                     return std::unexpected(table_result.error());
                 }
 
+                auto line_end = expect_line_end();
+                if (! line_end) {
+                    return std::unexpected(line_end.error());
+                }
+
                 auto key_path = table_result.value();
                 auto table_content = parse_table_content();
                 if (! table_content) {
@@ -248,6 +263,10 @@ private:
                 auto kv_result = parse_key_value();
                 if (! kv_result) {
                     return std::unexpected(kv_result.error());
+                }
+                auto line_end = expect_line_end();
+                if (! line_end) {
+                    return std::unexpected(line_end.error());
                 }
 
                 auto [key, val] = kv_result.value();
@@ -317,6 +336,10 @@ private:
             if (! kv_result) {
                 return std::unexpected(kv_result.error());
             }
+            auto line_end = expect_line_end();
+            if (! line_end) {
+                return std::unexpected(line_end.error());
+            }
 
             auto [key, val] = kv_result.value();
             result[key] = val;
@@ -345,8 +368,6 @@ private:
         if (! value_result) {
             return std::unexpected(value_result.error());
         }
-
-        skip_whitespace_and_comments();
 
         return std::make_pair(key, value_result.value());
     }
@@ -549,7 +570,7 @@ private:
             auto [key, val] = kv_result.value();
             result[key] = val;
 
-            skip_whitespace();
+            skip_whitespace_and_comments();
             if (current_char() == ',') {
                 advance();
                 skip_whitespace();

@@ -80,12 +80,13 @@ TEST(toml_test, bare_keys)
     ASSERT_TRUE(result.has_value());
 
     auto& dict = result.value();
-    EXPECT_TRUE(dict.contains("Key"));
-    EXPECT_TRUE(dict.contains("key_2"));
-    EXPECT_TRUE(dict.contains("A-b"));
-    EXPECT_TRUE(dict.contains("1234"));
-    EXPECT_TRUE(dict.contains("-x"));
-    EXPECT_TRUE(dict.contains("_"));
+    EXPECT_EQ(dict.size(), 6u);
+    EXPECT_EQ(dict["Key"].as<number>(), number{ "1" });
+    EXPECT_EQ(dict["key_2"].as<number>(), number{ "2" });
+    EXPECT_EQ(dict["A-b"].as<number>(), number{ "3" });
+    EXPECT_EQ(dict["1234"].as<number>(), number{ "4" });
+    EXPECT_EQ(dict["-x"].as<number>(), number{ "5" });
+    EXPECT_EQ(dict["_"].as<number>(), number{ "6" });
 
     dictionary input;
     input["Key-2_x"] = value(number{ "1" });
@@ -376,6 +377,21 @@ another_key = 42
     EXPECT_EQ(dict.size(), 2u);
     EXPECT_EQ(std::string(dict["key"].as<string>()), "value");
     EXPECT_EQ(dict["another_key"].as<number>(), number{ "42" });
+}
+
+TEST(toml_test, pairs_and_table_headers_end_their_line)
+{
+    for (const char* text : { "a = 1 b = 2\n", "a = 1-2 = 3\n", "a = -1 -x = 5\n", "a = \"s\" 1 = 2\n", "[a] b = 1\n", "[a]-b = 1\n", "[[a]] b = 1\n", "[a]\nb = 1 c = 2\n" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+        }
+    }
+
+    for (const char* text : { "a = 1", "a = 1 # c\nb = 2\n", "a = 1\t\r\nb = 2\r\n", "[a] # c\nb = 1\n", "[[a]] \nb = 1" }) {
+        EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
+    }
 }
 
 // Serialization Tests

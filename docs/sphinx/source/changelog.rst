@@ -46,6 +46,9 @@ Fixed
 - ``toml::deserialize()`` reads a bare key that starts with a digit or a
   hyphen, such as ``1234 = 1`` or ``[-x]``, which ``toml::serialize()``
   writes bare
+- ``toml::deserialize()`` rejects a key/value pair or a table header that
+  is followed on the same line by anything other than a comment, such as
+  ``a = 1 b = 2`` or ``[a] b = 1``, with ``std::errc::invalid_argument``
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
