@@ -303,6 +303,7 @@ public:
 
 private:
     friend class array;
+    friend class const_iterator;
     iterator(const std::any&);
 
 private:
@@ -336,6 +337,12 @@ public:
     const_iterator(const const_iterator& other);
 
     /**
+     * @brief Converting constructor from a mutable iterator.
+     * @param other The iterator to convert, pointing to the same element
+     */
+    const_iterator(const iterator& other);
+
+    /**
      * @brief Copy assignment operator.
      * @param other The const_iterator to copy from
      * @return Reference to this iterator
@@ -367,17 +374,15 @@ public:
 
     /**
      * @brief Equality comparison operator.
-     * @param other The const_iterator to compare with
+     *
+     * Either side can be an iterator, which converts to a const_iterator.
+     * != is derived from it.
+     *
+     * @param lhs The const_iterator to compare
+     * @param rhs The const_iterator to compare with
      * @return true if iterators point to the same element
      */
-    bool operator==(const const_iterator& other) const;
-
-    /**
-     * @brief Inequality comparison operator.
-     * @param other The const_iterator to compare with
-     * @return true if iterators point to different elements
-     */
-    bool operator!=(const const_iterator& other) const;
+    friend bool operator==(const const_iterator& lhs, const const_iterator& rhs);
 
 private:
     friend class array;

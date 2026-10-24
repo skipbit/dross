@@ -420,14 +420,12 @@ public:
 
     const_iterator operator+(std::ptrdiff_t n) const;
     const_iterator operator-(std::ptrdiff_t n) const;
-    std::ptrdiff_t operator-(const const_iterator& other) const;
 
-    bool operator==(const const_iterator& other) const noexcept;
-    bool operator!=(const const_iterator& other) const noexcept;
-    bool operator<(const const_iterator& other) const noexcept;
-    bool operator<=(const const_iterator& other) const noexcept;
-    bool operator>(const const_iterator& other) const noexcept;
-    bool operator>=(const const_iterator& other) const noexcept;
+    // Either side of these can be an iterator, which converts to a
+    // const_iterator. != and the ordering operators are derived from them.
+    friend std::ptrdiff_t operator-(const const_iterator& lhs, const const_iterator& rhs);
+    friend bool operator==(const const_iterator& lhs, const const_iterator& rhs) noexcept;
+    friend std::strong_ordering operator<=>(const const_iterator& lhs, const const_iterator& rhs) noexcept;
 
 private:
     const uint8_t* _ptr;

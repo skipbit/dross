@@ -232,6 +232,11 @@ array::const_iterator::const_iterator(const const_iterator& i)
 {
 }
 
+array::const_iterator::const_iterator(const iterator& i)
+    : _impl(std::make_unique<impl>(i._impl->cursor))
+{
+}
+
 array::const_iterator& array::const_iterator::operator=(const const_iterator& i)
 {
     *_impl = *(i._impl);
@@ -258,14 +263,9 @@ const value& array::const_iterator::operator*() const
     return *(_impl->cursor);
 }
 
-bool array::const_iterator::operator==(const const_iterator& i) const
+bool operator==(const array::const_iterator& lhs, const array::const_iterator& rhs)
 {
-    return (_impl->cursor == i._impl->cursor);
-}
-
-bool array::const_iterator::operator!=(const const_iterator& i) const
-{
-    return (_impl->cursor != i._impl->cursor);
+    return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
 }  // namespace dross

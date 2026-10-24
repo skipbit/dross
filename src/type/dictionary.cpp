@@ -157,6 +157,11 @@ dictionary::const_iterator::const_iterator(const const_iterator& i)
 {
 }
 
+dictionary::const_iterator::const_iterator(const iterator& i)
+    : _impl(std::make_unique<impl>(i._impl->cursor))
+{
+}
+
 dictionary::const_iterator& dictionary::const_iterator::operator=(const const_iterator& i)
 {
     *_impl = *(i._impl);
@@ -183,14 +188,9 @@ dictionary::const_iterator::value_type dictionary::const_iterator::operator*() c
     return { _impl->cursor->first, _impl->cursor->second };
 }
 
-bool dictionary::const_iterator::operator==(const const_iterator& i) const
+bool operator==(const dictionary::const_iterator& lhs, const dictionary::const_iterator& rhs)
 {
-    return (_impl->cursor == i._impl->cursor);
-}
-
-bool dictionary::const_iterator::operator!=(const const_iterator& i) const
-{
-    return (_impl->cursor != i._impl->cursor);
+    return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
 dictionary::iterator dictionary::begin()
