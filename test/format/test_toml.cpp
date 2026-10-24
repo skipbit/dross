@@ -74,6 +74,23 @@ TEST(toml_test, quoted_keys)
     EXPECT_EQ(std::string(dict["special key"].as<string>()), "value");
 }
 
+TEST(toml_test, bare_keys)
+{
+    auto result = toml::deserialize(make_data("Key = 1\nkey_2 = 2\nA-b = 3\n"));
+    ASSERT_TRUE(result.has_value());
+
+    auto& dict = result.value();
+    EXPECT_TRUE(dict.contains("Key"));
+    EXPECT_TRUE(dict.contains("key_2"));
+    EXPECT_TRUE(dict.contains("A-b"));
+
+    dictionary input;
+    input["Key-2_x"] = value(number{ "1" });
+    auto output = toml::serialize(input);
+    ASSERT_TRUE(output.has_value());
+    EXPECT_EQ(std::string(output.value()), "Key-2_x = 1\n");
+}
+
 TEST(toml_test, quoted_keys_read_the_same_escapes_as_strings)
 {
     auto result = toml::deserialize(make_data(R"("a\bb\fc" = "a\bb\fc")"));

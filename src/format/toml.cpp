@@ -6,7 +6,6 @@
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 
-#include <cctype>
 #include <sstream>
 
 namespace dross::toml {
@@ -69,6 +68,27 @@ bool is_forbidden_control(char c)
 {
     const auto byte = static_cast<unsigned char>(c);
     return ((byte < 0x20) && (byte != '\t')) || (byte == 0x7F);
+}
+
+// TOML defines keys and numbers in ASCII, so these do not depend on the locale.
+bool is_ascii_digit(char c)
+{
+    return (c >= '0') && (c <= '9');
+}
+
+bool is_ascii_alpha(char c)
+{
+    return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z'));
+}
+
+bool is_ascii_alnum(char c)
+{
+    return is_ascii_alpha(c) || is_ascii_digit(c);
+}
+
+bool is_ascii_xdigit(char c)
+{
+    return is_ascii_digit(c) || ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F'));
 }
 
 // Appends a Unicode scalar value (no surrogates, at most U+10FFFF) as UTF-8.
@@ -329,7 +349,7 @@ private:
     {
         if (current_char() == '"') {
             return parse_quoted_key();
-        } else if (std::isalpha(static_cast<unsigned char>(current_char())) || (current_char() == '_')) {
+        } else if (is_ascii_alpha(current_char()) || (current_char() == '_')) {
             return parse_bare_key();
         } else {
             return std::unexpected(create_error("Invalid key format"));
@@ -339,7 +359,7 @@ private:
     std::expected<std::string, error> parse_bare_key()
     {
         std::string result;
-        while ((_pos < _input.size()) && (std::isalnum(static_cast<unsigned char>(current_char())) || (current_char() == '_') || (current_char() == '-'))) {
+        while ((_pos < _input.size()) && (is_ascii_alnum(current_char()) || (current_char() == '_') || (current_char() == '-'))) {
             result += current_char();
             advance();
         }
@@ -399,7 +419,7 @@ private:
                     // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
                     const size_t digits = (current_char() == 'u') ? 4 : 8;
                     for (size_t k = 1; k <= digits; ++k) {
-                        if (! std::isxdigit(static_cast<unsigned char>(peek_char(k)))) {
+                        if (! is_ascii_xdigit(peek_char(k))) {
                             return std::unexpected(create_error("Invalid unicode escape"));
                         }
                     }
@@ -446,7 +466,7 @@ private:
             return parse_inline_table();
         } else if ((ch == 't') || (ch == 'f')) {
             return parse_boolean();
-        } else if (std::isdigit(static_cast<unsigned char>(ch)) || (ch == '-') || (ch == '+')) {
+        } else if (is_ascii_digit(ch) || (ch == '-') || (ch == '+')) {
             return parse_number();
         } else {
             return std::unexpected(create_error("Invalid value format"));
@@ -566,7 +586,7 @@ private:
 
         // Parse digits and decimal point
         bool has_dot = false;
-        while ((_pos < _input.size()) && (std::isdigit(static_cast<unsigned char>(current_char())) || (current_char() == '.'))) {
+        while ((_pos < _input.size()) && (is_ascii_digit(current_char()) || (current_char() == '.'))) {
             if (current_char() == '.') {
                 if (has_dot) {
                     break;  // Only one decimal point allowed
@@ -737,7 +757,7 @@ private:
         // Check if key needs quoting
         bool needs_quotes = false;
         for (char ch : key) {
-            if ((! std::isalnum(static_cast<unsigned char>(ch))) && (ch != '_') && (ch != '-')) {
+            if ((! is_ascii_alnum(ch)) && (ch != '_') && (ch != '-')) {
                 needs_quotes = true;
                 break;
             }

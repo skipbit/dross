@@ -35,10 +35,12 @@ Fixed
   of TOML integers as a float (``9223372036854775808.0``) instead of as an
   integer that TOML readers must refuse
 - ``toml::deserialize()``, ``toml::serialize()`` and constructing a
-  ``number`` from a string pass a byte from 0x80 up to the ``<cctype>``
-  classification functions as ``unsigned char``. On platforms where
-  ``char`` is signed, text outside ASCII reached them as a negative
-  value, which is undefined behaviour
+  ``number`` from a string classify key and number characters by ASCII
+  ranges instead of with ``<cctype>``. A byte from 0x80 up reached those
+  functions as a negative value where ``char`` is signed, which is
+  undefined behaviour, and under a single-byte locale such as ISO-8859-1
+  a UTF-8 key whose bytes that locale counts as letters, such as U+00EA,
+  was read as a bare key and written without quotes, both invalid TOML
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
