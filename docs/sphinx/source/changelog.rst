@@ -19,6 +19,14 @@ Added
 Changed
 ~~~~~~~
 
+- ``error`` compares with ``std::errc`` and with error code enums as
+  ``std::error_code`` does. A comparison with ``std::errc`` asks both
+  categories through ``equivalent()``, so a code whose category maps it
+  to a condition there matches that ``std::errc``. A comparison with an
+  error code enum matches only the same category and value, so a
+  ``system_category()`` code no longer equals an enum whose code is in
+  ``generic_category()``, even when both map to the same condition
+
 - An ``iterator`` of ``array``, ``dictionary`` or ``data`` compares with
   a ``const_iterator`` of the same type in either order, such as
   ``a.begin() == a.cend()``, and a ``data`` iterator also orders against
