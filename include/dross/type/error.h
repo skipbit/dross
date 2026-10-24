@@ -37,22 +37,18 @@ public:
 
     explicit operator bool() const noexcept;
 
+    // True when the category and the value both match, as std::error_code
+    // compares with an error code enum.
     template <error_enum_type E>
     bool operator==(const E e) const noexcept
     {
-        return (_code.default_error_condition() == e);
+        return (_code == std::error_code(e));
     }
 
-    template <error_enum_type E>
-    bool operator!=(const E e) const noexcept
-    {
-        return (_code.default_error_condition() != e);
-    }
-
-    // True when the code's default condition is e, so a system_category()
-    // code matches the std::errc it maps to.
+    // True when either category reports e as equivalent, as std::error_code
+    // compares with an error condition, so a system_category() code matches
+    // the std::errc it maps to.
     bool operator==(std::errc) const noexcept;
-    bool operator!=(std::errc) const noexcept;
 
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;
