@@ -297,13 +297,19 @@ TEST(toml_test, nested_arrays)
 TEST(toml_test, arrays_with_a_trailing_comma)
 {
     const array expected{ value(number{ "1" }), value(number{ "2" }) };
-    for (const char* text : { "x = [1, 2,]\n", "x = [\n  1,\n  2,\n]\n", "x = [1, 2, # c\n]\n" }) {
+    for (const char* text : { "x = [1, 2,]\n", "x = [\n  1,\n  2,\n]\n", "x = [\r\n  1,\r\n  2,\r\n]\r\n", "x = [1, 2, # c\n]\n" }) {
         auto result = toml::deserialize(make_data(text));
         ASSERT_TRUE(result.has_value()) << text;
         EXPECT_EQ(result.value()["x"].as<array>(), expected) << text;
     }
 
-    for (const char* text : { "x = [,]\n", "x = [1,,]\n", "x = [,1]\n" }) {
+    auto nested = toml::deserialize(make_data("x = [[1,], [2,],]\n"));
+    ASSERT_TRUE(nested.has_value());
+    const array expected_nested{ value(array{ value(number{ "1" }) }), value(array{ value(number{ "2" }) }) };
+    EXPECT_EQ(nested.value()["x"].as<array>(), expected_nested);
+
+    // Only arrays allow a trailing comma, not inline tables.
+    for (const char* text : { "x = [,]\n", "x = [1,,]\n", "x = [,1]\n", "x = {a = 1,}\n" }) {
         auto result = toml::deserialize(make_data(text));
         EXPECT_FALSE(result.has_value()) << text;
         if (! result.has_value()) {
