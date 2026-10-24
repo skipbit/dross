@@ -13,10 +13,11 @@ Changed
 ~~~~~~~
 
 - ``dictionary::iterator`` and ``dictionary::const_iterator`` declare
-  ``std::input_iterator_tag`` as their ``iterator_category`` and
-  ``std::forward_iterator_tag`` as their ``iterator_concept``, as the
-  standard range adaptors do. They return a pair by value, which the C++17
-  forward iterator requirements do not allow. They still model
+  ``std::input_iterator_tag`` as their ``iterator_category``,
+  ``std::forward_iterator_tag`` as their ``iterator_concept`` and ``void``
+  as their ``pointer``, as the standard range adaptors do. They return a
+  pair by value, which the C++17 forward iterator requirements do not
+  allow, and there is no pointer to it. They still model
   ``std::forward_iterator``
 
 0.1.1 - 2026-10-24
