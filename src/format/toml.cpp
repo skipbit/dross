@@ -329,7 +329,7 @@ private:
     {
         if (current_char() == '"') {
             return parse_quoted_key();
-        } else if (std::isalpha(current_char()) || (current_char() == '_')) {
+        } else if (std::isalpha(static_cast<unsigned char>(current_char())) || (current_char() == '_')) {
             return parse_bare_key();
         } else {
             return std::unexpected(create_error("Invalid key format"));
@@ -339,7 +339,7 @@ private:
     std::expected<std::string, error> parse_bare_key()
     {
         std::string result;
-        while ((_pos < _input.size()) && (std::isalnum(current_char()) || (current_char() == '_') || (current_char() == '-'))) {
+        while ((_pos < _input.size()) && (std::isalnum(static_cast<unsigned char>(current_char())) || (current_char() == '_') || (current_char() == '-'))) {
             result += current_char();
             advance();
         }
@@ -446,7 +446,7 @@ private:
             return parse_inline_table();
         } else if ((ch == 't') || (ch == 'f')) {
             return parse_boolean();
-        } else if (std::isdigit(ch) || (ch == '-') || (ch == '+')) {
+        } else if (std::isdigit(static_cast<unsigned char>(ch)) || (ch == '-') || (ch == '+')) {
             return parse_number();
         } else {
             return std::unexpected(create_error("Invalid value format"));
@@ -566,7 +566,7 @@ private:
 
         // Parse digits and decimal point
         bool has_dot = false;
-        while ((_pos < _input.size()) && (std::isdigit(current_char()) || (current_char() == '.'))) {
+        while ((_pos < _input.size()) && (std::isdigit(static_cast<unsigned char>(current_char())) || (current_char() == '.'))) {
             if (current_char() == '.') {
                 if (has_dot) {
                     break;  // Only one decimal point allowed
@@ -737,7 +737,7 @@ private:
         // Check if key needs quoting
         bool needs_quotes = false;
         for (char ch : key) {
-            if ((! std::isalnum(ch)) && (ch != '_') && (ch != '-')) {
+            if ((! std::isalnum(static_cast<unsigned char>(ch))) && (ch != '_') && (ch != '-')) {
                 needs_quotes = true;
                 break;
             }

@@ -165,7 +165,7 @@ bool is_valid_number(const std::string& str)
                 return false;  // Multiple dots
             }
             has_dot = true;
-        } else if (! std::isdigit(str[i])) {
+        } else if (! std::isdigit(static_cast<unsigned char>(str[i]))) {
             return false;
         }
     }
@@ -201,7 +201,7 @@ bool is_valid_number(const std::string& str)
 
         // Check that exponent contains only digits
         for (size_t i = exp_start; i < str.length(); ++i) {
-            if (! std::isdigit(str[i])) {
+            if (! std::isdigit(static_cast<unsigned char>(str[i]))) {
                 return false;
             }
         }

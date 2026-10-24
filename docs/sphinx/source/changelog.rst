@@ -34,6 +34,11 @@ Fixed
 - ``toml::serialize()`` writes an integral value outside the 64-bit range
   of TOML integers as a float (``9223372036854775808.0``) instead of as an
   integer that TOML readers must refuse
+- ``toml::deserialize()``, ``toml::serialize()`` and constructing a
+  ``number`` from a string pass a byte from 0x80 up to the ``<cctype>``
+  classification functions as ``unsigned char``. On platforms where
+  ``char`` is signed, text outside ASCII reached them as a negative
+  value, which is undefined behaviour
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
