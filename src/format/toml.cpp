@@ -91,6 +91,12 @@ bool is_ascii_xdigit(char c)
     return is_ascii_digit(c) || ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F'));
 }
 
+// The reader and the writer share this rule, so every key written bare reads back.
+bool is_bare_key_char(char c)
+{
+    return is_ascii_alnum(c) || (c == '_') || (c == '-');
+}
+
 // Appends a Unicode scalar value (no surrogates, at most U+10FFFF) as UTF-8.
 void append_utf8(std::string& text, char32_t code_point)
 {
@@ -214,6 +220,16 @@ private:
         }
     }
 
+    // A key/value pair or a table header ends its line, before an optional comment.
+    std::expected<void, error> expect_line_end()
+    {
+        skip_whitespace();
+        if ((_pos < _input.size()) && (current_char() != '\n') && (current_char() != '#')) {
+            return std::unexpected(create_error("Expected a newline"));
+        }
+        return {};
+    }
+
     std::expected<dictionary, error> parse_document()
     {
         dictionary result;
@@ -230,6 +246,11 @@ private:
                     return std::unexpected(table_result.error());
                 }
 
+                auto line_end = expect_line_end();
+                if (! line_end) {
+                    return std::unexpected(line_end.error());
+                }
+
                 auto key_path = table_result.value();
                 auto table_content = parse_table_content();
                 if (! table_content) {
@@ -242,6 +263,10 @@ private:
                 auto kv_result = parse_key_value();
                 if (! kv_result) {
                     return std::unexpected(kv_result.error());
+                }
+                auto line_end = expect_line_end();
+                if (! line_end) {
+                    return std::unexpected(line_end.error());
                 }
 
                 auto [key, val] = kv_result.value();
@@ -311,6 +336,10 @@ private:
             if (! kv_result) {
                 return std::unexpected(kv_result.error());
             }
+            auto line_end = expect_line_end();
+            if (! line_end) {
+                return std::unexpected(line_end.error());
+            }
 
             auto [key, val] = kv_result.value();
             result[key] = val;
@@ -340,8 +369,6 @@ private:
             return std::unexpected(value_result.error());
         }
 
-        skip_whitespace_and_comments();
-
         return std::make_pair(key, value_result.value());
     }
 
@@ -349,23 +376,19 @@ private:
     {
         if (current_char() == '"') {
             return parse_quoted_key();
-        } else if (is_ascii_alpha(current_char()) || (current_char() == '_')) {
+        } else if (is_bare_key_char(current_char())) {
             return parse_bare_key();
         } else {
             return std::unexpected(create_error("Invalid key format"));
         }
     }
 
-    std::expected<std::string, error> parse_bare_key()
+    std::string parse_bare_key()
     {
         std::string result;
-        while ((_pos < _input.size()) && (is_ascii_alnum(current_char()) || (current_char() == '_') || (current_char() == '-'))) {
+        while ((_pos < _input.size()) && is_bare_key_char(current_char())) {
             result += current_char();
             advance();
-        }
-
-        if (result.empty()) {
-            return std::unexpected(create_error("Empty bare key"));
         }
 
         return result;
@@ -543,7 +566,7 @@ private:
             auto [key, val] = kv_result.value();
             result[key] = val;
 
-            skip_whitespace();
+            skip_whitespace_and_comments();
             if (current_char() == ',') {
                 advance();
                 skip_whitespace();
@@ -757,7 +780,7 @@ private:
         // An empty key has no bare form, so it is always quoted.
         bool needs_quotes = key.empty();
         for (char ch : key) {
-            if ((! is_ascii_alnum(ch)) && (ch != '_') && (ch != '-')) {
+            if (! is_bare_key_char(ch)) {
                 needs_quotes = true;
                 break;
             }

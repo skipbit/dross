@@ -74,7 +74,6 @@ namespace dross::toml {
  * - Literal strings and multi-line strings
  * - Datetimes of every kind
  * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
- * - Bare keys that start with a digit or a hyphen
  * - Integers in hexadecimal, octal or binary, or with underscores
  * - Floats with an exponent, inf and nan
  * - Arrays with a comma after the last value
@@ -82,7 +81,6 @@ namespace dross::toml {
  * Invalid TOML that is read without an error:
  * - A key or table defined twice keeps only the last definition
  * - A key followed by a table of the same name keeps only the table
- * - A table header and key/value pairs on one line are all read
  * - Numbers with a leading zero or without a digit on one side of the
  *   decimal point, such as 01, 1. and -.5
  * - A newline before a comma in an inline table
