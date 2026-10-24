@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <concepts>
 #include <iterator>
 #include <ranges>
 #include <stdexcept>
@@ -325,6 +326,22 @@ static_assert(std::forward_iterator<dross::array::iterator>);
 static_assert(std::forward_iterator<dross::array::const_iterator>);
 static_assert(std::ranges::forward_range<dross::array>);
 static_assert(std::ranges::forward_range<const dross::array>);
+
+// An iterator converts to a const_iterator, and the two compare in either order.
+static_assert(std::is_convertible_v<dross::array::iterator, dross::array::const_iterator>);
+static_assert(std::equality_comparable_with<dross::array::iterator, dross::array::const_iterator>);
+
+TEST(array_test, iterators_compare_with_const_iterators)
+{
+    dross::array a{ 1, 2 };
+
+    const dross::array::const_iterator converted = a.begin();
+    EXPECT_EQ(converted, a.cbegin());
+    EXPECT_TRUE(a.begin() == a.cbegin());
+    EXPECT_TRUE(a.cbegin() == a.begin());
+    EXPECT_TRUE(a.begin() != a.cend());
+    EXPECT_TRUE(a.cend() != a.begin());
+}
 
 TEST(array_test, iterators_assign_and_post_increment)
 {

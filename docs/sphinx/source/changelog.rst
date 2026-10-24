@@ -9,8 +9,27 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Unreleased
 ----------
 
+Added
+~~~~~
+
+- ``array::const_iterator`` and ``dictionary::const_iterator`` convert
+  from the ``iterator`` of the same type, as ``data::const_iterator``
+  does
+
 Changed
 ~~~~~~~
+
+- An ``iterator`` of ``array``, ``dictionary`` or ``data`` compares with
+  a ``const_iterator`` of the same type in either order, such as
+  ``a.begin() == a.cend()``, and a ``data`` iterator also orders against
+  and subtracts from one in either order. The comparisons of every
+  iterator of the three types, and the difference of two ``data``
+  iterators, are friend functions instead of members, and ``!=`` and the
+  ordering operators are derived from ``==`` and ``<=>``. ``data``
+  iterators of the same kind now also compare with ``<=>``, and their
+  difference is ``noexcept``. Comparisons written with the operators
+  compile as before; naming a removed member, such as
+  ``&data::const_iterator::operator<``, does not
 
 - ``dictionary::iterator`` and ``dictionary::const_iterator`` declare
   ``std::input_iterator_tag`` as their ``iterator_category``,

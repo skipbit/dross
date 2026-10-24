@@ -6,8 +6,11 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <concepts>
+#include <iterator>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 using namespace dross;
@@ -478,6 +481,34 @@ TEST(data_test, iterator_stl_algorithms)
     auto it = std::find(d.begin(), d.end(), 0x03);
     EXPECT_NE(it, d.end());
     EXPECT_EQ(*it, 0x03);
+}
+
+// An iterator compares with a const_iterator, and subtracts from one, in
+// either order.
+static_assert(std::totally_ordered_with<data::iterator, data::const_iterator>);
+static_assert(std::sized_sentinel_for<data::const_iterator, data::iterator>);
+
+// Iterators of either kind compare three-way among themselves, and a
+// difference of two never throws.
+static_assert(std::three_way_comparable<data::iterator>);
+static_assert(std::three_way_comparable<data::const_iterator>);
+static_assert(noexcept(std::declval<const data::iterator&>() - std::declval<const data::iterator&>()));
+static_assert(noexcept(std::declval<const data::const_iterator&>() - std::declval<const data::const_iterator&>()));
+
+TEST(data_test, iterators_compare_with_const_iterators)
+{
+    data d{ "Hello" };
+
+    EXPECT_TRUE(d.begin() == d.cbegin());
+    EXPECT_TRUE(d.cbegin() == d.begin());
+    EXPECT_TRUE(d.begin() != d.cend());
+    EXPECT_TRUE(d.begin() < d.cend());
+    EXPECT_TRUE(d.cbegin() < d.end());
+    EXPECT_TRUE(d.begin() <= d.cbegin());
+    EXPECT_TRUE(d.end() > d.cbegin());
+    EXPECT_TRUE(d.cend() >= d.end());
+    EXPECT_EQ(d.cend() - d.begin(), 5);
+    EXPECT_EQ(d.begin() - d.cend(), -5);
 }
 
 TEST(data_test, const_iterator)

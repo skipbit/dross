@@ -348,39 +348,19 @@ data::iterator data::iterator::operator-(std::ptrdiff_t n) const
     return iterator(_ptr - n);
 }
 
-std::ptrdiff_t data::iterator::operator-(const iterator& other) const
+std::ptrdiff_t operator-(const data::iterator& lhs, const data::iterator& rhs) noexcept
 {
-    return (_ptr - other._ptr);
+    return (lhs._ptr - rhs._ptr);
 }
 
-bool data::iterator::operator==(const iterator& other) const noexcept
+bool operator==(const data::iterator& lhs, const data::iterator& rhs) noexcept
 {
-    return (_ptr == other._ptr);
+    return (lhs._ptr == rhs._ptr);
 }
 
-bool data::iterator::operator!=(const iterator& other) const noexcept
+std::strong_ordering operator<=>(const data::iterator& lhs, const data::iterator& rhs) noexcept
 {
-    return (_ptr != other._ptr);
-}
-
-bool data::iterator::operator<(const iterator& other) const noexcept
-{
-    return (_ptr < other._ptr);
-}
-
-bool data::iterator::operator<=(const iterator& other) const noexcept
-{
-    return (_ptr <= other._ptr);
-}
-
-bool data::iterator::operator>(const iterator& other) const noexcept
-{
-    return (_ptr > other._ptr);
-}
-
-bool data::iterator::operator>=(const iterator& other) const noexcept
-{
-    return (_ptr >= other._ptr);
+    return (lhs._ptr <=> rhs._ptr);
 }
 
 // data::const_iterator
@@ -463,38 +443,18 @@ data::const_iterator data::const_iterator::operator-(std::ptrdiff_t n) const
     return const_iterator(_ptr - n);
 }
 
-std::ptrdiff_t data::const_iterator::operator-(const const_iterator& other) const
+std::ptrdiff_t operator-(const data::const_iterator& lhs, const data::const_iterator& rhs) noexcept
 {
-    return (_ptr - other._ptr);
+    return (lhs._ptr - rhs._ptr);
 }
 
-bool data::const_iterator::operator==(const const_iterator& other) const noexcept
+bool operator==(const data::const_iterator& lhs, const data::const_iterator& rhs) noexcept
 {
-    return (_ptr == other._ptr);
+    return (lhs._ptr == rhs._ptr);
 }
 
-bool data::const_iterator::operator!=(const const_iterator& other) const noexcept
+std::strong_ordering operator<=>(const data::const_iterator& lhs, const data::const_iterator& rhs) noexcept
 {
-    return (_ptr != other._ptr);
-}
-
-bool data::const_iterator::operator<(const const_iterator& other) const noexcept
-{
-    return (_ptr < other._ptr);
-}
-
-bool data::const_iterator::operator<=(const const_iterator& other) const noexcept
-{
-    return (_ptr <= other._ptr);
-}
-
-bool data::const_iterator::operator>(const const_iterator& other) const noexcept
-{
-    return (_ptr > other._ptr);
-}
-
-bool data::const_iterator::operator>=(const const_iterator& other) const noexcept
-{
-    return (_ptr >= other._ptr);
+    return (lhs._ptr <=> rhs._ptr);
 }
 }  // namespace dross

@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <concepts>
 #include <iterator>
 #include <ranges>
 #include <string>
@@ -374,6 +375,23 @@ static_assert(std::is_same_v<std::iterator_traits<dross::dictionary::iterator>::
 static_assert(std::is_same_v<std::iterator_traits<dross::dictionary::const_iterator>::iterator_category, std::input_iterator_tag>);
 static_assert(std::is_void_v<std::iterator_traits<dross::dictionary::iterator>::pointer>);
 static_assert(std::is_void_v<std::iterator_traits<dross::dictionary::const_iterator>::pointer>);
+
+// An iterator converts to a const_iterator, and the two compare in either order.
+static_assert(std::is_convertible_v<dross::dictionary::iterator, dross::dictionary::const_iterator>);
+static_assert(std::equality_comparable_with<dross::dictionary::iterator, dross::dictionary::const_iterator>);
+
+TEST(dictionary_test, iterators_compare_with_const_iterators)
+{
+    dross::dictionary d;
+    d["a"] = dross::value(1);
+
+    const dross::dictionary::const_iterator converted = d.begin();
+    EXPECT_EQ(converted, d.cbegin());
+    EXPECT_TRUE(d.begin() == d.cbegin());
+    EXPECT_TRUE(d.cbegin() == d.begin());
+    EXPECT_TRUE(d.begin() != d.cend());
+    EXPECT_TRUE(d.cend() != d.begin());
+}
 
 TEST(dictionary_test, iterators_assign_and_post_increment)
 {

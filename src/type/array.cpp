@@ -197,14 +197,9 @@ value& array::iterator::operator*() const
     return *(_impl->cursor);
 }
 
-bool array::iterator::operator==(const iterator& i) const
+bool operator==(const array::iterator& lhs, const array::iterator& rhs)
 {
-    return (_impl->cursor == i._impl->cursor);
-}
-
-bool array::iterator::operator!=(const iterator& i) const
-{
-    return (_impl->cursor != i._impl->cursor);
+    return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
 class array::const_iterator::impl {
@@ -229,6 +224,11 @@ array::const_iterator::const_iterator()
 
 array::const_iterator::const_iterator(const const_iterator& i)
     : _impl(std::make_unique<impl>(*(i._impl)))
+{
+}
+
+array::const_iterator::const_iterator(const iterator& i)
+    : _impl(std::make_unique<impl>(i._impl->cursor))
 {
 }
 
@@ -258,14 +258,9 @@ const value& array::const_iterator::operator*() const
     return *(_impl->cursor);
 }
 
-bool array::const_iterator::operator==(const const_iterator& i) const
+bool operator==(const array::const_iterator& lhs, const array::const_iterator& rhs)
 {
-    return (_impl->cursor == i._impl->cursor);
-}
-
-bool array::const_iterator::operator!=(const const_iterator& i) const
-{
-    return (_impl->cursor != i._impl->cursor);
+    return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
 }  // namespace dross
