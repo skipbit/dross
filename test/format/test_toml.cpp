@@ -253,6 +253,21 @@ fraction = 3.0e2
     }
 }
 
+TEST(toml_test, numbers_that_number_cannot_hold)
+{
+    auto longest = toml::deserialize(make_data("x = 1e4095\n"));
+    ASSERT_TRUE(longest.has_value());
+    EXPECT_EQ(longest.value()["x"].as<number>(), number{ "1" + std::string(4095, '0') });
+
+    for (const char* text : { "x = 1e4096\n", "x = 1e-5000\n", "x = -.\n", "x = +.\n", "x = -.e5\n" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+        }
+    }
+}
+
 // Boolean Tests
 TEST(toml_test, boolean_values)
 {

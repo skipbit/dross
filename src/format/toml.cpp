@@ -644,7 +644,11 @@ private:
             }
         }
 
-        return value(number{ num_str });
+        number n{ num_str };
+        if (n.is_nan()) {
+            return std::unexpected(create_error("Invalid number format"));
+        }
+        return value(n);
     }
 
     void set_nested_value(dictionary& root, const std::vector<std::string>& key_path, const value& val)

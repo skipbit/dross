@@ -69,13 +69,16 @@ namespace dross::toml {
  * - Encoding errors (non-UTF-8 content)
  * - Control characters other than tab, except a CR that ends a line as CRLF
  * - Unicode escapes that do not name a Unicode scalar value
+ * - Numbers that number cannot hold: an exponent that expands the number
+ *   past 4096 digits, such as 1e5000
  *
  * Valid TOML that fails to read:
  * - Literal strings and multi-line strings
  * - Datetimes of every kind
  * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
- * - Integers in hexadecimal, octal or binary, or with underscores
- * - Floats inf and nan
+ * - Integers in hexadecimal, octal or binary
+ * - Integers and floats with underscores, such as 1_000 or 1e1_0
+ * - The floats inf and nan, with or without a sign
  *
  * Invalid TOML that is read without an error:
  * - A key or table defined twice keeps only the last definition
