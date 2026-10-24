@@ -76,7 +76,6 @@ namespace dross::toml {
  * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
  * - Integers in hexadecimal, octal or binary, or with underscores
  * - Floats with an exponent, inf and nan
- * - Arrays with a comma after the last value
  *
  * Invalid TOML that is read without an error:
  * - A key or table defined twice keeps only the last definition
