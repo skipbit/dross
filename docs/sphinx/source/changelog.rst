@@ -56,6 +56,15 @@ Fixed
 - ``toml::deserialize()`` rejects a number that ``number`` cannot hold,
   such as ``1e5000`` or ``-.``, with ``std::errc::invalid_argument``
   instead of reading it as NaN
+- ``toml::deserialize()`` rejects a key or table defined twice, such as
+  ``x = 1`` followed by ``x = 2`` or a ``[t]`` header after ``t = 1``, with
+  ``std::errc::invalid_argument`` instead of keeping only the last
+  definition
+- ``toml::deserialize()`` keeps table ``a.b`` when a ``[a]`` header
+  follows a ``[a.b]`` header, instead of replacing table ``a``
+- ``toml::deserialize()`` rejects a ``[[name]]`` array of tables header
+  with ``std::errc::invalid_argument`` instead of reading it as a
+  ``[name]`` table that keeps only the last table of the array
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home

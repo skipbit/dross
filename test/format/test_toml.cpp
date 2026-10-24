@@ -430,6 +430,42 @@ dc = "eqdc10"
     EXPECT_EQ(std::string(beta["dc"].as<string>()), "eqdc10");
 }
 
+TEST(toml_test, a_parent_table_defined_after_its_child_keeps_the_child)
+{
+    auto result = toml::deserialize(make_data("[a.b]\nc = 1\n[a]\nd = 2\n"));
+    ASSERT_TRUE(result.has_value());
+
+    auto a = result.value()["a"].as<dictionary>();
+    EXPECT_EQ(a["d"].as<number>(), number{ "2" });
+    EXPECT_EQ(a["b"].as<dictionary>()["c"].as<number>(), number{ "1" });
+}
+
+TEST(toml_test, keys_and_tables_defined_twice)
+{
+    for (const char* text : { "x = 1\nx = 2\n", "\"x\" = 1\nx = 2\n", "[t]\na = 1\na = 2\n", "a = {x = 1, x = 2}\n", "[t]\n[t]\n", "[t]\n[\"t\"]\n", "[a.b]\n[a.b]\n", "[a]\n[b]\n[a]\n", "t = 1\n[t]\n", "t = {a = 1}\n[t]\n", "a = 1\n[a.b]\n", "[a]\nb = 1\n[a.b]\n", "[a]\nb = {}\n[a.b.c]\n", "[a.b]\n[a]\nb = 1\n" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+        }
+    }
+
+    for (const char* text : { "x = 1\n[t]\nx = 1\n", "[a]\n[a.b]\n[a.c]\n", "[a.b.c]\n[a]\n[a.b]\n" }) {
+        EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
+    }
+}
+
+TEST(toml_test, arrays_of_tables_are_not_read)
+{
+    for (const char* text : { "[[t]]\na = 1\n", "[[t]]\na = 1\n[[t]]\na = 2\n" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+        }
+    }
+}
+
 // Comments Tests
 TEST(toml_test, comments)
 {
@@ -451,7 +487,7 @@ another_key = 42
 
 TEST(toml_test, pairs_and_table_headers_end_their_line)
 {
-    for (const char* text : { "a = 1 b = 2\n", "a = 1-2 = 3\n", "a = -1 -x = 5\n", "a = \"s\" 1 = 2\n", "[a] b = 1\n", "[a]-b = 1\n", "[[a]] b = 1\n", "[a]\nb = 1 c = 2\n" }) {
+    for (const char* text : { "a = 1 b = 2\n", "a = 1-2 = 3\n", "a = -1 -x = 5\n", "a = \"s\" 1 = 2\n", "[a] b = 1\n", "[a]-b = 1\n", "[a]\nb = 1 c = 2\n" }) {
         auto result = toml::deserialize(make_data(text));
         EXPECT_FALSE(result.has_value()) << text;
         if (! result.has_value()) {
@@ -459,7 +495,7 @@ TEST(toml_test, pairs_and_table_headers_end_their_line)
         }
     }
 
-    for (const char* text : { "a = 1", "a = 1 # c\nb = 2\n", "a = 1\t\r\nb = 2\r\n", "[a] # c\nb = 1\n", "[[a]] \nb = 1" }) {
+    for (const char* text : { "a = 1", "a = 1 # c\nb = 2\n", "a = 1\t\r\nb = 2\r\n", "[a] # c\nb = 1\n" }) {
         EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
     }
 }
