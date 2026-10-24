@@ -530,6 +530,10 @@ private:
             if (current_char() == ',') {
                 advance();
                 skip_whitespace_and_comments();
+                if (current_char() == ']') {
+                    advance();  // a comma may follow the last value
+                    break;
+                }
                 continue;
             } else if (current_char() == ']') {
                 advance();

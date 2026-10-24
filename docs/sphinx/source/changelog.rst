@@ -49,6 +49,8 @@ Fixed
 - ``toml::deserialize()`` rejects a key/value pair or a table header that
   is followed on the same line by anything other than a comment, such as
   ``a = 1 b = 2`` or ``[a] b = 1``, with ``std::errc::invalid_argument``
+- ``toml::deserialize()`` reads an array with a comma after the last
+  value, such as ``[1, 2,]``
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
