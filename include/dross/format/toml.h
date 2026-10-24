@@ -74,6 +74,7 @@ namespace dross::toml {
  * - Literal strings and multi-line strings
  * - Datetimes of every kind
  * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
+ * - Bare keys that start with a digit or a hyphen
  * - Integers in hexadecimal, octal or binary, or with underscores
  * - Floats with an exponent, inf and nan
  * - Arrays with a comma after the last value
@@ -81,10 +82,14 @@ namespace dross::toml {
  * Invalid TOML that is read without an error:
  * - A key or table defined twice keeps only the last definition
  * - A key followed by a table of the same name keeps only the table
- * - Two key/value pairs on one line are both read
+ * - A table header and key/value pairs on one line are all read
+ * - Numbers with a leading zero or without a digit on one side of the
+ *   decimal point, such as 01, 1. and -.5
+ * - A newline before a comma in an inline table
  *
  * @note Each [[name]] array of tables header is read as a [name] table,
- *       so only the last table of the array is kept.
+ *       so only the last table of the array is kept. A [a] table header
+ *       that follows a [a.b] header replaces table a, so a.b is lost.
  *       Comments are skipped and are not kept in the result.
  */
 std::expected<dictionary, error> deserialize(const data& input);
@@ -101,10 +106,11 @@ std::expected<dictionary, error> deserialize(const data& input);
  *
  * Error conditions:
  * - Unsupported value types, such as a timestamp
- * - Circular references in nested structures
- * - Invalid characters in table keys
  * - Values that cannot be represented in TOML format, such as a NaN number
  * - Strings or keys that are not valid UTF-8
+ *
+ * An empty key is not an error: it is written as an empty bare key, which
+ * deserialize() does not read back.
  *
  * Serialization rules:
  * - Dictionary keys are sorted alphabetically for consistent output
