@@ -76,19 +76,39 @@ TEST(toml_test, quoted_keys)
 
 TEST(toml_test, bare_keys)
 {
-    auto result = toml::deserialize(make_data("Key = 1\nkey_2 = 2\nA-b = 3\n"));
+    auto result = toml::deserialize(make_data("Key = 1\nkey_2 = 2\nA-b = 3\n1234 = 4\n-x = 5\n_ = 6\n"));
     ASSERT_TRUE(result.has_value());
 
     auto& dict = result.value();
     EXPECT_TRUE(dict.contains("Key"));
     EXPECT_TRUE(dict.contains("key_2"));
     EXPECT_TRUE(dict.contains("A-b"));
+    EXPECT_TRUE(dict.contains("1234"));
+    EXPECT_TRUE(dict.contains("-x"));
+    EXPECT_TRUE(dict.contains("_"));
 
     dictionary input;
     input["Key-2_x"] = value(number{ "1" });
     auto output = toml::serialize(input);
     ASSERT_TRUE(output.has_value());
     EXPECT_EQ(std::string(output.value()), "Key-2_x = 1\n");
+}
+
+TEST(toml_test, bare_keys_that_start_with_a_digit_or_hyphen_read_back)
+{
+    dictionary table;
+    table["-1"] = value(number{ "1" });
+    dictionary input;
+    input["1"] = value(number{ "2" });
+    input["-x"] = value(table);
+
+    auto output = toml::serialize(input);
+    ASSERT_TRUE(output.has_value());
+    EXPECT_EQ(std::string(output.value()), "1 = 2\n\n[-x]\n-1 = 1\n");
+
+    auto result = toml::deserialize(output.value());
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value(), input);
 }
 
 TEST(toml_test, empty_keys_are_written_quoted)

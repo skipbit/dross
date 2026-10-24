@@ -43,6 +43,9 @@ Fixed
   was read as a bare key and written without quotes, both invalid TOML
 - ``toml::serialize()`` writes an empty key as ``""`` instead of as an
   empty bare key, so ``toml::deserialize()`` reads it back
+- ``toml::deserialize()`` reads a bare key that starts with a digit or a
+  hyphen, such as ``1234 = 1`` or ``[-x]``, which ``toml::serialize()``
+  writes bare
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home

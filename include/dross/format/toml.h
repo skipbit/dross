@@ -74,7 +74,6 @@ namespace dross::toml {
  * - Literal strings and multi-line strings
  * - Datetimes of every kind
  * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
- * - Bare keys that start with a digit or a hyphen
  * - Integers in hexadecimal, octal or binary, or with underscores
  * - Floats with an exponent, inf and nan
  * - Arrays with a comma after the last value

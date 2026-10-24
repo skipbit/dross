@@ -91,6 +91,12 @@ bool is_ascii_xdigit(char c)
     return is_ascii_digit(c) || ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F'));
 }
 
+// The reader and the writer share this rule, so every key written bare reads back.
+bool is_bare_key_char(char c)
+{
+    return is_ascii_alnum(c) || (c == '_') || (c == '-');
+}
+
 // Appends a Unicode scalar value (no surrogates, at most U+10FFFF) as UTF-8.
 void append_utf8(std::string& text, char32_t code_point)
 {
@@ -349,7 +355,7 @@ private:
     {
         if (current_char() == '"') {
             return parse_quoted_key();
-        } else if (is_ascii_alpha(current_char()) || (current_char() == '_')) {
+        } else if (is_bare_key_char(current_char())) {
             return parse_bare_key();
         } else {
             return std::unexpected(create_error("Invalid key format"));
@@ -359,7 +365,7 @@ private:
     std::expected<std::string, error> parse_bare_key()
     {
         std::string result;
-        while ((_pos < _input.size()) && (is_ascii_alnum(current_char()) || (current_char() == '_') || (current_char() == '-'))) {
+        while ((_pos < _input.size()) && is_bare_key_char(current_char())) {
             result += current_char();
             advance();
         }
@@ -757,7 +763,7 @@ private:
         // An empty key has no bare form, so it is always quoted.
         bool needs_quotes = key.empty();
         for (char ch : key) {
-            if ((! is_ascii_alnum(ch)) && (ch != '_') && (ch != '-')) {
+            if (! is_bare_key_char(ch)) {
                 needs_quotes = true;
                 break;
             }
