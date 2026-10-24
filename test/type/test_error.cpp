@@ -49,6 +49,53 @@ std::error_code make_error_code(failure f)
 template <>
 struct std::is_error_code_enum<library_errors::failure> : std::true_type { };
 
+// A category that maps a code to a condition through equivalent() and leaves
+// default_error_condition() alone.
+namespace http_errors {
+
+class http_category_type final : public std::error_category {
+public:
+    const char* name() const noexcept override
+    {
+        return "http";
+    }
+
+    std::string message(int value) const override
+    {
+        return "http " + std::to_string(value);
+    }
+
+    bool equivalent(int value, const std::error_condition& condition) const noexcept override
+    {
+        return (value == 400) && (condition == std::errc::invalid_argument);
+    }
+};
+
+const std::error_category& http_category()
+{
+    static const http_category_type the_category;
+    return the_category;
+}
+
+}  // namespace http_errors
+
+// An error code enum whose codes are in generic_category().
+namespace posix_errors {
+
+enum class posix_code {
+    no_such_file = ENOENT
+};
+
+std::error_code make_error_code(posix_code c)
+{
+    return { static_cast<int>(c), std::generic_category() };
+}
+
+}  // namespace posix_errors
+
+template <>
+struct std::is_error_code_enum<posix_errors::posix_code> : std::true_type { };
+
 TEST(error_test, default_constructed_error_is_falsy)
 {
     const dross::error e;
@@ -208,4 +255,23 @@ TEST(error_test, a_system_code_equals_the_std_errc_it_maps_to)
 
     EXPECT_TRUE(e == std::errc::no_such_file_or_directory);
     EXPECT_FALSE(e == std::errc::permission_denied);
+}
+
+TEST(error_test, a_code_equals_the_std_errc_its_category_maps_it_to)
+{
+    const dross::error e(400, http_errors::http_category());
+
+    EXPECT_TRUE(e == std::errc::invalid_argument);
+    EXPECT_FALSE(e != std::errc::invalid_argument);
+    EXPECT_FALSE(e == std::errc::io_error);
+    EXPECT_TRUE(e != std::errc::io_error);
+}
+
+TEST(error_test, an_error_code_enum_equals_only_the_same_category_and_value)
+{
+    const dross::error e(ENOENT, std::system_category());
+
+    EXPECT_FALSE(e == posix_errors::posix_code::no_such_file);
+    EXPECT_TRUE(e != posix_errors::posix_code::no_such_file);
+    EXPECT_TRUE(dross::error(posix_errors::posix_code::no_such_file) == posix_errors::posix_code::no_such_file);
 }

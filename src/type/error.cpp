@@ -56,12 +56,12 @@ error::operator bool() const noexcept
 
 bool error::operator==(std::errc e) const noexcept
 {
-    return (_code.default_error_condition() == e);
+    return (_code == e);
 }
 
 bool error::operator!=(std::errc e) const noexcept
 {
-    return (_code.default_error_condition() != e);
+    return (! (*this == e));
 }
 
 bool error::operator==(const std::error_category& c) const noexcept
