@@ -383,16 +383,12 @@ private:
         }
     }
 
-    std::expected<std::string, error> parse_bare_key()
+    std::string parse_bare_key()
     {
         std::string result;
         while ((_pos < _input.size()) && is_bare_key_char(current_char())) {
             result += current_char();
             advance();
-        }
-
-        if (result.empty()) {
-            return std::unexpected(create_error("Empty bare key"));
         }
 
         return result;
