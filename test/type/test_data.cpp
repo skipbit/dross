@@ -10,6 +10,7 @@
 #include <iterator>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 using namespace dross;
@@ -486,6 +487,13 @@ TEST(data_test, iterator_stl_algorithms)
 // either order.
 static_assert(std::totally_ordered_with<data::iterator, data::const_iterator>);
 static_assert(std::sized_sentinel_for<data::const_iterator, data::iterator>);
+
+// Iterators of either kind compare three-way among themselves, and a
+// difference of two never throws.
+static_assert(std::three_way_comparable<data::iterator>);
+static_assert(std::three_way_comparable<data::const_iterator>);
+static_assert(noexcept(std::declval<const data::iterator&>() - std::declval<const data::iterator&>()));
+static_assert(noexcept(std::declval<const data::const_iterator&>() - std::declval<const data::const_iterator&>()));
 
 TEST(data_test, iterators_compare_with_const_iterators)
 {

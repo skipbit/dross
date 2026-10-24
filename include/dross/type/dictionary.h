@@ -244,18 +244,12 @@ public:
     value_type operator*() const;
 
     /**
-     * @brief Equality comparison operator.
-     * @param other The iterator to compare with
+     * @brief Equality comparison operator. != is derived from it.
+     * @param lhs The iterator to compare
+     * @param rhs The iterator to compare with
      * @return true if iterators point to the same element
      */
-    bool operator==(const iterator& other) const;
-
-    /**
-     * @brief Inequality comparison operator.
-     * @param other The iterator to compare with
-     * @return true if iterators point to different elements
-     */
-    bool operator!=(const iterator& other) const;
+    friend bool operator==(const iterator& lhs, const iterator& rhs);
 
 private:
     friend class dictionary;

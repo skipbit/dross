@@ -122,14 +122,9 @@ dictionary::iterator::value_type dictionary::iterator::operator*() const
     return { _impl->cursor->first, _impl->cursor->second };
 }
 
-bool dictionary::iterator::operator==(const iterator& i) const
+bool operator==(const dictionary::iterator& lhs, const dictionary::iterator& rhs)
 {
-    return (_impl->cursor == i._impl->cursor);
-}
-
-bool dictionary::iterator::operator!=(const iterator& i) const
-{
-    return (_impl->cursor != i._impl->cursor);
+    return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
 class dictionary::const_iterator::impl {

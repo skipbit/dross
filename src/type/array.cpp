@@ -197,14 +197,9 @@ value& array::iterator::operator*() const
     return *(_impl->cursor);
 }
 
-bool array::iterator::operator==(const iterator& i) const
+bool operator==(const array::iterator& lhs, const array::iterator& rhs)
 {
-    return (_impl->cursor == i._impl->cursor);
-}
-
-bool array::iterator::operator!=(const iterator& i) const
-{
-    return (_impl->cursor != i._impl->cursor);
+    return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
 class array::const_iterator::impl {
