@@ -13,25 +13,23 @@ namespace dross::toml {
  * @brief TOML format parser and serializer.
  *
  * This module provides functionality to convert between TOML format binary data
- * and dross structured data types. It follows the TOML v1.0.0 specification.
+ * and dross structured data types. It reads and writes a subset of TOML v1.0.0;
+ * deserialize() lists the forms it does not read.
  *
  * Key features:
- * - Complete TOML v1.0.0 specification support
  * - Bidirectional conversion (deserialize/serialize)
  * - Integration with dross::value type system
- * - Comprehensive error handling with detailed diagnostics
  * - Unicode support for strings and keys
- * - Precise datetime handling with timezone support
- * - Comments preservation during roundtrip operations
  *
  * Supported TOML types mapping to dross types:
  * - TOML String → dross::string
  * - TOML Integer → dross::number
  * - TOML Float → dross::number
  * - TOML Boolean → dross::boolean
- * - TOML Datetime → dross::timestamp
  * - TOML Array → dross::array
  * - TOML Table → dross::dictionary
+ *
+ * TOML Datetime values are not supported in either direction.
  *
  * @example
  * @code
@@ -71,14 +69,28 @@ namespace dross::toml {
  * - Encoding errors (non-UTF-8 content)
  * - Control characters other than tab, except a CR that ends a line as CRLF
  * - Unicode escapes that do not name a Unicode scalar value
- * - Duplicate keys in tables
- * - Invalid datetime formats
- * - Array type inconsistencies
- * - Table redefinitions
  *
- * @note The parser follows TOML v1.0.0 specification strictly.
- *       Comments are preserved in internal representation but not
- *       accessible through standard dictionary interface.
+ * Valid TOML that fails to read:
+ * - Literal strings and multi-line strings
+ * - Datetimes of every kind
+ * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
+ * - Bare keys that start with a digit or a hyphen
+ * - Integers in hexadecimal, octal or binary, or with underscores
+ * - Floats with an exponent, inf and nan
+ * - Arrays with a comma after the last value
+ *
+ * Invalid TOML that is read without an error:
+ * - A key or table defined twice keeps only the last definition
+ * - A key followed by a table of the same name keeps only the table
+ * - A table header and key/value pairs on one line are all read
+ * - Numbers with a leading zero or without a digit on one side of the
+ *   decimal point, such as 01, 1. and -.5
+ * - A newline before a comma in an inline table
+ *
+ * @note Each [[name]] array of tables header is read as a [name] table,
+ *       so only the last table of the array is kept. A [a] table header
+ *       that follows a [a.b] header replaces table a, so a.b is lost.
+ *       Comments are skipped and are not kept in the result.
  */
 std::expected<dictionary, error> deserialize(const data& input);
 
@@ -93,11 +105,12 @@ std::expected<dictionary, error> deserialize(const data& input);
  * @return TOML format binary data on success, error on failure
  *
  * Error conditions:
- * - Unsupported value types (only basic types and containers supported)
- * - Circular references in nested structures
- * - Invalid characters in table keys
+ * - Unsupported value types, such as a timestamp
  * - Values that cannot be represented in TOML format, such as a NaN number
  * - Strings or keys that are not valid UTF-8
+ *
+ * An empty key is not an error: it is written as an empty bare key, which
+ * deserialize() does not read back.
  *
  * Serialization rules:
  * - Dictionary keys are sorted alphabetically for consistent output

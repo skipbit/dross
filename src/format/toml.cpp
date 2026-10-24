@@ -94,9 +94,8 @@ void append_utf8(std::string& text, char32_t code_point)
 /**
  * @brief TOML parser implementation using recursive descent parsing.
  *
- * This class provides a complete TOML v1.0.0 parser with proper error handling
- * and diagnostic information. It uses a lexical analyzer followed by recursive
- * descent parsing for structured analysis.
+ * This class reads the subset of TOML v1.0.0 that toml.h describes, directly
+ * from the input characters.
  */
 class parser {
 public:
@@ -624,8 +623,7 @@ private:
 /**
  * @brief TOML serializer implementation.
  *
- * This class converts dross structured data back to TOML format with
- * proper formatting and escaping according to TOML v1.0.0 specification.
+ * This class converts dross structured data back to TOML format.
  */
 class serializer {
 public:
