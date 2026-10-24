@@ -628,7 +628,24 @@ private:
             return std::unexpected(create_error("Invalid number format"));
         }
 
-        return value(number{ num_str });
+        if ((current_char() == 'e') || (current_char() == 'E')) {
+            num_str += current_char();
+            advance();
+            if ((current_char() == '+') || (current_char() == '-')) {
+                num_str += current_char();
+                advance();
+            }
+            while ((_pos < _input.size()) && is_ascii_digit(current_char())) {
+                num_str += current_char();
+                advance();
+            }
+        }
+
+        number n{ num_str };
+        if (n.is_nan()) {
+            return std::unexpected(create_error("Invalid number format"));
+        }
+        return value(n);
     }
 
     void set_nested_value(dictionary& root, const std::vector<std::string>& key_path, const value& val)
