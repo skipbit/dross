@@ -6,6 +6,19 @@ All notable changes to the dross project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+Unreleased
+----------
+
+Changed
+~~~~~~~
+
+- ``dictionary::iterator`` and ``dictionary::const_iterator`` declare
+  ``std::input_iterator_tag`` as their ``iterator_category`` and
+  ``std::forward_iterator_tag`` as their ``iterator_concept``, as the
+  standard range adaptors do. They return a pair by value, which the C++17
+  forward iterator requirements do not allow. They still model
+  ``std::forward_iterator``
+
 0.1.1 - 2026-10-24
 ------------------
 
