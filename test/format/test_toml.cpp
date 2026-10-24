@@ -93,19 +93,34 @@ TEST(toml_test, bare_keys)
 
 TEST(toml_test, empty_keys_are_written_quoted)
 {
-    dictionary table;
-    table[""] = value(number{ "1" });
-    dictionary input;
-    input[""] = value(number{ "2" });
-    input["a"] = value(table);
+    dictionary leaf;
+    leaf[""] = value(number{ "1" });
+    dictionary keys;
+    keys[""] = value(number{ "2" });
+    keys["a"] = value(leaf);
 
-    auto output = toml::serialize(input);
-    ASSERT_TRUE(output.has_value());
-    EXPECT_EQ(std::string(output.value()), "\"\" = 2\n\n[a]\n\"\" = 1\n");
+    dictionary inner;
+    inner["x"] = value(number{ "1" });
+    dictionary a;
+    a[""] = value(inner);
+    a["list"] = value(array{ value(leaf) });
+    dictionary tables;
+    tables[""] = value(inner);
+    tables["a"] = value(a);
 
-    auto result = toml::deserialize(output.value());
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), input);
+    const std::vector<std::pair<dictionary, std::string>> cases = {
+        { keys, "\"\" = 2\n\n[a]\n\"\" = 1\n" },
+        { tables, "\n[\"\"]\nx = 1\n\n[a]\nlist = [{\"\" = 1}]\n\n[a.\"\"]\nx = 1\n" },
+    };
+    for (const auto& [input, expected] : cases) {
+        auto output = toml::serialize(input);
+        ASSERT_TRUE(output.has_value());
+        EXPECT_EQ(std::string(output.value()), expected);
+
+        auto result = toml::deserialize(output.value());
+        ASSERT_TRUE(result.has_value()) << expected;
+        EXPECT_EQ(result.value(), input) << expected;
+    }
 }
 
 TEST(toml_test, quoted_keys_read_the_same_escapes_as_strings)
