@@ -45,17 +45,10 @@ public:
         return (_code == std::error_code(e));
     }
 
-    template <error_enum_type E>
-    bool operator!=(const E e) const noexcept
-    {
-        return (! (*this == e));
-    }
-
     // True when either category reports e as equivalent, as std::error_code
     // compares with an error condition, so a system_category() code matches
     // the std::errc it maps to.
     bool operator==(std::errc) const noexcept;
-    bool operator!=(std::errc) const noexcept;
 
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;

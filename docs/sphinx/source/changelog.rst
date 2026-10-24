@@ -19,13 +19,16 @@ Added
 Changed
 ~~~~~~~
 
-- ``error`` compares with ``std::errc`` and with error code enums as
-  ``std::error_code`` does. A comparison with ``std::errc`` asks both
-  categories through ``equivalent()``, so a code whose category maps it
-  to a condition there matches that ``std::errc``. A comparison with an
-  error code enum matches only the same category and value, so a
+- ``error`` compared with an error code enum equals it only when the
+  category and the value both match, as ``std::error_code`` does. A
   ``system_category()`` code no longer equals an enum whose code is in
   ``generic_category()``, even when both map to the same condition
+
+- ``error`` compares with ``std::errc`` and with an error code enum in
+  either order, such as ``std::errc::invalid_argument == e``.
+  ``operator!=`` for these is derived from ``operator==``; naming the
+  removed member, such as ``&error::operator!=`` for ``std::errc``, does
+  not compile
 
 - An ``iterator`` of ``array``, ``dictionary`` or ``data`` compares with
   a ``const_iterator`` of the same type in either order, such as
@@ -46,6 +49,13 @@ Changed
   pair by value, which the C++17 forward iterator requirements do not
   allow, and there is no pointer to it. They still model
   ``std::forward_iterator``
+
+Fixed
+~~~~~
+
+- ``error`` compared with ``std::errc`` asks both categories through
+  ``equivalent()``, as ``std::error_code`` does, so a code whose category
+  maps it to that condition only in ``equivalent()`` equals it
 
 0.1.1 - 2026-10-24
 ------------------

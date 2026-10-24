@@ -265,6 +265,8 @@ TEST(error_test, a_code_equals_the_std_errc_its_category_maps_it_to)
     EXPECT_FALSE(e != std::errc::invalid_argument);
     EXPECT_FALSE(e == std::errc::io_error);
     EXPECT_TRUE(e != std::errc::io_error);
+    EXPECT_TRUE(std::errc::invalid_argument == e);
+    EXPECT_FALSE(std::errc::invalid_argument != e);
 }
 
 TEST(error_test, an_error_code_enum_equals_only_the_same_category_and_value)
@@ -273,5 +275,7 @@ TEST(error_test, an_error_code_enum_equals_only_the_same_category_and_value)
 
     EXPECT_FALSE(e == posix_errors::posix_code::no_such_file);
     EXPECT_TRUE(e != posix_errors::posix_code::no_such_file);
+    EXPECT_FALSE(posix_errors::posix_code::no_such_file == e);
+    EXPECT_TRUE(posix_errors::posix_code::no_such_file != e);
     EXPECT_TRUE(dross::error(posix_errors::posix_code::no_such_file) == posix_errors::posix_code::no_such_file);
 }

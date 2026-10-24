@@ -59,11 +59,6 @@ bool error::operator==(std::errc e) const noexcept
     return (_code == e);
 }
 
-bool error::operator!=(std::errc e) const noexcept
-{
-    return (! (*this == e));
-}
-
 bool error::operator==(const std::error_category& c) const noexcept
 {
     return _code.category() == c;
