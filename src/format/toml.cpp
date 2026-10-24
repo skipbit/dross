@@ -754,8 +754,8 @@ private:
 
     std::string escape_key(const std::string& key) const
     {
-        // Check if key needs quoting
-        bool needs_quotes = false;
+        // An empty key has no bare form, so it is always quoted.
+        bool needs_quotes = key.empty();
         for (char ch : key) {
             if ((! is_ascii_alnum(ch)) && (ch != '_') && (ch != '-')) {
                 needs_quotes = true;

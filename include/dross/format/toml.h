@@ -109,9 +109,6 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Values that cannot be represented in TOML format, such as a NaN number
  * - Strings or keys that are not valid UTF-8
  *
- * An empty key is not an error: it is written as an empty bare key, which
- * deserialize() does not read back.
- *
  * Serialization rules:
  * - Dictionary keys are sorted alphabetically for consistent output
  * - Arrays are formatted with proper spacing

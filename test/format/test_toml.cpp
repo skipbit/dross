@@ -91,6 +91,23 @@ TEST(toml_test, bare_keys)
     EXPECT_EQ(std::string(output.value()), "Key-2_x = 1\n");
 }
 
+TEST(toml_test, empty_keys_are_written_quoted)
+{
+    dictionary table;
+    table[""] = value(number{ "1" });
+    dictionary input;
+    input[""] = value(number{ "2" });
+    input["a"] = value(table);
+
+    auto output = toml::serialize(input);
+    ASSERT_TRUE(output.has_value());
+    EXPECT_EQ(std::string(output.value()), "\"\" = 2\n\n[a]\n\"\" = 1\n");
+
+    auto result = toml::deserialize(output.value());
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result.value(), input);
+}
+
 TEST(toml_test, quoted_keys_read_the_same_escapes_as_strings)
 {
     auto result = toml::deserialize(make_data(R"("a\bb\fc" = "a\bb\fc")"));

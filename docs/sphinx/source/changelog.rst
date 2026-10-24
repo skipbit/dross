@@ -41,6 +41,8 @@ Fixed
   undefined behaviour, and under a single-byte locale such as ISO-8859-1
   a UTF-8 key whose bytes that locale counts as letters, such as U+00EA,
   was read as a bare key and written without quotes, both invalid TOML
+- ``toml::serialize()`` writes an empty key as ``""`` instead of as an
+  empty bare key, so ``toml::deserialize()`` reads it back
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home
