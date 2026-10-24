@@ -51,6 +51,8 @@ Fixed
   ``a = 1 b = 2`` or ``[a] b = 1``, with ``std::errc::invalid_argument``
 - ``toml::deserialize()`` reads an array with a comma after the last
   value, such as ``[1, 2,]``
+- ``toml::deserialize()`` reads a float with an exponent, such as ``1e20``
+  or ``6.626e-34``
 - ``path::home()`` and the ``xdg`` accessors treat an empty ``HOME`` or
   ``XDG_*`` variable as unset, and ``path::home()`` returns
   ``std::nullopt`` when the password database entry has an empty home

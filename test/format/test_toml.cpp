@@ -222,6 +222,37 @@ zero_float = 0.0
     EXPECT_EQ(dict["zero_float"].as<number>(), number{ "0.0" });
 }
 
+TEST(toml_test, floats_with_an_exponent)
+{
+    std::string toml_content = R"(
+large = 1e20
+small = 6.626e-34
+signed = 5E+22
+leading_zero = 1e06
+negative = -2E-2
+fraction = 3.0e2
+)";
+
+    auto result = toml::deserialize(make_data(toml_content));
+    ASSERT_TRUE(result.has_value());
+
+    auto& dict = result.value();
+    EXPECT_EQ(dict["large"].as<number>(), number{ "100000000000000000000" });
+    EXPECT_EQ(dict["small"].as<number>(), number{ "0.0000000000000000000000000000000006626" });
+    EXPECT_EQ(dict["signed"].as<number>(), number{ "50000000000000000000000" });
+    EXPECT_EQ(dict["leading_zero"].as<number>(), number{ "1000000" });
+    EXPECT_EQ(dict["negative"].as<number>(), number{ "-0.02" });
+    EXPECT_EQ(dict["fraction"].as<number>(), number{ "300" });
+
+    for (const char* text : { "x = 1e\n", "x = 1e+\n", "x = 1E-x\n", "x = 1ee2\n", "x = 1e2.5\n" }) {
+        auto invalid = toml::deserialize(make_data(text));
+        EXPECT_FALSE(invalid.has_value()) << text;
+        if (! invalid.has_value()) {
+            EXPECT_EQ(invalid.error(), std::errc::invalid_argument) << text;
+        }
+    }
+}
+
 // Boolean Tests
 TEST(toml_test, boolean_values)
 {

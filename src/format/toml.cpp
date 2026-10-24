@@ -628,6 +628,22 @@ private:
             return std::unexpected(create_error("Invalid number format"));
         }
 
+        if ((current_char() == 'e') || (current_char() == 'E')) {
+            num_str += current_char();
+            advance();
+            if ((current_char() == '+') || (current_char() == '-')) {
+                num_str += current_char();
+                advance();
+            }
+            if (! is_ascii_digit(current_char())) {
+                return std::unexpected(create_error("Invalid number format"));
+            }
+            while ((_pos < _input.size()) && is_ascii_digit(current_char())) {
+                num_str += current_char();
+                advance();
+            }
+        }
+
         return value(number{ num_str });
     }
 
