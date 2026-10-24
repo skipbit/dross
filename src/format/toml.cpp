@@ -371,7 +371,7 @@ private:
         dictionary table;
         if (current_dict.contains(current_key)) {
             if (! _header_tables.contains(path)) {
-                return std::unexpected(create_error("Key defined twice"));
+                return std::unexpected(create_error("Table header names a key that is not a table"));
             }
             table = current_dict[current_key].as<dictionary>();
         }
