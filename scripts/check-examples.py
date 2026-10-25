@@ -49,23 +49,40 @@ class BlockError(Exception):
         self.line = line
 
 
+CPP = ('cpp', 'c++')
+
+
+def indent_of(line):
+    return len(line) - len(line.lstrip())
+
+
 def markdown_examples(lines):
     i = 0
     while i < len(lines):
-        if lines[i].strip() == '```cpp':
+        if re.match(r'\s*```(?:cpp|c\+\+)(?:\s.*)?$', lines[i]):
             j = i + 1
-            while lines[j].strip() != '```':
+            while j < len(lines) and lines[j].strip() != '```':
                 j += 1
+            if j == len(lines):
+                raise BlockError(i + 1, 'is not closed')
             yield i + 2, lines[i + 1:j], None
             i = j + 1
         else:
             i += 1
 
 
+# conf.py makes C++ the language of a block that names none, so such a
+# block is reported rather than read or skipped.
 def sphinx_examples(lines):
     i = 0
     while i < len(lines):
-        if re.match(r'\s*\.\. code-block:: cpp\s*$', lines[i]):
+        directive = re.match(r'\s*\.\. (?:code-block|code|sourcecode)::(.*)$', lines[i])
+        if not directive and lines[i].rstrip().endswith('::') and not lines[i].lstrip().startswith('..'):
+            raise BlockError(i + 1, 'starts a literal block; write a code-block that names its language')
+        if directive:
+            language = directive.group(1).strip()
+            if not language:
+                raise BlockError(i + 1, 'names no language')
             j = i + 1
             kind = None
             while j < len(lines) and re.match(r'\s+:[\w-]+:', lines[j]):
@@ -78,15 +95,17 @@ def sphinx_examples(lines):
                 j += 1
             while j < len(lines) and lines[j].strip() == '':
                 j += 1
-            indent = len(lines[j]) - len(lines[j].lstrip())
+            if j == len(lines) or indent_of(lines[j]) <= indent_of(lines[i]):
+                raise BlockError(i + 1, 'has no code')
+            indent = indent_of(lines[j])
             start = j
-            while j < len(lines) and (lines[j].strip() == ''
-                                      or len(lines[j]) - len(lines[j].lstrip()) >= indent):
+            while j < len(lines) and (lines[j].strip() == '' or indent_of(lines[j]) >= indent):
                 j += 1
             body = [line[indent:] for line in lines[start:j]]
             while body and body[-1].strip() == '':
                 body.pop()
-            yield start + 1, body, kind
+            if language in CPP:
+                yield start + 1, body, kind
             i = j
         else:
             i += 1
@@ -95,10 +114,12 @@ def sphinx_examples(lines):
 def header_examples(lines):
     i = 0
     while i < len(lines):
-        if re.match(r'\s*\*\s*@code\s*$', lines[i]):
+        if re.match(r'\s*\*\s*@code(?:\{\.(?:cpp|c\+\+)\})?\s*$', lines[i]):
             j = i + 1
-            while not re.match(r'\s*\*\s*@endcode', lines[j]):
+            while j < len(lines) and not re.match(r'\s*\*\s*@endcode', lines[j]):
                 j += 1
+            if j == len(lines):
+                raise BlockError(i + 1, 'is not closed')
             yield i + 2, [re.sub(r'^\s*\* ?', '', line) for line in lines[i + 1:j]], None
             i = j + 1
         else:

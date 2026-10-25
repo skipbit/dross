@@ -123,6 +123,52 @@ class sphinx_examples_test(unittest.TestCase):
         with self.assertRaises(check_examples.BlockError):
             list(check_examples.sphinx_examples(lines))
 
+    def test_reads_the_other_names_for_cpp(self):
+        for opener in ['.. code-block:: c++', '.. code:: cpp', '.. sourcecode:: cpp']:
+            lines = [opener, '', '    int x = 1;']
+
+            self.assertEqual(list(check_examples.sphinx_examples(lines)), [(3, ['int x = 1;'], None)], opener)
+
+    def test_skips_a_block_in_another_language(self):
+        lines = ['.. code-block:: bash', '', '    make html::', '', 'Text']
+
+        self.assertEqual(list(check_examples.sphinx_examples(lines)), [])
+
+    def test_a_block_with_no_language_is_an_error(self):
+        for lines in [['Example::', '', '    int x = 1;'], ['.. code-block::', '', '    int x = 1;'],
+                      ['.. code::', '', '    int x = 1;']]:
+            with self.assertRaises(check_examples.BlockError, msg=lines[0]):
+                list(check_examples.sphinx_examples(lines))
+
+    def test_a_block_with_no_body_is_an_error(self):
+        with self.assertRaises(check_examples.BlockError):
+            list(check_examples.sphinx_examples(['.. code-block:: cpp', '']))
+
+
+class markdown_examples_test(unittest.TestCase):
+    def test_reads_the_other_names_for_cpp(self):
+        for opener in ['```cpp', '```c++', '```cpp title="main.cpp"']:
+            self.assertEqual(list(check_examples.markdown_examples([opener, 'int x = 1;', '```'])),
+                             [(2, ['int x = 1;'], None)], opener)
+
+    def test_skips_a_block_in_another_language(self):
+        self.assertEqual(list(check_examples.markdown_examples(['```cmake', 'project(x)', '```'])), [])
+
+    def test_an_unclosed_block_is_an_error(self):
+        with self.assertRaises(check_examples.BlockError):
+            list(check_examples.markdown_examples(['```cpp', 'int x = 1;']))
+
+
+class header_examples_test(unittest.TestCase):
+    def test_reads_code_marked_as_cpp(self):
+        for opener in [' * @code', ' * @code{.cpp}']:
+            self.assertEqual(list(check_examples.header_examples([opener, ' * int x = 1;', ' * @endcode'])),
+                             [(2, ['int x = 1;'], None)], opener)
+
+    def test_an_unclosed_block_is_an_error(self):
+        with self.assertRaises(check_examples.BlockError):
+            list(check_examples.header_examples([' * @code', ' * int x = 1;']))
+
 
 if __name__ == '__main__':
     unittest.main()

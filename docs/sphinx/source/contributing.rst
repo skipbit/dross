@@ -208,7 +208,9 @@ with stay outside the function.
 On these pages, a ``code-block`` with ``:class: example-namespace-scope`` is
 compiled without being put in a function, and one with
 ``:class: example-fragment``, such as the Doxygen comment above, is not
-compiled.
+compiled. A block names its language, such as ``.. code-block:: console``
+for a shell session: Sphinx shows a literal block (``::``) or a
+``code-block`` without one as C++, so the check reports it.
 
 Documentation Building
 ~~~~~~~~~~~~~~~~~~~~~~
