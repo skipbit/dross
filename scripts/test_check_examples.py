@@ -52,10 +52,24 @@ class source_of_test(unittest.TestCase):
 
         self.assertEqual(function_body(source), 'dross::number n{42};\nint later();')
 
+    def test_a_comment_above_the_declarations_goes_with_them(self):
+        source = check_examples.source_of(['// helpers', 'int work();', 'work();'], None)
+
+        self.assertIn('// helpers\nint work();', above_function(source))
+        self.assertEqual(function_body(source), 'work();')
+
     def test_calls_and_definitions_are_not_taken_as_declarations(self):
         for line in ['worker.join();', 'dross::main_runloop().run();', 'dross::operation_queue queue{ 4 };',
-                     'auto loaded = queue.enqueue(load);']:
-            self.assertIsNone(check_examples.FUNCTION_DECLARATION.match(line), line)
+                     'auto loaded = queue.enqueue(load);', 'std::thread worker(run);', 'dross::number n(42);',
+                     'dross::path home(std::string{"/home"});', 'return compute(x);', 'return make();',
+                     'throw failure();']:
+            self.assertFalse(check_examples.is_function_declaration(line), line)
+
+    def test_declarations_are_recognised(self):
+        for line in ['int expensive_work();', 'void show(int answer);', 'void show(const std::string& text);',
+                     'void tick(void);', 'std::string name() noexcept;', 'int size() const;',
+                     'std::optional<dross::string> lookup(const dross::string& key, int depth);']:
+            self.assertTrue(check_examples.is_function_declaration(line), line)
 
     def test_an_example_with_main_is_compiled_as_it_is(self):
         body = ['int main()', '{', '    return 0;', '}']

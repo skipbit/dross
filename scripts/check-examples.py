@@ -127,7 +127,19 @@ def examples():
     return found, problems
 
 
-FUNCTION_DECLARATION = re.compile(r'[A-Za-z_][\w:<>, ]*[\s&*]+[A-Za-z_]\w*\([^;{}]*\)\s*;\s*$')
+FUNCTION_DECLARATION = re.compile(r'(?!(?:return|throw|co_return|co_yield)\b)'
+                                  r'[A-Za-z_][\w:<>, ]*[\s&*]+[A-Za-z_]\w*\(([^;{}]*)\)'
+                                  r'(?:\s*(?:const|noexcept))*\s*;\s*$')
+
+
+def is_function_declaration(line):
+    match = FUNCTION_DECLARATION.match(line)
+    if not match:
+        return False
+    # A parameter is a type and a name, where an argument such as run or 42
+    # is one word, so std::thread worker(run); stays a variable.
+    parameters = match.group(1).strip()
+    return parameters in ('', 'void') or all(len(p.split()) > 1 for p in parameters.split(','))
 
 
 def source_of(body, kind):
@@ -138,8 +150,8 @@ def source_of(body, kind):
     # the ones that open an example go above the function with the includes.
     leading = 0
     while leading < len(body) and (body[leading].strip() == ''
-                                   or body[leading].startswith('#include')
-                                   or FUNCTION_DECLARATION.match(body[leading])):
+                                   or body[leading].startswith(('#include', '//'))
+                                   or is_function_declaration(body[leading])):
         leading += 1
     above = body[:leading] + [line for line in body[leading:] if line.startswith('#include')]
     statements = [line for line in body[leading:] if not line.startswith('#include')]
