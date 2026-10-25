@@ -159,16 +159,14 @@ Here's a simple example using the dross type system:
 
     int main()
     {
-        using namespace dross;
-
         // Create a dictionary with mixed types
-        dictionary config;
-        config["name"] = string("My Application");
-        config["version"] = string("1.0");
-        config["debug"] = boolean(true);
+        dross::dictionary config;
+        config["name"] = dross::string("My Application");
+        config["version"] = dross::string("1.0");
+        config["debug"] = dross::boolean(true);
 
         // Create an array of features
-        array features;
+        dross::array features;
         features.append("logging");
         features.append("caching");
         features.append("monitoring");
@@ -177,18 +175,18 @@ Here's a simple example using the dross type system:
 
         // Access values. operator[] would insert a default value for a key
         // that is absent, so ask contains() before reading.
-        if (config.contains("name") && config["name"].is<string>()) {
-            std::string name = config["name"].as<string>();
+        if (config.contains("name") && config["name"].is<dross::string>()) {
+            std::string name = config["name"].as<dross::string>();
             std::cout << "Application: " << name << std::endl;
         }
 
-        if (config.contains("features") && config["features"].is<array>()) {
-            array feature_array = config["features"].as<array>();
+        if (config.contains("features") && config["features"].is<dross::array>()) {
+            dross::array feature_array = config["features"].as<dross::array>();
             std::cout << "Features:" << std::endl;
             for (const auto& feature : feature_array) {
                 // value has no operator<<; unwrap it first
-                if (feature.is<string>()) {
-                    std::string text = feature.as<string>();
+                if (feature.is<dross::string>()) {
+                    std::string text = feature.as<dross::string>();
                     std::cout << "  - " << text << std::endl;
                 }
             }

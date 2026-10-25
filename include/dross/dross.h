@@ -9,12 +9,11 @@
  * Usage:
  * @code
  * #include <dross/dross.h>
- * using namespace dross;
  *
  * // Use any dross functionality
- * number big_num{"12345678901234567890"};
- * string text{"Hello, world!"};
- * array list = {value{1}, value{"two"}, value{3.0}};
+ * dross::number big_num{"12345678901234567890"};
+ * dross::string text{"Hello, world!"};
+ * dross::array list = {dross::value{1}, dross::value{"two"}, dross::value{3.0}};
  * @endcode
  *
  * Modules included:

@@ -26,15 +26,14 @@
  *
  * @code
  * #include <dross/type.h>
- * using namespace dross;
  *
  * // Core types
- * boolean flag{true};
- * number precise{"99999999999999999999999999999"};
- * string text{"Hello, 世界!"};
- * timestamp meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
- * array list = {value{1}, value{"two"}, value{3.14}};
- * dictionary config;
+ * dross::boolean flag{true};
+ * dross::number precise{"99999999999999999999999999999"};
+ * dross::string text{"Hello, 世界!"};
+ * dross::timestamp meeting{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // +09:00
+ * dross::array list = {dross::value{1}, dross::value{"two"}, dross::value{3.14}};
+ * dross::dictionary config;
  * config["host"] = "localhost";
  * config["port"] = 8080;
  *
@@ -45,17 +44,18 @@
  * std::string d_str = meeting; // "2024-01-21T15:30:00+09:00"
  *
  * // STL-style explicit conversion
- * auto b_string = to_string(flag);    // "true"
- * auto n_string = to_string(precise); // "99999999999999999999999999999"
- * auto s_string = to_string(text);    // "Hello, 世界!"
- * auto d_string = to_string(meeting); // "2024-01-21T15:30:00+09:00"
+ * auto b_string = dross::to_string(flag);    // "true"
+ * auto n_string = dross::to_string(precise); // "99999999999999999999999999999"
+ * auto s_string = dross::to_string(text);    // "Hello, 世界!"
+ * auto d_string = dross::to_string(meeting); // "2024-01-21T15:30:00+09:00"
  *
  * // Stream output
- * std::cout << flag << " " << precise << " " << to_string(text) << " " << meeting << std::endl;
+ * std::cout << flag << " " << precise << " " << dross::to_string(text) << " " << meeting
+ *           << std::endl;
  *
  * // Utility functions
- * auto tokens = split("a,b,c", ",");
- * auto combined = join(tokens, ";");
+ * auto tokens = dross::split("a,b,c", ",");
+ * auto combined = dross::join(tokens, ";");
  * @endcode
  */
 
@@ -192,8 +192,8 @@ std::string to_string(const data& d);
  * information if available.
  *
  * @code
- * timestamp meeting{2024, 1, 21, 15, 30, 0, timezone::offset(9)}; // +09:00
- * auto str = to_string(meeting);  // "2024-01-21T15:30:00+09:00"
+ * dross::timestamp meeting{2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)}; // +09:00
+ * auto str = dross::to_string(meeting);  // "2024-01-21T15:30:00+09:00"
  * @endcode
  */
 std::string to_string(const timestamp& ts);
@@ -207,11 +207,11 @@ std::string to_string(const timestamp& ts);
  * other types. Returns the timezone in ISO 8601 format (e.g., "+09:00", "Z").
  *
  * @code
- * auto jst = timezone::offset(9);
- * auto str = to_string(jst);  // "+09:00"
+ * auto jst = dross::timezone::offset(9);
+ * auto str = dross::to_string(jst);  // "+09:00"
  *
- * auto utc = timezone::utc();
- * auto utc_str = to_string(utc);  // "Z"
+ * auto utc = dross::timezone::utc();
+ * auto utc_str = dross::to_string(utc);  // "Z"
  * @endcode
  */
 std::string to_string(const timezone& tz);

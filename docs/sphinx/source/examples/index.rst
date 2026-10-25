@@ -24,30 +24,28 @@ Working with Values
     // individual type headers.
     #include <dross/type.h>
 
-    using namespace dross;
-
-    void print_type_info(const value& v)
+    void print_type_info(const dross::value& v)
     {
         std::cout << "Type: ";
 
         // is<T>() is the only way to ask what a value holds. A default
         // constructed value holds none of these, and no separate predicate
         // for the empty case exists.
-        if (v.is<boolean>()) {
-            std::cout << "boolean: " << to_string(v.as<boolean>());
-        } else if (v.is<number>()) {
-            std::cout << "number: " << to_string(v.as<number>());
-        } else if (v.is<string>()) {
-            std::cout << "string: " << to_string(v.as<string>());
-        } else if (v.is<timestamp>()) {
-            std::cout << "timestamp: " << to_string(v.as<timestamp>());
-        } else if (v.is<data>()) {
-            std::cout << "data: " << to_string(v.as<data>());
-        } else if (v.is<array>()) {
+        if (v.is<dross::boolean>()) {
+            std::cout << "boolean: " << dross::to_string(v.as<dross::boolean>());
+        } else if (v.is<dross::number>()) {
+            std::cout << "number: " << dross::to_string(v.as<dross::number>());
+        } else if (v.is<dross::string>()) {
+            std::cout << "string: " << dross::to_string(v.as<dross::string>());
+        } else if (v.is<dross::timestamp>()) {
+            std::cout << "timestamp: " << dross::to_string(v.as<dross::timestamp>());
+        } else if (v.is<dross::data>()) {
+            std::cout << "data: " << dross::to_string(v.as<dross::data>());
+        } else if (v.is<dross::array>()) {
             // array and dictionary have no to_string overload
-            std::cout << "array of " << v.as<array>().length();
-        } else if (v.is<dictionary>()) {
-            std::cout << "dictionary of " << v.as<dictionary>().size();
+            std::cout << "array of " << v.as<dross::array>().length();
+        } else if (v.is<dross::dictionary>()) {
+            std::cout << "dictionary of " << v.as<dross::dictionary>().size();
         } else {
             std::cout << "empty";
         }
@@ -57,16 +55,16 @@ Working with Values
 
     int main()
     {
-        dictionary dict;
-        dict["x"] = number(1);
+        dross::dictionary dict;
+        dict["x"] = dross::number(1);
 
         // Different value types
-        print_type_info(value());                    // empty
-        print_type_info(value(boolean(true)));       // boolean
-        print_type_info(value(42));                  // number
-        print_type_info(value("hello"));             // string
-        print_type_info(value(array{1, 2, 3}));      // array
-        print_type_info(value(dict));                // dictionary
+        print_type_info(dross::value());                          // empty
+        print_type_info(dross::value(dross::boolean(true)));      // boolean
+        print_type_info(dross::value(42));                        // number
+        print_type_info(dross::value("hello"));                   // string
+        print_type_info(dross::value(dross::array{1, 2, 3}));     // array
+        print_type_info(dross::value(dict));                      // dictionary
 
         return 0;
     }
@@ -84,16 +82,14 @@ Building Data Structures
     #include <dross/type/dictionary.h>
     #include <dross/type/value.h>
 
-    using namespace dross;
-
-    dictionary create_person(const string& name, int age,
-                             const array& hobbies)
+    dross::dictionary create_person(const dross::string& name, int age,
+                                    const dross::array& hobbies)
     {
-        dictionary person;
+        dross::dictionary person;
         person["name"] = name;
-        person["age"] = number(age);
+        person["age"] = dross::number(age);
         person["hobbies"] = hobbies;
-        person["created"] = string("2024-01-20");
+        person["created"] = dross::string("2024-01-20");
 
         return person;
     }
@@ -101,35 +97,35 @@ Building Data Structures
     int main()
     {
         // Create a list of people
-        array people;
+        dross::array people;
 
         people.append(create_person("Alice", 30,
-                                    array{"reading", "hiking"}));
+                                    dross::array{"reading", "hiking"}));
         people.append(create_person("Bob", 25,
-                                    array{"gaming", "cooking"}));
+                                    dross::array{"gaming", "cooking"}));
         people.append(create_person("Charlie", 35,
-                                    array{"photography", "travel"}));
+                                    dross::array{"photography", "travel"}));
 
         // Create a database-like structure. array reports its size through
         // length(); dictionary and data use size().
-        dictionary database;
-        database["version"] = string("1.0");
+        dross::dictionary database;
+        database["version"] = dross::string("1.0");
         database["people"] = people;
-        database["count"] = number(people.length());
+        database["count"] = dross::number(people.length());
 
         // Access and print data
-        if (database.contains("people") && database["people"].is<array>()) {
-            array people_array = database["people"].as<array>();
+        if (database.contains("people") && database["people"].is<dross::array>()) {
+            dross::array people_array = database["people"].as<dross::array>();
 
             for (size_t i = 0; i < people_array.length(); ++i) {
-                const value& entry = people_array[i];
-                if (!entry.is<dictionary>()) {
+                const dross::value& entry = people_array[i];
+                if (!entry.is<dross::dictionary>()) {
                     continue;
                 }
 
-                dictionary person = entry.as<dictionary>();
-                if (person.contains("name") && person["name"].is<string>()) {
-                    std::string name = person["name"].as<string>();
+                dross::dictionary person = entry.as<dross::dictionary>();
+                if (person.contains("name") && person["name"].is<dross::string>()) {
+                    std::string name = person["name"].as<dross::string>();
                     std::cout << "Person " << i + 1 << ": "
                               << name << std::endl;
                 }
@@ -164,15 +160,13 @@ produces.
     #include <dross/type/dictionary.h>
     #include <dross/type/value.h>
 
-    using namespace dross;
-
     class config_manager {
     private:
-        dictionary _config;
-        path _config_path;
+        dross::dictionary _config;
+        dross::path _config_path;
 
     public:
-        explicit config_manager(const path& config_path)
+        explicit config_manager(const dross::path& config_path)
             : _config_path(config_path)
         {
             set_defaults();
@@ -180,21 +174,21 @@ produces.
 
         void set_defaults()
         {
-            _config["theme"] = string("dark");
-            _config["language"] = string("en");
-            _config["auto_save"] = boolean(true);
-            _config["save_interval"] = number(300); // 5 minutes
+            _config["theme"] = dross::string("dark");
+            _config["language"] = dross::string("en");
+            _config["auto_save"] = dross::boolean(true);
+            _config["save_interval"] = dross::number(300); // 5 minutes
 
-            dictionary window;
-            window["width"] = number(1024);
-            window["height"] = number(768);
-            window["maximized"] = boolean(false);
+            dross::dictionary window;
+            window["width"] = dross::number(1024);
+            window["height"] = dross::number(768);
+            window["maximized"] = dross::boolean(false);
             _config["window"] = window;
         }
 
         // Merges the file over the defaults. A missing file is not an error:
         // the defaults simply stay in place.
-        std::expected<void, error> load()
+        std::expected<void, dross::error> load()
         {
             std::ifstream input{_config_path.string(), std::ios::binary};
             if (!input) {
@@ -204,7 +198,7 @@ produces.
             const std::string text{std::istreambuf_iterator<char>{input},
                                    std::istreambuf_iterator<char>{}};
 
-            const auto parsed = toml::deserialize(data{text});
+            const auto parsed = dross::toml::deserialize(dross::data{text});
             if (!parsed) {
                 return std::unexpected(parsed.error());
             }
@@ -216,9 +210,9 @@ produces.
             return {};
         }
 
-        std::expected<void, error> save() const
+        std::expected<void, dross::error> save() const
         {
-            const auto serialized = toml::serialize(_config);
+            const auto serialized = dross::toml::serialize(_config);
             if (!serialized) {
                 return std::unexpected(serialized.error());
             }
@@ -227,7 +221,7 @@ produces.
             const std::string text = *serialized;
             output << text;
             if (!output) {
-                return std::unexpected(error{std::errc::io_error});
+                return std::unexpected(dross::error{std::errc::io_error});
             }
 
             return {};
@@ -240,12 +234,12 @@ produces.
 
         // Callers must check contains() first: the const operator[] throws
         // std::out_of_range for a key that is not present.
-        const value& get(const std::string& key) const
+        const dross::value& get(const std::string& key) const
         {
             return _config[key];
         }
 
-        void set(const std::string& key, const value& val)
+        void set(const std::string& key, const dross::value& val)
         {
             _config[key] = val;
         }
@@ -263,15 +257,13 @@ Data Processing Pipeline
     #include <dross/type/dictionary.h>
     #include <dross/type/value.h>
 
-    using namespace dross;
-
     class data_processor {
     public:
         // Filter items based on a condition
-        array filter(const array& items,
-                     std::function<bool(const value&)> predicate)
+        dross::array filter(const dross::array& items,
+                            std::function<bool(const dross::value&)> predicate)
         {
-            array result;
+            dross::array result;
             for (const auto& item : items) {
                 if (predicate(item)) {
                     result.append(item);
@@ -281,10 +273,10 @@ Data Processing Pipeline
         }
 
         // Transform items using a function
-        array map(const array& items,
-                  std::function<value(const value&)> transform)
+        dross::array map(const dross::array& items,
+                         std::function<dross::value(const dross::value&)> transform)
         {
-            array result;
+            dross::array result;
             for (const auto& item : items) {
                 result.append(transform(item));
             }
@@ -292,11 +284,11 @@ Data Processing Pipeline
         }
 
         // Reduce array to single value
-        value reduce(const array& items,
-                     std::function<value(const value&, const value&)> reducer,
-                     const value& initial)
+        dross::value reduce(const dross::array& items,
+                            std::function<dross::value(const dross::value&, const dross::value&)> reducer,
+                            const dross::value& initial)
         {
-            value result = initial;
+            dross::value result = initial;
             for (const auto& item : items) {
                 result = reducer(result, item);
             }
@@ -304,20 +296,20 @@ Data Processing Pipeline
         }
 
         // Group items by a key
-        dictionary group_by(const array& items,
-                            std::function<string(const value&)> key_func)
+        dross::dictionary group_by(const dross::array& items,
+                                   std::function<dross::string(const dross::value&)> key_func)
         {
-            dictionary groups;
+            dross::dictionary groups;
 
             for (const auto& item : items) {
-                const string key = key_func(item);
+                const dross::string key = key_func(item);
 
-                if (groups.contains(key) && groups[key].is<array>()) {
-                    array group = groups[key].as<array>();
+                if (groups.contains(key) && groups[key].is<dross::array>()) {
+                    dross::array group = groups[key].as<dross::array>();
                     group.append(item);
                     groups[key] = group;
                 } else {
-                    groups[key] = array{item};
+                    groups[key] = dross::array{item};
                 }
             }
 
@@ -332,15 +324,15 @@ Data Processing Pipeline
         // assigned after construction.
         auto make_product = [](const char* name, int price,
                                const char* category) {
-            dictionary product;
-            product["name"] = string(name);
-            product["price"] = number(price);
-            product["category"] = string(category);
+            dross::dictionary product;
+            product["name"] = dross::string(name);
+            product["price"] = dross::number(price);
+            product["category"] = dross::string(category);
             return product;
         };
 
         // Sample data: list of products
-        array products;
+        dross::array products;
         products.append(make_product("Laptop", 999, "Electronics"));
         products.append(make_product("Mouse", 29, "Electronics"));
         products.append(make_product("Desk", 299, "Furniture"));
@@ -350,12 +342,12 @@ Data Processing Pipeline
         data_processor processor;
 
         // Filter expensive items (price > 200)
-        auto expensive = processor.filter(products, [](const value& v) {
-            if (v.is<dictionary>()) {
-                dictionary product = v.as<dictionary>();
+        auto expensive = processor.filter(products, [](const dross::value& v) {
+            if (v.is<dross::dictionary>()) {
+                dross::dictionary product = v.as<dross::dictionary>();
                 if (product.contains("price") &&
-                    product["price"].is<number>()) {
-                    return product["price"].as<number>() > number(200);
+                    product["price"].is<dross::number>()) {
+                    return product["price"].as<dross::number>() > dross::number(200);
                 }
             }
             return false;
@@ -363,35 +355,35 @@ Data Processing Pipeline
 
         // Calculate total price
         auto total = processor.reduce(products,
-            [](const value& sum, const value& item) {
-                if (item.is<dictionary>()) {
-                    dictionary product = item.as<dictionary>();
+            [](const dross::value& sum, const dross::value& item) {
+                if (item.is<dross::dictionary>()) {
+                    dross::dictionary product = item.as<dross::dictionary>();
                     if (product.contains("price") &&
-                        product["price"].is<number>()) {
-                        return value(sum.as<number>() +
-                                     product["price"].as<number>());
+                        product["price"].is<dross::number>()) {
+                        return dross::value(sum.as<dross::number>() +
+                                            product["price"].as<dross::number>());
                     }
                 }
                 return sum;
             },
-            value(number(0))
+            dross::value(dross::number(0))
         );
 
         // Group by category
-        auto by_category = processor.group_by(products, [](const value& v) {
-            if (v.is<dictionary>()) {
-                dictionary product = v.as<dictionary>();
+        auto by_category = processor.group_by(products, [](const dross::value& v) {
+            if (v.is<dross::dictionary>()) {
+                dross::dictionary product = v.as<dross::dictionary>();
                 if (product.contains("category") &&
-                    product["category"].is<string>()) {
-                    return product["category"].as<string>();
+                    product["category"].is<dross::string>()) {
+                    return product["category"].as<dross::string>();
                 }
             }
-            return string("Unknown");
+            return dross::string("Unknown");
         });
 
         // value has no operator<<, so unwrap it before printing
         std::cout << "Expensive items: " << expensive.length() << std::endl;
-        std::cout << "Total value: $" << total.as<number>() << std::endl;
+        std::cout << "Total value: $" << total.as<dross::number>() << std::endl;
         std::cout << "Categories: " << by_category.size() << std::endl;
 
         return 0;

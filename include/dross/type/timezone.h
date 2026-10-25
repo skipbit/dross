@@ -29,13 +29,13 @@ namespace dross {
  *
  * @code
  * // Factory methods
- * auto utc = timezone::utc();
- * auto jst = timezone::offset(9);           // +09:00
- * auto pdt = timezone::offset(-7, 0);       // -07:00
- * auto custom = timezone::from_string("+05:30");  // India Standard Time
+ * auto utc = dross::timezone::utc();
+ * auto jst = dross::timezone::offset(9);                 // +09:00
+ * auto pdt = dross::timezone::offset(-7, 0);             // -07:00
+ * auto custom = dross::timezone::from_string("+05:30");  // India Standard Time
  *
  * // Usage with timestamp
- * timestamp ts(2024, 1, 21, 15, 30, 0, timezone::offset(9));
+ * dross::timestamp ts(2024, 1, 21, 15, 30, 0, dross::timezone::offset(9));
  * @endcode
  */
 class timezone final {
@@ -64,8 +64,9 @@ public:
      *
      * Positive values are east of UTC, negative values are west of UTC.
      * @code
-     * auto jst = timezone::offset(std::chrono::minutes(540));  // +09:00
-     * auto ist = timezone::offset(std::chrono::hours(5) + std::chrono::minutes(30));  // +05:30
+     * auto jst = dross::timezone::offset(std::chrono::minutes(540));  // +09:00
+     * auto ist = dross::timezone::offset(std::chrono::hours(5) +
+     *                                    std::chrono::minutes(30));  // +05:30
      * @endcode
      */
     static timezone offset(std::chrono::minutes offset_duration);
@@ -77,7 +78,7 @@ public:
      *         or the offset is outside -23:59..+23:59
      *
      * @code
-     * auto tz = timezone::from_string("+09:00");
+     * auto tz = dross::timezone::from_string("+09:00");
      * if (tz) {
      *     std::cout << "Parsed: " << tz->format() << std::endl;
      * } else {

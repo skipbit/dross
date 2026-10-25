@@ -49,18 +49,18 @@ namespace dross {
  *
  * @code
  * // Basic usage with timezone objects
- * timestamp now = timestamp::now();
- * timestamp meeting(2024, 1, 21, 15, 30, 0, timezone::offset(9)); // +09:00
- * timestamp utc_meeting(2024, 1, 21, 6, 30, 0, timezone::utc());   // UTC
+ * dross::timestamp now = dross::timestamp::now();
+ * dross::timestamp meeting(2024, 1, 21, 15, 30, 0, dross::timezone::offset(9)); // +09:00
+ * dross::timestamp utc_meeting(2024, 1, 21, 6, 30, 0, dross::timezone::utc());  // UTC
  *
  * // Date-only timestamps using constructor
- * timestamp birthday(1990, 12, 25);  // Date only (time defaults to 00:00:00)
+ * dross::timestamp birthday(1990, 12, 25);  // Date only (time defaults to 00:00:00)
  *
  * // String parsing
- * timestamp iso_meeting("2024-01-21T15:30:00+09:00");
+ * dross::timestamp iso_meeting("2024-01-21T15:30:00+09:00");
  *
  * // Duration arithmetic
- * timestamp tomorrow = now + std::chrono::hours(24);
+ * dross::timestamp tomorrow = now + std::chrono::hours(24);
  * auto age = now - birthday;
  *
  * // Accessing components
@@ -69,7 +69,7 @@ namespace dross {
  * std::cout << "Timezone: " << meeting.timezone().format() << std::endl;
  *
  * // Formatting
- * std::string iso_str = meeting.format(timestamp::format_type::iso8601);
+ * std::string iso_str = meeting.format(dross::timestamp::format_type::iso8601);
  * std::string custom = meeting.format("%Y-%m-%d %H:%M");
  *
  * // Conversion to std::chrono

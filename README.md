@@ -142,29 +142,28 @@ g++ -std=c++23 -I/usr/local/include main.cpp -L/usr/local/lib -ldross
 
 ```cpp
 #include <dross/dross.h>
-using namespace dross;
 
 int main()
 {
     // Arbitrary precision arithmetic
-    number big_num{"99999999999999999999999999999999999999"};
-    number result = big_num * big_num;  // No overflow!
+    dross::number big_num{"99999999999999999999999999999999999999"};
+    dross::number result = big_num * big_num;  // No overflow!
 
     // Dynamic typing. dictionary has no initializer-list constructor, so
     // entries are assigned after construction.
-    dictionary config;
-    config["name"] = string("Dross");
-    config["version"] = string("0.1.0");
-    config["features"] = array{string{"fast"}, string{"safe"}};
-    config["release_date"] = timestamp{2024, 1, 21, 15, 30, 0, timezone::utc()};
+    dross::dictionary config;
+    config["name"] = dross::string("Dross");
+    config["version"] = dross::string("0.1.0");
+    config["features"] = dross::array{dross::string{"fast"}, dross::string{"safe"}};
+    config["release_date"] = dross::timestamp{2024, 1, 21, 15, 30, 0, dross::timezone::utc()};
 
-    value root = config;
+    dross::value root = config;
 
     // Platform utilities. The XDG accessors are instance methods, and the
     // application name is already part of what they return.
-    xdg app{"myapp"};
+    dross::xdg app{"myapp"};
     if (auto config_dir = app.config_home()) {
-        path app_config = path{*config_dir}.append("config.toml");
+        dross::path app_config = dross::path{*config_dir}.append("config.toml");
     }
 }
 ```

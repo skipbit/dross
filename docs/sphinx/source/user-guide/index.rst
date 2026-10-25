@@ -87,28 +87,26 @@ Type System
 
 .. code-block:: cpp
 
-    using namespace dross;
-
     // dictionary has no initializer-list constructor, so it is built up
-    dictionary alice;
-    alice["name"] = string("Alice");
-    alice["age"] = number(30);
+    dross::dictionary alice;
+    alice["name"] = dross::string("Alice");
+    alice["age"] = dross::number(30);
 
-    dictionary bob;
-    bob["name"] = string("Bob");
-    bob["age"] = number(25);
+    dross::dictionary bob;
+    bob["name"] = dross::string("Bob");
+    bob["age"] = dross::number(25);
 
-    dictionary root;
-    root["users"] = array{alice, bob};
-    root["count"] = number(2);
+    dross::dictionary root;
+    root["users"] = dross::array{alice, bob};
+    root["count"] = dross::number(2);
 
-    value doc = root;
+    dross::value doc = root;
 
     // Safe access: ask contains() before reading, is<T>() before casting
-    if (doc.is<dictionary>()) {
-        dictionary top = doc.as<dictionary>();
-        if (top.contains("users") && top["users"].is<array>()) {
-            for (const auto& user : top["users"].as<array>()) {
+    if (doc.is<dross::dictionary>()) {
+        dross::dictionary top = doc.as<dross::dictionary>();
+        if (top.contains("users") && top["users"].is<dross::array>()) {
+            for (const auto& user : top["users"].as<dross::array>()) {
                 // Process each user
             }
         }
@@ -120,26 +118,26 @@ Error Handling
 .. code-block:: cpp
 
     // Function returning optional
-    std::optional<string> get_env_config(const string& key)
+    std::optional<dross::string> get_env_config(const dross::string& key)
     {
-        if (auto found = environment::value(key)) {  // Implicit string conversion
-            return string(*found);
+        if (auto found = dross::environment::value(key)) {  // Implicit string conversion
+            return dross::string(*found);
         }
         return std::nullopt;
     }
 
     // Function returning expected. dross parses TOML; reading the bytes is
     // left to the standard library.
-    std::expected<dictionary, error> load_config(const path& file)
+    std::expected<dross::dictionary, dross::error> load_config(const dross::path& file)
     {
         std::ifstream input{file.string(), std::ios::binary};
         if (!input) {
-            return std::unexpected(error{std::errc::no_such_file_or_directory});
+            return std::unexpected(dross::error{std::errc::no_such_file_or_directory});
         }
 
         const std::string text{std::istreambuf_iterator<char>{input},
                                std::istreambuf_iterator<char>{}};
-        return toml::deserialize(data{text});
+        return dross::toml::deserialize(dross::data{text});
     }
 
 Platform Utilities
@@ -148,15 +146,15 @@ Platform Utilities
 .. code-block:: cpp
 
     // Working with paths
-    const std::string home = environment::value("HOME").value_or("/tmp");
-    const path config_path = path{home}.append(".config").append("myapp");
+    const std::string home = dross::environment::value("HOME").value_or("/tmp");
+    const dross::path config_path = dross::path{home}.append(".config").append("myapp");
 
     // XDG directories: the application name is already part of the result
-    xdg app{"myapp"};
+    dross::xdg app{"myapp"};
     const std::string app_data = app.data_home().value_or(config_path.string());
 
     // Create the directory. mkdir() is idempotent: it succeeds whether it
     // creates the directory or finds it already there.
-    if (auto result = path::mkdir(app_data); !result) {
+    if (auto result = dross::path::mkdir(app_data); !result) {
         std::cerr << "mkdir: " << result.error().what() << std::endl;
     }
