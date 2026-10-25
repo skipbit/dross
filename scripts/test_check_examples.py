@@ -81,6 +81,22 @@ class sphinx_examples_test(unittest.TestCase):
 
         self.assertEqual(list(check_examples.sphinx_examples(lines)), [(3, ['int x = 1;'], None)])
 
+    def test_reads_the_class_option_after_a_hyphenated_one(self):
+        lines = ['.. code-block:: cpp', '    :emphasize-lines: 2', '    :class: example-fragment', '', '    int x = 1;']
+
+        self.assertEqual(list(check_examples.sphinx_examples(lines)), [(5, ['int x = 1;'], 'example-fragment')])
+
+    def test_finds_the_marker_among_other_classes(self):
+        lines = ['.. code-block:: cpp', '    :class: wide example-fragment', '', '    int x = 1;']
+
+        self.assertEqual(list(check_examples.sphinx_examples(lines)), [(4, ['int x = 1;'], 'example-fragment')])
+
+    def test_both_markers_on_one_block_are_an_error(self):
+        lines = ['.. code-block:: cpp', '    :class: example-fragment example-namespace-scope', '', '    int x = 1;']
+
+        with self.assertRaises(check_examples.BlockError):
+            list(check_examples.sphinx_examples(lines))
+
 
 if __name__ == '__main__':
     unittest.main()

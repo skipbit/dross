@@ -40,6 +40,15 @@ def tracked_files():
     return out.split()
 
 
+MARKERS = {'example-fragment', 'example-namespace-scope'}
+
+
+class BlockError(Exception):
+    def __init__(self, line, message):
+        super().__init__(message)
+        self.line = line
+
+
 def markdown_examples(lines):
     i = 0
     while i < len(lines):
@@ -59,10 +68,13 @@ def sphinx_examples(lines):
         if re.match(r'\s*\.\. code-block:: cpp\s*$', lines[i]):
             j = i + 1
             kind = None
-            while j < len(lines) and re.match(r'\s+:\w+:', lines[j]):
-                option = re.match(r'\s+:class:\s*(\S+)', lines[j])
+            while j < len(lines) and re.match(r'\s+:[\w-]+:', lines[j]):
+                option = re.match(r'\s+:class:(.*)', lines[j])
                 if option:
-                    kind = option.group(1)
+                    marked = MARKERS & set(option.group(1).split())
+                    if len(marked) > 1:
+                        raise BlockError(j + 1, 'has more than one of ' + ', '.join(sorted(MARKERS)))
+                    kind = marked.pop() if marked else None
                 j += 1
             while j < len(lines) and lines[j].strip() == '':
                 j += 1
@@ -94,6 +106,8 @@ def header_examples(lines):
 
 
 def examples():
+    found = []
+    problems = []
     for name in tracked_files():
         if name.endswith('.md'):
             extract = markdown_examples
@@ -105,8 +119,12 @@ def examples():
             continue
         with open(os.path.join(ROOT, name), encoding='utf-8') as f:
             lines = f.read().split('\n')
-        for line, body, kind in extract(lines):
-            yield name, line, body, kind
+        try:
+            for line, body, kind in extract(lines):
+                found.append((name, line, body, kind))
+        except BlockError as e:
+            problems.append('%s:%d: %s' % (name, e.line, e))
+    return found, problems
 
 
 FUNCTION_DECLARATION = re.compile(r'[A-Za-z_][\w:<>, ]*[\s&*]+[A-Za-z_]\w*\([^;{}]*\)\s*;\s*$')
@@ -141,14 +159,16 @@ def compile_one(compiler, directory, index, body, kind):
 
 def main():
     compiler = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('CXX', 'c++')
-    found = list(examples())
+    found, problems = examples()
     # A pattern that stopped matching would otherwise check nothing and pass.
     if not found:
         print('no examples found', file=sys.stderr)
         return 1
 
+    for problem in problems:
+        print(problem)
     compiled = [(i, e) for i, e in enumerate(found) if e[3] != 'example-fragment']
-    failed = 0
+    failed = len(problems)
     with tempfile.TemporaryDirectory() as directory:
         with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
             jobs = [(e, pool.submit(compile_one, compiler, directory, i, e[2], e[3]))
