@@ -47,8 +47,14 @@ public:
 
     // True when either category reports e as equivalent, as std::error_code
     // compares with an error condition, so a system_category() code matches
-    // the std::errc it maps to.
+    // the std::errc it maps to. Kept beside the std::error_condition
+    // overload: std::errc converts to both std::error_condition and error,
+    // so without an exact match the comparison would be ambiguous.
     bool operator==(std::errc) const noexcept;
+
+    // True when either category reports c as equivalent, the same as for
+    // std::errc. An error condition enum from any library converts to it.
+    bool operator==(const std::error_condition& c) const noexcept;
 
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;

@@ -16,6 +16,11 @@ Added
   from the ``iterator`` of the same type, as ``data::const_iterator``
   does
 
+- ``error`` compares with a ``std::error_condition`` and with an error
+  condition enum from any library in either order, equal when either
+  category reports them equivalent, as ``std::error_code`` does;
+  ``operator!=`` is derived from ``operator==``
+
 Changed
 ~~~~~~~
 
