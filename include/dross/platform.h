@@ -23,7 +23,8 @@
  * }
  *
  * // Filesystem operations
- * dross::path config_dir = dross::path::home().value_or(dross::path{std::string{"/tmp"}}).append("myapp");
+ * dross::path config_dir =
+ *     dross::path::home().value_or(dross::path{std::string{"/tmp"}}).append("myapp");
  * if (auto result = dross::path::mkdir(config_dir.string()); result) {
  *     // Directory created, or already there
  * }

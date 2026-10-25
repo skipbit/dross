@@ -65,7 +65,8 @@ public:
      * Positive values are east of UTC, negative values are west of UTC.
      * @code
      * auto jst = dross::timezone::offset(std::chrono::minutes(540));  // +09:00
-     * auto ist = dross::timezone::offset(std::chrono::hours(5) + std::chrono::minutes(30));  // +05:30
+     * auto ist = dross::timezone::offset(std::chrono::hours(5) +
+     *                                    std::chrono::minutes(30));  // +05:30
      * @endcode
      */
     static timezone offset(std::chrono::minutes offset_duration);

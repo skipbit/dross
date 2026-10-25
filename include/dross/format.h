@@ -12,6 +12,7 @@
  * #include <dross/format.h>
  *
  * // TOML parsing
+ * dross::data toml_data{"title = \"Example\""};
  * auto toml_result = dross::toml::deserialize(toml_data);
  * if (toml_result) {
  *     auto& config = toml_result.value();
@@ -21,7 +22,7 @@
  * // TOML serialization
  * dross::dictionary config;
  * config["key"] = dross::value(dross::string{"value"});
- * auto toml_data = dross::toml::serialize(config);
+ * auto serialized = dross::toml::serialize(config);
  * @endcode
  *
  * Supported formats:

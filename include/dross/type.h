@@ -50,7 +50,8 @@
  * auto d_string = dross::to_string(meeting); // "2024-01-21T15:30:00+09:00"
  *
  * // Stream output
- * std::cout << flag << " " << precise << " " << dross::to_string(text) << " " << meeting << std::endl;
+ * std::cout << flag << " " << precise << " " << dross::to_string(text) << " " << meeting
+ *           << std::endl;
  *
  * // Utility functions
  * auto tokens = dross::split("a,b,c", ",");

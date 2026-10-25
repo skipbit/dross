@@ -59,12 +59,12 @@ Working with Values
         dict["x"] = dross::number(1);
 
         // Different value types
-        print_type_info(dross::value());                    // empty
-        print_type_info(dross::value(dross::boolean(true)));       // boolean
-        print_type_info(dross::value(42));                  // number
-        print_type_info(dross::value("hello"));             // string
-        print_type_info(dross::value(dross::array{1, 2, 3}));      // array
-        print_type_info(dross::value(dict));                // dictionary
+        print_type_info(dross::value());                          // empty
+        print_type_info(dross::value(dross::boolean(true)));      // boolean
+        print_type_info(dross::value(42));                        // number
+        print_type_info(dross::value("hello"));                   // string
+        print_type_info(dross::value(dross::array{1, 2, 3}));     // array
+        print_type_info(dross::value(dict));                      // dictionary
 
         return 0;
     }
@@ -83,7 +83,7 @@ Building Data Structures
     #include <dross/type/value.h>
 
     dross::dictionary create_person(const dross::string& name, int age,
-                             const dross::array& hobbies)
+                                    const dross::array& hobbies)
     {
         dross::dictionary person;
         person["name"] = name;
@@ -261,7 +261,7 @@ Data Processing Pipeline
     public:
         // Filter items based on a condition
         dross::array filter(const dross::array& items,
-                     std::function<bool(const dross::value&)> predicate)
+                            std::function<bool(const dross::value&)> predicate)
         {
             dross::array result;
             for (const auto& item : items) {
@@ -274,7 +274,7 @@ Data Processing Pipeline
 
         // Transform items using a function
         dross::array map(const dross::array& items,
-                  std::function<dross::value(const dross::value&)> transform)
+                         std::function<dross::value(const dross::value&)> transform)
         {
             dross::array result;
             for (const auto& item : items) {
@@ -285,8 +285,8 @@ Data Processing Pipeline
 
         // Reduce array to single value
         dross::value reduce(const dross::array& items,
-                     std::function<dross::value(const dross::value&, const dross::value&)> reducer,
-                     const dross::value& initial)
+                            std::function<dross::value(const dross::value&, const dross::value&)> reducer,
+                            const dross::value& initial)
         {
             dross::value result = initial;
             for (const auto& item : items) {
@@ -297,7 +297,7 @@ Data Processing Pipeline
 
         // Group items by a key
         dross::dictionary group_by(const dross::array& items,
-                            std::function<dross::string(const dross::value&)> key_func)
+                                   std::function<dross::string(const dross::value&)> key_func)
         {
             dross::dictionary groups;
 
@@ -361,7 +361,7 @@ Data Processing Pipeline
                     if (product.contains("price") &&
                         product["price"].is<dross::number>()) {
                         return dross::value(sum.as<dross::number>() +
-                                     product["price"].as<dross::number>());
+                                            product["price"].as<dross::number>());
                     }
                 }
                 return sum;

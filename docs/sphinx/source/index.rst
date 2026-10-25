@@ -137,11 +137,11 @@ The dross type system provides dynamic typing with strong value semantics:
     dict["key"] = dross::string("value");
 
     // Create various types
-    dross::value v1 = 42;                 // number
-    dross::value v2 = "hello world";      // string
-    dross::value v3 = dross::array{1, 2, 3};     // array
-    dross::value v4 = dict;               // dictionary
-    dross::value v5 = dross::boolean{true};      // boolean
+    dross::value v1 = 42;                       // number
+    dross::value v2 = "hello world";            // string
+    dross::value v3 = dross::array{1, 2, 3};    // array
+    dross::value v4 = dict;                     // dictionary
+    dross::value v5 = dross::boolean{true};     // boolean
 
     // Type checking, then casting
     if (v1.is<dross::number>()) {
