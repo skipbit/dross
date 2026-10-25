@@ -79,8 +79,14 @@ Changed
   ``std::flat_map`` does, instead of the pair of references they return.
   An element kept through ``std::iter_value_t`` is a copy that no longer
   changes with the dictionary or dangles once it is destroyed, and copies
-  can be sorted. ``reference`` is still the pair of references, and
-  ``operator*`` is declared to return it
+  can be assigned and swapped, so they can be sorted by key.
+  ``reference`` is still the pair of references, and ``operator*`` is
+  declared to return it. Code that names ``value_type`` to take an
+  element, such as ``dictionary::iterator::value_type kv = *it;``, still
+  compiles but now writes to a copy, not to the dictionary; take it with
+  ``auto``, a structured binding or ``reference`` to write through it.
+  ``dictionary.h`` includes ``value.h``, since ``value_type`` holds a
+  ``value``
 
 Fixed
 ~~~~~

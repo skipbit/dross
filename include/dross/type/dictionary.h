@@ -1,12 +1,12 @@
 #pragma once
 
+#include "dross/type/value.h"
+
 #include <any>
 #include <memory>
 #include <string>
 
 namespace dross {
-
-class value;
 
 /**
  * @brief Key-value container for string keys and value objects.

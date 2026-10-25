@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <concepts>
+#include <functional>
 #include <iterator>
 #include <ranges>
 #include <string>
@@ -388,12 +389,15 @@ TEST(dictionary_test, iterators_dereference_to_references_and_copy_to_values)
     using it = dross::dictionary::iterator;
     using cit = dross::dictionary::const_iterator;
     using copied = std::pair<std::string, dross::value>;
+    const auto by_key = [](const auto& kv) -> const std::string& {
+        return kv.first;
+    };
 
     EXPECT_TRUE((std::is_same_v<std::iter_reference_t<it>, std::pair<const std::string&, dross::value&>>));
     EXPECT_TRUE((std::is_same_v<std::iter_reference_t<cit>, std::pair<const std::string&, const dross::value&>>));
     EXPECT_TRUE((std::is_same_v<std::iter_value_t<it>, copied>));
     EXPECT_TRUE((std::is_same_v<std::iter_value_t<cit>, copied>));
-    EXPECT_TRUE(std::permutable<std::vector<std::iter_value_t<it>>::iterator>);
+    EXPECT_TRUE((std::sortable<std::vector<std::iter_value_t<it>>::iterator, std::ranges::less, decltype(by_key)>));
 }
 
 TEST(dictionary_test, elements_kept_as_values_do_not_follow_the_dictionary)
