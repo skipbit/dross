@@ -11,6 +11,37 @@
 
 namespace dross {
 
+namespace {
+
+// Writes the year of %Y and %F in four digits, as the ISO 8601 form does,
+// before std::put_time sees them.
+std::string pad_year(const std::string& format, int year)
+{
+    std::ostringstream digits;
+    digits.imbue(std::locale::classic());
+    digits << std::setfill('0') << std::setw(4) << year;
+
+    std::string result;
+    for (std::size_t i = 0; i < format.size(); ++i) {
+        if ((format[i] != '%') || (i + 1 == format.size())) {
+            result += format[i];
+            continue;
+        }
+        const char specifier = format[++i];
+        if (specifier == 'Y') {
+            result += digits.str();
+        } else if (specifier == 'F') {
+            result += digits.str() + "-%m-%d";
+        } else {
+            result += '%';
+            result += specifier;
+        }
+    }
+    return result;
+}
+
+}  // namespace
+
 // Date implementation
 class timestamp::date_part::impl {
 public:
@@ -475,7 +506,8 @@ std::string timestamp::format(const std::string& custom_format) const
     }
 
     std::ostringstream oss;
-    oss << std::put_time(&tm, custom_format.c_str());
+    const std::string padded = pad_year(custom_format, tm.tm_year + 1900);
+    oss << std::put_time(&tm, padded.c_str());
     return oss.str();
 }
 

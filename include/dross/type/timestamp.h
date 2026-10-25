@@ -466,6 +466,10 @@ public:
      * @brief Format the timestamp using custom format string.
      * @param custom_format strftime-style format string
      * @return Formatted string representation
+     *
+     * %Y and %F write the year in four digits, as the ISO 8601 form does, so
+     * the year 999 is "0999". The other conversions are those of
+     * std::put_time.
      */
     std::string format(const std::string& custom_format) const;
 

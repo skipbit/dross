@@ -272,6 +272,33 @@ TEST(timestamp_test, formatting)
     EXPECT_EQ(ts.format("%Y-%m-%d %H:%M"), "2024-01-21 15:30");
 }
 
+// %Y and %F write the year in four digits, as the ISO 8601 form does.
+TEST(timestamp_test, custom_format_pads_the_year_to_four_digits)
+{
+    const dross::timestamp year_0("0000-06-01T00:00:00Z");
+    const dross::timestamp year_12("0012-01-01T00:00:00Z");
+    const dross::timestamp year_999("0999-06-01T12:00:00+09:00");
+
+    EXPECT_EQ(year_0.format("%Y"), "0000");
+    EXPECT_EQ(year_12.format("%Y"), "0012");
+    EXPECT_EQ(year_999.format("%Y"), "0999");
+    EXPECT_EQ(year_0.format("%F"), "0000-06-01");
+    EXPECT_EQ(year_12.format("%F"), "0012-01-01");
+    EXPECT_EQ(year_999.format("%F %H:%M"), "0999-06-01 12:00");
+    EXPECT_EQ(year_999.format("%Y-%m-%d"), year_999.format("%F"));
+    EXPECT_EQ(year_999.format("%Y-%m-%d"), std::string(year_999).substr(0, 10));
+}
+
+TEST(timestamp_test, custom_format_keeps_a_literal_percent_before_y)
+{
+    const dross::timestamp ts("0999-06-01T00:00:00Z");
+
+    EXPECT_EQ(ts.format("%%Y"), "%Y");
+    EXPECT_EQ(ts.format("%%F"), "%F");
+    EXPECT_EQ(ts.format("%%%Y"), "%0999");
+    EXPECT_EQ(ts.format("year %Y, %Y"), "year 0999, 0999");
+}
+
 // A custom format reads the time into a std::tm of its own, so two threads
 // formatting different timestamps each get their own text.
 TEST(timestamp_test, custom_formatting_from_two_threads)
