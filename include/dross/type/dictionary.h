@@ -1,12 +1,12 @@
 #pragma once
 
+#include "dross/type/value.h"
+
 #include <any>
 #include <memory>
 #include <string>
 
 namespace dross {
-
-class value;
 
 /**
  * @brief Key-value container for string keys and value objects.
@@ -188,6 +188,8 @@ private:
  *
  * Provides iterator interface for traversing dictionary entries.
  * Each dereferenced iterator returns a pair of key and value references.
+ * value_type is a pair of copies, so an element kept as a value_type, such
+ * as through std::iter_value_t, does not change with the dictionary.
  *
  * The pair is returned by value, so the iterator models std::forward_iterator
  * but declares std::input_iterator_tag as its iterator_category, and has no
@@ -195,10 +197,10 @@ private:
  */
 class dictionary::iterator final {
 public:
-    using value_type = std::pair<const std::string&, value&>;
+    using value_type = std::pair<std::string, value>;
     using difference_type = std::ptrdiff_t;
     using pointer = void;
-    using reference = value_type;
+    using reference = std::pair<const std::string&, value&>;
     using iterator_concept = std::forward_iterator_tag;
     using iterator_category = std::input_iterator_tag;
 
@@ -241,7 +243,7 @@ public:
      * @brief Dereference operator.
      * @return Pair containing key and value references
      */
-    value_type operator*() const;
+    reference operator*() const;
 
     /**
      * @brief Equality comparison operator. != is derived from it.
@@ -266,6 +268,7 @@ private:
  *
  * Provides read-only iterator interface for traversing dictionary entries.
  * Each dereferenced iterator returns a pair of const key and value references.
+ * value_type is a pair of copies, the same as for iterator.
  *
  * The pair is returned by value, so the iterator models std::forward_iterator
  * but declares std::input_iterator_tag as its iterator_category, and has no
@@ -273,10 +276,10 @@ private:
  */
 class dictionary::const_iterator final {
 public:
-    using value_type = std::pair<const std::string&, const value&>;
+    using value_type = std::pair<std::string, value>;
     using difference_type = std::ptrdiff_t;
     using pointer = void;
-    using reference = value_type;
+    using reference = std::pair<const std::string&, const value&>;
     using iterator_concept = std::forward_iterator_tag;
     using iterator_category = std::input_iterator_tag;
 
@@ -325,7 +328,7 @@ public:
      * @brief Dereference operator.
      * @return Pair containing const key and value references
      */
-    value_type operator*() const;
+    reference operator*() const;
 
     /**
      * @brief Equality comparison operator.

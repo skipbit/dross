@@ -117,7 +117,7 @@ dictionary::iterator dictionary::iterator::operator++(int)
     return previous;
 }
 
-dictionary::iterator::value_type dictionary::iterator::operator*() const
+dictionary::iterator::reference dictionary::iterator::operator*() const
 {
     return { _impl->cursor->first, _impl->cursor->second };
 }
@@ -178,7 +178,7 @@ dictionary::const_iterator dictionary::const_iterator::operator++(int)
     return previous;
 }
 
-dictionary::const_iterator::value_type dictionary::const_iterator::operator*() const
+dictionary::const_iterator::reference dictionary::const_iterator::operator*() const
 {
     return { _impl->cursor->first, _impl->cursor->second };
 }
