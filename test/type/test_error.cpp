@@ -138,6 +138,62 @@ std::error_condition make_error_condition(condition c)
 template <>
 struct std::is_error_condition_enum<library_conditions::condition> : std::true_type { };
 
+// An enum that is both an error code enum and an error condition enum, with
+// a category that reports every pair equivalent, so a match through
+// equivalent() differs from a match on the category and the value.
+namespace dual_errors {
+
+enum class dual {
+    one = 1
+};
+
+class dual_category_type final : public std::error_category {
+public:
+    const char* name() const noexcept override
+    {
+        return "dual_errors";
+    }
+
+    std::string message(int) const override
+    {
+        return "dual";
+    }
+
+    bool equivalent(int, const std::error_condition&) const noexcept override
+    {
+        return true;
+    }
+
+    bool equivalent(const std::error_code&, int) const noexcept override
+    {
+        return true;
+    }
+};
+
+const std::error_category& dual_category()
+{
+    static const dual_category_type the_category;
+    return the_category;
+}
+
+std::error_code make_error_code(dual d)
+{
+    return { static_cast<int>(d), dual_category() };
+}
+
+std::error_condition make_error_condition(dual d)
+{
+    return { static_cast<int>(d), dual_category() };
+}
+
+}  // namespace dual_errors
+
+template <>
+struct std::is_error_code_enum<dual_errors::dual> : std::true_type { };
+
+template <>
+struct std::is_error_condition_enum<dual_errors::dual> : std::true_type { };
+
 TEST(error_test, default_constructed_error_is_falsy)
 {
     const dross::error e;
@@ -345,6 +401,34 @@ TEST(error_test, a_code_equals_an_error_condition_its_category_maps_it_to)
     EXPECT_TRUE(invalid_argument == e);
     EXPECT_FALSE(e == io_error);
     EXPECT_TRUE(e != io_error);
+}
+
+TEST(error_test, an_enum_that_is_also_a_condition_enum_compares_as_an_error_code_enum)
+{
+    const dross::error other(1, std::generic_category());
+
+    EXPECT_FALSE(other == dual_errors::dual::one);
+    // std::error_code == dual_errors::dual is ambiguous, so the comparison
+    // that matches is the one with the enum's own std::error_code.
+    EXPECT_EQ(other == dual_errors::dual::one,
+              std::error_code(other.code(), other.category()) == std::error_code(dual_errors::dual::one));
+    EXPECT_TRUE(dross::error(dual_errors::dual::one) == dual_errors::dual::one);
+}
+
+TEST(error_test, compares_with_a_type_derived_from_std_error_condition)
+{
+    struct derived_condition : std::error_condition {
+        derived_condition()
+            : std::error_condition(std::make_error_condition(std::errc::io_error))
+        {
+        }
+    };
+    const dross::error io(EIO, std::system_category());
+    const derived_condition condition;
+
+    EXPECT_TRUE(io == condition);
+    EXPECT_TRUE(condition == io);
+    EXPECT_FALSE(dross::error(ENOENT, std::system_category()) == condition);
 }
 
 TEST(error_test, comparison_with_an_error_condition_agrees_with_std_error_code)

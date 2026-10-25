@@ -17,8 +17,9 @@ Added
   does
 
 - ``error`` compares with a ``std::error_condition`` and with an error
-  condition enum from any library, equal when either category reports
-  them equivalent, as ``std::error_code`` does
+  condition enum from any library in either order, equal when either
+  category reports them equivalent, as ``std::error_code`` does;
+  ``operator!=`` is derived from ``operator==``
 
 Changed
 ~~~~~~~
