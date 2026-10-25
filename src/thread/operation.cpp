@@ -46,6 +46,8 @@ public:
             return "operation priority is not one operation_priority names";
         case operation_errc::foreign_dependency:
             return "operation is to run after a result from another queue";
+        case operation_errc::empty_task:
+            return "operation task is empty";
         }
         return "unknown operation error";
     }

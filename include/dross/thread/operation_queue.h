@@ -185,7 +185,9 @@ public:
      * @param task The task
      * @param options How to run it
      * @return The result, not yet filled in, or the reason the task was not
-     * queued: operation_errc::invalid_priority for a priority
+     * queued: operation_errc::empty_task for a null function pointer or an
+     * empty std::function, the tasks submit() refuses as empty,
+     * operation_errc::invalid_priority for a priority
      * operation_priority does not name, operation_errc::foreign_dependency
      * when options.after names a result from another queue, or
      * operation_errc::queue_stopped once the queue has stopped
@@ -260,6 +262,26 @@ private:
 
     explicit operation_queue(std::shared_ptr<storage> store) noexcept;
 
+    // A std::function of any signature. A class derived from one is not,
+    // since std::function never takes such a class as empty either.
+    template <typename F>
+    struct is_std_function : std::false_type { };
+
+    template <typename R, typename... Args>
+    struct is_std_function<std::function<R(Args...)>> : std::true_type { };
+
+    // Empty the way std::function takes a task as empty, so enqueue() refuses
+    // what submit() does; a task of any other type is never empty.
+    template <typename F>
+    static bool is_empty(const F& task) noexcept
+    {
+        if constexpr (std::is_function_v<std::remove_pointer_t<F>> || is_std_function<F>::value) {
+            return (task == nullptr);
+        } else {
+            return false;
+        }
+    }
+
     // enqueue() without its type: task returns what the task returned, or
     // an empty std::any for one that returns nothing.
     std::expected<operation_result, error> enqueue_any(std::function<std::any()> task, operation_options options);
@@ -274,6 +296,9 @@ std::expected<operation_result, error> operation_queue::enqueue(F&& task, operat
 {
     using value_type = std::decay_t<std::invoke_result_t<std::decay_t<F>&>>;
 
+    if (is_empty<std::decay_t<F>>(task)) {
+        return std::unexpected(error{ operation_errc::empty_task });
+    }
     // Wrapped here, not in the library, so the value is put in on the same
     // side of a shared library boundary as get_as() takes it out.
     return enqueue_any([task = std::forward<F>(task)]() mutable {

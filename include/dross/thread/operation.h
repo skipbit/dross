@@ -27,6 +27,7 @@ enum class operation_errc {
     queue_stopped = 4,       ///< The queue had stopped and did not take the operation
     invalid_priority = 5,    ///< The operation was given a priority operation_priority does not name
     foreign_dependency = 6,  ///< The operation was to run after a result from another queue
+    empty_task = 7,          ///< The operation was given an empty task, which has nothing to run
 };
 
 /**

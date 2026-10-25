@@ -12,6 +12,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -969,6 +970,119 @@ TEST(operation_queue_test, enqueue_after_shutdown_reports_the_queue_stopped)
 
     ASSERT_FALSE(result.has_value());
     EXPECT_TRUE(result.error() == dross::operation_errc::queue_stopped);
+}
+
+TEST(operation_queue_test, enqueue_reports_an_empty_function_without_queueing_it)
+{
+    dross::operation_queue queue{ 1 };
+
+    const auto returning = queue.enqueue(std::function<int()>{});
+    const auto returning_nothing = queue.enqueue(std::function<void()>{});
+
+    ASSERT_FALSE(returning.has_value());
+    EXPECT_TRUE(returning.error() == dross::operation_errc::empty_task);
+    ASSERT_FALSE(returning_nothing.has_value());
+    EXPECT_TRUE(returning_nothing.error() == dross::operation_errc::empty_task);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, enqueue_reports_a_null_function_pointer_without_queueing_it)
+{
+    dross::operation_queue queue{ 1 };
+
+    const auto result = queue.enqueue(static_cast<int (*)()>(nullptr));
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error() == dross::operation_errc::empty_task);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, enqueue_runs_a_task_whose_operator_bool_means_something_else)
+{
+    // Converts to false, yet is not empty: only what std::function would
+    // take as empty counts, the same as for submit().
+    struct not_ready final {
+        int operator()() const
+        {
+            return 7;
+        }
+
+        explicit operator bool() const
+        {
+            return false;
+        }
+    };
+    dross::operation_queue queue{ 1 };
+
+    const auto result = queue.enqueue(not_ready{});
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->wait_for(kTimeout));
+    EXPECT_EQ(result->get_as<int>(), 7);
+    EXPECT_TRUE(queue.submit(std::function<void()>{ not_ready{} }));
+}
+
+TEST(operation_queue_test, enqueue_reports_an_empty_function_of_any_signature)
+{
+    // Calling a std::function<const int()> gives an int, so the signature
+    // cannot be read back from what the task returns. Named through an alias,
+    // as Clang warns of a const return type written out.
+    using const_int = const int;
+    dross::operation_queue queue{ 1 };
+    const std::function<int()> held;
+
+    const auto returning_const = queue.enqueue(std::function<const_int()>{});
+    const auto from_a_const_lvalue = queue.enqueue(held);
+
+    ASSERT_FALSE(returning_const.has_value());
+    EXPECT_TRUE(returning_const.error() == dross::operation_errc::empty_task);
+    ASSERT_FALSE(from_a_const_lvalue.has_value());
+    EXPECT_TRUE(from_a_const_lvalue.error() == dross::operation_errc::empty_task);
+    EXPECT_FALSE(queue.submit(std::function<const_int()>{}));
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+int seven()
+{
+    return 7;
+}
+
+TEST(operation_queue_test, enqueue_runs_a_function_passed_by_name)
+{
+    dross::operation_queue queue{ 1 };
+
+    const auto result = queue.enqueue(seven);
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->wait_for(kTimeout));
+    EXPECT_EQ(result->get_as<int>(), 7);
+}
+
+TEST(operation_queue_test, enqueue_takes_a_class_derived_from_std_function_as_not_empty)
+{
+    // std::function takes only itself as empty, never a class derived from
+    // it, and so does submit(). The task is queued to run after a cancelled
+    // result, so it is cancelled as it is accepted and never runs.
+    struct derived_function : std::function<int()> { };
+    dross::operation_queue queue{ 1 };
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.submit([release]() {
+        release->wait();
+    }));
+    const auto waiting = queue.enqueue([]() {
+        return 1;
+    });
+    ASSERT_TRUE(waiting.has_value());
+    ASSERT_TRUE(queue.cancel(waiting->id()));
+
+    const auto result = queue.enqueue(derived_function{}, { .after = { *waiting } });
+
+    ASSERT_TRUE(result.has_value());
+    const auto value = result->get_as<int>();
+    ASSERT_FALSE(value.has_value());
+    EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    release->set();
+    EXPECT_TRUE(queue.wait_for(kTimeout));
 }
 
 TEST(operation_queue_test, a_priority_operation_priority_does_not_name_is_not_queued)
