@@ -522,6 +522,9 @@ Type operations that may fail use ``std::optional`` or ``std::expected``:
 
 .. code-block:: cpp
 
+    void process(const std::string& text);
+    dross::data toml_input{"title = \"Example\""};
+
     // Returns std::optional<timezone>
     if (auto tz = dross::timezone::from_string("+09:00")) {
         process(tz->format());

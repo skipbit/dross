@@ -53,9 +53,9 @@ concept non_string_pointer_type = pointer_type<T> && (! std::same_as<std::remove
  *
  * @code
  * // Basic usage
- * boolean flag{true};
- * boolean enabled{"true"};  // From string
- * boolean disabled{0};      // From integer (0 = false, non-zero = true)
+ * dross::boolean flag{true};
+ * dross::boolean enabled{"true"};  // From string
+ * dross::boolean disabled{0};      // From integer (0 = false, non-zero = true)
  *
  * // Boolean operations
  * if (flag) {
@@ -63,13 +63,13 @@ concept non_string_pointer_type = pointer_type<T> && (! std::same_as<std::remove
  * }
  *
  * // Logical operations
- * boolean a{true};
- * boolean b{false};
- * boolean result = a && b;  // false
+ * dross::boolean a{true};
+ * dross::boolean b{false};
+ * dross::boolean result = a && b;  // false
  *
  * // String conversion (multiple approaches)
- * std::string str1 = flag;               // Implicit conversion
- * std::string str2 = to_string(flag);    // STL-style explicit conversion
+ * std::string str1 = flag;                    // Implicit conversion
+ * std::string str2 = dross::to_string(flag);  // STL-style explicit conversion
  *
  * // Comparison
  * if (flag == true) {

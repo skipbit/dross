@@ -34,19 +34,19 @@ namespace dross::toml {
  * @example
  * @code
  * // Deserialize TOML data to dictionary structure
- * data toml_content{"title = \"Example\"\nversion = 1.0"};
+ * dross::data toml_content{"title = \"Example\"\nversion = 1.0"};
  * auto result = dross::toml::deserialize(toml_content);
  * if (result) {
  *     auto& config = result.value();
  *     // Access parsed data through dictionary interface
- *     auto title = config["title"].as<string>();
- *     auto version = config["version"].as<number>();
+ *     auto title = config["title"].as<dross::string>();
+ *     auto version = config["version"].as<dross::number>();
  * }
  *
  * // Serialize dictionary structure to TOML format
- * dictionary config;
- * config["title"] = value(string{"My App"});
- * config["version"] = value(number{"1.0"});
+ * dross::dictionary config;
+ * config["title"] = dross::value(dross::string{"My App"});
+ * config["version"] = dross::value(dross::number{"1.0"});
  * auto toml_data = dross::toml::serialize(config);
  * if (toml_data) {
  *     std::string toml_string = toml_data.value();

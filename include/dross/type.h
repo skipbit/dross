@@ -90,10 +90,10 @@ namespace dross {
  * is not found, returns a vector containing the original string.
  *
  * @code
- * auto tokens = split("apple,banana,cherry", ",");
+ * auto tokens = dross::split("apple,banana,cherry", ",");
  * // Result: {"apple", "banana", "cherry"}
  *
- * auto parts = split("a::b::c", "::");
+ * auto parts = dross::split("a::b::c", "::");
  * // Result: {"a", "b", "c"}
  * @endcode
  */
@@ -110,10 +110,10 @@ std::vector<std::string> split(const std::string& s, const std::string& delimite
  * one token, returns that token without any delimiter.
  *
  * @code
- * auto result = join({"apple", "banana", "cherry"}, ", ");
+ * auto result = dross::join({"apple", "banana", "cherry"}, ", ");
  * // Result: "apple, banana, cherry"
  *
- * auto path = join({"usr", "local", "bin"}, "/");
+ * auto path = dross::join({"usr", "local", "bin"}, "/");
  * // Result: "usr/local/bin"
  * @endcode
  */
@@ -128,8 +128,8 @@ std::string join(const std::vector<std::string>& tokens, const std::string& deli
  * Always returns lowercase "true" or "false" for consistency.
  *
  * @code
- * boolean flag{true};
- * auto str = to_string(flag);  // "true"
+ * dross::boolean flag{true};
+ * auto str = dross::to_string(flag);  // "true"
  * @endcode
  */
 std::string to_string(const boolean& b);
@@ -144,8 +144,8 @@ std::string to_string(const boolean& b);
  * precision of the number.
  *
  * @code
- * number n{42.5};
- * auto str = to_string(n);  // "42.5"
+ * dross::number n{42.5};
+ * auto str = dross::to_string(n);  // "42.5"
  * @endcode
  */
 std::string to_string(const number& n);
@@ -159,8 +159,8 @@ std::string to_string(const number& n);
  * other types. Returns the UTF-8 encoded string content.
  *
  * @code
- * string text{"Hello, 世界!"};
- * auto str = to_string(text);  // "Hello, 世界!"
+ * dross::string text{"Hello, 世界!"};
+ * auto str = dross::to_string(text);  // "Hello, 世界!"
  * @endcode
  */
 std::string to_string(const string& s);
@@ -176,8 +176,8 @@ std::string to_string(const string& s);
  * data is.
  *
  * @code
- * data binary_data{"Hello, 世界!"};
- * auto str = to_string(binary_data);  // "Hello, 世界!"
+ * dross::data binary_data{"Hello, 世界!"};
+ * auto str = dross::to_string(binary_data);  // "Hello, 世界!"
  * @endcode
  */
 std::string to_string(const data& d);
@@ -245,16 +245,18 @@ concept container_type = requires(T a) {
  * be compatible (same element type and satisfy container_type concept).
  *
  * @code
+ * #include <list>
+ *
  * std::vector<int> v1 = {1, 2, 3};
  * std::vector<int> v2 = {4, 5};
  * std::vector<int> v3 = {6, 7, 8};
  *
- * auto result = concat(v1, v2, v3);
+ * auto result = dross::concat(v1, v2, v3);
  * // Result: {1, 2, 3, 4, 5, 6, 7, 8}
  *
  * std::list<std::string> l1 = {"a", "b"};
  * std::list<std::string> l2 = {"c", "d"};
- * auto combined = concat(l1, l2);
+ * auto combined = dross::concat(l1, l2);
  * // Result: {"a", "b", "c", "d"}
  * @endcode
  */

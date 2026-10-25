@@ -58,15 +58,20 @@ class timer;
  *   stays installed
  *
  * @code
+ * #include <thread>
+ *
+ * int expensive_work();
+ * void show(int answer);
+ *
  * // On a worker, handing a result back to the main thread.
- * runloop main_loop = main_runloop();
+ * dross::runloop main_loop = dross::main_runloop();
  *
  * std::thread worker{[main_loop]() mutable {
  *     auto answer = expensive_work();
  *     main_loop.perform([answer]() { show(answer); });
  * }};
  *
- * main_runloop().run();  // runs show(answer) here, until quit()
+ * dross::main_runloop().run();  // runs show(answer) here, until quit()
  * worker.join();
  * @endcode
  */

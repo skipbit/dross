@@ -38,23 +38,23 @@ namespace dross {
  *
  * @code
  * // Application-specific XDG directories
- * xdg app_dirs{"myapp"};
+ * dross::xdg app_dirs{"myapp"};
  *
  * // Get configuration directory
  * if (auto config_dir = app_dirs.config_home()) {
- *     path config_file = path{*config_dir}.append("config.toml");
+ *     dross::path config_file = dross::path{*config_dir}.append("config.toml");
  *     // Store configuration in ~/.config/myapp/config.toml
  * }
  *
  * // Get data directory
  * if (auto data_dir = app_dirs.data_home()) {
- *     path db_file = path{*data_dir}.append("database.sqlite");
+ *     dross::path db_file = dross::path{*data_dir}.append("database.sqlite");
  *     // Store data in ~/.local/share/myapp/database.sqlite
  * }
  *
  * // Get cache directory
  * if (auto cache_dir = app_dirs.cache_home()) {
- *     path cache_file = path{*cache_dir}.append("thumbnails");
+ *     dross::path cache_file = dross::path{*cache_dir}.append("thumbnails");
  *     // Store cache in ~/.cache/myapp/thumbnails
  * }
  * @endcode
@@ -80,7 +80,7 @@ public:
      * - Following naming conventions (lowercase, hyphens for separation)
      *
      * @code
-     * xdg app_dirs{"my-awesome-app"};
+     * dross::xdg app_dirs{"my-awesome-app"};
      * // Names directories like ~/.config/my-awesome-app/
      * @endcode
      */
@@ -99,11 +99,11 @@ public:
      * The returned directory may not exist yet. Use path::mkdir() to create it.
      *
      * @code
-     * xdg app{"myapp"};
+     * dross::xdg app{"myapp"};
      * if (auto config_dir = app.config_home()) {
      *     // Typically returns something like "/home/user/.config/myapp"
-     *     path config_path{*config_dir};
-     *     if (auto result = path::mkdir(config_path.string())) {
+     *     dross::path config_path{*config_dir};
+     *     if (auto result = dross::path::mkdir(config_path.string())) {
      *         // Directory ready for config files, whether just created or
      *         // already there
      *     }

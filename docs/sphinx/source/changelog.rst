@@ -26,6 +26,10 @@ Changed
   under the using-directive ``timezone`` and even ``timezone::utc()`` are
   ambiguous with ``dross::timezone``
 
+- The C++ examples in the README, the Sphinx guides and the header comments
+  compile after ``#include <dross/dross.h>``: each writes ``dross::`` before
+  the names it uses and declares what else it relies on
+
 - ``timestamp::format()`` with a format string writes the year of ``%Y``
   and ``%F`` as the ISO 8601 form does, in at least four digits, so the
   year 999 is ``0999``. The other conversions are still those of

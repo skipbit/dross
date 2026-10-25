@@ -51,12 +51,12 @@ namespace dross {
  *
  * @code
  * // Basic usage
- * data binary_data;
+ * dross::data binary_data;
  * binary_data.append({0x48, 0x65, 0x6C, 0x6C, 0x6F}); // "Hello"
  *
  * // Construction from various sources
- * data from_string{"Hello, World!"};
- * data from_vector{std::vector<uint8_t>{0x01, 0x02, 0x03}};
+ * dross::data from_string{"Hello, World!"};
+ * dross::data from_vector{std::vector<uint8_t>{0x01, 0x02, 0x03}};
  *
  * // Direct memory access
  * auto bytes_opt = binary_data.bytes();
@@ -73,7 +73,7 @@ namespace dross {
  * // String conversion
  * std::string text = binary_data; // Implicit conversion (the bytes, unchanged)
  * // or explicit conversion:
- * std::string explicit_text = to_string(binary_data);
+ * std::string explicit_text = dross::to_string(binary_data);
  * @endcode
  */
 class data final {

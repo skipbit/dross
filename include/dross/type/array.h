@@ -36,10 +36,10 @@ class value;
  *
  * @code
  * // Basic usage
- * array numbers = {value{1}, value{2}, value{3}};
+ * dross::array numbers = {dross::value{1}, dross::value{2}, dross::value{3}};
  *
  * // Adding elements
- * numbers.append(value{4});
+ * numbers.append(dross::value{4});
  *
  * // Iteration
  * for (const auto& item : numbers) {
@@ -47,11 +47,11 @@ class value;
  * }
  *
  * // Access by index
- * value& first = numbers[0];
+ * dross::value& first = numbers[0];
  *
  * // Search and removal
- * size_t pos = numbers.index_of(value{2});
- * numbers.remove(value{2});
+ * size_t pos = numbers.index_of(dross::value{2});
+ * numbers.remove(dross::value{2});
  * @endcode
  */
 class array final {

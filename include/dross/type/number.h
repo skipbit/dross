@@ -54,21 +54,21 @@ concept number_type = std::is_arithmetic_v<T>;
  *
  * @code
  * // Basic usage
- * number a{"123456789012345678901234567890"};
- * number b{42};
- * number result = a * b;  // No overflow!
+ * dross::number a{"123456789012345678901234567890"};
+ * dross::number b{42};
+ * dross::number result = a * b;  // No overflow!
  *
  * // Arithmetic operations
- * number sum = number{"999999999999999999"} + number{"1"};
+ * dross::number sum = dross::number{"999999999999999999"} + dross::number{"1"};
  *
  * // Comparisons
- * if (number{"3.14159"} > number{"3.14"}) {
+ * if (dross::number{"3.14159"} > dross::number{"3.14"}) {
  *     // Handle greater value
  * }
  *
  * // Conversion
- * double d = static_cast<double>(number{"123.456"});
- * std::string s = static_cast<std::string>(number{42});
+ * double d = static_cast<double>(dross::number{"123.456"});
+ * std::string s = static_cast<std::string>(dross::number{42});
  * @endcode
  */
 class number {
