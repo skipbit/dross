@@ -142,9 +142,18 @@ def is_function_declaration(line):
     return parameters in ('', 'void') or all(len(p.split()) > 1 for p in parameters.split(','))
 
 
+BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
+
+
+# Found at the start of a line, so only a comment over several lines can
+# hide one.
+def defines_main(code):
+    return re.search(r'^\s*(?:int|auto)\s+main\s*\(', BLOCK_COMMENT.sub('', code), re.M) is not None
+
+
 def source_of(body, kind):
     code = '\n'.join(body)
-    if kind == 'example-namespace-scope' or re.search(r'\bint\s+main\s*\(', code):
+    if kind == 'example-namespace-scope' or defines_main(code):
         return '#include <dross/dross.h>\n' + code + '\n'
     # A function declaration inside a function body draws -Wvexing-parse, so
     # the ones that open an example go above the function with the includes.

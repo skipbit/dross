@@ -77,6 +77,18 @@ class source_of_test(unittest.TestCase):
 
         self.assertEqual(source, '#include <dross/dross.h>\n' + '\n'.join(body) + '\n')
 
+    def test_a_main_with_a_trailing_return_type_is_compiled_as_it_is(self):
+        body = ['auto main() -> int', '{', '    return 0;', '}']
+        source = check_examples.source_of(body, None)
+
+        self.assertEqual(source, '#include <dross/dross.h>\n' + '\n'.join(body) + '\n')
+
+    def test_main_in_a_comment_or_a_string_does_not_count(self):
+        for body in [['// call this from int main()'], ['std::puts("int main()");'], ['/*', 'int main()', '*/']]:
+            source = check_examples.source_of(body + ['work();'], None)
+
+            self.assertIn('void example()', source, body)
+
     def test_a_namespace_scope_example_is_compiled_as_it_is(self):
         body = ['int twice(int x)', '{', '    return x * 2;', '}']
         source = check_examples.source_of(body, 'example-namespace-scope')
