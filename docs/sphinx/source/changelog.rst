@@ -16,6 +16,9 @@ Added
   from the ``iterator`` of the same type, as ``data::const_iterator``
   does
 
+- ``operation_errc::empty_task``, which ``operation_queue::enqueue()``
+  reports for an empty task
+
 - ``error`` compares with a ``std::error_condition`` and with an error
   condition enum from any library in either order, equal when either
   category reports them equivalent, as ``std::error_code`` does;

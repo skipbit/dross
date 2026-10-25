@@ -262,12 +262,20 @@ private:
 
     explicit operation_queue(std::shared_ptr<storage> store) noexcept;
 
+    // A std::function of any signature. A class derived from one is not,
+    // since std::function never takes such a class as empty either.
+    template <typename F>
+    struct is_std_function : std::false_type { };
+
+    template <typename R, typename... Args>
+    struct is_std_function<std::function<R(Args...)>> : std::true_type { };
+
     // Empty the way std::function takes a task as empty, so enqueue() refuses
     // what submit() does; a task of any other type is never empty.
     template <typename F>
     static bool is_empty(const F& task) noexcept
     {
-        if constexpr (std::is_pointer_v<F> || std::same_as<F, std::function<std::invoke_result_t<F&>()>>) {
+        if constexpr (std::is_function_v<std::remove_pointer_t<F>> || is_std_function<F>::value) {
             return (task == nullptr);
         } else {
             return false;
