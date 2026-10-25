@@ -289,6 +289,23 @@ TEST(timestamp_test, custom_format_pads_the_year_to_four_digits)
     EXPECT_EQ(year_999.format("%Y-%m-%d"), std::string(year_999).substr(0, 10));
 }
 
+// Arithmetic can leave the years 0 to 9999 that parsing accepts; the year
+// keeps its sign and is still padded to four digits.
+TEST(timestamp_test, a_year_outside_0_to_9999_is_written_with_its_sign)
+{
+    const dross::timestamp before = dross::timestamp("0000-01-01T00:00:00Z") - std::chrono::hours(1);
+    const dross::timestamp after = dross::timestamp("9999-12-31T23:00:00Z") + std::chrono::hours(2);
+
+    EXPECT_EQ(std::string(before), "-0001-12-31T23:00:00Z");
+    EXPECT_EQ(std::string(before.date()), "-0001-12-31");
+    EXPECT_EQ(before.format("%Y"), "-0001");
+    EXPECT_EQ(before.format("%F"), "-0001-12-31");
+    EXPECT_EQ(std::string(after), "10000-01-01T01:00:00Z");
+    EXPECT_EQ(std::string(after.date()), "10000-01-01");
+    EXPECT_EQ(after.format("%Y"), "10000");
+    EXPECT_EQ(after.format("%F"), "10000-01-01");
+}
+
 TEST(timestamp_test, custom_format_keeps_a_literal_percent_before_y)
 {
     const dross::timestamp ts("0999-06-01T00:00:00Z");

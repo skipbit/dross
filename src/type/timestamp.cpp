@@ -1,6 +1,7 @@
 #include <dross/type/timestamp.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 #include <iomanip>
 #include <locale>
@@ -13,28 +14,37 @@ namespace dross {
 
 namespace {
 
-// Writes the year of %Y and %F in four digits, as the ISO 8601 form does,
-// before std::put_time sees them.
-std::string pad_year(const std::string& format, int year)
+// The year in at least four digits, with a minus sign before a negative one,
+// so the years that arithmetic reaches outside 0 to 9999 still read as years.
+std::string year_digits(int year)
 {
-    std::ostringstream digits;
-    digits.imbue(std::locale::classic());
-    digits << std::setfill('0') << std::setw(4) << year;
+    std::ostringstream oss;
+    oss.imbue(std::locale::classic());
+    if (year < 0) {
+        oss << "-";
+    }
+    oss << std::setfill('0') << std::setw(4) << std::abs(year);
+    return oss.str();
+}
 
+// Writes %Y and %F as the ISO 8601 form writes them, before std::put_time
+// reads the rest of the format.
+std::string expand_date_conversions(const std::string& format, const timestamp::date_part& date)
+{
     std::string result;
     for (std::size_t i = 0; i < format.size(); ++i) {
         if ((format[i] != '%') || (i + 1 == format.size())) {
             result += format[i];
             continue;
         }
-        const char specifier = format[++i];
-        if (specifier == 'Y') {
-            result += digits.str();
-        } else if (specifier == 'F') {
-            result += digits.str() + "-%m-%d";
+        const char conversion = format[++i];
+        if (conversion == 'Y') {
+            result += year_digits(date.year());
+        } else if (conversion == 'F') {
+            result += static_cast<std::string>(date);
         } else {
             result += '%';
-            result += specifier;
+            result += conversion;
         }
     }
     return result;
@@ -119,7 +129,7 @@ timestamp::date_part::operator std::string() const
 {
     std::ostringstream oss;
     oss.imbue(std::locale::classic());
-    oss << std::setfill('0') << std::setw(4) << year() << "-" << std::setw(2) << month() << "-" << std::setw(2) << day();
+    oss << year_digits(year()) << "-" << std::setfill('0') << std::setw(2) << month() << "-" << std::setw(2) << day();
     return oss.str();
 }
 
@@ -505,9 +515,9 @@ std::string timestamp::format(const std::string& custom_format) const
         return "";
     }
 
+    const std::string expanded = expand_date_conversions(custom_format, _store->date_value);
     std::ostringstream oss;
-    const std::string padded = pad_year(custom_format, tm.tm_year + 1900);
-    oss << std::put_time(&tm, padded.c_str());
+    oss << std::put_time(&tm, expanded.c_str());
     return oss.str();
 }
 
@@ -531,8 +541,7 @@ std::string timestamp::format_iso8601() const
     std::ostringstream oss;
     oss.imbue(std::locale::classic());
 
-    oss << std::setfill('0') << std::setw(4) << _store->date_value.year() << "-" << std::setw(2) << _store->date_value.month() << "-"
-        << std::setw(2) << _store->date_value.day() << "T" << std::setw(2) << _store->time_value.hour() << ":" << std::setw(2)
+    oss << static_cast<std::string>(_store->date_value) << "T" << std::setfill('0') << std::setw(2) << _store->time_value.hour() << ":" << std::setw(2)
         << _store->time_value.minute() << ":" << std::setw(2) << _store->time_value.second();
 
     if (auto fraction = _store->subseconds().count(); fraction != 0) {
