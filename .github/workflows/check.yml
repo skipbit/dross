@@ -445,6 +445,58 @@ jobs:
           echo "$(find docs/build/doxygen/xml -name '*.xml' | wc -l) Doxygen files"
           echo "$(find docs/build/sphinx/html -name '*.html' | wc -l) HTML pages"
 
+  # The examples in the README, the Sphinx sources and the header comments,
+  # compiled one by one with the rules scripts/check-examples.py describes.
+  # libc++ is the one that fails an example leaning on a header libstdc++
+  # happens to include.
+  examples:
+    name: examples (${{ matrix.toolchain.name }})
+    runs-on: ${{ matrix.toolchain.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - { name: 'gcc-13', os: ubuntu-24.04, cxx: g++-13, stdlib: '_GLIBCXX_RELEASE 13' }
+          - { name: 'clang-22, libc++', os: ubuntu-26.04, cxx: clang++-22, stdlib: _LIBCPP_VERSION, packages: 'libc++-22-dev libc++abi-22-dev', flags: '-stdlib=libc++' }
+    env:
+      CXX: ${{ matrix.toolchain.cxx }}
+      CXXFLAGS: ${{ matrix.toolchain.flags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Install the standard library
+        if: matrix.toolchain.packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.toolchain.packages }}
+
+      - name: Report toolchain versions
+        run: |
+          "$CXX" --version
+          python3 --version
+
+      - name: Check the standard library the compiler sees
+        run: |
+          read -r -a flags <<< "${CXXFLAGS:-}"
+          macros=$(echo '#include <version>' | "$CXX" -std=c++23 "${flags[@]}" -x c++ -dM -E -)
+          seen=$(grep -E '^#define (_GLIBCXX_RELEASE|_LIBCPP_VERSION) ' <<< "$macros" | tr '\n' ' ')
+          if ! grep -Eq '^#define ${{ matrix.toolchain.stdlib }}( |$)' <<< "$macros"; then
+            echo "::error::expected ${{ matrix.toolchain.stdlib }}, the compiler defines $seen"
+            exit 1
+          fi
+          echo "the compiler defines $seen"
+
+      - name: Test the example checker
+        run: python3 scripts/test_check_examples.py
+
+      - name: Compile the examples
+        run: python3 scripts/check-examples.py
+
   # The layout is defined by .clang-format alone, so the check runs the release
   # that configuration was written against. clang-format changes what it
   # produces between releases, and an unpinned one would rewrite files the
@@ -468,7 +520,7 @@ jobs:
   required:
     name: required
     if: always()
-    needs: [build-and-test, packaging, sanitize, docs, format-check]
+    needs: [build-and-test, packaging, sanitize, docs, examples, format-check]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 
