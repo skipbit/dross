@@ -12,6 +12,8 @@
 #include <ranges>
 #include <string>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -379,6 +381,35 @@ static_assert(std::is_void_v<std::iterator_traits<dross::dictionary::const_itera
 // An iterator converts to a const_iterator, and the two compare in either order.
 static_assert(std::is_convertible_v<dross::dictionary::iterator, dross::dictionary::const_iterator>);
 static_assert(std::equality_comparable_with<dross::dictionary::iterator, dross::dictionary::const_iterator>);
+
+TEST(dictionary_test, iterators_dereference_to_references_and_copy_to_values)
+{
+    // Checked at run time, so a wrong type fails this test, not the build.
+    using it = dross::dictionary::iterator;
+    using cit = dross::dictionary::const_iterator;
+    using copied = std::pair<std::string, dross::value>;
+
+    EXPECT_TRUE((std::is_same_v<std::iter_reference_t<it>, std::pair<const std::string&, dross::value&>>));
+    EXPECT_TRUE((std::is_same_v<std::iter_reference_t<cit>, std::pair<const std::string&, const dross::value&>>));
+    EXPECT_TRUE((std::is_same_v<std::iter_value_t<it>, copied>));
+    EXPECT_TRUE((std::is_same_v<std::iter_value_t<cit>, copied>));
+    EXPECT_TRUE(std::permutable<std::vector<std::iter_value_t<it>>::iterator>);
+}
+
+TEST(dictionary_test, elements_kept_as_values_do_not_follow_the_dictionary)
+{
+    dross::dictionary d;
+    d["a"] = dross::value(1);
+    std::vector<std::iter_value_t<dross::dictionary::iterator>> kept(d.begin(), d.end());
+    std::vector<std::iter_value_t<dross::dictionary::const_iterator>> kept_const(d.cbegin(), d.cend());
+
+    d["a"] = dross::value(2);
+
+    ASSERT_EQ(kept.size(), 1);
+    EXPECT_EQ(kept[0].second, dross::value(1));
+    ASSERT_EQ(kept_const.size(), 1);
+    EXPECT_EQ(kept_const[0].second, dross::value(1));
+}
 
 TEST(dictionary_test, iterators_compare_with_const_iterators)
 {

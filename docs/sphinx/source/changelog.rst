@@ -74,6 +74,14 @@ Changed
   allow, and there is no pointer to it. They still model
   ``std::forward_iterator``
 
+- ``dictionary::iterator`` and ``dictionary::const_iterator`` declare
+  ``std::pair<std::string, value>`` as their ``value_type``, as
+  ``std::flat_map`` does, instead of the pair of references they return.
+  An element kept through ``std::iter_value_t`` is a copy that no longer
+  changes with the dictionary or dangles once it is destroyed, and copies
+  can be sorted. ``reference`` is still the pair of references, and
+  ``operator*`` is declared to return it
+
 Fixed
 ~~~~~
 
