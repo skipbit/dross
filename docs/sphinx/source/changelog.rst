@@ -83,6 +83,11 @@ Fixed
   ``equivalent()``, as ``std::error_code`` does, so a code whose category
   maps it to that condition only in ``equivalent()`` equals it
 
+- ``operation_queue::enqueue()`` refuses an empty ``std::function`` or a
+  null function pointer with the new ``operation_errc::empty_task``, as
+  ``submit()`` refuses them by returning ``false``. It used to queue the
+  task, and the process ended once a worker ran it
+
 0.1.1 - 2026-10-24
 ------------------
 

@@ -12,6 +12,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -969,6 +970,56 @@ TEST(operation_queue_test, enqueue_after_shutdown_reports_the_queue_stopped)
 
     ASSERT_FALSE(result.has_value());
     EXPECT_TRUE(result.error() == dross::operation_errc::queue_stopped);
+}
+
+TEST(operation_queue_test, enqueue_reports_an_empty_function_without_queueing_it)
+{
+    dross::operation_queue queue{ 1 };
+
+    const auto returning = queue.enqueue(std::function<int()>{});
+    const auto returning_nothing = queue.enqueue(std::function<void()>{});
+
+    ASSERT_FALSE(returning.has_value());
+    EXPECT_TRUE(returning.error() == dross::operation_errc::empty_task);
+    ASSERT_FALSE(returning_nothing.has_value());
+    EXPECT_TRUE(returning_nothing.error() == dross::operation_errc::empty_task);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, enqueue_reports_a_null_function_pointer_without_queueing_it)
+{
+    dross::operation_queue queue{ 1 };
+
+    const auto result = queue.enqueue(static_cast<int (*)()>(nullptr));
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error() == dross::operation_errc::empty_task);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
+TEST(operation_queue_test, enqueue_runs_a_task_whose_operator_bool_means_something_else)
+{
+    // Converts to false, yet is not empty: only what std::function would
+    // take as empty counts, the same as for submit().
+    struct not_ready final {
+        int operator()() const
+        {
+            return 7;
+        }
+
+        explicit operator bool() const
+        {
+            return false;
+        }
+    };
+    dross::operation_queue queue{ 1 };
+
+    const auto result = queue.enqueue(not_ready{});
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->wait_for(kTimeout));
+    EXPECT_EQ(result->get_as<int>(), 7);
+    EXPECT_TRUE(queue.submit(std::function<void()>{ not_ready{} }));
 }
 
 TEST(operation_queue_test, a_priority_operation_priority_does_not_name_is_not_queued)
