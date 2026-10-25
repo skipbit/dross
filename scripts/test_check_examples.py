@@ -4,10 +4,15 @@
 #
 #   python3 scripts/test_check_examples.py
 
+import contextlib
 import importlib.util
+import io
 import os
+import subprocess
 import sys
+import tempfile
 import unittest
+import unittest.mock
 
 # Loading the script would otherwise leave a __pycache__ in scripts/.
 sys.dont_write_bytecode = True
@@ -168,6 +173,36 @@ class header_examples_test(unittest.TestCase):
     def test_an_unclosed_block_is_an_error(self):
         with self.assertRaises(check_examples.BlockError):
             list(check_examples.header_examples([' * @code', ' * int x = 1;']))
+
+
+class environment_test(unittest.TestCase):
+    def setUp(self):
+        self.root = check_examples.ROOT
+        self.directory = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        check_examples.ROOT = self.root
+        self.directory.cleanup()
+
+    def test_a_file_name_with_a_space_is_one_file(self):
+        os.mkdir(os.path.join(self.directory.name, 'docs'))
+        open(os.path.join(self.directory.name, 'docs', 'a b.rst'), 'w').close()
+        subprocess.run(['git', 'init', '-q'], cwd=self.directory.name, check=True)
+        subprocess.run(['git', 'add', '.'], cwd=self.directory.name, check=True)
+        check_examples.ROOT = self.directory.name
+
+        self.assertEqual(check_examples.tracked_files(), ['docs/a b.rst'])
+
+    def test_outside_a_git_work_tree_fails_with_a_message(self):
+        check_examples.ROOT = self.directory.name
+
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            self.assertEqual(check_examples.main(), 1)
+        self.assertIn('git work tree', stderr.getvalue())
+
+    def test_cxxflags_are_split_as_a_shell_would(self):
+        with unittest.mock.patch.dict(os.environ, {'CXXFLAGS': '-stdlib=libc++ -DGREETING="hello world"'}):
+            self.assertEqual(check_examples.compile_flags()[-2:], ['-stdlib=libc++', '-DGREETING=hello world'])
 
 
 if __name__ == '__main__':

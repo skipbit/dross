@@ -20,6 +20,7 @@
 import concurrent.futures
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -35,9 +36,9 @@ FLAGS = [
 
 
 def tracked_files():
-    out = subprocess.run(['git', 'ls-files', 'README.md', 'docs', 'include'],
+    out = subprocess.run(['git', 'ls-files', '-z', 'README.md', 'docs', 'include'],
                          cwd=ROOT, capture_output=True, text=True, check=True).stdout
-    return out.split()
+    return out.split('\0')[:-1]
 
 
 MARKERS = {'example-fragment', 'example-namespace-scope'}
@@ -189,19 +190,26 @@ def source_of(body, kind):
             + 'void example()\n{\n' + '\n'.join(statements) + '\n}\n')
 
 
+def compile_flags():
+    return FLAGS + shlex.split(os.environ.get('CXXFLAGS', ''))
+
+
 def compile_one(compiler, directory, index, body, kind):
     path = os.path.join(directory, 'example_%03d.cpp' % index)
     with open(path, 'w', encoding='utf-8') as f:
         f.write(source_of(body, kind))
-    flags = FLAGS + os.environ.get('CXXFLAGS', '').split()
-    result = subprocess.run([compiler, *flags, '-I', os.path.join(ROOT, 'include'), path],
+    result = subprocess.run([compiler, *compile_flags(), '-I', os.path.join(ROOT, 'include'), path],
                             capture_output=True, text=True)
     return result.returncode, result.stderr
 
 
 def main():
     compiler = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('CXX', 'c++')
-    found, problems = examples()
+    try:
+        found, problems = examples()
+    except subprocess.CalledProcessError:
+        print('run this in a git work tree: the examples are read from the files git tracks', file=sys.stderr)
+        return 1
     # A pattern that stopped matching would otherwise check nothing and pass.
     if not found:
         print('no examples found', file=sys.stderr)
