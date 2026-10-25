@@ -50,6 +50,10 @@ public:
     // the std::errc it maps to.
     bool operator==(std::errc) const noexcept;
 
+    // True when either category reports c as equivalent, the same as for
+    // std::errc. An error condition enum from any library converts to it.
+    bool operator==(const std::error_condition& c) const noexcept;
+
     bool operator==(const std::error_category&) const noexcept;
     bool operator!=(const std::error_category&) const noexcept;
 
