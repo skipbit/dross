@@ -16,23 +16,22 @@
  * Usage:
  * @code
  * #include <dross/platform.h>
- * using namespace dross;
  *
  * // Environment variables
- * if (auto home = environment::value("HOME")) {
+ * if (auto home = dross::environment::value("HOME")) {
  *     std::cout << "Home: " << *home << std::endl;
  * }
  *
  * // Filesystem operations
- * path config_dir = path::home().value_or(path{std::string{"/tmp"}}).append("myapp");
- * if (auto result = path::mkdir(config_dir.string()); result) {
+ * dross::path config_dir = dross::path::home().value_or(dross::path{std::string{"/tmp"}}).append("myapp");
+ * if (auto result = dross::path::mkdir(config_dir.string()); result) {
  *     // Directory created, or already there
  * }
  *
  * // XDG directories
- * xdg app_dirs{"myapp"};
+ * dross::xdg app_dirs{"myapp"};
  * if (auto config = app_dirs.config_home()) {
- *     path config_file = path{*config}.append("config.toml");
+ *     dross::path config_file = dross::path{*config}.append("config.toml");
  * }
  * @endcode
  *

@@ -19,6 +19,13 @@ Added
 Changed
 ~~~~~~~
 
+- The examples in the README, the Sphinx guides and the header comments
+  write ``dross::`` before each name instead of ``using namespace dross;``.
+  With glibc, ``<time.h>`` declares ``long timezone`` and ``<sys/time.h>``,
+  which libstdc++'s ``<thread>`` includes, declares ``struct timezone``, so
+  under the using-directive ``timezone`` and even ``timezone::utc()`` are
+  ambiguous with ``dross::timezone``
+
 - ``timestamp::format()`` with a format string writes the year of ``%Y``
   and ``%F`` as the ISO 8601 form does, in at least four digits, so the
   year 999 is ``0999``. The other conversions are still those of

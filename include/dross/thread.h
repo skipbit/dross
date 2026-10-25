@@ -20,10 +20,9 @@
  * Usage:
  * @code
  * #include <dross/thread.h>
- * using namespace dross;
  *
  * // The main thread's loop, taken on the main thread and handed to a worker.
- * runloop main_loop = main_runloop();
+ * dross::runloop main_loop = dross::main_runloop();
  *
  * std::thread worker{[main_loop]() mutable {
  *     auto answer = expensive_work();
@@ -31,7 +30,7 @@
  *     main_loop.perform([answer]() { show(answer); });
  * }};
  *
- * main_runloop().run();  // until something calls quit()
+ * dross::main_runloop().run();  // until something calls quit()
  * worker.join();
  * @endcode
  *

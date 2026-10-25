@@ -10,19 +10,18 @@
  * Usage:
  * @code
  * #include <dross/format.h>
- * using namespace dross;
  *
  * // TOML parsing
- * auto toml_result = toml::deserialize(toml_data);
+ * auto toml_result = dross::toml::deserialize(toml_data);
  * if (toml_result) {
  *     auto& config = toml_result.value();
  *     // Use dictionary directly
  * }
  *
  * // TOML serialization
- * dictionary config;
- * config["key"] = value(string{"value"});
- * auto toml_data = toml::serialize(config);
+ * dross::dictionary config;
+ * config["key"] = dross::value(dross::string{"value"});
+ * auto toml_data = dross::toml::serialize(config);
  * @endcode
  *
  * Supported formats:

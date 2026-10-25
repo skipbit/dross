@@ -132,22 +132,20 @@ The dross type system provides dynamic typing with strong value semantics:
     #include <dross/type/dictionary.h>
     #include <dross/type/value.h>
 
-    using namespace dross;
-
     // dictionary has no initializer-list constructor
-    dictionary dict;
-    dict["key"] = string("value");
+    dross::dictionary dict;
+    dict["key"] = dross::string("value");
 
     // Create various types
-    value v1 = 42;                 // number
-    value v2 = "hello world";      // string
-    value v3 = array{1, 2, 3};     // array
-    value v4 = dict;               // dictionary
-    value v5 = boolean{true};      // boolean
+    dross::value v1 = 42;                 // number
+    dross::value v2 = "hello world";      // string
+    dross::value v3 = dross::array{1, 2, 3};     // array
+    dross::value v4 = dict;               // dictionary
+    dross::value v5 = dross::boolean{true};      // boolean
 
     // Type checking, then casting
-    if (v1.is<number>()) {
-        auto n = v1.as<number>();
+    if (v1.is<dross::number>()) {
+        auto n = v1.as<dross::number>();
         std::cout << "Number: " << n << std::endl;  // number has operator<<
     }
 
@@ -165,17 +163,15 @@ Cross-platform utilities for common operations:
     #include <dross/platform/path.h>
     #include <dross/platform/xdg.h>
 
-    using namespace dross;
-
     // Environment variables
-    const std::string home = environment::value("HOME").value_or("/tmp");
+    const std::string home = dross::environment::value("HOME").value_or("/tmp");
 
     // Path operations
-    const path config_dir = path{home}.append(".config");
+    const dross::path config_dir = dross::path{home}.append(".config");
     std::cout << "Config: " << config_dir.string() << std::endl;
 
     // XDG Base Directory support
-    xdg app{"myapp"};
+    dross::xdg app{"myapp"};
     if (auto data_home = app.data_home()) {
         std::cout << "Data: " << *data_home << std::endl;
     }
