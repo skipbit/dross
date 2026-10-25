@@ -30,6 +30,15 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
  * Every member has a default, so a task given no options gets them all, and
  * one given some can name just those:
  * @code
+ * void load();
+ * void check();
+ * void render();
+ * void save();
+ *
+ * dross::operation_queue queue{ 4 };
+ * auto loaded = queue.enqueue(load);
+ * auto checked = queue.enqueue(check);
+ *
  * queue.enqueue(render, { .priority = dross::operation_priority::high });
  * queue.enqueue(save, { .after = { *loaded, *checked } });
  * @endcode
@@ -111,6 +120,9 @@ struct operation_options final {
  *   translated
  *
  * @code
+ * int expensive_work();
+ * void show(int answer);
+ *
  * dross::operation_queue queue{ 4 };
  * dross::runloop main_loop = dross::main_runloop();
  * queue.submit([main_loop]() mutable {

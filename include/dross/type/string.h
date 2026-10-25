@@ -44,8 +44,8 @@ concept string_type = std::same_as<T, const char*> || std::same_as<T, char*> || 
  *
  * @code
  * // Basic usage
- * string greeting{"Hello, 世界!"};
- * string name{"Alice"};
+ * dross::string greeting{"Hello, 世界!"};
+ * dross::string name{"Alice"};
  *
  * // Length is in bytes: 14 here, for 10 characters
  * size_t len = greeting.length();

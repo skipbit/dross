@@ -116,6 +116,10 @@ Error Handling
 ~~~~~~~~~~~~~~
 
 .. code-block:: cpp
+    :class: example-namespace-scope
+
+    #include <fstream>
+    #include <iterator>
 
     // Function returning optional
     std::optional<dross::string> get_env_config(const dross::string& key)

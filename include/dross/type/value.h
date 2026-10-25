@@ -75,24 +75,24 @@ concept value_number_type = number_type<T> && (! std::same_as<T, bool>) && (! ch
  *
  * @code
  * // Basic usage with different types
- * value bool_val = boolean{true};
- * value num = number{42};
- * value str = string{"hello"};
- * value arr = array{value{1}, value{2}, value{3}};
+ * dross::value bool_val = dross::boolean{true};
+ * dross::value num = dross::number{42};
+ * dross::value str = dross::string{"hello"};
+ * dross::value arr = dross::array{dross::value{1}, dross::value{2}, dross::value{3}};
  *
  * // Automatic type conversion
- * value int_val = 123;      // Creates number
- * value flag = true;        // Creates boolean
- * value str_val = "text";   // Creates string
+ * dross::value int_val = 123;      // Creates number
+ * dross::value flag = true;        // Creates boolean
+ * dross::value str_val = "text";   // Creates string
  *
  * // Type checking and casting
- * if (num.is<number>()) {
- *     number n = value_cast<number>(num);
+ * if (num.is<dross::number>()) {
+ *     dross::number n = dross::value_cast<dross::number>(num);
  * }
  *
  * // Braces hold the value they enclose; a list is built as an array
- * value one = value{number{42}};
- * value list_val = array{value{1}, value{"two"}, value{3.0}};
+ * dross::value one = dross::value{dross::number{42}};
+ * dross::value list_val = dross::array{dross::value{1}, dross::value{"two"}, dross::value{3.0}};
  * @endcode
  */
 class value final {
@@ -378,9 +378,9 @@ private:
  * Supported types: boolean, number, string, array, dictionary, timestamp, data.
  *
  * @code
- * value val = number{42};
- * if (val.is<number>()) {
- *     number n = value_cast<number>(val);
+ * dross::value val = dross::number{42};
+ * if (val.is<dross::number>()) {
+ *     dross::number n = dross::value_cast<dross::number>(val);
  * }
  * @endcode
  */

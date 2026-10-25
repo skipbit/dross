@@ -36,10 +36,10 @@ class value;
  *
  * @code
  * // Basic usage
- * dictionary config;
- * config["host"] = value{string{"localhost"}};
- * config["port"] = value{number{8080}};
- * config["ssl"] = value{string{"true"}};
+ * dross::dictionary config;
+ * config["host"] = dross::value{dross::string{"localhost"}};
+ * config["port"] = dross::value{dross::number{8080}};
+ * config["ssl"] = dross::value{dross::string{"true"}};
  *
  * // Key checking and access
  * if (config.contains("timeout")) {

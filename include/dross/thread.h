@@ -20,6 +20,10 @@
  * Usage:
  * @code
  * #include <dross/thread.h>
+ * #include <thread>
+ *
+ * int expensive_work();
+ * void show(int answer);
  *
  * // The main thread's loop, taken on the main thread and handed to a worker.
  * dross::runloop main_loop = dross::main_runloop();

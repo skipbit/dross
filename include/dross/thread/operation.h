@@ -153,6 +153,9 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * - Every operation is free of data races when called from any thread
  *
  * @code
+ * int expensive_work();
+ *
+ * dross::operation_queue queue{ 4 };
  * std::expected<dross::operation_result, dross::error> result = queue.enqueue([]() {
  *     return expensive_work();
  * });

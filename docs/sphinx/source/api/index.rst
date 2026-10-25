@@ -64,14 +64,17 @@ Example:
 
 .. code-block:: cpp
 
+    void process_path(const std::string& path);
+    void handle_error(const std::filesystem::filesystem_error& error);
+
     // Using std::optional
-    auto env_value = environment::value("MY_VAR");
+    auto env_value = dross::environment::value("MY_VAR");
     if (env_value) {
         std::cout << "Value: " << *env_value << std::endl;
     }
 
     // Using std::expected
-    auto result = path::mkdir(std::string{"/path/to/dir"});
+    auto result = dross::path::mkdir(std::string{"/path/to/dir"});
     if (result) {
         process_path(result->string());
     } else {

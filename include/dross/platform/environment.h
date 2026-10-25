@@ -31,19 +31,19 @@ namespace dross {
  *
  * @code
  * // Basic usage
- * if (auto home = environment::value("HOME")) {
+ * if (auto home = dross::environment::value("HOME")) {
  *     std::cout << "Home directory: " << *home << std::endl;
  * } else {
  *     std::cout << "HOME environment variable not set" << std::endl;
  * }
  *
  * // Providing defaults
- * std::string shell = environment::value("SHELL").value_or("/bin/sh");
+ * std::string shell = dross::environment::value("SHELL").value_or("/bin/sh");
  *
  * // Common environment variables
- * auto path = environment::value("PATH");
- * auto user = environment::value("USER");
- * auto temp = environment::value("TMPDIR").value_or("/tmp");
+ * auto path = dross::environment::value("PATH");
+ * auto user = dross::environment::value("USER");
+ * auto temp = dross::environment::value("TMPDIR").value_or("/tmp");
  * @endcode
  */
 class environment {
@@ -67,12 +67,12 @@ public:
      *
      * @code
      * // Check if variable exists
-     * if (auto value = environment::value("MY_VAR")) {
+     * if (auto value = dross::environment::value("MY_VAR")) {
      *     std::cout << "MY_VAR = " << *value << std::endl;
      * }
      *
      * // Use with default value
-     * std::string config_dir = environment::value("CONFIG_DIR")
+     * std::string config_dir = dross::environment::value("CONFIG_DIR")
      *                           .value_or("/etc/myapp");
      * @endcode
      */

@@ -41,22 +41,22 @@ namespace dross {
  *
  * @code
  * // Basic path operations
- * path config_path{std::string{"~/.config/myapp"}};
+ * dross::path config_path{std::string{"~/.config/myapp"}};
  * if (auto expanded = config_path.expand()) {
  *     std::cout << "Expanded path: " << expanded->string() << std::endl;
  * }
  *
  * // Directory creation
- * path new_dir{std::string{"/tmp/myapp/data"}};
- * if (auto result = path::mkdir(new_dir.string())) {
+ * dross::path new_dir{std::string{"/tmp/myapp/data"}};
+ * if (auto result = dross::path::mkdir(new_dir.string())) {
  *     std::cout << "Directory ready: " << result->string() << std::endl;
  * } else {
  *     std::cerr << "Failed to create directory: " << result.error().what() << std::endl;
  * }
  *
  * // Path building
- * if (auto home = path::home()) {
- *     path config_file = home->append("myapp").append("config.toml");
+ * if (auto home = dross::path::home()) {
+ *     dross::path config_file = home->append("myapp").append("config.toml");
  *     if (config_file.exists()) {
  *         // Process config file
  *     }
@@ -81,7 +81,7 @@ public:
      * and is ambiguous, so name std::string.
      *
      * @code
-     * if (auto result = path::mkdir(std::string{"/tmp/myapp/data"})) {
+     * if (auto result = dross::path::mkdir(std::string{"/tmp/myapp/data"})) {
      *     std::cout << "Ready: " << result->string() << std::endl;
      * } else {
      *     std::cerr << "Error: " << result.error().what() << std::endl;
@@ -128,8 +128,8 @@ public:
      * A relative HOME is returned as it is, not resolved or ignored.
      *
      * @code
-     * if (auto home = path::home()) {
-     *     path config = home->append(".config");
+     * if (auto home = dross::path::home()) {
+     *     dross::path config = home->append(".config");
      * } else {
      *     // Handle case where home directory cannot be determined
      * }
@@ -204,8 +204,8 @@ public:
      * platform-appropriate path separator. Does not modify this path object.
      *
      * @code
-     * path base{std::string{"/usr/local"}};
-     * path full = base.append("bin").append("myapp");
+     * dross::path base{std::string{"/usr/local"}};
+     * dross::path full = base.append("bin").append("myapp");
      * // Result: "/usr/local/bin/myapp"
      * @endcode
      */
@@ -232,7 +232,7 @@ public:
      * and always succeeds.
      *
      * @code
-     * path user_config{std::string{"~/.config/myapp"}};
+     * dross::path user_config{std::string{"~/.config/myapp"}};
      * if (auto expanded = user_config.expand()) {
      *     // expanded contains something like "/home/user/.config/myapp"
      * } else {
@@ -255,7 +255,7 @@ public:
      * directory.
      *
      * @code
-     * path relative{std::string{"../config/../data/file.txt"}};
+     * dross::path relative{std::string{"../config/../data/file.txt"}};
      * if (auto resolved = relative.resolve()) {
      *     // resolved contains the canonical absolute path
      * }

@@ -130,6 +130,7 @@ Writing Tests
 Tests use GoogleTest and are located in the ``test/`` directory:
 
 .. code-block:: cpp
+    :class: example-fragment
 
     #include <string>
 
@@ -183,6 +184,7 @@ API Documentation
 Use Doxygen-style comments for all public APIs:
 
 .. code-block:: cpp
+    :class: example-fragment
 
     /**
      * @brief Converts the value to a string representation.
@@ -191,6 +193,24 @@ Use Doxygen-style comments for all public APIs:
      * @note Never throws
      */
     string to_string() const noexcept;
+
+Code Examples
+~~~~~~~~~~~~~
+
+``scripts/check-examples.py`` compiles every C++ example in the README, these
+pages and the header comments, and the pull request checks run it with GCC and
+with Clang and libc++. An example compiles after ``#include <dross/dross.h>``,
+taken as the body of a function unless it defines ``main``. It names what it
+uses with ``dross::``, includes the other headers it needs and declares what
+else it relies on; ``#include`` lines and the function declarations it opens
+with stay outside the function.
+
+On these pages, a ``code-block`` with ``:class: example-namespace-scope`` is
+compiled without being put in a function, and one with
+``:class: example-fragment``, such as the Doxygen comment above, is not
+compiled. A block names its language, such as ``.. code-block:: console``
+for a shell session: Sphinx shows a literal block (``::``) or a
+``code-block`` without one as C++, so the check reports it.
 
 Documentation Building
 ~~~~~~~~~~~~~~~~~~~~~~
