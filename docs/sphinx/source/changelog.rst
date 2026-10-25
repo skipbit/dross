@@ -19,6 +19,11 @@ Added
 Changed
 ~~~~~~~
 
+- ``timestamp::format()`` with a format string writes the year of ``%Y``
+  and ``%F`` as the ISO 8601 form does, in at least four digits, so the
+  year 999 is ``0999``. The other conversions are still those of
+  ``std::put_time``
+
 - ``error`` compared with an error code enum equals it only when the
   category and the value both match, as ``std::error_code`` does. A
   ``system_category()`` code no longer equals an enum whose code is in
@@ -52,6 +57,11 @@ Changed
 
 Fixed
 ~~~~~
+
+- The ISO 8601 form of a ``timestamp`` and the string of its
+  ``date_part`` write a year below 0, which arithmetic can reach, with a
+  minus sign before four digits, such as ``-0001-12-31``, instead of
+  ``00-1-12-31``
 
 - ``error`` compared with ``std::errc`` asks both categories through
   ``equivalent()``, as ``std::error_code`` does, so a code whose category
