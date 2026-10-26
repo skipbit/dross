@@ -9,9 +9,11 @@
  * The type system is designed around value semantics, using std::optional
  * and std::expected for error handling rather than exceptions. The
  * bounds-checked accessors are the exception: array and dictionary throw
- * std::out_of_range for an index or key that is not present. The core
- * types use the Pimpl idiom for ABI stability; error wraps a
- * std::error_code directly.
+ * std::out_of_range for an index or key that is not present, and so do
+ * timestamp's arithmetic operators for a result outside the years 0 to
+ * 9999, which timestamp::add() and timestamp::subtract() report as
+ * std::nullopt instead. The core types use the Pimpl idiom for ABI
+ * stability; error wraps a std::error_code directly.
  *
  * Key features:
  * - Arbitrary precision arithmetic with number

@@ -8,14 +8,16 @@
 #include <optional>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 
 namespace dross {
 
 namespace {
 
-// The year in at least four digits, with a minus sign before a negative one,
-// so the years that arithmetic reaches outside 0 to 9999 still read as years.
+// The year in at least four digits, with a minus sign before a negative one.
+// Arithmetic keeps a timestamp within the years 0 to 9999, so the year
+// written is always four digits without a sign.
 std::string year_digits(int year)
 {
     std::ostringstream oss;
@@ -471,29 +473,58 @@ timestamp timestamp::operator+(const std::chrono::minutes& duration) const
 
 timestamp timestamp::operator-(const std::chrono::minutes& duration) const
 {
-    return *this + (-duration);
+    return *this - std::chrono::seconds(duration);
 }
 
 timestamp timestamp::operator+(const std::chrono::hours& duration) const
 {
-    return *this + std::chrono::duration_cast<std::chrono::minutes>(duration);
+    return *this + std::chrono::seconds(duration);
 }
 
 timestamp timestamp::operator-(const std::chrono::hours& duration) const
 {
-    return *this + (-duration);
+    return *this - std::chrono::seconds(duration);
 }
 
 timestamp timestamp::operator+(const std::chrono::seconds& duration) const
 {
-    timestamp result(*this);
-    result._store->set_local(_store->local_seconds() + duration, _store->subseconds());
-    return result;
+    if (auto result = add(duration)) {
+        return std::move(*result);
+    }
+    throw std::out_of_range("timestamp arithmetic leaves the years 0 to 9999");
 }
 
 timestamp timestamp::operator-(const std::chrono::seconds& duration) const
 {
-    return *this + (-duration);
+    if (auto result = subtract(duration)) {
+        return std::move(*result);
+    }
+    throw std::out_of_range("timestamp arithmetic leaves the years 0 to 9999");
+}
+
+std::optional<timestamp> timestamp::add(std::chrono::seconds duration) const
+{
+    // Compared as distances from here, which cannot overflow, before adding.
+    using std::chrono::January;
+    const std::chrono::sys_seconds first{ std::chrono::sys_days{ std::chrono::year{ 0 } / January / 1 } };
+    const std::chrono::sys_seconds end{ std::chrono::sys_days{ std::chrono::year{ 10000 } / January / 1 } };
+    const auto local = _store->local_seconds();
+    if ((duration < first - local) || (duration >= end - local)) {
+        return std::nullopt;
+    }
+
+    timestamp result(*this);
+    result._store->set_local(local + duration, _store->subseconds());
+    return result;
+}
+
+std::optional<timestamp> timestamp::subtract(std::chrono::seconds duration) const
+{
+    // The one duration whose negation overflows is far outside the range.
+    if (duration == std::chrono::seconds::min()) {
+        return std::nullopt;
+    }
+    return add(-duration);
 }
 
 std::string timestamp::format(format_type fmt) const

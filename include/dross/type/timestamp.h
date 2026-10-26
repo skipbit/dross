@@ -23,7 +23,8 @@ namespace dross {
  * Key features:
  * - ISO 8601 and RFC 3339 format support
  * - Type-safe timezone operations with timezone class
- * - Integration with std::chrono for duration arithmetic
+ * - Integration with std::chrono for duration arithmetic, kept within the
+ *   years 0 to 9999 that parsing accepts
  * - Value semantics (copyable and assignable)
  * - Thread-safe for read operations
  * - A date alone is read as midnight and written in full
@@ -383,9 +384,7 @@ public:
      * @return ISO 8601 formatted string representation
      *
      * Always writes the date, the time and the offset, so the string reads
-     * back as the same timestamp for any year from 0 to 9999. Arithmetic can
-     * move a timestamp outside those years; it still compares and computes
-     * correctly, but its string does not read back.
+     * back as the same timestamp.
      */
     operator std::string() const;
 
@@ -407,6 +406,8 @@ public:
      * @brief Add a duration to this timestamp.
      * @param duration The duration to add (in minutes)
      * @return New timestamp with the duration added
+     * @throws std::out_of_range if the result is outside the years 0 to 9999;
+     *         add() and subtract() report that as nullopt instead
      */
     timestamp operator+(const std::chrono::minutes& duration) const;
 
@@ -414,6 +415,8 @@ public:
      * @brief Subtract a duration from this timestamp.
      * @param duration The duration to subtract (in minutes)
      * @return New timestamp with the duration subtracted
+     * @throws std::out_of_range if the result is outside the years 0 to 9999;
+     *         add() and subtract() report that as nullopt instead
      */
     timestamp operator-(const std::chrono::minutes& duration) const;
 
@@ -421,6 +424,8 @@ public:
      * @brief Add hours to this timestamp.
      * @param duration The duration to add (in hours)
      * @return New timestamp with the duration added
+     * @throws std::out_of_range if the result is outside the years 0 to 9999;
+     *         add() and subtract() report that as nullopt instead
      */
     timestamp operator+(const std::chrono::hours& duration) const;
 
@@ -428,6 +433,8 @@ public:
      * @brief Subtract hours from this timestamp.
      * @param duration The duration to subtract (in hours)
      * @return New timestamp with the duration subtracted
+     * @throws std::out_of_range if the result is outside the years 0 to 9999;
+     *         add() and subtract() report that as nullopt instead
      */
     timestamp operator-(const std::chrono::hours& duration) const;
 
@@ -435,6 +442,8 @@ public:
      * @brief Add seconds to this timestamp.
      * @param duration The duration to add (in seconds)
      * @return New timestamp with the duration added
+     * @throws std::out_of_range if the result is outside the years 0 to 9999;
+     *         add() and subtract() report that as nullopt instead
      */
     timestamp operator+(const std::chrono::seconds& duration) const;
 
@@ -442,8 +451,31 @@ public:
      * @brief Subtract seconds from this timestamp.
      * @param duration The duration to subtract (in seconds)
      * @return New timestamp with the duration subtracted
+     * @throws std::out_of_range if the result is outside the years 0 to 9999;
+     *         add() and subtract() report that as nullopt instead
      */
     timestamp operator-(const std::chrono::seconds& duration) const;
+
+    /**
+     * @brief Add a duration, reporting a result outside the years 0 to 9999.
+     * @param duration The duration to add, which minutes and hours convert to
+     * @return The timestamp with the duration added, or nullopt if its year,
+     *         in this timestamp's offset, is outside 0 to 9999
+     *
+     * The years are those parsing accepts and the string writes, so the
+     * result always reads back.
+     */
+    std::optional<timestamp> add(std::chrono::seconds duration) const;
+
+    /**
+     * @brief Subtract a duration, reporting a result outside the years 0 to
+     * 9999.
+     * @param duration The duration to subtract, which minutes and hours
+     *        convert to
+     * @return The timestamp with the duration subtracted, or nullopt if its
+     *         year, in this timestamp's offset, is outside 0 to 9999
+     */
+    std::optional<timestamp> subtract(std::chrono::seconds duration) const;
 
     /**
      * @brief Calculate the duration between two timestamps.
@@ -467,9 +499,8 @@ public:
      * @param custom_format strftime-style format string
      * @return Formatted string representation
      *
-     * %Y and %F write the year as the ISO 8601 form does: in at least four
-     * digits, so the year 999 is "0999", and with a minus sign before a year
-     * below 0 that arithmetic reaches. The other conversions are those of
+     * %Y and %F write the year as the ISO 8601 form does, in four digits, so
+     * the year 999 is "0999". The other conversions are those of
      * std::put_time.
      */
     std::string format(const std::string& custom_format) const;

@@ -12,6 +12,10 @@ Unreleased
 Added
 ~~~~~
 
+- ``timestamp::add()`` and ``timestamp::subtract()``, which take a
+  duration in seconds, minutes or hours and report a result outside the
+  years 0 to 9999 as ``std::nullopt`` instead of throwing
+
 - ``array::const_iterator`` and ``dictionary::const_iterator`` convert
   from the ``iterator`` of the same type, as ``data::const_iterator``
   does
@@ -26,6 +30,15 @@ Added
 
 Changed
 ~~~~~~~
+
+- ``timestamp``'s ``+`` and ``-`` with a duration throw
+  ``std::out_of_range`` for a result whose year, in the timestamp's own
+  offset, is outside 0 to 9999, the years parsing accepts. They used to
+  return it, and its string did not read back; far enough out the year
+  wrapped and the result compared on the wrong side of where it started.
+  A timestamp now always holds a year from 0 to 9999, so the signed year
+  that ``%Y``, ``%F`` and the ISO 8601 form write below 0 is no longer
+  reached
 
 - The examples in the README, the Sphinx guides and the header comments
   write ``dross::`` before each name instead of ``using namespace dross;``.
@@ -92,9 +105,8 @@ Fixed
 ~~~~~
 
 - The ISO 8601 form of a ``timestamp`` and the string of its
-  ``date_part`` write a year below 0, which arithmetic can reach, with a
-  minus sign before four digits, such as ``-0001-12-31``, instead of
-  ``00-1-12-31``
+  ``date_part`` write a year below 0 with a minus sign before four
+  digits, such as ``-0001-12-31``, instead of ``00-1-12-31``
 
 - ``error`` compared with ``std::errc`` asks both categories through
   ``equivalent()``, as ``std::error_code`` does, so a code whose category

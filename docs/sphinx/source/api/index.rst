@@ -59,6 +59,10 @@ Some operations are exceptions to that rule:
   ``std::filesystem::filesystem_error``.
 - The default ``path`` constructor resolves ``"."`` with the throwing form of
   ``std::filesystem::absolute``.
+- ``timestamp``'s ``+`` and ``-`` with a duration throw ``std::out_of_range``
+  for a result outside the years 0 to 9999, which parsing accepts.
+  ``timestamp::add()`` and ``timestamp::subtract()`` report it as
+  ``std::nullopt`` instead.
 
 Example:
 
