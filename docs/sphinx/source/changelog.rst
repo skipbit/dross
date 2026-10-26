@@ -13,8 +13,8 @@ Added
 ~~~~~
 
 - ``timestamp::add()`` and ``timestamp::subtract()``, which take a
-  duration in seconds, minutes or hours and report a result outside the
-  years 0 to 9999 as ``std::nullopt`` instead of throwing
+  ``std::chrono::seconds`` and report a result outside the years 0 to
+  9999 as ``std::nullopt`` instead of throwing
 
 - ``array::const_iterator`` and ``dictionary::const_iterator`` convert
   from the ``iterator`` of the same type, as ``data::const_iterator``
@@ -36,9 +36,9 @@ Changed
   offset, is outside 0 to 9999, the years parsing accepts. They used to
   return it, and its string did not read back; far enough out the year
   wrapped and the result compared on the wrong side of where it started.
-  A timestamp now always holds a year from 0 to 9999, so the signed year
-  that ``%Y``, ``%F`` and the ISO 8601 form write below 0 is no longer
-  reached
+  Minutes and hours with more seconds than ``std::chrono::seconds`` holds
+  throw as well instead of overflowing. Arithmetic no longer reaches the
+  signed year that ``%Y``, ``%F`` and the ISO 8601 form write below 0
 
 - The examples in the README, the Sphinx guides and the header comments
   write ``dross::`` before each name instead of ``using namespace dross;``.

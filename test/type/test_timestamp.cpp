@@ -361,6 +361,26 @@ TEST(timestamp_test, add_and_subtract_report_the_largest_durations_without_overf
     EXPECT_FALSE(last.subtract(std::chrono::seconds::min()).has_value());
 }
 
+// Minutes and hours with more seconds than std::chrono::seconds holds are
+// refused before they are converted, so they cannot wrap into the range.
+TEST(timestamp_test, operators_refuse_minutes_and_hours_beyond_the_seconds_range)
+{
+    const dross::timestamp base("2024-01-01T00:00:00Z");
+    // 3600 times this wraps to -16 seconds in 64 bits.
+    const std::chrono::hours wrapping(5124095576030431);
+
+    EXPECT_THROW((void)(base + std::chrono::hours::max()), std::out_of_range);
+    EXPECT_THROW((void)(base + std::chrono::hours::min()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::hours::max()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::hours::min()), std::out_of_range);
+    EXPECT_THROW((void)(base + wrapping), std::out_of_range);
+    EXPECT_THROW((void)(base - wrapping), std::out_of_range);
+    EXPECT_THROW((void)(base + std::chrono::minutes::max()), std::out_of_range);
+    EXPECT_THROW((void)(base + std::chrono::minutes::min()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::minutes::max()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::minutes::min()), std::out_of_range);
+}
+
 // The years are those of the timestamp's own offset, which its string writes.
 TEST(timestamp_test, arithmetic_range_follows_the_timestamps_own_offset)
 {

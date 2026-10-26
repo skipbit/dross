@@ -15,9 +15,35 @@ namespace dross {
 
 namespace {
 
+// The years 0 to 9999 that parsing accepts, as the first second and the one
+// after the last.
+constexpr std::chrono::sys_seconds first_second{ std::chrono::sys_days{ std::chrono::year{ 0 } / std::chrono::January / 1 } };
+constexpr std::chrono::sys_seconds end_second{ std::chrono::sys_days{ std::chrono::year{ 10000 } / std::chrono::January / 1 } };
+
+// Compared in its own unit, since converting a duration with more seconds
+// than std::chrono::seconds holds overflows.
+template <typename Duration>
+std::optional<std::chrono::seconds> in_seconds(Duration duration)
+{
+    if ((duration > std::chrono::duration_cast<Duration>(std::chrono::seconds::max()))
+        || (duration < std::chrono::duration_cast<Duration>(std::chrono::seconds::min()))) {
+        return std::nullopt;
+    }
+    return std::chrono::seconds(duration);
+}
+
+timestamp value_or_throw(std::optional<timestamp> result)
+{
+    if (! result) {
+        throw std::out_of_range("timestamp arithmetic leaves the years 0 to 9999");
+    }
+    return std::move(*result);
+}
+
 // The year in at least four digits, with a minus sign before a negative one.
-// Arithmetic keeps a timestamp within the years 0 to 9999, so the year
-// written is always four digits without a sign.
+// Arithmetic keeps a timestamp within the years 0 to 9999; a
+// system_clock::time_point outside them can still give a year with a sign or
+// five digits.
 std::string year_digits(int year)
 {
     std::ostringstream oss;
@@ -468,48 +494,43 @@ std::chrono::system_clock::duration timestamp::operator-(const timestamp& other)
 
 timestamp timestamp::operator+(const std::chrono::minutes& duration) const
 {
-    return *this + std::chrono::seconds(duration);
+    const auto seconds = in_seconds(duration);
+    return value_or_throw(seconds ? add(*seconds) : std::nullopt);
 }
 
 timestamp timestamp::operator-(const std::chrono::minutes& duration) const
 {
-    return *this - std::chrono::seconds(duration);
+    const auto seconds = in_seconds(duration);
+    return value_or_throw(seconds ? subtract(*seconds) : std::nullopt);
 }
 
 timestamp timestamp::operator+(const std::chrono::hours& duration) const
 {
-    return *this + std::chrono::seconds(duration);
+    const auto seconds = in_seconds(duration);
+    return value_or_throw(seconds ? add(*seconds) : std::nullopt);
 }
 
 timestamp timestamp::operator-(const std::chrono::hours& duration) const
 {
-    return *this - std::chrono::seconds(duration);
+    const auto seconds = in_seconds(duration);
+    return value_or_throw(seconds ? subtract(*seconds) : std::nullopt);
 }
 
 timestamp timestamp::operator+(const std::chrono::seconds& duration) const
 {
-    if (auto result = add(duration)) {
-        return std::move(*result);
-    }
-    throw std::out_of_range("timestamp arithmetic leaves the years 0 to 9999");
+    return value_or_throw(add(duration));
 }
 
 timestamp timestamp::operator-(const std::chrono::seconds& duration) const
 {
-    if (auto result = subtract(duration)) {
-        return std::move(*result);
-    }
-    throw std::out_of_range("timestamp arithmetic leaves the years 0 to 9999");
+    return value_or_throw(subtract(duration));
 }
 
 std::optional<timestamp> timestamp::add(std::chrono::seconds duration) const
 {
     // Compared as distances from here, which cannot overflow, before adding.
-    using std::chrono::January;
-    const std::chrono::sys_seconds first{ std::chrono::sys_days{ std::chrono::year{ 0 } / January / 1 } };
-    const std::chrono::sys_seconds end{ std::chrono::sys_days{ std::chrono::year{ 10000 } / January / 1 } };
     const auto local = _store->local_seconds();
-    if ((duration < first - local) || (duration >= end - local)) {
+    if ((duration < first_second - local) || (duration >= end_second - local)) {
         return std::nullopt;
     }
 

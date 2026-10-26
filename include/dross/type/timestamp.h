@@ -305,7 +305,10 @@ public:
      * @brief Construct from std::chrono::system_clock::time_point.
      * @param tp The time point to construct from
      *
-     * The resulting timestamp will be in UTC (no timezone offset).
+     * The resulting timestamp will be in UTC (no timezone offset). Where the
+     * range of system_clock reaches past the years 0 to 9999, as it does
+     * where its duration counts microseconds, a time point outside them
+     * gives a timestamp whose string does not read back.
      */
     timestamp(const std::chrono::system_clock::time_point& tp);
 
@@ -384,7 +387,8 @@ public:
      * @return ISO 8601 formatted string representation
      *
      * Always writes the date, the time and the offset, so the string reads
-     * back as the same timestamp.
+     * back as the same timestamp for any year from 0 to 9999, which
+     * arithmetic keeps.
      */
     operator std::string() const;
 
@@ -499,9 +503,9 @@ public:
      * @param custom_format strftime-style format string
      * @return Formatted string representation
      *
-     * %Y and %F write the year as the ISO 8601 form does, in four digits, so
-     * the year 999 is "0999". The other conversions are those of
-     * std::put_time.
+     * %Y and %F write the year as the ISO 8601 form does: in at least four
+     * digits, so the year 999 is "0999", and with a minus sign before a year
+     * below 0. The other conversions are those of std::put_time.
      */
     std::string format(const std::string& custom_format) const;
 
