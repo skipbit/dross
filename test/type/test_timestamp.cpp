@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -289,21 +290,107 @@ TEST(timestamp_test, custom_format_pads_the_year_to_four_digits)
     EXPECT_EQ(year_999.format("%Y-%m-%d"), std::string(year_999).substr(0, 10));
 }
 
-// Arithmetic can leave the years 0 to 9999 that parsing accepts; the year
-// keeps its sign and is still padded to four digits.
-TEST(timestamp_test, a_year_outside_0_to_9999_is_written_with_its_sign)
+// The operators keep a timestamp in the years 0 to 9999 that parsing
+// accepts, so its string always reads back.
+TEST(timestamp_test, arithmetic_operators_refuse_to_leave_the_years_0_to_9999)
 {
-    const dross::timestamp before = dross::timestamp("0000-01-01T00:00:00Z") - std::chrono::hours(1);
-    const dross::timestamp after = dross::timestamp("9999-12-31T23:00:00Z") + std::chrono::hours(2);
+    const dross::timestamp first("0000-01-01T00:00:00Z");
+    const dross::timestamp last("9999-12-31T23:59:59Z");
 
-    EXPECT_EQ(std::string(before), "-0001-12-31T23:00:00Z");
-    EXPECT_EQ(std::string(before.date()), "-0001-12-31");
-    EXPECT_EQ(before.format("%Y"), "-0001");
-    EXPECT_EQ(before.format("%F"), "-0001-12-31");
-    EXPECT_EQ(std::string(after), "10000-01-01T01:00:00Z");
-    EXPECT_EQ(std::string(after.date()), "10000-01-01");
-    EXPECT_EQ(after.format("%Y"), "10000");
-    EXPECT_EQ(after.format("%F"), "10000-01-01");
+    EXPECT_THROW((void)(first - std::chrono::seconds(1)), std::out_of_range);
+    EXPECT_THROW((void)(first - std::chrono::minutes(1)), std::out_of_range);
+    EXPECT_THROW((void)(first - std::chrono::hours(1)), std::out_of_range);
+    EXPECT_THROW((void)(last + std::chrono::seconds(1)), std::out_of_range);
+    EXPECT_THROW((void)(last + std::chrono::minutes(1)), std::out_of_range);
+    EXPECT_THROW((void)(last + std::chrono::hours(1)), std::out_of_range);
+    EXPECT_THROW((void)(first + std::chrono::hours(-1)), std::out_of_range);
+    EXPECT_THROW((void)(last - std::chrono::hours(-1)), std::out_of_range);
+
+    EXPECT_EQ(std::string(first - std::chrono::seconds(0)), "0000-01-01T00:00:00Z");
+    EXPECT_EQ(std::string(last + std::chrono::seconds(0)), "9999-12-31T23:59:59Z");
+}
+
+// Far enough out, std::chrono::year wraps, and the result once compared on
+// the wrong side of where it started.
+TEST(timestamp_test, arithmetic_far_outside_the_years_0_to_9999_is_refused)
+{
+    const auto years = std::chrono::hours(24 * 366 * 22767);
+
+    EXPECT_THROW((void)(dross::timestamp("9999-12-31T23:00:00Z") + years), std::out_of_range);
+    EXPECT_THROW((void)(dross::timestamp("0000-01-01T00:00:00Z") - years), std::out_of_range);
+}
+
+TEST(timestamp_test, add_and_subtract_report_a_result_outside_the_years_0_to_9999)
+{
+    const dross::timestamp first("0000-01-01T00:00:00Z");
+    const dross::timestamp last("9999-12-31T23:59:58.5Z");
+
+    EXPECT_FALSE(first.subtract(std::chrono::seconds(1)).has_value());
+    EXPECT_FALSE(first.add(std::chrono::seconds(-1)).has_value());
+    EXPECT_FALSE(last.add(std::chrono::seconds(2)).has_value());
+    EXPECT_FALSE(last.subtract(std::chrono::seconds(-2)).has_value());
+    EXPECT_FALSE(last.add(std::chrono::hours(1)).has_value());
+
+    const auto to_first = first.subtract(std::chrono::seconds(0));
+    const auto to_last = last.add(std::chrono::seconds(1));
+    ASSERT_TRUE(to_first.has_value());
+    EXPECT_EQ(std::string(*to_first), "0000-01-01T00:00:00Z");
+    ASSERT_TRUE(to_last.has_value());
+    EXPECT_EQ(std::string(*to_last), "9999-12-31T23:59:59.5Z");
+}
+
+TEST(timestamp_test, add_and_subtract_match_the_operators_within_the_years_0_to_9999)
+{
+    const dross::timestamp base("2024-01-21T15:30:00+09:00");
+
+    EXPECT_EQ(base.add(std::chrono::hours(2)), base + std::chrono::hours(2));
+    EXPECT_EQ(base.subtract(std::chrono::minutes(90)), base - std::chrono::minutes(90));
+    EXPECT_EQ(base.add(std::chrono::seconds(-30)), base - std::chrono::seconds(30));
+    EXPECT_EQ(base.add(std::chrono::hours(2))->timezone(), base.timezone());
+}
+
+TEST(timestamp_test, add_and_subtract_report_the_largest_durations_without_overflow)
+{
+    const dross::timestamp first("0000-01-01T00:00:00Z");
+    const dross::timestamp last("9999-12-31T23:59:59Z");
+
+    EXPECT_FALSE(first.add(std::chrono::seconds::max()).has_value());
+    EXPECT_FALSE(last.add(std::chrono::seconds::max()).has_value());
+    EXPECT_FALSE(first.add(std::chrono::seconds::min()).has_value());
+    EXPECT_FALSE(first.subtract(std::chrono::seconds::max()).has_value());
+    EXPECT_FALSE(last.subtract(std::chrono::seconds::min()).has_value());
+}
+
+// Minutes and hours with more seconds than std::chrono::seconds holds are
+// refused before they are converted, so they cannot wrap into the range.
+TEST(timestamp_test, operators_refuse_minutes_and_hours_beyond_the_seconds_range)
+{
+    const dross::timestamp base("2024-01-01T00:00:00Z");
+    // 3600 times this wraps to -16 seconds in 64 bits.
+    const std::chrono::hours wrapping(5124095576030431);
+
+    EXPECT_THROW((void)(base + std::chrono::hours::max()), std::out_of_range);
+    EXPECT_THROW((void)(base + std::chrono::hours::min()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::hours::max()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::hours::min()), std::out_of_range);
+    EXPECT_THROW((void)(base + wrapping), std::out_of_range);
+    EXPECT_THROW((void)(base - wrapping), std::out_of_range);
+    EXPECT_THROW((void)(base + std::chrono::minutes::max()), std::out_of_range);
+    EXPECT_THROW((void)(base + std::chrono::minutes::min()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::minutes::max()), std::out_of_range);
+    EXPECT_THROW((void)(base - std::chrono::minutes::min()), std::out_of_range);
+}
+
+// The years are those of the timestamp's own offset, which its string writes.
+TEST(timestamp_test, arithmetic_range_follows_the_timestamps_own_offset)
+{
+    const dross::timestamp west("9999-12-31T23:00:00-05:00");
+    const dross::timestamp east("0000-01-01T01:00:00+09:00");
+
+    EXPECT_EQ(std::string(west + std::chrono::minutes(59)), "9999-12-31T23:59:00-05:00");
+    EXPECT_THROW((void)(west + std::chrono::hours(1)), std::out_of_range);
+    EXPECT_EQ(std::string(east - std::chrono::hours(1)), "0000-01-01T00:00:00+09:00");
+    EXPECT_THROW((void)(east - std::chrono::hours(2)), std::out_of_range);
 }
 
 TEST(timestamp_test, custom_format_keeps_a_literal_percent_before_y)
@@ -553,7 +640,7 @@ TEST(timestamp_test, arithmetic_holds_far_from_1970)
     for (const char* s : { "2262-04-11T23:47:17Z", "2300-01-01T00:00:00Z", "9999-12-31T23:59:59+09:00" }) {
         const dross::timestamp ts(s);
         EXPECT_GT(ts, ref) << s;
-        EXPECT_EQ(ts + std::chrono::hours(1) - std::chrono::hours(1), ts) << s;
+        EXPECT_EQ(ts - std::chrono::hours(1) + std::chrono::hours(1), ts) << s;
     }
     for (const char* s : { "1677-09-21T00:12:43Z", "1600-01-01T00:00:00Z", "0000-01-01T00:00:00-09:00" }) {
         const dross::timestamp ts(s);
