@@ -300,6 +300,13 @@ public:
     {
     }
 
+    storage(int year, int month, int day, int hour, int minute, int second, const dross::timezone& zone)
+        : date_value(year, month, day)
+        , time_value(hour, minute, second)
+        , tz(zone)
+    {
+    }
+
     storage(const storage& other)
         : date_value(other.date_value)
         , time_value(other.time_value)
@@ -343,6 +350,11 @@ timestamp timestamp::now()
 
 timestamp::timestamp()
     : _store(std::make_unique<storage>())
+{
+}
+
+timestamp::timestamp(std::unique_ptr<storage> store)
+    : _store(std::move(store))
 {
 }
 
@@ -442,14 +454,13 @@ std::optional<timestamp> timestamp::from_components(int year, int month, int day
         return std::nullopt;
     }
 
-    timestamp result;
-    result._store->date_value = timestamp::date_part{ year, month, day };
-    if (! static_cast<std::chrono::year_month_day>(result._store->date_value).ok()) {
+    const std::chrono::year_month_day ymd{ std::chrono::year{ year },
+                                           std::chrono::month{ static_cast<unsigned>(month) },
+                                           std::chrono::day{ static_cast<unsigned>(day) } };
+    if (! ymd.ok()) {
         return std::nullopt;
     }
-    result._store->time_value = timestamp::time_part{ hour, minute, second };
-    result._store->tz = tz;
-    return result;
+    return timestamp(std::make_unique<storage>(year, month, day, hour, minute, second, tz));
 }
 
 timestamp::~timestamp() = default;

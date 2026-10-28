@@ -31,6 +31,10 @@ Added
 Changed
 ~~~~~~~
 
+- ``timestamp::from_components()`` and the ``timestamp`` constructors
+  that take the components build the timestamp from its parts, instead of
+  building a default one and replacing each part, so they allocate less
+
 - ``timestamp``'s ``+`` and ``-`` with a duration throw
   ``std::out_of_range`` for a result whose year, in the timestamp's own
   offset, is outside 0 to 9999, the years parsing accepts. They used to

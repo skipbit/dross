@@ -65,6 +65,31 @@ target_link_libraries(${TEST_NAME}
 
 gtest_discover_tests(${TEST_NAME})
 
+# Replaces operator new to count allocations, which would reach every test in
+# the executable above.
+set(ALLOCATION_TEST_NAME ${PROJECT_NAME}_allocation_test)
+
+add_executable(${ALLOCATION_TEST_NAME}
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp_allocations.cpp
+)
+
+target_compile_options(${ALLOCATION_TEST_NAME}
+    PUBLIC -Wall -Wextra -Werror
+    $<$<CONFIG:Debug>:-O0 -g3>
+    $<$<CONFIG:Release>:-O3>
+)
+target_compile_features(${ALLOCATION_TEST_NAME} PUBLIC cxx_std_23)
+
+target_include_directories(${ALLOCATION_TEST_NAME}
+    PRIVATE ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(${ALLOCATION_TEST_NAME}
+    dross
+    GTest::gmock_main
+)
+
+gtest_discover_tests(${ALLOCATION_TEST_NAME})
+
 # --- CMake module tests (run in script mode) ---
 #
 # The version is resolved at configure time, so the logic behind it cannot be
