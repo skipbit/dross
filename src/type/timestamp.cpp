@@ -32,6 +32,11 @@ std::optional<std::chrono::seconds> in_seconds(Duration duration)
     return std::chrono::seconds(duration);
 }
 
+std::chrono::year_month_day year_month_day_of(int year, int month, int day)
+{
+    return { std::chrono::year{ year }, std::chrono::month{ static_cast<unsigned>(month) }, std::chrono::day{ static_cast<unsigned>(day) } };
+}
+
 timestamp value_or_throw(std::optional<timestamp> result)
 {
     if (! result) {
@@ -91,9 +96,7 @@ public:
     }
 
     impl(int year, int month, int day)
-        : ymd{ std::chrono::year{ year },
-               std::chrono::month{ static_cast<unsigned>(month) },
-               std::chrono::day{ static_cast<unsigned>(day) } }
+        : ymd{ year_month_day_of(year, month, day) }
     {
     }
 
@@ -300,8 +303,8 @@ public:
     {
     }
 
-    storage(int year, int month, int day, int hour, int minute, int second, const dross::timezone& zone)
-        : date_value(year, month, day)
+    storage(const std::chrono::year_month_day& ymd, int hour, int minute, int second, const dross::timezone& zone)
+        : date_value(ymd)
         , time_value(hour, minute, second)
         , tz(zone)
     {
@@ -454,13 +457,11 @@ std::optional<timestamp> timestamp::from_components(int year, int month, int day
         return std::nullopt;
     }
 
-    const std::chrono::year_month_day ymd{ std::chrono::year{ year },
-                                           std::chrono::month{ static_cast<unsigned>(month) },
-                                           std::chrono::day{ static_cast<unsigned>(day) } };
+    const auto ymd = year_month_day_of(year, month, day);
     if (! ymd.ok()) {
         return std::nullopt;
     }
-    return timestamp(std::make_unique<storage>(year, month, day, hour, minute, second, tz));
+    return timestamp(std::make_unique<storage>(ymd, hour, minute, second, tz));
 }
 
 timestamp::~timestamp() = default;
