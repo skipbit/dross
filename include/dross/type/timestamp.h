@@ -531,6 +531,8 @@ private:
     class storage;
     std::unique_ptr<storage> _store;
 
+    explicit timestamp(std::unique_ptr<storage> store);
+
     /**
      * @brief Private helper method for ISO 8601 formatting.
      */

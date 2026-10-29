@@ -14,9 +14,24 @@ if(NOT GTest_FOUND)
     FetchContent_MakeAvailable(googletest)
 endif()
 
+function(dross_add_test_executable name)
+    add_executable(${name} ${ARGN})
+    target_compile_options(${name}
+        PUBLIC -Wall -Wextra -Werror
+        $<$<CONFIG:Debug>:-O0 -g3>
+        $<$<CONFIG:Release>:-O3>
+    )
+    target_compile_features(${name} PUBLIC cxx_std_23)
+    target_link_libraries(${name}
+        dross
+        GTest::gmock_main
+    )
+    gtest_discover_tests(${name})
+endfunction()
+
 set(TEST_NAME ${PROJECT_NAME}_test)
 
-add_executable(${TEST_NAME})
+dross_add_test_executable(${TEST_NAME})
 
 target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/test_environment.cpp
@@ -48,22 +63,35 @@ target_sources(${TEST_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
 )
 
-target_compile_options(${TEST_NAME}
-    PUBLIC -Wall -Wextra -Werror
-    $<$<CONFIG:Debug>:-O0 -g3>
-    $<$<CONFIG:Release>:-O3>
-)
-target_compile_features(${TEST_NAME} PUBLIC cxx_std_23)
-
 target_include_directories(${TEST_NAME}
     PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src
 )
-target_link_libraries(${TEST_NAME}
-    dross
-    GTest::gmock_main
-)
 
-gtest_discover_tests(${TEST_NAME})
+# Replaces operator new to count allocations, which would reach every test in
+# the executable above. A runtime that defines operator new and delete itself,
+# such as ThreadSanitizer's with Clang, keeps the replacement from linking, so
+# the test is built only where a program replacing the same functions links.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles([[
+#include <cstdlib>
+#include <new>
+
+void* operator new(std::size_t size) { return std::malloc(size); }
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept { return std::malloc(size); }
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void operator delete(void* p, const std::nothrow_t&) noexcept { std::free(p); }
+
+int main()
+{
+    delete new int(0);
+}
+]] DROSS_OPERATOR_NEW_REPLACEABLE)
+if(DROSS_OPERATOR_NEW_REPLACEABLE)
+    dross_add_test_executable(${PROJECT_NAME}_allocation_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp_allocations.cpp
+    )
+endif()
 
 # --- CMake module tests (run in script mode) ---
 #

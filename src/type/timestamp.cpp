@@ -32,6 +32,11 @@ std::optional<std::chrono::seconds> in_seconds(Duration duration)
     return std::chrono::seconds(duration);
 }
 
+std::chrono::year_month_day year_month_day_of(int year, int month, int day)
+{
+    return { std::chrono::year{ year }, std::chrono::month{ static_cast<unsigned>(month) }, std::chrono::day{ static_cast<unsigned>(day) } };
+}
+
 timestamp value_or_throw(std::optional<timestamp> result)
 {
     if (! result) {
@@ -91,9 +96,7 @@ public:
     }
 
     impl(int year, int month, int day)
-        : ymd{ std::chrono::year{ year },
-               std::chrono::month{ static_cast<unsigned>(month) },
-               std::chrono::day{ static_cast<unsigned>(day) } }
+        : ymd{ year_month_day_of(year, month, day) }
     {
     }
 
@@ -300,6 +303,13 @@ public:
     {
     }
 
+    storage(const std::chrono::year_month_day& ymd, int hour, int minute, int second, const dross::timezone& zone)
+        : date_value(ymd)
+        , time_value(hour, minute, second)
+        , tz(zone)
+    {
+    }
+
     storage(const storage& other)
         : date_value(other.date_value)
         , time_value(other.time_value)
@@ -343,6 +353,11 @@ timestamp timestamp::now()
 
 timestamp::timestamp()
     : _store(std::make_unique<storage>())
+{
+}
+
+timestamp::timestamp(std::unique_ptr<storage> store)
+    : _store(std::move(store))
 {
 }
 
@@ -442,14 +457,11 @@ std::optional<timestamp> timestamp::from_components(int year, int month, int day
         return std::nullopt;
     }
 
-    timestamp result;
-    result._store->date_value = timestamp::date_part{ year, month, day };
-    if (! static_cast<std::chrono::year_month_day>(result._store->date_value).ok()) {
+    const auto ymd = year_month_day_of(year, month, day);
+    if (! ymd.ok()) {
         return std::nullopt;
     }
-    result._store->time_value = timestamp::time_part{ hour, minute, second };
-    result._store->tz = tz;
-    return result;
+    return timestamp(std::make_unique<storage>(ymd, hour, minute, second, tz));
 }
 
 timestamp::~timestamp() = default;
