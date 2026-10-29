@@ -31,7 +31,7 @@ void* operator new(std::size_t size)
     throw std::bad_alloc();
 }
 
-// Replaced too, so that what it allocates is not freed by the replaced
+// The nothrow forms are replaced too, so that memory is never freed by an
 // operator delete from another allocator.
 void* operator new(std::size_t size, const std::nothrow_t&) noexcept
 {
@@ -45,6 +45,11 @@ void operator delete(void* p) noexcept
 }
 
 void operator delete(void* p, std::size_t) noexcept
+{
+    std::free(p);
+}
+
+void operator delete(void* p, const std::nothrow_t&) noexcept
 {
     std::free(p);
 }
