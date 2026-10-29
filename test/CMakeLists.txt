@@ -14,9 +14,24 @@ if(NOT GTest_FOUND)
     FetchContent_MakeAvailable(googletest)
 endif()
 
+function(dross_add_test_executable name)
+    add_executable(${name} ${ARGN})
+    target_compile_options(${name}
+        PUBLIC -Wall -Wextra -Werror
+        $<$<CONFIG:Debug>:-O0 -g3>
+        $<$<CONFIG:Release>:-O3>
+    )
+    target_compile_features(${name} PUBLIC cxx_std_23)
+    target_link_libraries(${name}
+        dross
+        GTest::gmock_main
+    )
+    gtest_discover_tests(${name})
+endfunction()
+
 set(TEST_NAME ${PROJECT_NAME}_test)
 
-add_executable(${TEST_NAME})
+dross_add_test_executable(${TEST_NAME})
 
 target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/test_environment.cpp
@@ -48,47 +63,18 @@ target_sources(${TEST_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
 )
 
-target_compile_options(${TEST_NAME}
-    PUBLIC -Wall -Wextra -Werror
-    $<$<CONFIG:Debug>:-O0 -g3>
-    $<$<CONFIG:Release>:-O3>
-)
-target_compile_features(${TEST_NAME} PUBLIC cxx_std_23)
-
 target_include_directories(${TEST_NAME}
     PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src
 )
-target_link_libraries(${TEST_NAME}
-    dross
-    GTest::gmock_main
-)
-
-gtest_discover_tests(${TEST_NAME})
 
 # Replaces operator new to count allocations, which would reach every test in
-# the executable above.
-set(ALLOCATION_TEST_NAME ${PROJECT_NAME}_allocation_test)
-
-add_executable(${ALLOCATION_TEST_NAME}
-    ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp_allocations.cpp
-)
-
-target_compile_options(${ALLOCATION_TEST_NAME}
-    PUBLIC -Wall -Wextra -Werror
-    $<$<CONFIG:Debug>:-O0 -g3>
-    $<$<CONFIG:Release>:-O3>
-)
-target_compile_features(${ALLOCATION_TEST_NAME} PUBLIC cxx_std_23)
-
-target_include_directories(${ALLOCATION_TEST_NAME}
-    PRIVATE ${PROJECT_SOURCE_DIR}/include
-)
-target_link_libraries(${ALLOCATION_TEST_NAME}
-    dross
-    GTest::gmock_main
-)
-
-gtest_discover_tests(${ALLOCATION_TEST_NAME})
+# the executable above. ThreadSanitizer's runtime defines operator new and
+# delete itself, so the replacement cannot link.
+if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=([^ ]*,)?thread")
+    dross_add_test_executable(${PROJECT_NAME}_allocation_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp_allocations.cpp
+    )
+endif()
 
 # --- CMake module tests (run in script mode) ---
 #
