@@ -68,9 +68,26 @@ target_include_directories(${TEST_NAME}
 )
 
 # Replaces operator new to count allocations, which would reach every test in
-# the executable above. ThreadSanitizer's runtime defines operator new and
-# delete itself, so the replacement cannot link.
-if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=([^ ]*,)?thread")
+# the executable above. A runtime that defines operator new and delete itself,
+# such as ThreadSanitizer's with Clang, keeps the replacement from linking, so
+# the test is built only where a program replacing the same functions links.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles([[
+#include <cstdlib>
+#include <new>
+
+void* operator new(std::size_t size) { return std::malloc(size); }
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept { return std::malloc(size); }
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void operator delete(void* p, const std::nothrow_t&) noexcept { std::free(p); }
+
+int main()
+{
+    delete new int(0);
+}
+]] DROSS_OPERATOR_NEW_REPLACEABLE)
+if(DROSS_OPERATOR_NEW_REPLACEABLE)
     dross_add_test_executable(${PROJECT_NAME}_allocation_test
         ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp_allocations.cpp
     )
