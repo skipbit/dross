@@ -93,6 +93,20 @@ TEST(xdg_test, config_home_falls_back_when_xdg_config_home_is_empty)
     EXPECT_EQ(*result, "/tmp/dross_xdg_test/home/.config/myapp");
 }
 
+TEST(xdg_test, config_home_falls_back_when_xdg_config_home_is_relative)
+{
+    scoped_env_var xdg_config_home("XDG_CONFIG_HOME");
+    xdg_config_home.set("relative/xdg_config_home");
+    scoped_env_var home("HOME");
+    home.set("/tmp/dross_xdg_test/home");
+
+    const dross::xdg app{ "myapp" };
+    const auto result = app.config_home();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, "/tmp/dross_xdg_test/home/.config/myapp");
+}
+
 // --- data_home ---------------------------------------------------------
 
 TEST(xdg_test, data_home_uses_xdg_data_home_when_set)
@@ -125,6 +139,20 @@ TEST(xdg_test, data_home_falls_back_when_xdg_data_home_is_empty)
 {
     scoped_env_var xdg_data_home("XDG_DATA_HOME");
     xdg_data_home.set("");
+    scoped_env_var home("HOME");
+    home.set("/tmp/dross_xdg_test/home");
+
+    const dross::xdg app{ "myapp" };
+    const auto result = app.data_home();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, "/tmp/dross_xdg_test/home/.local/share/myapp");
+}
+
+TEST(xdg_test, data_home_falls_back_when_xdg_data_home_is_relative)
+{
+    scoped_env_var xdg_data_home("XDG_DATA_HOME");
+    xdg_data_home.set("relative/xdg_data_home");
     scoped_env_var home("HOME");
     home.set("/tmp/dross_xdg_test/home");
 
@@ -177,6 +205,20 @@ TEST(xdg_test, cache_home_falls_back_when_xdg_cache_home_is_empty)
     EXPECT_EQ(*result, "/tmp/dross_xdg_test/home/.cache/myapp");
 }
 
+TEST(xdg_test, cache_home_falls_back_when_xdg_cache_home_is_relative)
+{
+    scoped_env_var xdg_cache_home("XDG_CACHE_HOME");
+    xdg_cache_home.set("relative/xdg_cache_home");
+    scoped_env_var home("HOME");
+    home.set("/tmp/dross_xdg_test/home");
+
+    const dross::xdg app{ "myapp" };
+    const auto result = app.cache_home();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, "/tmp/dross_xdg_test/home/.cache/myapp");
+}
+
 // --- state_home --------------------------------------------------------
 
 TEST(xdg_test, state_home_uses_xdg_state_home_when_set)
@@ -209,6 +251,20 @@ TEST(xdg_test, state_home_falls_back_when_xdg_state_home_is_empty)
 {
     scoped_env_var xdg_state_home("XDG_STATE_HOME");
     xdg_state_home.set("");
+    scoped_env_var home("HOME");
+    home.set("/tmp/dross_xdg_test/home");
+
+    const dross::xdg app{ "myapp" };
+    const auto result = app.state_home();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, "/tmp/dross_xdg_test/home/.local/state/myapp");
+}
+
+TEST(xdg_test, state_home_falls_back_when_xdg_state_home_is_relative)
+{
+    scoped_env_var xdg_state_home("XDG_STATE_HOME");
+    xdg_state_home.set("relative/xdg_state_home");
     scoped_env_var home("HOME");
     home.set("/tmp/dross_xdg_test/home");
 

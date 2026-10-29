@@ -8,6 +8,17 @@
 
 namespace dross {
 
+namespace {
+
+// A home directory is taken only as an absolute path, so an empty or
+// relative one counts as missing.
+std::optional<path> absolute_home(const std::string& home)
+{
+    return std::filesystem::path{ home }.is_absolute() ? std::make_optional(path{ home }) : std::nullopt;
+}
+
+}  // namespace
+
 std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::string& dir_path)
 {
     return path::mkdir(std::filesystem::path{ dir_path });
@@ -29,13 +40,10 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::fi
 
 std::optional<path> path::home()
 {
-    const auto h = environment::value("HOME").and_then([](const std::string& home) {
-        return home.empty() ? std::nullopt : std::make_optional(path(home));
-    }).or_else([]() {
+    const auto h = environment::value("HOME").and_then(absolute_home).or_else([]() {
         struct passwd* pw = getpwuid(getuid());
-        if (pw && pw->pw_dir && pw->pw_dir[0] != '\0') {
-            const std::string p = pw->pw_dir;
-            return std::make_optional(path{ p });
+        if (pw && pw->pw_dir) {
+            return absolute_home(pw->pw_dir);
         }
         return std::optional<path>(std::nullopt);
     });

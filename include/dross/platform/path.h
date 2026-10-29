@@ -124,8 +124,10 @@ public:
      * @return Optional containing the home directory path, or std::nullopt if not determinable
      *
      * Reads the $HOME environment variable, and falls back to the password
-     * database entry of the current user when it is not set or is empty.
-     * A relative HOME is returned as it is, not resolved or ignored.
+     * database entry of the current user when it is not set, is empty or
+     * is a relative path. A home directory that is not an absolute path is
+     * ignored from either source, so std::nullopt is returned when neither
+     * gives an absolute one.
      *
      * @code
      * if (auto home = dross::path::home()) {
