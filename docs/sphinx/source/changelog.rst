@@ -31,6 +31,15 @@ Added
 Changed
 ~~~~~~~
 
+- The ``xdg`` accessors ignore a relative path in an ``XDG_*`` variable,
+  as the XDG Base Directory specification asks, and use the default under
+  the home directory as for an empty one. ``path::home()`` ignores a
+  relative ``HOME`` and falls back to the password database, and returns
+  ``std::nullopt`` when the password database entry is not an absolute
+  path. They used to return such a path as it was, relative to the working
+  directory, and so did the ``~`` expansion of ``path::expand()`` and
+  ``path::resolve()``
+
 - ``timestamp::from_components()`` and the ``timestamp`` constructors
   that take the components build the timestamp from its parts, instead of
   building a default one and replacing each part, so they allocate less

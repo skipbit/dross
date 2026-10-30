@@ -216,11 +216,11 @@ Every accessor returns ``std::optional<std::string>`` and yields
 itself is not created for you — pass the result to ``path::mkdir()``, which
 accepts an already-present directory as success.
 
-An ``XDG_*`` variable set to the empty string is treated as unset, and the
-default under the home directory is used. A relative path in an ``XDG_*``
-variable is used as it is rather than ignored as the specification asks,
-and so is a relative ``HOME``. Either way the result is relative to the
-working directory.
+An ``XDG_*`` variable set to the empty string or to a relative path is
+treated as unset, as the specification asks, and the default under the home
+directory is used. ``path::home()`` likewise ignores an empty or relative
+``HOME`` and falls back to the password database, so the defaults are
+always absolute paths.
 
 Example Usage
 ~~~~~~~~~~~~~

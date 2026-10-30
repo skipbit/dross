@@ -219,6 +219,22 @@ TEST(path_test, home_uses_the_password_database_when_home_is_empty)
     EXPECT_EQ(result->string(), dross::path{ pw_dir }.string());
 }
 
+TEST(path_test, home_uses_the_password_database_when_home_is_relative)
+{
+    scoped_env_var home("HOME");
+    home.set("relative/home");
+    const struct passwd* pw = getpwuid(getuid());
+    if (pw == nullptr || pw->pw_dir == nullptr || ! std::filesystem::path{ pw->pw_dir }.is_absolute()) {
+        GTEST_SKIP() << "the password database has no absolute home directory for this user";
+    }
+    const std::string pw_dir = pw->pw_dir;
+
+    const auto result = dross::path::home();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->string(), dross::path{ pw_dir }.string());
+}
+
 // --- path::expand --------------------------------------------------------
 
 TEST(path_test, expand_of_a_tilde_path_matches_a_freshly_computed_canonical_path)

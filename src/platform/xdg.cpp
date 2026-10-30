@@ -2,16 +2,20 @@
 
 #include "dross/platform/environment.h"
 #include "dross/platform/path.h"
+#include "platform/absolute_directory.h"
+
+#include <filesystem>
 
 namespace dross {
 
 namespace {
 
-// The XDG Base Directory specification treats an empty variable as unset.
+// The XDG Base Directory specification treats an empty variable as unset
+// and asks for a relative path in one to be ignored.
 std::optional<std::string> variable(const std::string& name)
 {
-    return environment::value(name).and_then([](const std::string& v) {
-        return v.empty() ? std::nullopt : std::make_optional(v);
+    return environment::value(name).and_then(absolute_directory).transform([](const std::filesystem::path& v) {
+        return v.string();
     });
 }
 
