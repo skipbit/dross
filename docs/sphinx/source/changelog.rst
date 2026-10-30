@@ -132,9 +132,9 @@ Fixed
 
 - ``path::home()`` reads the password database with ``getpwuid_r()``
   into a buffer of its own. It used ``getpwuid()``, whose entry is shared
-  by the whole process, so a call on one thread could overwrite an entry
-  another thread was reading, through ``path::home()``, the ``xdg``
-  accessors or ``getpwuid()`` itself
+  by the whole process, so a call on one thread, directly or through the
+  ``xdg`` accessors, could overwrite an entry that another thread had
+  taken from ``getpwuid()``
 
 0.1.1 - 2026-10-24
 ------------------
