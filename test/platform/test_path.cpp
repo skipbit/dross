@@ -224,7 +224,7 @@ TEST(path_test, home_uses_the_password_database_when_home_is_relative)
     scoped_env_var home("HOME");
     home.set("relative/home");
     const struct passwd* pw = getpwuid(getuid());
-    if (pw == nullptr || pw->pw_dir == nullptr || pw->pw_dir[0] != '/') {
+    if (pw == nullptr || pw->pw_dir == nullptr || ! std::filesystem::path{ pw->pw_dir }.is_absolute()) {
         GTEST_SKIP() << "the password database has no absolute home directory for this user";
     }
     const std::string pw_dir = pw->pw_dir;
