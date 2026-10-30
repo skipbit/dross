@@ -2,6 +2,7 @@
 
 #include "dross/platform/environment.h"
 #include "dross/platform/path.h"
+#include "platform/absolute_directory.h"
 
 #include <filesystem>
 
@@ -13,8 +14,8 @@ namespace {
 // and asks for a relative path in one to be ignored.
 std::optional<std::string> variable(const std::string& name)
 {
-    return environment::value(name).and_then([](const std::string& v) {
-        return std::filesystem::path{ v }.is_absolute() ? std::make_optional(v) : std::nullopt;
+    return environment::value(name).and_then(absolute_directory).transform([](const std::filesystem::path& v) {
+        return v.string();
     });
 }
 

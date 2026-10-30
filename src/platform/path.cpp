@@ -1,6 +1,7 @@
 #include "dross/platform/path.h"
 
 #include "dross/platform/environment.h"
+#include "platform/absolute_directory.h"
 
 #include <optional>
 #include <pwd.h>
@@ -10,11 +11,11 @@ namespace dross {
 
 namespace {
 
-// A home directory is taken only as an absolute path, so an empty or
-// relative one counts as missing.
 std::optional<path> absolute_home(const std::string& home)
 {
-    return std::filesystem::path{ home }.is_absolute() ? std::make_optional(path{ home }) : std::nullopt;
+    return absolute_directory(home).transform([](const std::filesystem::path& p) {
+        return path{ p };
+    });
 }
 
 }  // namespace
