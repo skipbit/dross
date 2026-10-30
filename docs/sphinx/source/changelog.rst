@@ -130,6 +130,12 @@ Fixed
   ``submit()`` refuses them by returning ``false``. It used to queue the
   task, and the process ended once a worker ran it
 
+- ``path::home()`` reads the password database with ``getpwuid_r()``
+  into a buffer of its own. It used ``getpwuid()``, whose entry is shared
+  by the whole process, so a call on one thread could overwrite an entry
+  another thread was reading, through ``path::home()``, the ``xdg``
+  accessors or ``getpwuid()`` itself
+
 0.1.1 - 2026-10-24
 ------------------
 
