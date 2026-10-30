@@ -28,12 +28,16 @@ std::optional<path> password_database_home()
     constexpr std::size_t largest_buffer = 1024 * 1024;
     const long suggested = sysconf(_SC_GETPW_R_SIZE_MAX);
     std::vector<char> buffer(suggested > 0 ? static_cast<std::size_t>(suggested) : 1024);
+    const uid_t uid = getuid();
     struct passwd entry { };
     struct passwd* found = nullptr;
-    int err = getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found);
-    while (err == ERANGE && buffer.size() < largest_buffer) {
+    int err = 0;
+    while (true) {
+        err = getpwuid_r(uid, &entry, buffer.data(), buffer.size(), &found);
+        if (err != ERANGE || buffer.size() >= largest_buffer) {
+            break;
+        }
         buffer.resize(buffer.size() * 2);
-        err = getpwuid_r(getuid(), &entry, buffer.data(), buffer.size(), &found);
     }
     if (err != 0 || found == nullptr || found->pw_dir == nullptr) {
         return std::nullopt;
