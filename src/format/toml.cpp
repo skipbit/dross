@@ -7,7 +7,7 @@
 #include "dross/type/string.h"
 
 #include <set>
-#include <sstream>
+#include <string>
 
 namespace dross::toml {
 
@@ -166,9 +166,7 @@ private:
 
     error create_error(const std::string& message) const
     {
-        std::ostringstream oss;
-        oss << "TOML parse error at line " << _line << ", column " << _column << ": " << message;
-        return error{ std::errc::invalid_argument };
+        return error{ std::errc::invalid_argument, "line " + std::to_string(_line) + ", column " + std::to_string(_column) + ": " + message };
     }
 
     char current_char() const
@@ -718,12 +716,12 @@ public:
             serialize_dictionary(input, {});
 
             if (! is_valid_utf8(_output)) {
-                return std::unexpected(error{ std::errc::operation_not_supported });
+                return std::unexpected(error{ std::errc::operation_not_supported, "A string or key is not valid UTF-8" });
             }
 
             return data{ _output };
         } catch (const std::exception& e) {
-            return std::unexpected(error{ std::errc::operation_not_supported });
+            return std::unexpected(error{ std::errc::operation_not_supported, e.what() });
         }
     }
 
@@ -910,7 +908,7 @@ std::expected<dictionary, error> deserialize(const data& input)
     std::string toml_string = input;
 
     if (! is_valid_utf8(toml_string)) {
-        return std::unexpected(error{ std::errc::invalid_argument });
+        return std::unexpected(error{ std::errc::invalid_argument, "Input is not valid UTF-8" });
     }
 
     parser p{ toml_string };

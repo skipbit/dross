@@ -256,6 +256,47 @@ TEST(error_test, copy_constructor_preserves_the_underlying_code)
     EXPECT_EQ(copy.domain(), original.domain());
 }
 
+TEST(error_test, an_error_without_a_detail_has_an_empty_one)
+{
+    const dross::error e = std::errc::invalid_argument;
+
+    EXPECT_EQ(e.detail(), "");
+    EXPECT_EQ(e.message(), std::make_error_code(std::errc::invalid_argument).message());
+}
+
+TEST(error_test, message_joins_the_code_message_and_the_detail)
+{
+    const dross::error e(std::errc::invalid_argument, "line 7, column 1: Expected '='");
+    const std::string code_message = std::make_error_code(std::errc::invalid_argument).message();
+
+    EXPECT_EQ(e.detail(), "line 7, column 1: Expected '='");
+    EXPECT_EQ(e.message(), code_message + ": line 7, column 1: Expected '='");
+    EXPECT_EQ(e, std::errc::invalid_argument);
+}
+
+TEST(error_test, copy_and_assignment_keep_the_detail)
+{
+    const dross::error original(std::errc::invalid_argument, "detail");
+    const dross::error copy(original);
+    dross::error assigned;
+    assigned = original;
+
+    EXPECT_EQ(copy.detail(), "detail");
+    EXPECT_EQ(assigned.detail(), "detail");
+}
+
+TEST(error_test, comparisons_ignore_the_detail)
+{
+    const dross::error plain = std::errc::invalid_argument;
+    const dross::error one(std::errc::invalid_argument, "one");
+    const dross::error other(std::errc::invalid_argument, "other");
+
+    EXPECT_TRUE(one == other);
+    EXPECT_TRUE(one == plain);
+    EXPECT_TRUE((one <=> other) == std::strong_ordering::equal);
+    EXPECT_TRUE((one <=> plain) == std::strong_ordering::equal);
+}
+
 TEST(error_test, three_way_comparison_orders_by_the_underlying_error_code)
 {
     const dross::error smaller(0, std::generic_category());

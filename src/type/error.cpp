@@ -1,7 +1,10 @@
 #include "dross/type/error.h"
 
 #include <compare>
+#include <memory>
+#include <string>
 #include <system_error>
+#include <utility>
 
 namespace dross {
 
@@ -9,7 +12,15 @@ error::error() = default;
 
 error::error(const error& e)
     : _code(e._code)
+    , _detail(e._detail)
 {
+}
+
+error& error::operator=(const error& e)
+{
+    _code = e._code;
+    _detail = e._detail;
+    return *this;
 }
 
 error::error(int value, const std::error_category& category)
@@ -19,6 +30,12 @@ error::error(int value, const std::error_category& category)
 
 error::error(std::errc e)
     : _code(std::make_error_code(e))
+{
+}
+
+error::error(std::errc e, std::string detail)
+    : _code(std::make_error_code(e))
+    , _detail(std::make_shared<const std::string>(std::move(detail)))
 {
 }
 
@@ -36,7 +53,13 @@ int error::code() const noexcept
 
 std::string error::message() const
 {
-    return _code.message();
+    const std::string d = detail();
+    return d.empty() ? _code.message() : _code.message() + ": " + d;
+}
+
+std::string error::detail() const
+{
+    return _detail ? *_detail : std::string{};
 }
 
 const std::error_category& error::category() const noexcept
