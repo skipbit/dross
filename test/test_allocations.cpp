@@ -1,5 +1,6 @@
 // Replaces operator new to count allocations, which would reach every test
 // in the program, so this file is a test executable of its own.
+#include "dross/format/toml.h"
 #include "dross/type/timestamp.h"
 
 #include <gtest/gtest.h>
@@ -7,6 +8,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <new>
+#include <string>
 
 namespace {
 
@@ -75,4 +77,36 @@ TEST(timestamp_allocation_test, building_from_components_allocates_no_more_than_
     ASSERT_GT(copy, 0);
     EXPECT_LE(from_components, 2 * copy);
     EXPECT_LE(constructor, 2 * copy);
+}
+
+namespace {
+
+std::string servers(int count)
+{
+    std::string text;
+    for (int i = 0; i < count; ++i) {
+        const std::string n = std::to_string(i);
+        text += "[servers.s" + n + "]\nhost = \"h" + n + "\"\nport = " + n + "\n";
+    }
+    return text;
+}
+
+}  // namespace
+
+// Doubling the tables under one parent roughly doubles the allocations of
+// reading them, where copying the parent for each header would quadruple them.
+TEST(toml_allocation_test, reading_tables_under_one_parent_allocates_in_proportion)
+{
+    const dross::data small{ servers(200) };
+    const dross::data large{ servers(400) };
+
+    const long small_count = count_allocations([&] {
+        ASSERT_TRUE(dross::toml::deserialize(small));
+    });
+    const long large_count = count_allocations([&] {
+        ASSERT_TRUE(dross::toml::deserialize(large));
+    });
+
+    ASSERT_GT(small_count, 0);
+    EXPECT_LE(large_count, 3 * small_count);
 }
