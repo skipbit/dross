@@ -315,7 +315,7 @@ private:
     {
         dictionary result = node.pairs;
         for (const auto& [key, table] : node.tables) {
-            result[key] = value(to_dictionary(*table));
+            result[key] = to_dictionary(*table);
         }
         return result;
     }
