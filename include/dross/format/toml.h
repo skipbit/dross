@@ -63,10 +63,12 @@ namespace dross::toml {
  *
  * @param input TOML format binary data (UTF-8 encoded)
  * @return Parsed dictionary structure on success, error on failure. The
- *         error is std::errc::invalid_argument, and its detail() names the
- *         line and the column where reading stopped, both counted from 1
- *         and the column in bytes, and what was wrong, such as
- *         "line 2, column 3: Expected '='".
+ *         error is std::errc::invalid_argument, and its detail() names a
+ *         line and a column, both counted from 1 and the column in bytes,
+ *         and what was wrong, such as "line 2, column 3: Expected '='".
+ *         For a key or table defined twice they are where its key/value
+ *         pair or table header starts; otherwise they are where reading
+ *         stopped.
  *
  * Error conditions:
  * - Invalid TOML syntax

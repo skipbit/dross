@@ -127,10 +127,11 @@ Fixed
 ~~~~~
 
 - ``toml::deserialize()`` and ``toml::serialize()`` report why they
-  failed in the detail of the error. A parse error names the line and the
-  column, counted in bytes, where reading stopped, and what was wrong.
-  They used to build the message and drop it, so every parse error read
-  ``Invalid argument``
+  failed in the detail of the error. A parse error names a line and a
+  column, counted in bytes, and what was wrong: for a key or table defined
+  twice, where its key/value pair or table header starts, and otherwise
+  where reading stopped. They used to build the message and drop it, so
+  every parse error read ``Invalid argument``
 
 - ``error`` declares its copy assignment, so assigning one compiles under
   GCC with ``-Wextra -Werror``. The assignment the compiler declared was

@@ -699,6 +699,23 @@ TEST(toml_test, parse_errors_on_different_lines_name_their_own_line)
     }
 }
 
+TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a = 1\na = 2\n", "line 2, column 1: Key defined twice" },
+        { "[t]\nx = 1\n  x = 2\n", "line 3, column 3: Key defined twice" },
+        { "t = { a = 1, a = 2 }\n", "line 1, column 14: Key defined twice" },
+        { "[a]\nx = 1\n[a]\ny = 2\nz = 3\n", "line 3, column 1: Table defined twice" },
+        { "[a.b]\nx = 1\n[a]\nb = 2\n", "line 3, column 1: Key defined twice" },
+        { "t = 1\n[t]\nq = 1\n", "line 2, column 1: Table header names a key that is not a table" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
+    }
+}
+
 TEST(toml_test, input_that_is_not_utf8_has_a_detail)
 {
     auto result = toml::deserialize(make_data("key = \"\xff\""));
