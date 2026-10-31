@@ -6,8 +6,9 @@
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 
+#include <new>
 #include <set>
-#include <sstream>
+#include <string>
 
 namespace dross::toml {
 
@@ -164,11 +165,24 @@ private:
     // Tables that a header named
     std::set<std::vector<std::string>> _defined_tables;
 
+    struct position {
+        size_t line;
+        size_t column;
+    };
+
+    position current_position() const
+    {
+        return { _line, _column };
+    }
+
     error create_error(const std::string& message) const
     {
-        std::ostringstream oss;
-        oss << "TOML parse error at line " << _line << ", column " << _column << ": " << message;
-        return error{ std::errc::invalid_argument };
+        return create_error(message, current_position());
+    }
+
+    error create_error(const std::string& message, const position& at) const
+    {
+        return error{ std::errc::invalid_argument, "line " + std::to_string(at.line) + ", column " + std::to_string(at.column) + ": " + message };
     }
 
     char current_char() const
@@ -246,6 +260,7 @@ private:
             }
 
             if (current_char() == '[') {
+                const position header_start = current_position();
                 auto table_result = parse_table_header();
                 if (! table_result) {
                     return std::unexpected(table_result.error());
@@ -262,11 +277,12 @@ private:
                     return std::unexpected(table_content.error());
                 }
 
-                auto inserted = insert_table(result, key_path, 0, table_content.value());
+                auto inserted = insert_table(result, key_path, 0, table_content.value(), header_start);
                 if (! inserted) {
                     return std::unexpected(inserted.error());
                 }
             } else {
+                const position pair_start = current_position();
                 auto kv_result = parse_key_value();
                 if (! kv_result) {
                     return std::unexpected(kv_result.error());
@@ -277,7 +293,7 @@ private:
                 }
 
                 auto [key, val] = kv_result.value();
-                auto added = add_key(result, key, val);
+                auto added = add_key(result, key, val, pair_start);
                 if (! added) {
                     return std::unexpected(added.error());
                 }
@@ -334,6 +350,7 @@ private:
                 break;
             }
 
+            const position pair_start = current_position();
             auto kv_result = parse_key_value();
             if (! kv_result) {
                 return std::unexpected(kv_result.error());
@@ -344,7 +361,7 @@ private:
             }
 
             auto [key, val] = kv_result.value();
-            auto added = add_key(result, key, val);
+            auto added = add_key(result, key, val, pair_start);
             if (! added) {
                 return std::unexpected(added.error());
             }
@@ -353,17 +370,18 @@ private:
         return result;
     }
 
-    std::expected<void, error> add_key(dictionary& table, const std::string& key, const value& val)
+    std::expected<void, error> add_key(dictionary& table, const std::string& key, const value& val, const position& at)
     {
         if (table.contains(key)) {
-            return std::unexpected(create_error("Key defined twice"));
+            return std::unexpected(create_error("Key defined twice", at));
         }
         table[key] = val;
         return {};
     }
 
     // Only a table that headers created can take a header, and only one header can name it.
-    std::expected<void, error> insert_table(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const dictionary& content)
+    // A failure names the start of the header, as the content has no positions.
+    std::expected<void, error> insert_table(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const dictionary& content, const position& header_start)
     {
         const std::vector<std::string> path(key_path.begin(), key_path.begin() + index + 1);
         const std::string& current_key = key_path[index];
@@ -371,7 +389,7 @@ private:
         dictionary table;
         if (current_dict.contains(current_key)) {
             if (! _header_tables.contains(path)) {
-                return std::unexpected(create_error("Table header names a key that is not a table"));
+                return std::unexpected(create_error("Table header names a key that is not a table", header_start));
             }
             table = current_dict[current_key].as<dictionary>();
         }
@@ -379,16 +397,16 @@ private:
 
         if (index == (key_path.size() - 1)) {
             if (! _defined_tables.insert(path).second) {
-                return std::unexpected(create_error("Table defined twice"));
+                return std::unexpected(create_error("Table defined twice", header_start));
             }
             for (const auto& [key, val] : content) {
-                auto added = add_key(table, key, val);
+                auto added = add_key(table, key, val, header_start);
                 if (! added) {
                     return added;
                 }
             }
         } else {
-            auto inserted = insert_table(table, key_path, index + 1, content);
+            auto inserted = insert_table(table, key_path, index + 1, content, header_start);
             if (! inserted) {
                 return inserted;
             }
@@ -612,13 +630,14 @@ private:
         }
 
         while (true) {
+            const position pair_start = current_position();
             auto kv_result = parse_key_value();
             if (! kv_result) {
                 return std::unexpected(kv_result.error());
             }
 
             auto [key, val] = kv_result.value();
-            auto added = add_key(result, key, val);
+            auto added = add_key(result, key, val, pair_start);
             if (! added) {
                 return std::unexpected(added.error());
             }
@@ -718,12 +737,15 @@ public:
             serialize_dictionary(input, {});
 
             if (! is_valid_utf8(_output)) {
-                return std::unexpected(error{ std::errc::operation_not_supported });
+                return std::unexpected(error{ std::errc::operation_not_supported, "A string or key is not valid UTF-8" });
             }
 
             return data{ _output };
-        } catch (const std::exception& e) {
+        } catch (const std::bad_alloc&) {
+            // Building a detail would allocate again.
             return std::unexpected(error{ std::errc::operation_not_supported });
+        } catch (const std::exception& e) {
+            return std::unexpected(error{ std::errc::operation_not_supported, e.what() });
         }
     }
 
@@ -910,7 +932,7 @@ std::expected<dictionary, error> deserialize(const data& input)
     std::string toml_string = input;
 
     if (! is_valid_utf8(toml_string)) {
-        return std::unexpected(error{ std::errc::invalid_argument });
+        return std::unexpected(error{ std::errc::invalid_argument, "Input is not valid UTF-8" });
     }
 
     parser p{ toml_string };

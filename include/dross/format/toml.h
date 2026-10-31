@@ -62,7 +62,13 @@ namespace dross::toml {
  * TOML documents always have a table (dictionary) as their root structure.
  *
  * @param input TOML format binary data (UTF-8 encoded)
- * @return Parsed dictionary structure on success, error on failure
+ * @return Parsed dictionary structure on success, error on failure. The
+ *         error is std::errc::invalid_argument, and its detail() names a
+ *         line and a column, both counted from 1 and the column in bytes,
+ *         and what was wrong, such as "line 2, column 3: Expected '='".
+ *         For a key or table defined twice they are where its key/value
+ *         pair or table header starts; otherwise they are where reading
+ *         stopped.
  *
  * Error conditions:
  * - Invalid TOML syntax
@@ -100,7 +106,9 @@ std::expected<dictionary, error> deserialize(const data& input);
  * TOML documents always have a table (dictionary) as their root structure.
  *
  * @param input Dictionary structure to serialize
- * @return TOML format binary data on success, error on failure
+ * @return TOML format binary data on success, error on failure. The error
+ *         is std::errc::operation_not_supported, and its detail() says why,
+ *         such as "NaN cannot be written as a TOML value".
  *
  * Error conditions:
  * - Unsupported value types, such as a timestamp

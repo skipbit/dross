@@ -673,6 +673,58 @@ TEST(toml_test, invalid_array)
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(toml_test, a_parse_error_names_the_line_the_column_and_the_fault)
+{
+    auto result = toml::deserialize(make_data("a = 1\nb 2\n"));
+    ASSERT_FALSE(result.has_value());
+
+    const std::string code_message = std::make_error_code(std::errc::invalid_argument).message();
+    EXPECT_EQ(result.error(), std::errc::invalid_argument);
+    EXPECT_EQ(result.error().detail(), "line 2, column 3: Expected '='");
+    EXPECT_EQ(result.error().message(), code_message + ": line 2, column 3: Expected '='");
+}
+
+TEST(toml_test, parse_errors_on_different_lines_name_their_own_line)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "= 1\n", "line 1, " },
+        { "a=1\nb=2\nc=3\nd=4\ne=5\nf=6\n]]]\n", "line 7, " },
+        { "a = \"oops\n", "line 1, " },
+        { "a = 1\n!!!\n", "line 2, " },
+    };
+    for (const auto& [content, line] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_TRUE(result.error().detail().starts_with(line)) << content << result.error().detail();
+    }
+}
+
+TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a = 1\na = 2\n", "line 2, column 1: Key defined twice" },
+        { "[t]\nx = 1\n  x = 2\n", "line 3, column 3: Key defined twice" },
+        { "t = { a = 1, a = 2 }\n", "line 1, column 14: Key defined twice" },
+        { "[a]\nx = 1\n[a]\ny = 2\nz = 3\n", "line 3, column 1: Table defined twice" },
+        { "[a.b]\nx = 1\n[a]\nb = 2\n", "line 3, column 1: Key defined twice" },
+        { "t = 1\n[t]\nq = 1\n", "line 2, column 1: Table header names a key that is not a table" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
+    }
+}
+
+TEST(toml_test, input_that_is_not_utf8_has_a_detail)
+{
+    auto result = toml::deserialize(make_data("key = \"\xff\""));
+    ASSERT_FALSE(result.has_value());
+
+    EXPECT_EQ(result.error(), std::errc::invalid_argument);
+    EXPECT_FALSE(result.error().detail().empty());
+}
+
 TEST(toml_test, invalid_utf8)
 {
     const std::vector<std::string> invalid = {
@@ -922,6 +974,23 @@ TEST(toml_test, serialize_rejects_nan)
             }
         }
     }
+}
+
+TEST(toml_test, serialize_failures_say_why)
+{
+    dictionary with_nan;
+    with_nan["n"] = value(number::nan());
+    auto nan_result = toml::serialize(with_nan);
+    ASSERT_FALSE(nan_result.has_value());
+    EXPECT_EQ(nan_result.error(), std::errc::operation_not_supported);
+    EXPECT_EQ(nan_result.error().detail(), "NaN cannot be written as a TOML value");
+
+    dictionary with_invalid_utf8;
+    with_invalid_utf8["s"] = value(string{ std::string{ "\xff" } });
+    auto utf8_result = toml::serialize(with_invalid_utf8);
+    ASSERT_FALSE(utf8_result.has_value());
+    EXPECT_EQ(utf8_result.error(), std::errc::operation_not_supported);
+    EXPECT_FALSE(utf8_result.error().detail().empty());
 }
 
 TEST(toml_test, serialize_writes_integers_outside_64_bits_as_floats)

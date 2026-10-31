@@ -9,6 +9,7 @@
 #include <string>
 #include <system_error>
 #include <type_traits>
+#include <utility>
 
 // An error code enum declared the way a library outside std declares one: its
 // own category and its own make_error_code, found only by argument-dependent
@@ -256,6 +257,77 @@ TEST(error_test, copy_constructor_preserves_the_underlying_code)
     EXPECT_EQ(copy.domain(), original.domain());
 }
 
+TEST(error_test, an_error_without_a_detail_has_an_empty_one)
+{
+    const dross::error e = std::errc::invalid_argument;
+
+    EXPECT_EQ(e.detail(), "");
+    EXPECT_EQ(e.message(), std::make_error_code(std::errc::invalid_argument).message());
+}
+
+TEST(error_test, an_empty_detail_leaves_the_message_unchanged)
+{
+    const dross::error e(std::errc::invalid_argument, "");
+
+    EXPECT_EQ(e.detail(), "");
+    EXPECT_EQ(e.message(), std::make_error_code(std::errc::invalid_argument).message());
+}
+
+TEST(error_test, message_joins_the_code_message_and_the_detail)
+{
+    const dross::error e(std::errc::invalid_argument, "line 7, column 1: Expected '='");
+    const std::string code_message = std::make_error_code(std::errc::invalid_argument).message();
+
+    EXPECT_EQ(e.detail(), "line 7, column 1: Expected '='");
+    EXPECT_EQ(e.message(), code_message + ": line 7, column 1: Expected '='");
+    EXPECT_EQ(e, std::errc::invalid_argument);
+}
+
+TEST(error_test, copy_and_assignment_keep_the_detail)
+{
+    const dross::error original(std::errc::invalid_argument, "detail");
+    const dross::error copy(original);
+    dross::error assigned;
+    assigned = original;
+
+    EXPECT_EQ(copy.detail(), "detail");
+    EXPECT_EQ(assigned.detail(), "detail");
+}
+
+TEST(error_test, move_keeps_the_detail_without_throwing)
+{
+    static_assert(std::is_nothrow_move_constructible_v<dross::error>);
+    static_assert(std::is_nothrow_move_assignable_v<dross::error>);
+
+    dross::error original(std::errc::invalid_argument, "detail");
+    const dross::error moved(std::move(original));
+    dross::error assigned;
+    assigned = dross::error(std::errc::invalid_argument, "assigned");
+
+    EXPECT_EQ(moved.detail(), "detail");
+    EXPECT_EQ(moved, std::errc::invalid_argument);
+    EXPECT_EQ(assigned.detail(), "assigned");
+}
+
+TEST(error_test, comparisons_ignore_the_detail)
+{
+    const dross::error plain = std::errc::invalid_argument;
+    const dross::error one(std::errc::invalid_argument, "one");
+    const dross::error other(std::errc::invalid_argument, "other");
+
+    EXPECT_TRUE(one == other);
+    EXPECT_TRUE(one == plain);
+    EXPECT_TRUE((one <=> other) == std::weak_ordering::equivalent);
+    EXPECT_TRUE((one <=> plain) == std::weak_ordering::equivalent);
+}
+
+// Errors that differ only in their detail compare equivalent but can be
+// told apart, so the ordering is weak.
+TEST(error_test, three_way_comparison_is_a_weak_ordering)
+{
+    static_assert(std::is_same_v<decltype(std::declval<const dross::error&>() <=> std::declval<const dross::error&>()), std::weak_ordering>);
+}
+
 TEST(error_test, three_way_comparison_orders_by_the_underlying_error_code)
 {
     const dross::error smaller(0, std::generic_category());
@@ -263,7 +335,7 @@ TEST(error_test, three_way_comparison_orders_by_the_underlying_error_code)
 
     EXPECT_TRUE(smaller < larger);
     EXPECT_TRUE(larger > smaller);
-    EXPECT_TRUE((smaller <=> smaller) == std::strong_ordering::equal);
+    EXPECT_TRUE((smaller <=> smaller) == std::weak_ordering::equivalent);
 }
 
 TEST(error_test, equality_operator_compares_the_underlying_error_code)
@@ -292,7 +364,7 @@ TEST(error_test, equality_agrees_with_three_way_comparison)
 
     for (const auto& a : errors) {
         for (const auto& b : errors) {
-            EXPECT_EQ(a == b, (a <=> b) == std::strong_ordering::equal);
+            EXPECT_EQ(a == b, (a <=> b) == std::weak_ordering::equivalent);
         }
     }
 }
@@ -305,6 +377,17 @@ TEST(error_test, stream_insertion_writes_domain_and_code)
     out << e;
 
     const std::string expected = e.domain() + ":" + std::to_string(e.code());
+    EXPECT_EQ(out.str(), expected);
+}
+
+TEST(error_test, stream_insertion_writes_the_detail_after_the_code)
+{
+    const dross::error e(std::errc::invalid_argument, "line 2, column 3: Expected '='");
+
+    std::ostringstream out;
+    out << e;
+
+    const std::string expected = e.domain() + ":" + std::to_string(e.code()) + ": line 2, column 3: Expected '='";
     EXPECT_EQ(out.str(), expected);
 }
 

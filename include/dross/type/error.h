@@ -1,6 +1,7 @@
 #pragma once
 
 #include <compare>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <system_error>
@@ -14,10 +15,16 @@ class error {
 public:
     error();
     error(const error&);
+    error(error&&) noexcept;
+    error& operator=(const error&);
+    error& operator=(error&&) noexcept;
     error(int, const std::error_category&);
     // std::errc names error conditions rather than codes, so it gets its own
     // constructor; the code is std::make_error_code(e), in generic_category().
     error(std::errc);
+    // detail says what failed and where, such as the line of a parse error.
+    // Comparisons ignore it.
+    error(std::errc, std::string detail);
     virtual ~error();
 
     // std::error_code's own constructor finds make_error_code by
@@ -30,7 +37,10 @@ public:
 
     std::string domain() const;
     int code() const noexcept;
+    // The message of the code, followed by ": " and the detail when there
+    // is one.
     std::string message() const;
+    std::string detail() const;
 
     const std::error_category& category() const noexcept;
     std::error_condition condition() const noexcept;
@@ -61,16 +71,24 @@ public:
 
     bool operator==(const error&) const noexcept;
     bool operator!=(const error&) const noexcept;
-    std::strong_ordering operator<=>(const error&) const noexcept;
+    // Weak, as errors that differ only in their detail are equivalent but
+    // can be told apart.
+    std::weak_ordering operator<=>(const error&) const noexcept;
 
 private:
     std::error_code _code;
+    // Shared and immutable, so a copy does not copy the text.
+    std::shared_ptr<const std::string> _detail;
 };
 
+// Writes domain:code, followed by ": " and the detail when there is one.
 template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& os, const error& e)
 {
     os << e.domain() << ":" << e.code();
+    if (const std::string detail = e.detail(); ! detail.empty()) {
+        os << ": " << detail;
+    }
     return os;
 }
 

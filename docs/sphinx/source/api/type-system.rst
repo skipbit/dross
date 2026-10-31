@@ -409,6 +409,12 @@ The ``error`` class provides structured error information:
     std::cout << "Code: " << err.code() << std::endl;
     std::cout << "Error: " << err.message() << std::endl;
 
+    // A detail says what failed and where. message() adds it after the
+    // message of the code, and comparisons ignore it.
+    dross::error parse_err{std::errc::invalid_argument, "line 2, column 3: Expected '='"};
+    std::cout << "Detail: " << parse_err.detail() << std::endl;
+    std::cout << "Error: " << parse_err.message() << std::endl;
+
 Type Concepts
 -------------
 

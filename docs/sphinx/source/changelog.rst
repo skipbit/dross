@@ -28,6 +28,10 @@ Added
   category reports them equivalent, as ``std::error_code`` does;
   ``operator!=`` is derived from ``operator==``
 
+- ``error`` carries a detail that says what failed and where: the
+  constructor ``error(std::errc, std::string)`` takes it and ``detail()``
+  returns it, empty when there is none. Comparisons ignore it
+
 Changed
 ~~~~~~~
 
@@ -114,8 +118,37 @@ Changed
   ``dictionary.h`` includes ``value.h``, since ``value_type`` holds a
   ``value``
 
+- ``error::message()`` returns the message of the code followed by ``": "``
+  and the detail when the error has one, such as ``Invalid argument: line
+  2, column 3: Expected '='``. Without a detail it returns the message of
+  the code as before
+
+- Writing an ``error`` to a stream with ``<<`` adds ``": "`` and the
+  detail after ``domain:code`` when the error has one, such as
+  ``generic:22: line 2, column 3: Expected '='``. Without a detail it
+  writes ``domain:code`` as before
+
+- ``error``'s ``<=>`` returns ``std::weak_ordering`` instead of
+  ``std::strong_ordering``, since errors that differ only in their detail
+  compare equivalent but can be told apart. ``a < b`` and
+  ``(a <=> b) == 0`` compile as before; code that stores the result in a
+  ``std::strong_ordering`` does not
+
 Fixed
 ~~~~~
+
+- ``toml::deserialize()`` and ``toml::serialize()`` report why they
+  failed in the detail of the error. A parse error names a line and a
+  column, counted in bytes, and what was wrong: for a key or table defined
+  twice, where its key/value pair or table header starts, and otherwise
+  where reading stopped. They used to build the message and drop it, so
+  every parse error read ``Invalid argument``
+
+- ``error`` declares its copy and move operations, so assigning one
+  compiles under GCC with ``-Wextra -Werror``, and moving one no longer
+  copies it. The assignment the compiler declared was deprecated because
+  ``error`` has its own copy constructor, which also kept the compiler
+  from declaring the moves
 
 - The ISO 8601 form of a ``timestamp`` and the string of its
   ``date_part`` write a year below 0 with a minus sign before four
