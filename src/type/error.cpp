@@ -107,7 +107,7 @@ bool error::operator!=(const error& e) const noexcept
     return (_code != e._code);
 }
 
-std::strong_ordering error::operator<=>(const error& e) const noexcept
+std::weak_ordering error::operator<=>(const error& e) const noexcept
 {
     return (_code <=> e._code);
 }

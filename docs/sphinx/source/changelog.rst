@@ -123,6 +123,12 @@ Changed
   2, column 3: Expected '='``. Without a detail it returns the message of
   the code as before
 
+- ``error``'s ``<=>`` returns ``std::weak_ordering`` instead of
+  ``std::strong_ordering``, since errors that differ only in their detail
+  compare equivalent but can be told apart. ``a < b`` and
+  ``(a <=> b) == 0`` compile as before; code that stores the result in a
+  ``std::strong_ordering`` does not
+
 Fixed
 ~~~~~
 

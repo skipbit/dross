@@ -9,6 +9,7 @@
 #include <string>
 #include <system_error>
 #include <type_traits>
+#include <utility>
 
 // An error code enum declared the way a library outside std declares one: its
 // own category and its own make_error_code, found only by argument-dependent
@@ -293,8 +294,15 @@ TEST(error_test, comparisons_ignore_the_detail)
 
     EXPECT_TRUE(one == other);
     EXPECT_TRUE(one == plain);
-    EXPECT_TRUE((one <=> other) == std::strong_ordering::equal);
-    EXPECT_TRUE((one <=> plain) == std::strong_ordering::equal);
+    EXPECT_TRUE((one <=> other) == std::weak_ordering::equivalent);
+    EXPECT_TRUE((one <=> plain) == std::weak_ordering::equivalent);
+}
+
+// Errors that differ only in their detail compare equivalent but can be
+// told apart, so the ordering is weak.
+TEST(error_test, three_way_comparison_is_a_weak_ordering)
+{
+    static_assert(std::is_same_v<decltype(std::declval<const dross::error&>() <=> std::declval<const dross::error&>()), std::weak_ordering>);
 }
 
 TEST(error_test, three_way_comparison_orders_by_the_underlying_error_code)
@@ -304,7 +312,7 @@ TEST(error_test, three_way_comparison_orders_by_the_underlying_error_code)
 
     EXPECT_TRUE(smaller < larger);
     EXPECT_TRUE(larger > smaller);
-    EXPECT_TRUE((smaller <=> smaller) == std::strong_ordering::equal);
+    EXPECT_TRUE((smaller <=> smaller) == std::weak_ordering::equivalent);
 }
 
 TEST(error_test, equality_operator_compares_the_underlying_error_code)
@@ -333,7 +341,7 @@ TEST(error_test, equality_agrees_with_three_way_comparison)
 
     for (const auto& a : errors) {
         for (const auto& b : errors) {
-            EXPECT_EQ(a == b, (a <=> b) == std::strong_ordering::equal);
+            EXPECT_EQ(a == b, (a <=> b) == std::weak_ordering::equivalent);
         }
     }
 }

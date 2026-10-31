@@ -69,7 +69,9 @@ public:
 
     bool operator==(const error&) const noexcept;
     bool operator!=(const error&) const noexcept;
-    std::strong_ordering operator<=>(const error&) const noexcept;
+    // Weak, as errors that differ only in their detail are equivalent but
+    // can be told apart.
+    std::weak_ordering operator<=>(const error&) const noexcept;
 
 private:
     std::error_code _code;
