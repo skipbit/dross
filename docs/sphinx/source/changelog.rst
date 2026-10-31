@@ -137,6 +137,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` no longer slows down with the square of the
+  number of table headers under one parent. Each header copied the tables that earlier headers had put
+  under the same parent, so 2000 headers such as ``[servers.sN]`` took
+  about 25 seconds in a Debug build, against 0.2 seconds now
+
 - ``toml::deserialize()`` and ``toml::serialize()`` report why they
   failed in the detail of the error. A parse error names a line and a
   column, counted in bytes, and what was wrong: for a key or table defined
