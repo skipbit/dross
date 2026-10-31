@@ -265,6 +265,14 @@ TEST(error_test, an_error_without_a_detail_has_an_empty_one)
     EXPECT_EQ(e.message(), std::make_error_code(std::errc::invalid_argument).message());
 }
 
+TEST(error_test, an_empty_detail_leaves_the_message_unchanged)
+{
+    const dross::error e(std::errc::invalid_argument, "");
+
+    EXPECT_EQ(e.detail(), "");
+    EXPECT_EQ(e.message(), std::make_error_code(std::errc::invalid_argument).message());
+}
+
 TEST(error_test, message_joins_the_code_message_and_the_detail)
 {
     const dross::error e(std::errc::invalid_argument, "line 7, column 1: Expected '='");

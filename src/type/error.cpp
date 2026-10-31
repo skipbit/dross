@@ -48,8 +48,10 @@ int error::code() const noexcept
 
 std::string error::message() const
 {
-    const std::string d = detail();
-    return d.empty() ? _code.message() : _code.message() + ": " + d;
+    if (! _detail || _detail->empty()) {
+        return _code.message();
+    }
+    return _code.message() + ": " + *_detail;
 }
 
 std::string error::detail() const
