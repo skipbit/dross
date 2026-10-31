@@ -123,6 +123,11 @@ Changed
   2, column 3: Expected '='``. Without a detail it returns the message of
   the code as before
 
+- Writing an ``error`` to a stream with ``<<`` adds ``": "`` and the
+  detail after ``domain:code`` when the error has one, such as
+  ``generic:22: line 2, column 3: Expected '='``. Without a detail it
+  writes ``domain:code`` as before
+
 - ``error``'s ``<=>`` returns ``std::weak_ordering`` instead of
   ``std::strong_ordering``, since errors that differ only in their detail
   compare equivalent but can be told apart. ``a < b`` and

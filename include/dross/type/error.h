@@ -81,10 +81,14 @@ private:
     std::shared_ptr<const std::string> _detail;
 };
 
+// Writes domain:code, followed by ": " and the detail when there is one.
 template <class C, class T>
 std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& os, const error& e)
 {
     os << e.domain() << ":" << e.code();
+    if (const std::string detail = e.detail(); ! detail.empty()) {
+        os << ": " << detail;
+    }
     return os;
 }
 

@@ -380,6 +380,17 @@ TEST(error_test, stream_insertion_writes_domain_and_code)
     EXPECT_EQ(out.str(), expected);
 }
 
+TEST(error_test, stream_insertion_writes_the_detail_after_the_code)
+{
+    const dross::error e(std::errc::invalid_argument, "line 2, column 3: Expected '='");
+
+    std::ostringstream out;
+    out << e;
+
+    const std::string expected = e.domain() + ":" + std::to_string(e.code()) + ": line 2, column 3: Expected '='";
+    EXPECT_EQ(out.str(), expected);
+}
+
 TEST(error_test, value_and_category_constructor)
 {
     const dross::error e(5, std::generic_category());
