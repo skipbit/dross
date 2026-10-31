@@ -6,6 +6,7 @@
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 
+#include <new>
 #include <set>
 #include <string>
 
@@ -740,6 +741,9 @@ public:
             }
 
             return data{ _output };
+        } catch (const std::bad_alloc&) {
+            // Building a detail would allocate again.
+            return std::unexpected(error{ std::errc::operation_not_supported });
         } catch (const std::exception& e) {
             return std::unexpected(error{ std::errc::operation_not_supported, e.what() });
         }
