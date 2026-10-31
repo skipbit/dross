@@ -139,9 +139,11 @@ Fixed
   where reading stopped. They used to build the message and drop it, so
   every parse error read ``Invalid argument``
 
-- ``error`` declares its copy assignment, so assigning one compiles under
-  GCC with ``-Wextra -Werror``. The assignment the compiler declared was
-  deprecated because ``error`` has its own copy constructor
+- ``error`` declares its copy and move operations, so assigning one
+  compiles under GCC with ``-Wextra -Werror``, and moving one no longer
+  copies it. The assignment the compiler declared was deprecated because
+  ``error`` has its own copy constructor, which also kept the compiler
+  from declaring the moves
 
 - The ISO 8601 form of a ``timestamp`` and the string of its
   ``date_part`` write a year below 0 with a minus sign before four

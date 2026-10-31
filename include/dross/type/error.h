@@ -15,7 +15,9 @@ class error {
 public:
     error();
     error(const error&);
+    error(error&&) noexcept;
     error& operator=(const error&);
+    error& operator=(error&&) noexcept;
     error(int, const std::error_category&);
     // std::errc names error conditions rather than codes, so it gets its own
     // constructor; the code is std::make_error_code(e), in generic_category().

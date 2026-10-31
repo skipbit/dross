@@ -286,6 +286,21 @@ TEST(error_test, copy_and_assignment_keep_the_detail)
     EXPECT_EQ(assigned.detail(), "detail");
 }
 
+TEST(error_test, move_keeps_the_detail_without_throwing)
+{
+    static_assert(std::is_nothrow_move_constructible_v<dross::error>);
+    static_assert(std::is_nothrow_move_assignable_v<dross::error>);
+
+    dross::error original(std::errc::invalid_argument, "detail");
+    const dross::error moved(std::move(original));
+    dross::error assigned;
+    assigned = dross::error(std::errc::invalid_argument, "assigned");
+
+    EXPECT_EQ(moved.detail(), "detail");
+    EXPECT_EQ(moved, std::errc::invalid_argument);
+    EXPECT_EQ(assigned.detail(), "assigned");
+}
+
 TEST(error_test, comparisons_ignore_the_detail)
 {
     const dross::error plain = std::errc::invalid_argument;

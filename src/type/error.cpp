@@ -10,18 +10,13 @@ namespace dross {
 
 error::error() = default;
 
-error::error(const error& e)
-    : _code(e._code)
-    , _detail(e._detail)
-{
-}
+error::error(const error&) = default;
 
-error& error::operator=(const error& e)
-{
-    _code = e._code;
-    _detail = e._detail;
-    return *this;
-}
+error::error(error&&) noexcept = default;
+
+error& error::operator=(const error&) = default;
+
+error& error::operator=(error&&) noexcept = default;
 
 error::error(int value, const std::error_category& category)
     : _code(value, category)
