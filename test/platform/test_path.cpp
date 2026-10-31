@@ -235,6 +235,28 @@ TEST(path_test, home_uses_the_password_database_when_home_is_relative)
     EXPECT_EQ(result->string(), dross::path{ pw_dir }.string());
 }
 
+// getpwuid() returns storage shared by the whole process, which another
+// thread may be reading, so home() reads the password database without it.
+TEST(path_test, home_leaves_an_entry_from_getpwuid_unchanged)
+{
+    scoped_env_var home("HOME");
+    home.unset();
+    const struct passwd* own = getpwuid(getuid());
+    if (own == nullptr || own->pw_dir == nullptr) {
+        GTEST_SKIP() << "the password database has no home directory for this user";
+    }
+    const std::string own_dir = own->pw_dir;
+    const struct passwd* root = getpwuid(0);
+    if (root == nullptr || root->pw_dir == nullptr || own_dir == root->pw_dir) {
+        GTEST_SKIP() << "the entries for root and this user have the same home directory";
+    }
+    const std::string root_dir = root->pw_dir;
+
+    (void)dross::path::home();
+
+    EXPECT_EQ(std::string{ root->pw_dir }, root_dir);
+}
+
 // --- path::expand --------------------------------------------------------
 
 TEST(path_test, expand_of_a_tilde_path_matches_a_freshly_computed_canonical_path)

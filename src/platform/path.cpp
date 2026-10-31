@@ -3,9 +3,12 @@
 #include "dross/platform/environment.h"
 #include "platform/absolute_directory.h"
 
+#include <cerrno>
+#include <cstddef>
 #include <optional>
 #include <pwd.h>
 #include <unistd.h>
+#include <vector>
 
 namespace dross {
 
@@ -16,6 +19,30 @@ std::optional<path> absolute_home(const std::string& home)
     return absolute_directory(home).transform([](const std::filesystem::path& p) {
         return path{ p };
     });
+}
+
+// getpwuid() returns storage shared by the whole process, which another
+// thread may be using, so the entry is read into a buffer of this call.
+std::optional<path> password_database_home()
+{
+    constexpr std::size_t largest_buffer = 1024 * 1024;
+    const long suggested = sysconf(_SC_GETPW_R_SIZE_MAX);
+    std::vector<char> buffer(suggested > 0 ? static_cast<std::size_t>(suggested) : 1024);
+    const uid_t uid = getuid();
+    struct passwd entry { };
+    struct passwd* found = nullptr;
+    int err = 0;
+    while (true) {
+        err = getpwuid_r(uid, &entry, buffer.data(), buffer.size(), &found);
+        if (err != ERANGE || buffer.size() >= largest_buffer) {
+            break;
+        }
+        buffer.resize(buffer.size() * 2);
+    }
+    if (err != 0 || found == nullptr || found->pw_dir == nullptr) {
+        return std::nullopt;
+    }
+    return absolute_home(found->pw_dir);
 }
 
 }  // namespace
@@ -41,13 +68,7 @@ std::expected<path, std::filesystem::filesystem_error> path::mkdir(const std::fi
 
 std::optional<path> path::home()
 {
-    const auto h = environment::value("HOME").and_then(absolute_home).or_else([]() {
-        struct passwd* pw = getpwuid(getuid());
-        if (pw && pw->pw_dir) {
-            return absolute_home(pw->pw_dir);
-        }
-        return std::optional<path>(std::nullopt);
-    });
+    const auto h = environment::value("HOME").and_then(absolute_home).or_else(password_database_home);
 
     return h;
 }
