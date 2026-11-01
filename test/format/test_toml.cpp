@@ -663,11 +663,26 @@ TEST(toml_test, invalid_number)
 
 TEST(toml_test, numbers_with_a_leading_zero_or_a_bare_decimal_point)
 {
-    for (const char* text : { "a = 01", "a = +01", "a = -01", "a = 00", "a = 00.5", "a = 01.5", "a = 1.", "a = 0.", "a = -1.", "a = 1.e5", "a = -.5", "a = +.5" }) {
+    const std::vector<std::pair<const char*, const char*>> rejected = {
+        { "a = 01", "Leading zero in a number" },
+        { "a = +01", "Leading zero in a number" },
+        { "a = -01", "Leading zero in a number" },
+        { "a = 00", "Leading zero in a number" },
+        { "a = 00.5", "Leading zero in a number" },
+        { "a = 01.5", "Leading zero in a number" },
+        { "a = 1.", "Expected a digit after '.'" },
+        { "a = 0.", "Expected a digit after '.'" },
+        { "a = -1.", "Expected a digit after '.'" },
+        { "a = 1.e5", "Expected a digit after '.'" },
+        { "a = -.5", "Invalid number format" },
+        { "a = +.5", "Invalid number format" },
+    };
+    for (const auto& [text, fault] : rejected) {
         auto result = toml::deserialize(make_data(text));
         EXPECT_FALSE(result.has_value()) << text;
         if (! result.has_value()) {
             EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+            EXPECT_NE(result.error().detail().find(fault), std::string::npos) << text << ": " << result.error().detail();
         }
     }
 
@@ -683,6 +698,7 @@ TEST(toml_test, inline_tables_stay_on_one_line)
         EXPECT_FALSE(result.has_value()) << text;
         if (! result.has_value()) {
             EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+            EXPECT_NE(result.error().detail().find("Expected ',' or '}'"), std::string::npos) << text << ": " << result.error().detail();
         }
     }
 
