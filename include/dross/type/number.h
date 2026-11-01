@@ -92,7 +92,8 @@ public:
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
      * An exponent is expanded in the text, keeping every digit: "1e3" is stored
      * as 1000. An expansion longer than 4096 digits, and longer than the
-     * number as written, results in NaN, as do invalid strings.
+     * number as written, results in NaN, as do invalid strings. A decimal
+     * point or an exponent in the text makes a floating-point number.
      */
     number(const char* str);
 
@@ -103,7 +104,8 @@ public:
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
      * An exponent is expanded in the text, keeping every digit: "1e3" is stored
      * as 1000. An expansion longer than 4096 digits, and longer than the
-     * number as written, results in NaN, as do invalid strings.
+     * number as written, results in NaN, as do invalid strings. A decimal
+     * point or an exponent in the text makes a floating-point number.
      */
     number(const std::string& str);
 
@@ -268,6 +270,9 @@ public:
      * @brief Assignment from C-style string.
      * @param str Null-terminated string representation
      * @return Reference to this number
+     *
+     * The number is floating point if the text has a decimal point or an
+     * exponent, and not otherwise.
      */
     number& operator=(const char* str);
 
@@ -275,6 +280,9 @@ public:
      * @brief Assignment from std::string.
      * @param str String representation of the number
      * @return Reference to this number
+     *
+     * The number is floating point if the text has a decimal point or an
+     * exponent, and not otherwise.
      */
     number& operator=(const std::string& str);
 
