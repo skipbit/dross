@@ -835,7 +835,17 @@ private:
 
         number result{ 0 };
         size_t digits = 0;
-        for (int digit = digit_value(current_char()); digit >= 0; digit = digit_value(current_char())) {
+        while (true) {
+            if (current_char() == '_') {
+                if ((digits == 0) || (digit_value(peek_char()) < 0)) {
+                    return std::unexpected(create_error("An underscore must be between digits"));
+                }
+                advance();
+            }
+            const int digit = digit_value(current_char());
+            if (digit < 0) {
+                break;
+            }
             result = result * number{ base } + number{ digit };
             advance();
             ++digits;
@@ -863,30 +873,46 @@ private:
             }
         }
 
-        const auto read_digits = [&] {
+        // An underscore separates two digits and is not kept.
+        const auto read_digits = [&]() -> std::expected<size_t, error> {
             size_t count = 0;
-            while (is_ascii_digit(current_char())) {
+            while (true) {
+                if (current_char() == '_') {
+                    if ((count == 0) || ! is_ascii_digit(peek_char())) {
+                        return std::unexpected(create_error("An underscore must be between digits"));
+                    }
+                    advance();
+                }
+                if (! is_ascii_digit(current_char())) {
+                    return count;
+                }
                 num_str += current_char();
                 advance();
                 ++count;
             }
-            return count;
         };
 
         // The integer part has no leading zero, a decimal point has a digit on both sides,
         // and an exponent has a digit.
         const bool leading_zero = (current_char() == '0');
-        const size_t integer_digits = read_digits();
-        if (integer_digits == 0) {
+        const auto integer_digits = read_digits();
+        if (! integer_digits) {
+            return std::unexpected(integer_digits.error());
+        }
+        if (*integer_digits == 0) {
             return std::unexpected(create_error("Invalid number format"));
         }
-        if (leading_zero && (integer_digits > 1)) {
+        if (leading_zero && (*integer_digits > 1)) {
             return std::unexpected(create_error("Leading zero in a number"));
         }
         if (current_char() == '.') {
             num_str += current_char();
             advance();
-            if (read_digits() == 0) {
+            const auto fraction_digits = read_digits();
+            if (! fraction_digits) {
+                return std::unexpected(fraction_digits.error());
+            }
+            if (*fraction_digits == 0) {
                 return std::unexpected(create_error("Expected a digit after '.'"));
             }
         }
@@ -898,7 +924,11 @@ private:
                 num_str += current_char();
                 advance();
             }
-            if (read_digits() == 0) {
+            const auto exponent_digits = read_digits();
+            if (! exponent_digits) {
+                return std::unexpected(exponent_digits.error());
+            }
+            if (*exponent_digits == 0) {
                 return std::unexpected(create_error("Expected a digit in the exponent"));
             }
         }

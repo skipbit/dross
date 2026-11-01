@@ -149,6 +149,12 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads underscores between the digits of a
+  number, such as ``1_000``, ``3.14_15``, ``1e1_0`` and ``0xDEAD_beef``,
+  and rejects one without a digit on each side. ``toml::serialize()``
+  writes the number back without them. They used to fail with
+  ``Expected a newline``
+
 - ``toml::deserialize()`` reads integers in hexadecimal, octal and
   binary, such as ``0xff``, ``0o755`` and ``0b1010``, and
   ``toml::serialize()`` writes them back in decimal. They used to fail

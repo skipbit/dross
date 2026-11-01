@@ -294,6 +294,43 @@ TEST(toml_test, integers_in_hexadecimal_octal_and_binary)
     }
 }
 
+// An underscore may separate digits in any number, with a digit on each side.
+TEST(toml_test, numbers_with_underscores)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 1_000\n", "1000" },
+        { "x = 1_2_3\n", "123" },
+        { "x = -1_000\n", "-1000" },
+        { "x = 3.14_15\n", "3.1415" },
+        { "x = 1e1_0\n", "10000000000" },
+        { "x = 1_0.5e0_1\n", "105" },
+        { "x = 0xDEAD_beef\n", "3735928559" },
+        { "x = 0o7_7\n", "63" },
+        { "x = 0b1_0\n", "2" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        EXPECT_EQ(std::string(result.value()["x"].as<number>()), expected) << content;
+    }
+
+    const std::vector<std::pair<std::string, std::string>> invalid_cases = {
+        { "x = 1__000\n", "line 1, column 6: An underscore must be between digits" },
+        { "x = 1_\n", "line 1, column 6: An underscore must be between digits" },
+        { "x = 1_.5\n", "line 1, column 6: An underscore must be between digits" },
+        { "x = 1._5\n", "line 1, column 7: An underscore must be between digits" },
+        { "x = 1e_5\n", "line 1, column 7: An underscore must be between digits" },
+        { "x = 0x_ff\n", "line 1, column 7: An underscore must be between digits" },
+        { "x = 0xff_\n", "line 1, column 9: An underscore must be between digits" },
+        { "x = 0_1\n", "line 1, column 8: Leading zero in a number" },
+    };
+    for (const auto& [content, detail] : invalid_cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
 TEST(toml_test, numbers_that_number_cannot_hold)
 {
     auto longest = toml::deserialize(make_data("x = 1e4095\n"));
