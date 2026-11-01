@@ -664,8 +664,11 @@ private:
                 return std::unexpected(added.error());
             }
 
-            // An inline table stays on one line, so it has no newline or comment.
+            // TOML v1.0.0 keeps an inline table on one line, so it has no newline or comment.
             skip_whitespace();
+            if ((current_char() == '\n') || (current_char() == '#')) {
+                return std::unexpected(create_error("An inline table must stay on one line"));
+            }
             if (current_char() == ',') {
                 advance();
                 skip_whitespace();

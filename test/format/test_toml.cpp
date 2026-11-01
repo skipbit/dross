@@ -696,12 +696,12 @@ TEST(toml_test, numbers_with_a_leading_zero_or_a_bare_decimal_point)
 
 TEST(toml_test, inline_tables_stay_on_one_line)
 {
-    for (const char* text : { "a = {x = 1\n, y = 2}", "a = {x = 1\n}", "a = {x = 1 # c\n}" }) {
+    for (const char* text : { "a = {x = 1\n, y = 2}", "a = {x = 1\n}", "a = {x = 1\r\n}", "a = {x = 1 # c\n}" }) {
         auto result = toml::deserialize(make_data(text));
         EXPECT_FALSE(result.has_value()) << text;
         if (! result.has_value()) {
             EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
-            EXPECT_NE(result.error().detail().find("Expected ',' or '}'"), std::string::npos) << text << ": " << result.error().detail();
+            EXPECT_NE(result.error().detail().find("An inline table must stay on one line"), std::string::npos) << text << ": " << result.error().detail();
         }
     }
 
