@@ -149,6 +149,15 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads a datetime with an offset, such as
+  ``1979-05-27T07:32:00Z`` or ``1979-05-27 00:32:00.5-07:00``, as a
+  ``timestamp`` that keeps the offset, and ``toml::serialize()`` writes a
+  ``timestamp`` back in that form. A local date-time, a local date and a
+  local time fail with ``timestamp cannot hold a datetime without an
+  offset``, since a ``timestamp`` always has an offset. Reading used to
+  fail with ``Expected a newline`` or ``Leading zero in a number``, and
+  writing with ``Unsupported value type for TOML serialization``
+
 - ``toml::deserialize()`` fails on the floats ``inf`` and ``nan``, with
   or without a sign, with the detail ``number cannot hold inf or nan``.
   It used to say ``Invalid value format`` or ``Invalid number format``

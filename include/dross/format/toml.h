@@ -28,8 +28,10 @@ namespace dross::toml {
  * - TOML Boolean → dross::boolean
  * - TOML Array → dross::array
  * - TOML Table → dross::dictionary
+ * - TOML Offset Date-Time → dross::timestamp
  *
- * TOML Datetime values are not supported in either direction.
+ * A timestamp always has an offset, so a local date-time, a local date and
+ * a local time are not read.
  *
  * @example
  * @code
@@ -83,10 +85,13 @@ namespace dross::toml {
  *   table a header or an inline table defined
  * - Numbers with a leading zero or without a digit on both sides of the
  *   decimal point, such as 01, 1. and -.5
+ * - Datetimes that timestamp rejects, such as February 30 or a leap
+ *   second written as second 60
  * - A newline or a comment inside an inline table, outside its values
  *
  * Valid TOML that fails to read:
- * - Datetimes of every kind
+ * - Local date-times, local dates and local times, which timestamp cannot
+ *   hold, fail with "timestamp cannot hold a datetime without an offset"
  * - The floats inf and nan, with or without a sign, which number cannot
  *   hold, fail with "number cannot hold inf or nan"
  * - Arrays of tables, written with [[name]] headers
@@ -110,7 +115,7 @@ std::expected<dictionary, error> deserialize(const data& input);
  *         such as "NaN cannot be written as a TOML value".
  *
  * Error conditions:
- * - Unsupported value types, such as a timestamp
+ * - Unsupported value types, such as data
  * - Values that cannot be represented in TOML format, such as a NaN number
  * - Strings or keys that are not valid UTF-8
  *

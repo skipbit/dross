@@ -349,6 +349,69 @@ TEST(toml_test, inf_and_nan_fail_with_a_reason)
     EXPECT_EQ(other.error().detail(), "line 1, column 5: Invalid value format");
 }
 
+// A datetime with an offset is read as a timestamp, which keeps the offset
+// and the fraction of a second, and is written back in the same form.
+TEST(toml_test, offset_datetimes_are_timestamps)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 1979-05-27T07:32:00Z\n", "1979-05-27T07:32:00Z" },
+        { "x = 1979-05-27T00:32:00-07:00\n", "1979-05-27T00:32:00-07:00" },
+        { "x = 1979-05-27T00:32:00.999999-07:00\n", "1979-05-27T00:32:00.999999-07:00" },
+        { "x = 1979-05-27 07:32:00Z\n", "1979-05-27T07:32:00Z" },
+        { "x = 1979-05-27t07:32:00z\n", "1979-05-27T07:32:00Z" },
+        { "x = 1979-05-27T07:32:00.1234567891+09:30\n", "1979-05-27T07:32:00.123456789+09:30" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        ASSERT_TRUE(result.value()["x"].is<timestamp>()) << content;
+        EXPECT_EQ(std::string(result.value()["x"].as<timestamp>()), expected) << content;
+
+        auto written = toml::serialize(result.value());
+        ASSERT_TRUE(written.has_value()) << content;
+        EXPECT_EQ(std::string(*written), "x = " + expected + "\n") << content;
+    }
+
+    dictionary d;
+    d["when"] = value(dross::timestamp{ 2024, 1, 21, 15, 30, 0, dross::timezone::offset(9) });
+    d["list"] = value(array{ value(dross::timestamp{ 2024, 1, 21, 6, 30, 0 }) });
+    auto written = toml::serialize(d);
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(std::string(*written), "list = [2024-01-21T06:30:00Z]\nwhen = 2024-01-21T15:30:00+09:00\n");
+    auto read = toml::deserialize(*written);
+    ASSERT_TRUE(read.has_value());
+    EXPECT_EQ(read.value(), d);
+
+    dictionary bytes;
+    bytes["blob"] = value(data{ "a" });
+    auto unsupported = toml::serialize(bytes);
+    ASSERT_FALSE(unsupported.has_value());
+    EXPECT_EQ(unsupported.error(), std::errc::operation_not_supported);
+}
+
+// timestamp has an offset, so a datetime without one fails rather than being
+// read as UTC, and so does one that timestamp cannot hold.
+TEST(toml_test, datetimes_that_timestamp_cannot_hold_fail)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 1979-05-27T07:32:00\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 1979-05-27\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 07:32:00\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 07:32:00.5\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 1979-02-30T00:00:00Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32:60Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32:00.Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-5-27T07:32:00Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32:00+0900\n", "line 1, column 5: Invalid datetime" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
+    }
+}
+
 TEST(toml_test, numbers_that_number_cannot_hold)
 {
     auto longest = toml::deserialize(make_data("x = 1e4095\n"));

@@ -5,6 +5,7 @@
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
+#include "dross/type/timestamp.h"
 
 #include <map>
 #include <memory>
@@ -702,6 +703,8 @@ private:
             return parse_inline_table();
         } else if ((ch == 't') || (ch == 'f')) {
             return parse_boolean();
+        } else if (at_date() || at_time()) {
+            return parse_datetime();
         } else if (is_ascii_digit(ch) || (ch == '-') || (ch == '+')) {
             return parse_number();
         } else {
@@ -820,6 +823,97 @@ private:
         } else {
             return std::unexpected(create_error("Invalid boolean value"));
         }
+    }
+
+    bool digits_ahead(size_t offset, size_t count) const
+    {
+        for (size_t k = 0; k < count; ++k) {
+            if (! is_ascii_digit(peek_char(offset + k))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool at_date() const
+    {
+        return digits_ahead(0, 4) && (peek_char(4) == '-');
+    }
+
+    bool at_time() const
+    {
+        return digits_ahead(0, 2) && (peek_char(2) == ':');
+    }
+
+    // Reads a datetime with an offset, as RFC 3339 writes it, into a timestamp.
+    // timestamp has an offset, so a local datetime, date or time fails.
+    std::expected<value, error> parse_datetime()
+    {
+        const position start = current_position();
+        const auto invalid = [&] {
+            return std::unexpected(create_error("Invalid datetime", start));
+        };
+        const auto without_offset = [&] {
+            return std::unexpected(create_error("timestamp cannot hold a datetime without an offset", start));
+        };
+        if (at_time()) {
+            return without_offset();
+        }
+
+        std::string text;
+        const auto take_digits = [&](size_t count) {
+            if (! digits_ahead(0, count)) {
+                return false;
+            }
+            for (size_t k = 0; k < count; ++k) {
+                text += current_char();
+                advance();
+            }
+            return true;
+        };
+        const auto take = [&](char c) {
+            if (current_char() != c) {
+                return false;
+            }
+            text += c;
+            advance();
+            return true;
+        };
+
+        if (! (take_digits(4) && take('-') && take_digits(2) && take('-') && take_digits(2))) {
+            return invalid();
+        }
+        const bool time_follows = (current_char() == 'T') || (current_char() == 't') || ((current_char() == ' ') && digits_ahead(1, 2) && (peek_char(3) == ':'));
+        if (! time_follows) {
+            return without_offset();
+        }
+        text += 'T';
+        advance();
+        if (! (take_digits(2) && take(':') && take_digits(2) && take(':') && take_digits(2))) {
+            return invalid();
+        }
+        if (take('.')) {
+            while (is_ascii_digit(current_char())) {
+                take_digits(1);
+            }
+        }
+
+        if ((current_char() == 'Z') || (current_char() == 'z')) {
+            text += 'Z';
+            advance();
+        } else if ((current_char() == '+') || (current_char() == '-')) {
+            if (! (take(current_char()) && take_digits(2) && take(':') && take_digits(2))) {
+                return invalid();
+            }
+        } else {
+            return without_offset();
+        }
+
+        auto parsed = timestamp::from_string(text);
+        if (! parsed) {
+            return invalid();
+        }
+        return value(*parsed);
     }
 
     bool at_integer_prefix() const
@@ -1035,6 +1129,8 @@ private:
             }
         } else if (val.is<boolean>()) {
             _output += val.as<boolean>() ? "true" : "false";
+        } else if (val.is<timestamp>()) {
+            _output += std::string(val.as<timestamp>());
         } else if (val.is<array>()) {
             serialize_array(val.as<array>());
         } else if (val.is<dictionary>()) {
