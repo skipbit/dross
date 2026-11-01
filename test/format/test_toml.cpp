@@ -754,7 +754,7 @@ TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
         { "[t]\nx = 1\n  x = 2\n", "line 3, column 3: Key defined twice" },
         { "t = { a = 1, a = 2 }\n", "line 1, column 14: Key defined twice" },
         { "[a]\nx = 1\n[a]\ny = 2\nz = 3\n", "line 3, column 1: Table defined twice" },
-        { "[a.b]\nx = 1\n[a]\nb = 2\n", "line 3, column 1: Key defined twice" },
+        { "[a.b]\nx = 1\n[a]\nb = 2\n", "line 4, column 1: Key defined twice" },
         { "t = 1\n[t]\nq = 1\n", "line 2, column 1: Table header names a key that is not a table" },
     };
     for (const auto& [content, detail] : cases) {
