@@ -86,12 +86,13 @@ namespace dross::toml {
  * - A newline or a comment inside an inline table, outside its values
  *
  * Valid TOML that fails to read:
- * - Multi-line strings
  * - Datetimes of every kind
  * - Integers in hexadecimal, octal or binary
  * - Integers and floats with underscores, such as 1_000 or 1e1_0
  * - The floats inf and nan, with or without a sign
  * - Arrays of tables, written with [[name]] headers
+ *
+ * A newline in a multi-line string is kept as it is written, LF or CRLF.
  *
  * @note Comments are skipped and are not kept in the result.
  */
@@ -119,7 +120,8 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Arrays are formatted with proper spacing
  * - Nested tables use dotted notation when appropriate
  * - Strings are properly escaped according to TOML rules. A string read
- *   from a literal string is written as a basic string with the same text
+ *   from a literal or multi-line string is written as a basic string with
+ *   the same text
  * - Numbers are written in number's canonical form, without trailing zeros.
  *   A floating-point number (number::is_floating_point()) whose value is
  *   integral is written with ".0", so a float read as 1.0 or 1e2 is written

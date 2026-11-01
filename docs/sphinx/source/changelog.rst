@@ -149,6 +149,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads multi-line strings, between ``"""`` or
+  ``'''``, keeping each newline as it is written. ``toml::serialize()``
+  writes the text back as a basic string. They used to fail with
+  ``Expected a newline`` or ``Invalid value format``
+
 - ``toml::deserialize()`` reads literal strings, such as
   ``'C:\Users'``, as values and as keys. ``toml::serialize()`` writes
   the text back as a basic string. They used to fail with

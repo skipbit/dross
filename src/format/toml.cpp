@@ -477,6 +477,55 @@ private:
         return parse_basic_string("quoted key");
     }
 
+    // Reads the escape whose letter is the current character, after a backslash.
+    std::expected<void, error> append_escape(std::string& result)
+    {
+        switch (current_char()) {
+        case '"':
+            result += '"';
+            return {};
+        case '\\':
+            result += '\\';
+            return {};
+        case 'n':
+            result += '\n';
+            return {};
+        case 't':
+            result += '\t';
+            return {};
+        case 'r':
+            result += '\r';
+            return {};
+        case 'b':
+            result += '\b';
+            return {};
+        case 'f':
+            result += '\f';
+            return {};
+        case 'u':
+        case 'U': {
+            // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
+            const size_t digits = (current_char() == 'u') ? 4 : 8;
+            for (size_t k = 1; k <= digits; ++k) {
+                if (! is_ascii_xdigit(peek_char(k))) {
+                    return std::unexpected(create_error("Invalid unicode escape"));
+                }
+            }
+            const auto code_point = static_cast<char32_t>(std::stoul(_input.substr(_pos + 1, digits), nullptr, 16));
+            if (((code_point >= 0xD800) && (code_point <= 0xDFFF)) || (code_point > 0x10FFFF)) {
+                return std::unexpected(create_error("Invalid unicode escape"));
+            }
+            append_utf8(result, code_point);
+            for (size_t k = 0; k < digits; ++k) {
+                advance();
+            }
+            return {};
+        }
+        default:
+            return std::unexpected(create_error("Invalid escape sequence"));
+        }
+    }
+
     // Reads a double-quoted string, which TOML uses for both values and keys.
     std::expected<std::string, error> parse_basic_string(const std::string& kind)
     {
@@ -492,50 +541,9 @@ private:
                 if (_pos >= _input.size()) {
                     return std::unexpected(create_error("Unterminated " + kind));
                 }
-                // Handle escape sequences
-                switch (current_char()) {
-                case '"':
-                    result += '"';
-                    break;
-                case '\\':
-                    result += '\\';
-                    break;
-                case 'n':
-                    result += '\n';
-                    break;
-                case 't':
-                    result += '\t';
-                    break;
-                case 'r':
-                    result += '\r';
-                    break;
-                case 'b':
-                    result += '\b';
-                    break;
-                case 'f':
-                    result += '\f';
-                    break;
-                case 'u':
-                case 'U': {
-                    // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
-                    const size_t digits = (current_char() == 'u') ? 4 : 8;
-                    for (size_t k = 1; k <= digits; ++k) {
-                        if (! is_ascii_xdigit(peek_char(k))) {
-                            return std::unexpected(create_error("Invalid unicode escape"));
-                        }
-                    }
-                    const auto code_point = static_cast<char32_t>(std::stoul(_input.substr(_pos + 1, digits), nullptr, 16));
-                    if (((code_point >= 0xD800) && (code_point <= 0xDFFF)) || (code_point > 0x10FFFF)) {
-                        return std::unexpected(create_error("Invalid unicode escape"));
-                    }
-                    append_utf8(result, code_point);
-                    for (size_t k = 0; k < digits; ++k) {
-                        advance();
-                    }
-                    break;
-                }
-                default:
-                    return std::unexpected(create_error("Invalid escape sequence"));
+                auto escaped = append_escape(result);
+                if (! escaped) {
+                    return std::unexpected(escaped.error());
                 }
             } else if (is_forbidden_control(current_char())) {
                 return std::unexpected(create_error("Control character in " + kind));
@@ -575,18 +583,105 @@ private:
         return result;
     }
 
+    bool at_line_end() const
+    {
+        return (current_char() == '\n') || ((current_char() == '\r') && (peek_char() == '\n'));
+    }
+
+    void skip_line_end()
+    {
+        if (current_char() == '\r') {
+            advance();
+        }
+        advance();
+    }
+
+    // Reads a string between three quotes, which may span lines. A newline
+    // right after the opening quotes is dropped, and up to two quotes may
+    // come right before the closing ones. A basic string, between """, also
+    // reads escapes and drops the whitespace after a backslash that ends a
+    // line; a literal one, between ''', reads its text as it is.
+    std::expected<std::string, error> parse_multi_line_string(char quote, const std::string& kind)
+    {
+        const bool basic = (quote == '"');
+        for (int k = 0; k < 3; ++k) {
+            advance();  // skip opening quotes
+        }
+        if (at_line_end()) {
+            skip_line_end();
+        }
+
+        std::string result;
+        while (_pos < _input.size()) {
+            const char ch = current_char();
+            if ((ch == quote) && (peek_char(1) == quote) && (peek_char(2) == quote)) {
+                size_t extra = 0;
+                while ((extra < 2) && (peek_char(3 + extra) == quote)) {
+                    ++extra;
+                }
+                result.append(extra, quote);
+                for (size_t k = 0; k < (3 + extra); ++k) {
+                    advance();  // skip closing quotes
+                }
+                return result;
+            }
+            if (basic && (ch == '\\')) {
+                size_t k = 1;
+                while ((peek_char(k) == ' ') || (peek_char(k) == '\t')) {
+                    ++k;
+                }
+                if ((peek_char(k) == '\n') || ((peek_char(k) == '\r') && (peek_char(k + 1) == '\n'))) {
+                    advance();  // skip backslash
+                    while ((current_char() == ' ') || (current_char() == '\t') || at_line_end()) {
+                        if (at_line_end()) {
+                            skip_line_end();
+                        } else {
+                            advance();
+                        }
+                    }
+                    continue;
+                }
+                advance();  // skip backslash
+                auto escaped = append_escape(result);
+                if (! escaped) {
+                    return std::unexpected(escaped.error());
+                }
+                advance();
+                continue;
+            }
+            if (at_line_end()) {
+                if (ch == '\r') {
+                    result += '\r';
+                }
+                result += '\n';
+                skip_line_end();
+                continue;
+            }
+            if (is_forbidden_control(ch)) {
+                return std::unexpected(create_error("Control character in " + kind));
+            }
+            result += ch;
+            advance();
+        }
+
+        return std::unexpected(create_error("Unterminated " + kind));
+    }
+
     std::expected<value, error> parse_value()
     {
         skip_whitespace();
 
         char ch = current_char();
 
-        if (ch == '"') {
+        const auto to_value = [](const std::string& text) {
+            return value(string{ text });
+        };
+        if (((ch == '"') || (ch == '\'')) && (peek_char(1) == ch) && (peek_char(2) == ch)) {
+            return parse_multi_line_string(ch, (ch == '"') ? "multi-line string" : "multi-line literal string").transform(to_value);
+        } else if (ch == '"') {
             return parse_string();
         } else if (ch == '\'') {
-            return parse_literal_string("literal string").transform([](const std::string& text) {
-                return value(string{ text });
-            });
+            return parse_literal_string("literal string").transform(to_value);
         } else if (ch == '[') {
             return parse_array();
         } else if (ch == '{') {

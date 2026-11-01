@@ -790,6 +790,46 @@ TEST(toml_test, literal_strings)
     }
 }
 
+// A multi-line string drops a newline right after its opening delimiter, and
+// a basic one also drops the whitespace after a backslash that ends a line.
+TEST(toml_test, multi_line_strings)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = \"\"\"a\"\"\"\n", "a" },
+        { "x = \"\"\"\na\nb\"\"\"\n", "a\nb" },
+        { "x = \"\"\"\r\na\r\nb\"\"\"\n", "a\r\nb" },
+        { "x = \"\"\"a\\tb\\u00e9\"\"\"\n", "a\tb\xc3\xa9" },
+        { "x = \"\"\"a \\\n   \n  b\"\"\"\n", "a b" },
+        { "x = \"\"\"a \\  \r\n  b\"\"\"\n", "a b" },
+        { "x = \"\"\"a\"b\"\"c\"\"\"\n", "a\"b\"\"c" },
+        { "x = \"\"\"a\"\"\"\"\"\n", "a\"\"" },
+        { "x = \"\"\"\"\"\"\n", "" },
+        { "x = '''a\\b'''\n", "a\\b" },
+        { "x = '''\nC:\\Users\n'''\n", "C:\\Users\n" },
+        { "x = '''a'b''c''''\n", "a'b''c'" },
+        { "x = '''\ta'''\n", "\ta" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        EXPECT_EQ(std::string(result.value()["x"].as<string>()), expected) << content;
+    }
+
+    const std::vector<std::pair<std::string, std::string>> invalid_cases = {
+        { "x = \"\"\"a\n", "line 2, column 1: Unterminated multi-line string" },
+        { "x = '''a", "line 1, column 9: Unterminated multi-line literal string" },
+        { "x = \"\"\"a\x01\"\"\"\n", "line 1, column 9: Control character in multi-line string" },
+        { "x = '''a\rb'''\n", "line 1, column 9: Control character in multi-line literal string" },
+        { "x = \"\"\"a\\q\"\"\"\n", "line 1, column 10: Invalid escape sequence" },
+        { "x = \"\"\"a\"\"\"\"\"\"\n", "line 1, column 14: Expected a newline" },
+    };
+    for (const auto& [content, detail] : invalid_cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
 // A dotted key creates the tables before its last part, which later dotted
 // keys in the same table can add to, as TOML v1.0.0 says.
 TEST(toml_test, dotted_keys_create_tables)
