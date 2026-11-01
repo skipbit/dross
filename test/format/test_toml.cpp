@@ -676,6 +676,9 @@ TEST(toml_test, numbers_with_a_leading_zero_or_a_bare_decimal_point)
         { "a = 1.e5", "Expected a digit after '.'" },
         { "a = -.5", "Invalid number format" },
         { "a = +.5", "Invalid number format" },
+        { "a = 1e", "Expected a digit in the exponent" },
+        { "a = 1e+", "Expected a digit in the exponent" },
+        { "a = 1.5E-", "Expected a digit in the exponent" },
     };
     for (const auto& [text, fault] : rejected) {
         auto result = toml::deserialize(make_data(text));

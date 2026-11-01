@@ -716,7 +716,8 @@ private:
             return count;
         };
 
-        // The integer part has no leading zero, and a decimal point has a digit on both sides.
+        // The integer part has no leading zero, a decimal point has a digit on both sides,
+        // and an exponent has a digit.
         const bool leading_zero = (current_char() == '0');
         const size_t integer_digits = read_digits();
         if (integer_digits == 0) {
@@ -740,9 +741,8 @@ private:
                 num_str += current_char();
                 advance();
             }
-            while ((_pos < _input.size()) && is_ascii_digit(current_char())) {
-                num_str += current_char();
-                advance();
+            if (read_digits() == 0) {
+                return std::unexpected(create_error("Expected a digit in the exponent"));
             }
         }
 
