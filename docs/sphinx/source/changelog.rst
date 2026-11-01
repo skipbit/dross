@@ -149,6 +149,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads integers in hexadecimal, octal and
+  binary, such as ``0xff``, ``0o755`` and ``0b1010``, and
+  ``toml::serialize()`` writes them back in decimal. They used to fail
+  with ``Expected a newline``
+
 - ``toml::deserialize()`` reads multi-line strings, between ``"""`` or
   ``'''``, keeping each newline as it is written. ``toml::serialize()``
   writes the text back as a basic string. They used to fail with

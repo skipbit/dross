@@ -808,14 +808,59 @@ private:
         }
     }
 
+    bool at_integer_prefix() const
+    {
+        return (current_char() == '0') && ((peek_char() == 'x') || (peek_char() == 'o') || (peek_char() == 'b'));
+    }
+
+    // Reads an integer after a 0x, 0o or 0b prefix, which may start with zeros.
+    std::expected<value, error> parse_prefixed_integer()
+    {
+        const char prefix = peek_char();
+        const int base = (prefix == 'x') ? 16 : ((prefix == 'o') ? 8 : 2);
+        advance();
+        advance();
+
+        const auto digit_value = [base](char c) {
+            int digit = -1;
+            if (is_ascii_digit(c)) {
+                digit = c - '0';
+            } else if ((c >= 'a') && (c <= 'f')) {
+                digit = c - 'a' + 10;
+            } else if ((c >= 'A') && (c <= 'F')) {
+                digit = c - 'A' + 10;
+            }
+            return (digit < base) ? digit : -1;
+        };
+
+        number result{ 0 };
+        size_t digits = 0;
+        for (int digit = digit_value(current_char()); digit >= 0; digit = digit_value(current_char())) {
+            result = result * number{ base } + number{ digit };
+            advance();
+            ++digits;
+        }
+        if (digits == 0) {
+            return std::unexpected(create_error(std::string("Expected a digit after '0") + prefix + "'"));
+        }
+        return value(result);
+    }
+
     std::expected<value, error> parse_number()
     {
+        if (at_integer_prefix()) {
+            return parse_prefixed_integer();
+        }
+
         std::string num_str;
 
         // Handle sign
         if ((current_char() == '+') || (current_char() == '-')) {
             num_str += current_char();
             advance();
+            if (at_integer_prefix()) {
+                return std::unexpected(create_error("An integer with a prefix has no sign"));
+            }
         }
 
         const auto read_digits = [&] {

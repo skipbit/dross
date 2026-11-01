@@ -253,6 +253,47 @@ fraction = 3.0e2
     }
 }
 
+// An integer with a 0x, 0o or 0b prefix is read in that base and written back
+// in decimal.
+TEST(toml_test, integers_in_hexadecimal_octal_and_binary)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 0xff\n", "255" },
+        { "x = 0xDEADbeef\n", "3735928559" },
+        { "x = 0x00ff\n", "255" },
+        { "x = 0x0\n", "0" },
+        { "x = 0o755\n", "493" },
+        { "x = 0b1010\n", "10" },
+        { "x = 0xffffffffffffffffff\n", "4722366482869645213695" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        const number n = result.value()["x"].as<number>();
+        EXPECT_EQ(std::string(n), expected) << content;
+        EXPECT_FALSE(n.is_floating_point()) << content;
+    }
+
+    auto written = toml::serialize(toml::deserialize(make_data("x = 0xff\n")).value());
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(std::string(*written), "x = 255\n");
+
+    const std::vector<std::pair<std::string, std::string>> invalid_cases = {
+        { "x = 0x\n", "line 1, column 7: Expected a digit after '0x'" },
+        { "x = 0o8\n", "line 1, column 7: Expected a digit after '0o'" },
+        { "x = 0b2\n", "line 1, column 7: Expected a digit after '0b'" },
+        { "x = +0x1\n", "line 1, column 6: An integer with a prefix has no sign" },
+        { "x = -0o7\n", "line 1, column 6: An integer with a prefix has no sign" },
+        { "x = 0X1\n", "line 1, column 6: Expected a newline" },
+        { "x = 0o17.5\n", "line 1, column 9: Expected a newline" },
+    };
+    for (const auto& [content, detail] : invalid_cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
 TEST(toml_test, numbers_that_number_cannot_hold)
 {
     auto longest = toml::deserialize(make_data("x = 1e4095\n"));

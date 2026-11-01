@@ -87,7 +87,6 @@ namespace dross::toml {
  *
  * Valid TOML that fails to read:
  * - Datetimes of every kind
- * - Integers in hexadecimal, octal or binary
  * - Integers and floats with underscores, such as 1_000 or 1e1_0
  * - The floats inf and nan, with or without a sign
  * - Arrays of tables, written with [[name]] headers
@@ -123,6 +122,7 @@ std::expected<dictionary, error> deserialize(const data& input);
  *   from a literal or multi-line string is written as a basic string with
  *   the same text
  * - Numbers are written in number's canonical form, without trailing zeros.
+ *   An integer read in hexadecimal, octal or binary is written in decimal.
  *   A floating-point number (number::is_floating_point()) whose value is
  *   integral is written with ".0", so a float read as 1.0 or 1e2 is written
  *   as 1.0 or 100.0, and an integer as an integer.
