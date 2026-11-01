@@ -9,7 +9,6 @@
 #include <map>
 #include <memory>
 #include <new>
-#include <set>
 #include <string>
 
 namespace dross::toml {
@@ -162,8 +161,6 @@ private:
     size_t _pos;
     size_t _line;
     size_t _column;
-    // Tables that a header named
-    std::set<std::vector<std::string>> _defined_tables;
 
     // The tables that headers create, either named or as the parent of a named
     // one, are kept apart from their key/value pairs so that a header updates
@@ -171,6 +168,8 @@ private:
     struct table_node {
         dictionary pairs;
         std::map<std::string, std::unique_ptr<table_node>> tables;
+        // Whether a header named this table, rather than only passing through it
+        bool named = false;
     };
 
     struct position {
@@ -419,9 +418,10 @@ private:
         table_node& table = *child;
 
         if (index == (key_path.size() - 1)) {
-            if (! _defined_tables.insert(key_path).second) {
+            if (table.named) {
                 return std::unexpected(create_error("Table defined twice", header_start));
             }
+            table.named = true;
             for (const auto& [key, val] : content) {
                 auto added = add_key(table, key, val, header_start);
                 if (! added) {
