@@ -149,6 +149,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads dotted keys, such as ``a.b = 1``, at the
+  top level, under a table header and in an inline table, and rejects one
+  that would add to a table a header or an inline table defined, as
+  TOML v1.0.0 says. They used to fail with ``Expected '='``
+
 - ``toml::serialize()`` writes a float whose value is integral with
   ``.0``, so ``x = 1.0`` and ``x = 1e2`` read and written back are
   ``x = 1.0`` and ``x = 100.0``. They used to be written as the integers

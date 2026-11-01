@@ -764,6 +764,50 @@ TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
     }
 }
 
+// A dotted key creates the tables before its last part, which later dotted
+// keys in the same table can add to, as TOML v1.0.0 says.
+TEST(toml_test, dotted_keys_create_tables)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a.b = 1\na.c = 2\n", "a = {b = 1, c = 2}\n" },
+        { "a . b = 1\n", "a = {b = 1}\n" },
+        { "\"a.b\".c = 1\n", "\"a.b\" = {c = 1}\n" },
+        { "[t]\na.b.c = 1\na.d = 2\n", "t = {a = {b = {c = 1}, d = 2}}\n" },
+        { "x = {a.b = 1, a.c = 2}\n", "x = {a = {b = 1, c = 2}}\n" },
+        { "a.b = 1\n[a.c]\nx = 1\n", "a = {b = 1, c = {x = 1}}\n" },
+        { "[fruit]\napple.color = 1\napple.taste.sweet = true\n[fruit.apple.texture]\nsmooth = true\n", "fruit = {apple = {color = 1, taste = {sweet = true}, texture = {smooth = true}}}\n" },
+    };
+    for (const auto& [content, expected_text] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        auto expected = toml::deserialize(make_data(expected_text));
+        ASSERT_TRUE(expected.has_value()) << expected_text;
+        EXPECT_EQ(result.value(), expected.value()) << content;
+    }
+}
+
+// A dotted key cannot add to a table that a header or an inline table
+// defined, and a header cannot name a table that dotted keys defined.
+TEST(toml_test, dotted_keys_do_not_redefine_tables)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a = 1\na.b = 2\n", "line 2, column 1: Key defined twice" },
+        { "a.b = 1\na = 2\n", "line 2, column 1: Key defined twice" },
+        { "a.b = 1\na.b = 2\n", "line 2, column 1: Key defined twice" },
+        { "a = {}\na.b = 1\n", "line 2, column 1: Key defined twice" },
+        { "x = {a = {}, a.b = 1}\n", "line 1, column 14: Key defined twice" },
+        { "[a.b.c]\nz = 9\n[a]\nb.c.t = 1\n", "line 4, column 1: Key defined twice" },
+        { "a.b = 1\n[a]\n", "line 2, column 1: Table defined twice" },
+        { "[fruit]\napple.color = 1\n[fruit.apple]\n", "line 3, column 1: Table defined twice" },
+        { "[fruit]\napple.taste.sweet = true\n[fruit.apple.taste]\n", "line 3, column 1: Table defined twice" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
+    }
+}
+
 TEST(toml_test, input_that_is_not_utf8_has_a_detail)
 {
     auto result = toml::deserialize(make_data("key = \"\xff\""));

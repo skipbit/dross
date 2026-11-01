@@ -78,7 +78,9 @@ namespace dross::toml {
  * - Numbers that number cannot hold: an exponent that expands the number
  *   past 4096 digits, such as 1e5000
  * - A key or table defined twice, including a table header that names a
- *   key already set by a key/value pair or an inline table
+ *   key already set by a key/value pair or an inline table, a table header
+ *   that names a table dotted keys created, and a dotted key that adds to a
+ *   table a header or an inline table defined
  * - Numbers with a leading zero or without a digit on both sides of the
  *   decimal point, such as 01, 1. and -.5
  * - A newline or a comment inside an inline table, outside its values
@@ -86,7 +88,6 @@ namespace dross::toml {
  * Valid TOML that fails to read:
  * - Literal strings and multi-line strings
  * - Datetimes of every kind
- * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
  * - Integers in hexadecimal, octal or binary
  * - Integers and floats with underscores, such as 1_000 or 1e1_0
  * - The floats inf and nan, with or without a sign

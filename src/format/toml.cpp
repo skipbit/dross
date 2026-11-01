@@ -171,6 +171,8 @@ private:
         std::map<std::string, std::unique_ptr<table_node>> tables;
         // Whether a header named this table, rather than only passing through it
         bool named = false;
+        // Whether dotted keys created this table, which only they can add to
+        bool dotted = false;
     };
 
     struct position {
@@ -296,8 +298,8 @@ private:
                     return std::unexpected(line_end.error());
                 }
 
-                auto [key, val] = kv_result.value();
-                auto added = add_key(*current, key, val, pair_start);
+                auto [key_path, val] = kv_result.value();
+                auto added = add_pair(*current, key_path, val, pair_start);
                 if (! added) {
                     return std::unexpected(added.error());
                 }
@@ -370,6 +372,28 @@ private:
         return add_key(table.pairs, key, val, at);
     }
 
+    // A dotted key creates the tables before its last part, and can only pass
+    // through a table that dotted keys created.
+    std::expected<void, error> add_pair(table_node& table, const std::vector<std::string>& key_path, const value& val, const position& at)
+    {
+        table_node* node = &table;
+        for (size_t i = 0; (i + 1) < key_path.size(); ++i) {
+            const std::string& key = key_path[i];
+            if (node->pairs.contains(key)) {
+                return std::unexpected(create_error("Key defined twice", at));
+            }
+            auto& child = node->tables[key];
+            if (! child) {
+                child = std::make_unique<table_node>();
+                child->dotted = true;
+            } else if (! child->dotted) {
+                return std::unexpected(create_error("Key defined twice", at));
+            }
+            node = child.get();
+        }
+        return add_key(*node, key_path.back(), val, at);
+    }
+
     // Only a table that headers created can take a header, and only one header can name it.
     std::expected<table_node*, error> open_table(table_node& root, const std::vector<std::string>& key_path, const position& header_start)
     {
@@ -385,23 +409,31 @@ private:
             table = child.get();
         }
 
-        if (table->named) {
+        if (table->named || table->dotted) {
             return std::unexpected(create_error("Table defined twice", header_start));
         }
         table->named = true;
         return table;
     }
 
-    std::expected<std::pair<std::string, value>, error> parse_key_value()
+    std::expected<std::pair<std::vector<std::string>, value>, error> parse_key_value()
     {
-        auto key_result = parse_key();
-        if (! key_result) {
-            return std::unexpected(key_result.error());
+        std::vector<std::string> key_path;
+        while (true) {
+            auto key_result = parse_key();
+            if (! key_result) {
+                return std::unexpected(key_result.error());
+            }
+            key_path.push_back(key_result.value());
+
+            skip_whitespace();
+            if (current_char() != '.') {
+                break;
+            }
+            advance();  // skip '.'
+            skip_whitespace();
         }
 
-        std::string key = key_result.value();
-
-        skip_whitespace();
         if (current_char() != '=') {
             return std::unexpected(create_error("Expected '='"));
         }
@@ -413,7 +445,7 @@ private:
             return std::unexpected(value_result.error());
         }
 
-        return std::make_pair(key, value_result.value());
+        return std::make_pair(key_path, value_result.value());
     }
 
     std::expected<std::string, error> parse_key()
@@ -597,12 +629,12 @@ private:
         }
         advance();  // skip '{'
 
-        dictionary result;
+        table_node result;
 
         skip_whitespace();
         if (current_char() == '}') {
             advance();
-            return value(result);
+            return value(dictionary{});
         }
 
         while (true) {
@@ -612,8 +644,8 @@ private:
                 return std::unexpected(kv_result.error());
             }
 
-            auto [key, val] = kv_result.value();
-            auto added = add_key(result, key, val, pair_start);
+            auto [key_path, val] = kv_result.value();
+            auto added = add_pair(result, key_path, val, pair_start);
             if (! added) {
                 return std::unexpected(added.error());
             }
@@ -635,7 +667,7 @@ private:
             }
         }
 
-        return value(result);
+        return value(to_dictionary(result));
     }
 
     std::expected<value, error> parse_boolean()
