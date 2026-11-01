@@ -6,8 +6,9 @@
 #include "dross/type/number.h"
 #include "dross/type/string.h"
 
+#include <map>
+#include <memory>
 #include <new>
-#include <set>
 #include <string>
 
 namespace dross::toml {
@@ -160,10 +161,16 @@ private:
     size_t _pos;
     size_t _line;
     size_t _column;
-    // Tables that headers created, either named or as the parent of a named one
-    std::set<std::vector<std::string>> _header_tables;
-    // Tables that a header named
-    std::set<std::vector<std::string>> _defined_tables;
+
+    // The tables that headers create, either named or as the parent of a named
+    // one, are kept apart from their key/value pairs so that a header updates
+    // its table in place, and become a dictionary once the document is read.
+    struct table_node {
+        dictionary pairs;
+        std::map<std::string, std::unique_ptr<table_node>> tables;
+        // Whether a header named this table, rather than only passing through it
+        bool named = false;
+    };
 
     struct position {
         size_t line;
@@ -251,7 +258,7 @@ private:
 
     std::expected<dictionary, error> parse_document()
     {
-        dictionary result;
+        table_node result;
 
         while (_pos < _input.size()) {
             skip_whitespace_and_comments();
@@ -300,6 +307,15 @@ private:
             }
         }
 
+        return to_dictionary(result);
+    }
+
+    static dictionary to_dictionary(const table_node& node)
+    {
+        dictionary result = node.pairs;
+        for (const auto& [key, table] : node.tables) {
+            result[key] = to_dictionary(*table);
+        }
         return result;
     }
 
@@ -379,26 +395,33 @@ private:
         return {};
     }
 
+    std::expected<void, error> add_key(table_node& table, const std::string& key, const value& val, const position& at)
+    {
+        if (table.tables.contains(key)) {
+            return std::unexpected(create_error("Key defined twice", at));
+        }
+        return add_key(table.pairs, key, val, at);
+    }
+
     // Only a table that headers created can take a header, and only one header can name it.
     // A failure names the start of the header, as the content has no positions.
-    std::expected<void, error> insert_table(dictionary& current_dict, const std::vector<std::string>& key_path, size_t index, const dictionary& content, const position& header_start)
+    std::expected<void, error> insert_table(table_node& parent, const std::vector<std::string>& key_path, size_t index, const dictionary& content, const position& header_start)
     {
-        const std::vector<std::string> path(key_path.begin(), key_path.begin() + index + 1);
         const std::string& current_key = key_path[index];
-
-        dictionary table;
-        if (current_dict.contains(current_key)) {
-            if (! _header_tables.contains(path)) {
-                return std::unexpected(create_error("Table header names a key that is not a table", header_start));
-            }
-            table = current_dict[current_key].as<dictionary>();
+        if (parent.pairs.contains(current_key)) {
+            return std::unexpected(create_error("Table header names a key that is not a table", header_start));
         }
-        _header_tables.insert(path);
+        auto& child = parent.tables[current_key];
+        if (! child) {
+            child = std::make_unique<table_node>();
+        }
+        table_node& table = *child;
 
         if (index == (key_path.size() - 1)) {
-            if (! _defined_tables.insert(path).second) {
+            if (table.named) {
                 return std::unexpected(create_error("Table defined twice", header_start));
             }
+            table.named = true;
             for (const auto& [key, val] : content) {
                 auto added = add_key(table, key, val, header_start);
                 if (! added) {
@@ -412,7 +435,6 @@ private:
             }
         }
 
-        current_dict[current_key] = value(table);
         return {};
     }
 

@@ -89,7 +89,7 @@ int main()
 ]] DROSS_OPERATOR_NEW_REPLACEABLE)
 if(DROSS_OPERATOR_NEW_REPLACEABLE)
     dross_add_test_executable(${PROJECT_NAME}_allocation_test
-        ${CMAKE_CURRENT_SOURCE_DIR}/type/test_timestamp_allocations.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_allocations.cpp
     )
 endif()
 
