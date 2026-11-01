@@ -149,6 +149,10 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` fails on the floats ``inf`` and ``nan``, with
+  or without a sign, with the detail ``number cannot hold inf or nan``.
+  It used to say ``Invalid value format`` or ``Invalid number format``
+
 - ``toml::deserialize()`` reads underscores between the digits of a
   number, such as ``1_000``, ``3.14_15``, ``1e1_0`` and ``0xDEAD_beef``,
   and rejects one without a digit on each side. ``toml::serialize()``

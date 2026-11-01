@@ -667,11 +667,25 @@ private:
         return std::unexpected(create_error("Unterminated " + kind));
     }
 
+    // The floats inf and nan, with or without a sign, ending the word.
+    bool at_inf_or_nan() const
+    {
+        const size_t start = ((current_char() == '+') || (current_char() == '-')) ? 1 : 0;
+        const auto is_word = [&](const char* word) {
+            return (_input.compare(_pos + start, 3, word) == 0) && ! is_bare_key_char(peek_char(start + 3));
+        };
+        return is_word("inf") || is_word("nan");
+    }
+
     std::expected<value, error> parse_value()
     {
         skip_whitespace();
 
         char ch = current_char();
+
+        if (at_inf_or_nan()) {
+            return std::unexpected(create_error("number cannot hold inf or nan"));
+        }
 
         const auto to_value = [](const std::string& text) {
             return value(string{ text });

@@ -331,6 +331,24 @@ TEST(toml_test, numbers_with_underscores)
     }
 }
 
+// number holds neither infinity nor a NaN read from a document, so inf and
+// nan fail with a detail that says so.
+TEST(toml_test, inf_and_nan_fail_with_a_reason)
+{
+    for (const char* text : { "x = inf\n", "x = +inf\n", "x = -inf\n", "x = nan\n", "x = +nan\n", "x = -nan\n", "x = [1, inf]\n" }) {
+        auto result = toml::deserialize(make_data(text));
+        ASSERT_FALSE(result.has_value()) << text;
+        EXPECT_TRUE(result.error().detail().ends_with(": number cannot hold inf or nan")) << text << result.error().detail();
+    }
+    auto result = toml::deserialize(make_data("x = -inf\n"));
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().detail(), "line 1, column 5: number cannot hold inf or nan");
+
+    auto other = toml::deserialize(make_data("x = info\n"));
+    ASSERT_FALSE(other.has_value());
+    EXPECT_EQ(other.error().detail(), "line 1, column 5: Invalid value format");
+}
+
 TEST(toml_test, numbers_that_number_cannot_hold)
 {
     auto longest = toml::deserialize(make_data("x = 1e4095\n"));

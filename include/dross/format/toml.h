@@ -87,7 +87,8 @@ namespace dross::toml {
  *
  * Valid TOML that fails to read:
  * - Datetimes of every kind
- * - The floats inf and nan, with or without a sign
+ * - The floats inf and nan, with or without a sign, which number cannot
+ *   hold, fail with "number cannot hold inf or nan"
  * - Arrays of tables, written with [[name]] headers
  *
  * A newline in a multi-line string is kept as it is written, LF or CRLF.
