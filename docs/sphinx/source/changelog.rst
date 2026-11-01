@@ -34,9 +34,9 @@ Added
 
 - ``number::is_floating_point()``, true for a number written with a
   decimal point or an exponent, made from a floating-point type, or
-  computed with a floating-point operand. It does not depend on the
-  value, so ``number("1.0")`` is both floating point and an integer.
-  Comparisons ignore it
+  computed with a floating-point operand or with a fraction, such as
+  ``1 / 4``. It does not depend on the value, so ``number("1.0")`` is
+  both floating point and an integer. Comparisons ignore it
 
 Changed
 ~~~~~~~

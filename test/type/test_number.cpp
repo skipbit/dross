@@ -111,16 +111,18 @@ TEST(number_test, copy_and_assignment_keep_floating_point)
 }
 
 // Arithmetic with a floating-point operand is floating point, as in TOML,
-// JSON and most languages; arithmetic on integers is not, even a division.
+// JSON and most languages, and so is a result with a fraction; arithmetic on
+// integers with an integral result is not.
 TEST(number_test, arithmetic_keeps_floating_point)
 {
     const dross::number f("1.5");
     const dross::number i(2);
-    for (const dross::number& n : { f + i, i + f, f - i, f * i, i * f, f / i, dross::number("3.0") % i, i % dross::number("3.0") }) {
+    const dross::number quarter = dross::number(1) / dross::number(4);
+    for (const dross::number& n : { f + i, i + f, f - i, f * i, i * f, f / i, dross::number("3.0") % i, i % dross::number("3.0"), quarter, quarter * dross::number(4) }) {
         SCOPED_TRACE(std::string(n));
         EXPECT_TRUE(n.is_floating_point());
     }
-    for (const dross::number& n : { i + i, i - i, i * i, dross::number(4) / i, dross::number(1) / dross::number(4), dross::number(5) % i }) {
+    for (const dross::number& n : { i + i, i - i, i * i, dross::number(4) / i, dross::number(5) % i }) {
         SCOPED_TRACE(std::string(n));
         EXPECT_FALSE(n.is_floating_point());
     }

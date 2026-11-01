@@ -1096,9 +1096,10 @@ TEST(toml_test, serialize_writes_back_a_float_with_an_integral_value)
     made["a"] = value(number{ 1.0 });
     made["b"] = value(number{ "1.5" } * number{ 2 });
     made["c"] = value(number{ 2 } * number{ 2 });
+    made["d"] = value(number{ 1 } / number{ 4 } * number{ 4 });
     auto made_written = toml::serialize(made);
     ASSERT_TRUE(made_written.has_value());
-    EXPECT_EQ(std::string(*made_written), "a = 1.0\nb = 3.0\nc = 4\n");
+    EXPECT_EQ(std::string(*made_written), "a = 1.0\nb = 3.0\nc = 4\nd = 1.0\n");
 }
 
 // Performance and Large Data Tests

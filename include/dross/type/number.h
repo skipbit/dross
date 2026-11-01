@@ -154,8 +154,9 @@ public:
      *
      * A number is floating point when its text has a decimal point or an
      * exponent, when it is made from a floating-point type, or when it is the
-     * result of arithmetic with a floating-point operand. Unlike is_integer(),
-     * this does not depend on the value: 1.0 is both. Comparisons ignore it.
+     * result of arithmetic with a floating-point operand or with a fraction,
+     * such as 1 / 4. Unlike is_integer(), this does not depend on the value:
+     * 1.0 is both. Comparisons ignore it.
      * Returns false for NaN values.
      */
     bool is_floating_point() const;

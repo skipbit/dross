@@ -990,7 +990,7 @@ number::operator long long() const
 number number::calculate(const number& other, char op) const
 {
     number result{ perform_arithmetic(_store->number, other._store->number, op) };
-    result._store->floating_point = (_store->floating_point || other._store->floating_point);
+    result._store->floating_point = (result._store->floating_point || _store->floating_point || other._store->floating_point);
     return result;
 }
 
