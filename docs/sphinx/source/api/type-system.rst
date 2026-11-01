@@ -511,7 +511,7 @@ provide three-way comparison (the spaceship operator). ``value``, ``string``,
         std::cout << "n1 is less than n2" << std::endl;
     }
 
-    auto ordering = n1 <=> n2;  // std::strong_ordering
+    auto ordering = n1 <=> n2;  // std::weak_ordering
 
     // value is only equality-comparable
     dross::value v1 = 42;

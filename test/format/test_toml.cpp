@@ -513,8 +513,7 @@ TEST(toml_test, serialize_simple)
 
     std::string output = result.value();
     EXPECT_TRUE(output.find("title = \"Example\"") != std::string::npos);
-    // number keeps no record of a float, so 1.0 is written as 1.
-    EXPECT_TRUE(output.find("version = 1\n") != std::string::npos);
+    EXPECT_TRUE(output.find("version = 1.0\n") != std::string::npos);
     EXPECT_TRUE(output.find("enabled = true") != std::string::npos);
 }
 
@@ -1078,6 +1077,29 @@ TEST(toml_test, serialize_writes_back_a_large_float_it_read)
     auto written = toml::serialize(*read);
     ASSERT_TRUE(written.has_value());
     EXPECT_EQ(std::string(*written), document);
+}
+
+// A float keeps a fractional part when its value is integral, so it reads
+// back as a float.
+TEST(toml_test, serialize_writes_back_a_float_with_an_integral_value)
+{
+    const std::string document = "a = 1.0\nb = 100.0\nc = 0.0\nd = 1.25\ne = 1\nf = 100\n";
+
+    auto read = toml::deserialize(data{ "a = 1.0\nb = 1e2\nc = 0.0\nd = 1.25\ne = 1\nf = 100\n" });
+    ASSERT_TRUE(read.has_value());
+
+    auto written = toml::serialize(*read);
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(std::string(*written), document);
+
+    dictionary made;
+    made["a"] = value(number{ 1.0 });
+    made["b"] = value(number{ "1.5" } * number{ 2 });
+    made["c"] = value(number{ 2 } * number{ 2 });
+    made["d"] = value(number{ 1 } / number{ 4 } * number{ 4 });
+    auto made_written = toml::serialize(made);
+    ASSERT_TRUE(made_written.has_value());
+    EXPECT_EQ(std::string(*made_written), "a = 1.0\nb = 3.0\nc = 4\nd = 1.0\n");
 }
 
 // Performance and Large Data Tests

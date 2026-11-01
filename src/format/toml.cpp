@@ -828,10 +828,11 @@ private:
                 throw std::runtime_error("NaN cannot be written as a TOML value");
             }
             _output += std::string(n);
-            // TOML integers are 64-bit, so a larger integral value is written as a float.
+            // A float keeps its fraction, and TOML integers are 64-bit, so a
+            // larger integral value is written as a float.
             static const number int64_max{ "9223372036854775807" };
             static const number int64_min{ "-9223372036854775808" };
-            if (n.is_integer() && (n > int64_max || n < int64_min)) {
+            if (n.is_integer() && (n.is_floating_point() || n > int64_max || n < int64_min)) {
                 _output += ".0";
             }
         } else if (val.is<boolean>()) {

@@ -119,8 +119,9 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Nested tables use dotted notation when appropriate
  * - Strings are properly escaped according to TOML rules
  * - Numbers are written in number's canonical form, without trailing zeros.
- *   number does not record whether it was a TOML integer or float, so a
- *   float whose fraction is all zeros (1.0) is written as an integer (1).
+ *   A floating-point number (number::is_floating_point()) whose value is
+ *   integral is written with ".0", so a float read as 1.0 or 1e2 is written
+ *   as 1.0 or 100.0, and an integer as an integer.
  *   An integral value outside the 64-bit range of TOML integers is written
  *   as a float (9223372036854775808.0). dross reads it back exactly, but a
  *   reader that holds floats as 64-bit doubles may round it.

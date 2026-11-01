@@ -1,6 +1,7 @@
 #pragma once
 
 #include <charconv>
+#include <compare>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -91,7 +92,8 @@ public:
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
      * An exponent is expanded in the text, keeping every digit: "1e3" is stored
      * as 1000. An expansion longer than 4096 digits, and longer than the
-     * number as written, results in NaN, as do invalid strings.
+     * number as written, results in NaN, as do invalid strings. A decimal
+     * point or an exponent in the text makes a floating-point number.
      */
     number(const char* str);
 
@@ -102,7 +104,8 @@ public:
      * Accepts decimal numbers in standard notation (e.g., "123", "-45.67", "1.23e-4").
      * An exponent is expanded in the text, keeping every digit: "1e3" is stored
      * as 1000. An expansion longer than 4096 digits, and longer than the
-     * number as written, results in NaN, as do invalid strings.
+     * number as written, results in NaN, as do invalid strings. A decimal
+     * point or an exponent in the text makes a floating-point number.
      */
     number(const std::string& str);
 
@@ -116,11 +119,12 @@ public:
      * double follows the standard library's std::to_chars, which in libc++
      * writes it at double precision. A value whose expansion is longer than
      * 4096 digits, or that is not finite, results in NaN. A character is read
-     * as its code and bool as 0 or 1.
+     * as its code and bool as 0 or 1. A float, double or long double makes a
+     * floating-point number.
      */
     template <number_type T>
     number(const T n)
-        : number(arithmetic_text(n))
+        : number(arithmetic_text(n), std::is_floating_point_v<T>)
     {
     }
 
@@ -147,6 +151,19 @@ public:
     bool is_integer() const;
 
     /**
+     * @brief Check if this number was made as a floating-point number.
+     * @return true if the number is floating point, false otherwise
+     *
+     * A number is floating point when its text has a decimal point or an
+     * exponent, when it is made from a floating-point type, or when it is the
+     * result of arithmetic with a floating-point operand or with a fraction,
+     * such as 1 / 4. Unlike is_integer(), this does not depend on the value:
+     * 1.0 is both. Comparisons ignore it.
+     * Returns false for NaN values.
+     */
+    bool is_floating_point() const;
+
+    /**
      * @brief Test equality with another number.
      * @param other The number to compare with
      * @return true if both numbers represent the same value, false otherwise
@@ -169,20 +186,21 @@ public:
     /**
      * @brief Three-way comparison with another number.
      * @param other The number to compare with
-     * @return std::strong_ordering result (less, equal or greater)
+     * @return std::weak_ordering result (less, equivalent or greater)
      *
      * NaN is one value, ordered below every number, so numbers that hold NaN
-     * can be sorted and used as keys.
+     * can be sorted and used as keys. Numbers of the same value are
+     * equivalent whether or not they are floating point.
      */
-    std::strong_ordering compare(const number& other) const noexcept;
+    std::weak_ordering compare(const number& other) const noexcept;
 
     /**
      * @brief Three-way comparison with an arithmetic value.
      * @param n The arithmetic value to compare with
-     * @return std::strong_ordering result (less, equal or greater)
+     * @return std::weak_ordering result (less, equivalent or greater)
      */
     template <number_type T>
-    std::strong_ordering compare(const T n) const noexcept
+    std::weak_ordering compare(const T n) const noexcept
     {
         return compare(number(n));
     }
@@ -204,9 +222,9 @@ public:
     /**
      * @brief Three-way comparison operator (spaceship operator).
      * @param other The number to compare with
-     * @return std::strong_ordering result for use with comparison operators
+     * @return std::weak_ordering result for use with comparison operators
      */
-    std::strong_ordering operator<=>(const number& other) const noexcept;
+    std::weak_ordering operator<=>(const number& other) const noexcept;
 
     /**
      * @brief Equality comparison with arithmetic types.
@@ -233,10 +251,10 @@ public:
     /**
      * @brief Three-way comparison with arithmetic types.
      * @param n The arithmetic value to compare with
-     * @return std::strong_ordering result for use with comparison operators
+     * @return std::weak_ordering result for use with comparison operators
      */
     template <number_type T>
-    std::strong_ordering operator<=>(const T n) const noexcept
+    std::weak_ordering operator<=>(const T n) const noexcept
     {
         return compare(n);
     }
@@ -252,6 +270,9 @@ public:
      * @brief Assignment from C-style string.
      * @param str Null-terminated string representation
      * @return Reference to this number
+     *
+     * The number is floating point if the text has a decimal point or an
+     * exponent, and not otherwise.
      */
     number& operator=(const char* str);
 
@@ -259,6 +280,9 @@ public:
      * @brief Assignment from std::string.
      * @param str String representation of the number
      * @return Reference to this number
+     *
+     * The number is floating point if the text has a decimal point or an
+     * exponent, and not otherwise.
      */
     number& operator=(const std::string& str);
 
@@ -406,6 +430,10 @@ public:
     static number nan();
 
 private:
+    number(const std::string& text, bool floating_point);
+
+    number calculate(const number& other, char op) const;
+
     template <number_type T>
     static std::string arithmetic_text(const T n)
     {
