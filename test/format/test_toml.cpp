@@ -661,6 +661,36 @@ TEST(toml_test, invalid_number)
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(toml_test, numbers_with_a_leading_zero_or_a_bare_decimal_point)
+{
+    for (const char* text : { "a = 01", "a = +01", "a = -01", "a = 00", "a = 00.5", "a = 01.5", "a = 1.", "a = 0.", "a = -1.", "a = 1.e5", "a = -.5", "a = +.5" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+        }
+    }
+
+    for (const char* text : { "a = 0", "a = -0", "a = +0", "a = 0.5", "a = -0.5", "a = 10", "a = 1e05", "a = 0e0", "a = 1.5e-05" }) {
+        EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
+    }
+}
+
+TEST(toml_test, inline_tables_stay_on_one_line)
+{
+    for (const char* text : { "a = {x = 1\n, y = 2}", "a = {x = 1\n}", "a = {x = 1 # c\n}" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+        }
+    }
+
+    for (const char* text : { "a = {x = 1, y = 2}", "a = { x = 1 }", "a = {x = [1,\n2]}" }) {
+        EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
+    }
+}
+
 TEST(toml_test, missing_equals)
 {
     auto result = toml::deserialize(make_data("key value"));

@@ -79,6 +79,9 @@ namespace dross::toml {
  *   past 4096 digits, such as 1e5000
  * - A key or table defined twice, including a table header that names a
  *   key already set by a key/value pair or an inline table
+ * - Numbers with a leading zero or without a digit on both sides of the
+ *   decimal point, such as 01, 1. and -.5
+ * - A newline or a comment inside an inline table, outside its values
  *
  * Valid TOML that fails to read:
  * - Literal strings and multi-line strings
@@ -88,11 +91,6 @@ namespace dross::toml {
  * - Integers and floats with underscores, such as 1_000 or 1e1_0
  * - The floats inf and nan, with or without a sign
  * - Arrays of tables, written with [[name]] headers
- *
- * Invalid TOML that is read without an error:
- * - Numbers with a leading zero or without a digit on one side of the
- *   decimal point, such as 01, 1. and -.5
- * - A newline before a comma in an inline table
  *
  * @note Comments are skipped and are not kept in the result.
  */
