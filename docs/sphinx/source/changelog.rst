@@ -32,6 +32,12 @@ Added
   constructor ``error(std::errc, std::string)`` takes it and ``detail()``
   returns it, empty when there is none. Comparisons ignore it
 
+- ``number::is_floating_point()``, true for a number written with a
+  decimal point or an exponent, made from a floating-point type, or
+  computed with a floating-point operand. It does not depend on the
+  value, so ``number("1.0")`` is both floating point and an integer.
+  Comparisons ignore it
+
 Changed
 ~~~~~~~
 
@@ -134,8 +140,19 @@ Changed
   ``(a <=> b) == 0`` compile as before; code that stores the result in a
   ``std::strong_ordering`` does not
 
+- ``number``'s ``<=>`` and ``compare()`` return ``std::weak_ordering``
+  instead of ``std::strong_ordering``, since ``number("1.0")`` and
+  ``number(1)`` compare equivalent but only the first is floating point.
+  ``a < b`` and ``(a <=> b) == 0`` compile as before; code that stores the
+  result in a ``std::strong_ordering`` does not
+
 Fixed
 ~~~~~
+
+- ``toml::serialize()`` writes a float whose value is integral with
+  ``.0``, so ``x = 1.0`` and ``x = 1e2`` read and written back are
+  ``x = 1.0`` and ``x = 100.0``. They used to be written as the integers
+  ``x = 1`` and ``x = 100``, which read back as integers
 
 - ``toml::deserialize()`` rejects a number with a leading zero, such as
   ``01`` or ``-01``, or without a digit on both sides of the decimal

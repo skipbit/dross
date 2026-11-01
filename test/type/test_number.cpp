@@ -4,8 +4,11 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <compare>
 #include <limits>
 #include <sstream>
+#include <type_traits>
+#include <utility>
 
 TEST(number_test, default_constructor_is_zero)
 {
@@ -66,6 +69,97 @@ TEST(number_test, floating_point_keeps_its_shortest_form)
 
     EXPECT_TRUE(dross::number(std::numeric_limits<double>::infinity()).is_nan());
     EXPECT_TRUE(dross::number(std::numeric_limits<double>::quiet_NaN()).is_nan());
+}
+
+// A number written with a decimal point or an exponent, or made from a
+// floating-point type, is floating point even when its value is integral.
+TEST(number_test, floating_point_records_how_the_number_was_made)
+{
+    for (const dross::number& n : { dross::number("1.0"), dross::number("1.25"), dross::number("1e2"), dross::number("1E2"), dross::number("-0.0"), dross::number(1.0), dross::number(2.5f), dross::number(1.0L) }) {
+        SCOPED_TRACE(std::string(n));
+        EXPECT_TRUE(n.is_floating_point());
+    }
+    for (const dross::number& n : { dross::number(), dross::number("1"), dross::number("-12"), dross::number(1), dross::number(1LL), dross::number('a'), dross::number(true), dross::number::nan(), dross::number("1.0.0") }) {
+        SCOPED_TRACE(std::string(n));
+        EXPECT_FALSE(n.is_floating_point());
+    }
+
+    EXPECT_TRUE(dross::number("1.0").is_integer());
+    EXPECT_EQ(std::string(dross::number("1.0")), "1");
+    EXPECT_EQ(std::string(dross::number(1.0)), "1");
+}
+
+TEST(number_test, copy_and_assignment_keep_floating_point)
+{
+    const dross::number written("1.0");
+    const dross::number copied(written);
+    EXPECT_TRUE(copied.is_floating_point());
+
+    dross::number assigned;
+    assigned = written;
+    EXPECT_TRUE(assigned.is_floating_point());
+    assigned = dross::number(1);
+    EXPECT_FALSE(assigned.is_floating_point());
+    assigned = "2.0";
+    EXPECT_TRUE(assigned.is_floating_point());
+    assigned = std::string("2");
+    EXPECT_FALSE(assigned.is_floating_point());
+    assigned = 2.0;
+    EXPECT_TRUE(assigned.is_floating_point());
+    assigned = 2;
+    EXPECT_FALSE(assigned.is_floating_point());
+}
+
+// Arithmetic with a floating-point operand is floating point, as in TOML,
+// JSON and most languages; arithmetic on integers is not, even a division.
+TEST(number_test, arithmetic_keeps_floating_point)
+{
+    const dross::number f("1.5");
+    const dross::number i(2);
+    for (const dross::number& n : { f + i, i + f, f - i, f * i, i * f, f / i, dross::number("3.0") % i, i % dross::number("3.0") }) {
+        SCOPED_TRACE(std::string(n));
+        EXPECT_TRUE(n.is_floating_point());
+    }
+    for (const dross::number& n : { i + i, i - i, i * i, dross::number(4) / i, dross::number(1) / dross::number(4), dross::number(5) % i }) {
+        SCOPED_TRACE(std::string(n));
+        EXPECT_FALSE(n.is_floating_point());
+    }
+    EXPECT_EQ(std::string(f * i), "3");
+
+    dross::number compound(2);
+    compound += f;
+    EXPECT_TRUE(compound.is_floating_point());
+    dross::number a(4);
+    dross::number b(4);
+    dross::number c(4);
+    dross::number d(4);
+    a -= f;
+    b *= f;
+    c /= f;
+    d %= dross::number("3.0");
+    EXPECT_TRUE(a.is_floating_point());
+    EXPECT_TRUE(b.is_floating_point());
+    EXPECT_TRUE(c.is_floating_point());
+    EXPECT_TRUE(d.is_floating_point());
+    dross::number e(4);
+    e += i;
+    EXPECT_FALSE(e.is_floating_point());
+}
+
+// Numbers compare by value only, so 1.0 equals 1 although only one of them
+// is floating point; equal numbers can be told apart, so the ordering is weak.
+TEST(number_test, comparison_ignores_floating_point)
+{
+    EXPECT_EQ(dross::number("1.0"), dross::number(1));
+    EXPECT_EQ(dross::number(1.0), 1);
+    EXPECT_TRUE((dross::number("1.0") <=> dross::number(1)) == std::weak_ordering::equivalent);
+    EXPECT_TRUE(dross::number("1.0").compare(1) == std::weak_ordering::equivalent);
+    EXPECT_LT(dross::number(1), dross::number("1.5"));
+
+    static_assert(std::is_same_v<decltype(std::declval<const dross::number&>() <=> std::declval<const dross::number&>()), std::weak_ordering>);
+    static_assert(std::is_same_v<decltype(std::declval<const dross::number&>() <=> 1), std::weak_ordering>);
+    static_assert(std::is_same_v<decltype(std::declval<const dross::number&>().compare(std::declval<const dross::number&>())), std::weak_ordering>);
+    static_assert(std::is_same_v<decltype(std::declval<const dross::number&>().compare(1)), std::weak_ordering>);
 }
 
 // A character is read as its code and bool as 0 or 1, as number.h documents.

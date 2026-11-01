@@ -832,15 +832,25 @@ class number::storage {
 public:
     // Holds only the canonical form or NAN_VALUE.
     std::string number{ "0" };
+    bool floating_point = false;
 
     storage() = default;
-    storage(const char* s)
-        : number(canonical_text(s))
-    {
-    }
     storage(const std::string& s)
         : number(canonical_text(s))
+        , floating_point(is_written_as_floating_point(s))
     {
+    }
+
+    void assign(const std::string& s)
+    {
+        number = canonical_text(s);
+        floating_point = is_written_as_floating_point(s);
+    }
+
+private:
+    static bool is_written_as_floating_point(const std::string& s)
+    {
+        return (s.find_first_of(".eE") != std::string::npos);
     }
 };
 
@@ -864,6 +874,12 @@ number::number(const std::string& s)
 {
 }
 
+number::number(const std::string& text, bool floating_point)
+    : number(text)
+{
+    _store->floating_point = floating_point;
+}
+
 number::~number() = default;
 
 bool number::is_nan() const
@@ -876,12 +892,17 @@ bool number::is_integer() const
     return (! is_nan()) && (_store->number.find('.') == std::string::npos);
 }
 
-bool number::equals(const number& n) const
+bool number::is_floating_point() const
 {
-    return (compare(n) == std::strong_ordering::equal);
+    return (! is_nan()) && _store->floating_point;
 }
 
-std::strong_ordering number::compare(const number& n) const noexcept
+bool number::equals(const number& n) const
+{
+    return (compare(n) == std::weak_ordering::equivalent);
+}
+
+std::weak_ordering number::compare(const number& n) const noexcept
 {
     // Handle invalid numbers
     const bool valid1 = is_valid_number(_store->number);
@@ -890,20 +911,20 @@ std::strong_ordering number::compare(const number& n) const noexcept
     // NaN is one value, below every number.
     if ((! valid1) || (! valid2)) {
         if ((! valid1) && (! valid2)) {
-            return std::strong_ordering::equal;
+            return std::weak_ordering::equivalent;
         }
-        return valid1 ? std::strong_ordering::greater : std::strong_ordering::less;
+        return valid1 ? std::weak_ordering::greater : std::weak_ordering::less;
     }
 
     // Both are valid numbers
     int cmp = compare_numbers(_store->number, n._store->number);
     if (cmp < 0) {
-        return std::strong_ordering::less;
+        return std::weak_ordering::less;
     }
     if (cmp > 0) {
-        return std::strong_ordering::greater;
+        return std::weak_ordering::greater;
     }
-    return std::strong_ordering::equal;
+    return std::weak_ordering::equivalent;
 }
 
 bool number::operator==(const number& n) const
@@ -916,7 +937,7 @@ bool number::operator!=(const number& n) const
     return (! equals(n));
 }
 
-std::strong_ordering number::operator<=>(const number& n) const noexcept
+std::weak_ordering number::operator<=>(const number& n) const noexcept
 {
     return compare(n);
 }
@@ -924,18 +945,19 @@ std::strong_ordering number::operator<=>(const number& n) const noexcept
 number& number::operator=(const number& n)
 {
     _store->number = n._store->number;
+    _store->floating_point = n._store->floating_point;
     return *this;
 }
 
 number& number::operator=(const char* s)
 {
-    _store->number = canonical_text(s);
+    _store->assign(s);
     return *this;
 }
 
 number& number::operator=(const std::string& s)
 {
-    _store->number = canonical_text(s);
+    _store->assign(s);
     return *this;
 }
 
@@ -965,34 +987,36 @@ number::operator long long() const
 }
 
 // Arithmetic operators
+number number::calculate(const number& other, char op) const
+{
+    number result{ perform_arithmetic(_store->number, other._store->number, op) };
+    result._store->floating_point = (_store->floating_point || other._store->floating_point);
+    return result;
+}
+
 number number::operator+(const number& other) const
 {
-    std::string result = perform_arithmetic(_store->number, other._store->number, '+');
-    return number{ result };
+    return calculate(other, '+');
 }
 
 number number::operator-(const number& other) const
 {
-    std::string result = perform_arithmetic(_store->number, other._store->number, '-');
-    return number{ result };
+    return calculate(other, '-');
 }
 
 number number::operator*(const number& other) const
 {
-    std::string result = perform_arithmetic(_store->number, other._store->number, '*');
-    return number{ result };
+    return calculate(other, '*');
 }
 
 number number::operator/(const number& other) const
 {
-    std::string result = perform_arithmetic(_store->number, other._store->number, '/');
-    return number{ result };
+    return calculate(other, '/');
 }
 
 number number::operator%(const number& other) const
 {
-    std::string result = perform_arithmetic(_store->number, other._store->number, '%');
-    return number{ result };
+    return calculate(other, '%');
 }
 
 // Compound assignment operators
