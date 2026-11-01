@@ -664,7 +664,11 @@ private:
                 return std::unexpected(added.error());
             }
 
-            skip_whitespace_and_comments();
+            // TOML v1.0.0 keeps an inline table on one line, so it has no newline or comment.
+            skip_whitespace();
+            if ((current_char() == '\n') || (current_char() == '#')) {
+                return std::unexpected(create_error("An inline table must stay on one line"));
+            }
             if (current_char() == ',') {
                 advance();
                 skip_whitespace();
@@ -705,21 +709,32 @@ private:
             advance();
         }
 
-        // Parse digits and decimal point
-        bool has_dot = false;
-        while ((_pos < _input.size()) && (is_ascii_digit(current_char()) || (current_char() == '.'))) {
-            if (current_char() == '.') {
-                if (has_dot) {
-                    break;  // Only one decimal point allowed
-                }
-                has_dot = true;
+        const auto read_digits = [&] {
+            size_t count = 0;
+            while (is_ascii_digit(current_char())) {
+                num_str += current_char();
+                advance();
+                ++count;
             }
+            return count;
+        };
+
+        // The integer part has no leading zero, a decimal point has a digit on both sides,
+        // and an exponent has a digit.
+        const bool leading_zero = (current_char() == '0');
+        const size_t integer_digits = read_digits();
+        if (integer_digits == 0) {
+            return std::unexpected(create_error("Invalid number format"));
+        }
+        if (leading_zero && (integer_digits > 1)) {
+            return std::unexpected(create_error("Leading zero in a number"));
+        }
+        if (current_char() == '.') {
             num_str += current_char();
             advance();
-        }
-
-        if (num_str.empty() || num_str == "+" || num_str == "-" || num_str == ".") {
-            return std::unexpected(create_error("Invalid number format"));
+            if (read_digits() == 0) {
+                return std::unexpected(create_error("Expected a digit after '.'"));
+            }
         }
 
         if ((current_char() == 'e') || (current_char() == 'E')) {
@@ -729,9 +744,8 @@ private:
                 num_str += current_char();
                 advance();
             }
-            while ((_pos < _input.size()) && is_ascii_digit(current_char())) {
-                num_str += current_char();
-                advance();
+            if (read_digits() == 0) {
+                return std::unexpected(create_error("Expected a digit in the exponent"));
             }
         }
 

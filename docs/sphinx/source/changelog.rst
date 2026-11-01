@@ -137,6 +137,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` rejects a number with a leading zero, such as
+  ``01`` or ``-01``, or without a digit on both sides of the decimal
+  point, such as ``1.`` or ``-.5``, and a newline or a comment before a
+  comma or the closing brace of an inline table. It used to read them
+
 - ``toml::deserialize()`` no longer slows down with the square of the
   number of table headers under one parent. Each header copied the tables
   that earlier headers had put under the same parent, so 2000 headers such

@@ -661,6 +661,55 @@ TEST(toml_test, invalid_number)
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(toml_test, numbers_with_a_leading_zero_or_a_bare_decimal_point)
+{
+    const std::vector<std::pair<const char*, const char*>> rejected = {
+        { "a = 01", "Leading zero in a number" },
+        { "a = +01", "Leading zero in a number" },
+        { "a = -01", "Leading zero in a number" },
+        { "a = 00", "Leading zero in a number" },
+        { "a = 00.5", "Leading zero in a number" },
+        { "a = 01.5", "Leading zero in a number" },
+        { "a = 1.", "Expected a digit after '.'" },
+        { "a = 0.", "Expected a digit after '.'" },
+        { "a = -1.", "Expected a digit after '.'" },
+        { "a = 1.e5", "Expected a digit after '.'" },
+        { "a = -.5", "Invalid number format" },
+        { "a = +.5", "Invalid number format" },
+        { "a = 1e", "Expected a digit in the exponent" },
+        { "a = 1e+", "Expected a digit in the exponent" },
+        { "a = 1.5E-", "Expected a digit in the exponent" },
+    };
+    for (const auto& [text, fault] : rejected) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+            EXPECT_NE(result.error().detail().find(fault), std::string::npos) << text << ": " << result.error().detail();
+        }
+    }
+
+    for (const char* text : { "a = 0", "a = -0", "a = +0", "a = 0.5", "a = -0.5", "a = 10", "a = 1e05", "a = 0e0", "a = 1.5e-05" }) {
+        EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
+    }
+}
+
+TEST(toml_test, inline_tables_stay_on_one_line)
+{
+    for (const char* text : { "a = {x = 1\n, y = 2}", "a = {x = 1\n}", "a = {x = 1\r\n}", "a = {x = 1 # c\n}" }) {
+        auto result = toml::deserialize(make_data(text));
+        EXPECT_FALSE(result.has_value()) << text;
+        if (! result.has_value()) {
+            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
+            EXPECT_NE(result.error().detail().find("An inline table must stay on one line"), std::string::npos) << text << ": " << result.error().detail();
+        }
+    }
+
+    for (const char* text : { "a = {x = 1, y = 2}", "a = { x = 1 }", "a = {x = [1,\n2]}" }) {
+        EXPECT_TRUE(toml::deserialize(make_data(text)).has_value()) << text;
+    }
+}
+
 TEST(toml_test, missing_equals)
 {
     auto result = toml::deserialize(make_data("key value"));
