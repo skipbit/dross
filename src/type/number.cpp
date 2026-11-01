@@ -840,6 +840,11 @@ public:
         , floating_point(is_written_as_floating_point(s))
     {
     }
+    storage(const std::string& s, bool floating_point)
+        : number(canonical_text(s))
+        , floating_point(floating_point)
+    {
+    }
 
     void assign(const std::string& s)
     {
@@ -875,9 +880,8 @@ number::number(const std::string& s)
 }
 
 number::number(const std::string& text, bool floating_point)
-    : number(text)
+    : _store(std::make_unique<storage>(text, floating_point))
 {
-    _store->floating_point = floating_point;
 }
 
 number::~number() = default;
