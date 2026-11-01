@@ -764,6 +764,32 @@ TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
     }
 }
 
+// A literal string reads its characters as they are, with no escapes, as a
+// value and as a key.
+TEST(toml_test, literal_strings)
+{
+    auto result = toml::deserialize(make_data("path = 'C:\\Users\\a'\nquote = '\"'\nempty = ''\n'a b'.c = 1\n['t.u']\nx = 1\n"));
+    ASSERT_TRUE(result.has_value()) << result.error().detail();
+    auto& dict = result.value();
+    EXPECT_EQ(std::string(dict["path"].as<string>()), "C:\\Users\\a");
+    EXPECT_EQ(std::string(dict["quote"].as<string>()), "\"");
+    EXPECT_EQ(std::string(dict["empty"].as<string>()), "");
+    EXPECT_EQ(dict["a b"].as<dictionary>()["c"].as<number>(), number{ 1 });
+    EXPECT_EQ(dict["t.u"].as<dictionary>()["x"].as<number>(), number{ 1 });
+
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 'a\n", "line 1, column 7: Control character in literal string" },
+        { "x = 'a", "line 1, column 7: Unterminated literal string" },
+        { "x = 'a\x01'\n", "line 1, column 7: Control character in literal string" },
+        { "'a\n = 1\n", "line 1, column 3: Control character in literal key" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
 // A dotted key creates the tables before its last part, which later dotted
 // keys in the same table can add to, as TOML v1.0.0 says.
 TEST(toml_test, dotted_keys_create_tables)

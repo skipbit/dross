@@ -149,6 +149,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads literal strings, such as
+  ``'C:\Users'``, as values and as keys. ``toml::serialize()`` writes
+  the text back as a basic string. They used to fail with
+  ``Invalid value format`` or ``Invalid key format``
+
 - ``toml::deserialize()`` reads dotted keys, such as ``a.b = 1``, at the
   top level, under a table header and in an inline table, and rejects one
   that would add to a table a header or an inline table defined, as

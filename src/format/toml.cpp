@@ -452,6 +452,8 @@ private:
     {
         if (current_char() == '"') {
             return parse_quoted_key();
+        } else if (current_char() == '\'') {
+            return parse_literal_string("literal key");
         } else if (is_bare_key_char(current_char())) {
             return parse_bare_key();
         } else {
@@ -551,6 +553,28 @@ private:
         return result;
     }
 
+    // Reads a single-quoted string, which has no escapes.
+    std::expected<std::string, error> parse_literal_string(const std::string& kind)
+    {
+        advance();  // skip opening quote
+
+        std::string result;
+        while ((_pos < _input.size()) && (current_char() != '\'')) {
+            if (is_forbidden_control(current_char())) {
+                return std::unexpected(create_error("Control character in " + kind));
+            }
+            result += current_char();
+            advance();
+        }
+
+        if (current_char() != '\'') {
+            return std::unexpected(create_error("Unterminated " + kind));
+        }
+        advance();  // skip closing quote
+
+        return result;
+    }
+
     std::expected<value, error> parse_value()
     {
         skip_whitespace();
@@ -559,6 +583,10 @@ private:
 
         if (ch == '"') {
             return parse_string();
+        } else if (ch == '\'') {
+            return parse_literal_string("literal string").transform([](const std::string& text) {
+                return value(string{ text });
+            });
         } else if (ch == '[') {
             return parse_array();
         } else if (ch == '{') {
