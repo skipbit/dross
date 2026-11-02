@@ -338,11 +338,11 @@ TEST(toml_test, inf_and_nan_fail_with_a_reason)
     for (const char* text : { "x = inf\n", "x = +inf\n", "x = -inf\n", "x = nan\n", "x = +nan\n", "x = -nan\n", "x = [1, inf]\n" }) {
         auto result = toml::deserialize(make_data(text));
         ASSERT_FALSE(result.has_value()) << text;
-        EXPECT_TRUE(result.error().detail().ends_with(": number cannot hold inf or nan")) << text << result.error().detail();
+        EXPECT_TRUE(result.error().detail().ends_with(": number has no infinity and keeps nan for errors")) << text << result.error().detail();
     }
     auto result = toml::deserialize(make_data("x = -inf\n"));
     ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error().detail(), "line 1, column 5: number cannot hold inf or nan");
+    EXPECT_EQ(result.error().detail(), "line 1, column 5: number has no infinity and keeps nan for errors");
 
     auto other = toml::deserialize(make_data("x = info\n"));
     ASSERT_FALSE(other.has_value());

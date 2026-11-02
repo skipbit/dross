@@ -91,8 +91,8 @@ namespace dross::toml {
  * Valid TOML that fails to read:
  * - Local date-times, local dates and local times, which timestamp cannot
  *   hold, fail with "timestamp cannot hold a datetime without an offset"
- * - The floats inf and nan, with or without a sign, which number cannot
- *   hold, fail with "number cannot hold inf or nan"
+ * - The floats inf and nan, with or without a sign, fail with "number has
+ *   no infinity and keeps nan for errors"
  * - A leap second, written as second 60, which timestamp cannot hold,
  *   fails with "Invalid datetime"
  * - Arrays of tables, written with [[name]] headers

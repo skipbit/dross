@@ -685,7 +685,7 @@ private:
         char ch = current_char();
 
         if (at_inf_or_nan()) {
-            return std::unexpected(create_error("number cannot hold inf or nan"));
+            return std::unexpected(create_error("number has no infinity and keeps nan for errors"));
         }
 
         const auto to_value = [](const std::string& text) {
