@@ -1,7 +1,6 @@
 #include <dross/type/timestamp.h>
 
 #include <chrono>
-#include <cstdlib>
 #include <ctime>
 #include <iomanip>
 #include <locale>
@@ -45,15 +44,12 @@ timestamp value_or_throw(std::optional<timestamp> result)
     return std::move(*result);
 }
 
-// The year in at least four digits, with a minus sign before a negative one.
+// The year in four digits. A timestamp stays within the years 0 to 9999.
 std::string year_digits(int year)
 {
     std::ostringstream oss;
     oss.imbue(std::locale::classic());
-    if (year < 0) {
-        oss << "-";
-    }
-    oss << std::setfill('0') << std::setw(4) << std::abs(year);
+    oss << std::setfill('0') << std::setw(4) << year;
     return oss.str();
 }
 

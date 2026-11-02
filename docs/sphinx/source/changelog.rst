@@ -79,8 +79,7 @@ Changed
   return it, and its string did not read back; far enough out the year
   wrapped and the result compared on the wrong side of where it started.
   Minutes and hours with more seconds than ``std::chrono::seconds`` holds
-  throw as well instead of overflowing. Arithmetic no longer reaches the
-  signed year that ``%Y``, ``%F`` and the ISO 8601 form write below 0
+  throw as well instead of overflowing
 
 - The examples in the README, the Sphinx guides and the header comments
   write ``dross::`` before each name instead of ``using namespace dross;``.
@@ -245,10 +244,6 @@ Fixed
   copies it. The assignment the compiler declared was deprecated because
   ``error`` has its own copy constructor, which also kept the compiler
   from declaring the moves
-
-- The ISO 8601 form of a ``timestamp`` and the string of its
-  ``date_part`` write a year below 0 with a minus sign before four
-  digits, such as ``-0001-12-31``, instead of ``00-1-12-31``
 
 - ``error`` compared with ``std::errc`` asks both categories through
   ``equivalent()``, as ``std::error_code`` does, so a code whose category
