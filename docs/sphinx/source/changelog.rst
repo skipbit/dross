@@ -12,6 +12,10 @@ Unreleased
 Added
 ~~~~~
 
+- ``timestamp::from_time_point()``, which reports a
+  ``std::chrono::system_clock::time_point`` outside the years 0 to 9999 as
+  ``std::nullopt``
+
 - ``timestamp::add()`` and ``timestamp::subtract()``, which take a
   ``std::chrono::seconds`` and report a result outside the years 0 to
   9999 as ``std::nullopt`` instead of throwing
@@ -40,6 +44,13 @@ Added
 
 Changed
 ~~~~~~~
+
+- The ``timestamp`` constructor that takes a
+  ``std::chrono::system_clock::time_point`` results in epoch time for one
+  outside the years 0 to 9999, as the constructors that take a string or
+  components do for input they reject. With libc++, whose ``system_clock``
+  reaches those years, it used to give a timestamp whose string did not
+  read back, and adding to it threw
 
 - The API page describes the members of ``error``, which it used to list
   by name only

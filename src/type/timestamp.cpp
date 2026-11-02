@@ -46,9 +46,6 @@ timestamp value_or_throw(std::optional<timestamp> result)
 }
 
 // The year in at least four digits, with a minus sign before a negative one.
-// Arithmetic keeps a timestamp within the years 0 to 9999; a
-// system_clock::time_point outside them can still give a year with a sign or
-// five digits.
 std::string year_digits(int year)
 {
     std::ostringstream oss;
@@ -367,10 +364,12 @@ timestamp::timestamp(const timestamp& other)
 }
 
 timestamp::timestamp(const std::chrono::system_clock::time_point& tp)
-    : _store(std::make_unique<storage>())
 {
-    auto seconds = std::chrono::floor<std::chrono::seconds>(tp);
-    _store->set_local(seconds, std::chrono::duration_cast<std::chrono::nanoseconds>(tp - seconds));
+    if (auto parsed = from_time_point(tp)) {
+        _store = std::move(parsed->_store);
+    } else {
+        _store = std::make_unique<storage>();
+    }
 }
 
 timestamp::timestamp(const std::string& iso8601_str)
@@ -445,6 +444,20 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
         digits.resize(9, '0');
         result->_store->set_local(result->_store->local_seconds(), std::chrono::nanoseconds(std::stoll(digits)));
     }
+    return result;
+}
+
+std::optional<timestamp> timestamp::from_time_point(const std::chrono::system_clock::time_point& tp)
+{
+    // Compared as seconds: std::chrono::year holds 16 bits, so a year far
+    // outside the range can wrap around to one inside it.
+    const auto seconds = std::chrono::floor<std::chrono::seconds>(tp);
+    if ((seconds < first_second) || (seconds >= end_second)) {
+        return std::nullopt;
+    }
+
+    timestamp result;
+    result._store->set_local(seconds, std::chrono::duration_cast<std::chrono::nanoseconds>(tp - seconds));
     return result;
 }
 

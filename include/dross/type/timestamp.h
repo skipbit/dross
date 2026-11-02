@@ -291,6 +291,17 @@ public:
     static std::optional<timestamp> from_components(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, const dross::timezone& tz = dross::timezone::utc());
 
     /**
+     * @brief Build a timestamp from a time point, reporting one out of range.
+     * @param tp The time point, read as UTC
+     * @return The timestamp, or nullopt if the time point is outside the
+     *         years 0 to 9999
+     *
+     * system_clock reaches past those years where its duration counts
+     * microseconds.
+     */
+    static std::optional<timestamp> from_time_point(const std::chrono::system_clock::time_point& tp);
+
+    /**
      * @brief Default constructor creating epoch time (1970-01-01T00:00:00Z).
      */
     timestamp();
@@ -305,10 +316,8 @@ public:
      * @brief Construct from std::chrono::system_clock::time_point.
      * @param tp The time point to construct from
      *
-     * The resulting timestamp will be in UTC (no timezone offset). Where the
-     * range of system_clock reaches past the years 0 to 9999, as it does
-     * where its duration counts microseconds, a time point outside them
-     * gives a timestamp whose string does not read back.
+     * The resulting timestamp will be in UTC (no timezone offset). A time
+     * point that from_time_point() rejects results in epoch time.
      */
     timestamp(const std::chrono::system_clock::time_point& tp);
 
