@@ -344,7 +344,7 @@ private:
                 array elements;
                 for (auto& element : table->elements) {
                     merge_tables(*element);
-                    elements.append(value(element->pairs));
+                    elements.append(element->pairs);
                 }
                 node.pairs[key] = elements;
             } else {
