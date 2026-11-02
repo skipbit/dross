@@ -253,6 +253,176 @@ fraction = 3.0e2
     }
 }
 
+// An integer with a 0x, 0o or 0b prefix is read in that base and written back
+// in decimal.
+TEST(toml_test, integers_in_hexadecimal_octal_and_binary)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 0xff\n", "255" },
+        { "x = 0xDEADbeef\n", "3735928559" },
+        { "x = 0x00ff\n", "255" },
+        { "x = 0x0\n", "0" },
+        { "x = 0o755\n", "493" },
+        { "x = 0b1010\n", "10" },
+        { "x = 0xffffffffffffffffff\n", "4722366482869645213695" },
+        { "x = 0xfffffffffffffff\n", "1152921504606846975" },
+        { "x = 0x1000000000000000\n", "1152921504606846976" },
+        { "x = 0x0000000000000001\n", "1" },
+        { "x = 0xffffffffffffffffffffffffffffff\n", "1329227995784915872903807060280344575" },
+        { "x = 0xfffffffffffffffffffffffffffffff\n", "21267647932558653966460912964485513215" },
+        { "x = 0o777777777777777777777\n", "9223372036854775807" },
+        { "x = 0o7777777777777777777777\n", "73786976294838206463" },
+        { "x = 0o1000000000000000000000\n", "9223372036854775808" },
+        { "x = 0b111111111111111111111111111111111111111111111111111111111111111\n", "9223372036854775807" },
+        { "x = 0b1111111111111111111111111111111111111111111111111111111111111111\n", "18446744073709551615" },
+        { "x = 0b1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111\n", "170141183460469231731687303715884105727" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        const number n = result.value()["x"].as<number>();
+        EXPECT_EQ(std::string(n), expected) << content;
+        EXPECT_FALSE(n.is_floating_point()) << content;
+    }
+
+    auto written = toml::serialize(toml::deserialize(make_data("x = 0xff\n")).value());
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(std::string(*written), "x = 255\n");
+
+    const std::vector<std::pair<std::string, std::string>> invalid_cases = {
+        { "x = 0x\n", "line 1, column 7: Expected a digit after '0x'" },
+        { "x = 0o8\n", "line 1, column 7: Expected a digit after '0o'" },
+        { "x = 0b2\n", "line 1, column 7: Expected a digit after '0b'" },
+        { "x = +0x1\n", "line 1, column 6: An integer with a prefix has no sign" },
+        { "x = -0o7\n", "line 1, column 6: An integer with a prefix has no sign" },
+        { "x = 0X1\n", "line 1, column 6: Expected a newline" },
+        { "x = 0o17.5\n", "line 1, column 9: Expected a newline" },
+    };
+    for (const auto& [content, detail] : invalid_cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
+// An underscore may separate digits in any number, with a digit on each side.
+TEST(toml_test, numbers_with_underscores)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 1_000\n", "1000" },
+        { "x = 1_2_3\n", "123" },
+        { "x = -1_000\n", "-1000" },
+        { "x = 3.14_15\n", "3.1415" },
+        { "x = 1e1_0\n", "10000000000" },
+        { "x = 1_0.5e0_1\n", "105" },
+        { "x = 0xDEAD_beef\n", "3735928559" },
+        { "x = 0o7_7\n", "63" },
+        { "x = 0b1_0\n", "2" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        EXPECT_EQ(std::string(result.value()["x"].as<number>()), expected) << content;
+    }
+
+    const std::vector<std::pair<std::string, std::string>> invalid_cases = {
+        { "x = 1__000\n", "line 1, column 6: An underscore must be between digits" },
+        { "x = 1_\n", "line 1, column 6: An underscore must be between digits" },
+        { "x = 1_.5\n", "line 1, column 6: An underscore must be between digits" },
+        { "x = 1._5\n", "line 1, column 7: An underscore must be between digits" },
+        { "x = 1e_5\n", "line 1, column 7: An underscore must be between digits" },
+        { "x = 0x_ff\n", "line 1, column 7: An underscore must be between digits" },
+        { "x = 0xff_\n", "line 1, column 9: An underscore must be between digits" },
+        { "x = 0_1\n", "line 1, column 8: Leading zero in a number" },
+    };
+    for (const auto& [content, detail] : invalid_cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
+// number holds neither infinity nor a NaN read from a document, so inf and
+// nan fail with a detail that says so.
+TEST(toml_test, inf_and_nan_fail_with_a_reason)
+{
+    for (const char* text : { "x = inf\n", "x = +inf\n", "x = -inf\n", "x = nan\n", "x = +nan\n", "x = -nan\n", "x = [1, inf]\n" }) {
+        auto result = toml::deserialize(make_data(text));
+        ASSERT_FALSE(result.has_value()) << text;
+        EXPECT_TRUE(result.error().detail().ends_with(": number has no infinity and keeps nan for errors")) << text << result.error().detail();
+    }
+    auto result = toml::deserialize(make_data("x = -inf\n"));
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().detail(), "line 1, column 5: number has no infinity and keeps nan for errors");
+
+    auto other = toml::deserialize(make_data("x = info\n"));
+    ASSERT_FALSE(other.has_value());
+    EXPECT_EQ(other.error().detail(), "line 1, column 5: Invalid value format");
+}
+
+// A datetime with an offset is read as a timestamp, which keeps the offset
+// and the fraction of a second, and is written back in the same form.
+TEST(toml_test, offset_datetimes_are_timestamps)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 1979-05-27T07:32:00Z\n", "1979-05-27T07:32:00Z" },
+        { "x = 1979-05-27T00:32:00-07:00\n", "1979-05-27T00:32:00-07:00" },
+        { "x = 1979-05-27T00:32:00.999999-07:00\n", "1979-05-27T00:32:00.999999-07:00" },
+        { "x = 1979-05-27 07:32:00Z\n", "1979-05-27T07:32:00Z" },
+        { "x = 1979-05-27t07:32:00z\n", "1979-05-27T07:32:00Z" },
+        { "x = 1979-05-27T07:32:00.1234567891+09:30\n", "1979-05-27T07:32:00.123456789+09:30" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        ASSERT_TRUE(result.value()["x"].is<timestamp>()) << content;
+        EXPECT_EQ(std::string(result.value()["x"].as<timestamp>()), expected) << content;
+
+        auto written = toml::serialize(result.value());
+        ASSERT_TRUE(written.has_value()) << content;
+        EXPECT_EQ(std::string(*written), "x = " + expected + "\n") << content;
+    }
+
+    dictionary d;
+    d["when"] = value(dross::timestamp{ 2024, 1, 21, 15, 30, 0, dross::timezone::offset(9) });
+    d["list"] = value(array{ value(dross::timestamp{ 2024, 1, 21, 6, 30, 0 }) });
+    auto written = toml::serialize(d);
+    ASSERT_TRUE(written.has_value());
+    EXPECT_EQ(std::string(*written), "list = [2024-01-21T06:30:00Z]\nwhen = 2024-01-21T15:30:00+09:00\n");
+    auto read = toml::deserialize(*written);
+    ASSERT_TRUE(read.has_value());
+    EXPECT_EQ(read.value(), d);
+
+    dictionary bytes;
+    bytes["blob"] = value(data{ "a" });
+    auto unsupported = toml::serialize(bytes);
+    ASSERT_FALSE(unsupported.has_value());
+    EXPECT_EQ(unsupported.error(), std::errc::operation_not_supported);
+}
+
+// timestamp has an offset, so a datetime without one fails rather than being
+// read as UTC, and so does one that timestamp cannot hold.
+TEST(toml_test, datetimes_that_timestamp_cannot_hold_fail)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 1979-05-27T07:32:00\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 1979-05-27\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 07:32:00\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 07:32:00.5\n", "line 1, column 5: timestamp cannot hold a datetime without an offset" },
+        { "x = 1979-02-30T00:00:00Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32:60Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32:00.Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-5-27T07:32:00Z\n", "line 1, column 5: Invalid datetime" },
+        { "x = 1979-05-27T07:32:00+0900\n", "line 1, column 5: Invalid datetime" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
+    }
+}
+
 TEST(toml_test, numbers_that_number_cannot_hold)
 {
     auto longest = toml::deserialize(make_data("x = 1e4095\n"));
@@ -754,8 +924,135 @@ TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
         { "[t]\nx = 1\n  x = 2\n", "line 3, column 3: Key defined twice" },
         { "t = { a = 1, a = 2 }\n", "line 1, column 14: Key defined twice" },
         { "[a]\nx = 1\n[a]\ny = 2\nz = 3\n", "line 3, column 1: Table defined twice" },
-        { "[a.b]\nx = 1\n[a]\nb = 2\n", "line 3, column 1: Key defined twice" },
+        { "[a.b]\nx = 1\n[a]\nb = 2\n", "line 4, column 1: Key defined twice" },
         { "t = 1\n[t]\nq = 1\n", "line 2, column 1: Table header names a key that is not a table" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
+    }
+}
+
+// A basic string names its kind when it fails, as a value and as a key.
+TEST(toml_test, basic_strings_name_their_kind_when_they_fail)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = \"a", "line 1, column 7: Unterminated string" },
+        { "x = \"a\x01\"\n", "line 1, column 7: Control character in string" },
+        { "\"a\x01\" = 1\n", "line 1, column 3: Control character in quoted key" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
+// A literal string reads its characters as they are, with no escapes, as a
+// value and as a key.
+TEST(toml_test, literal_strings)
+{
+    auto result = toml::deserialize(make_data("path = 'C:\\Users\\a'\nquote = '\"'\nempty = ''\n'a b'.c = 1\n['t.u']\nx = 1\n"));
+    ASSERT_TRUE(result.has_value()) << result.error().detail();
+    auto& dict = result.value();
+    EXPECT_EQ(std::string(dict["path"].as<string>()), "C:\\Users\\a");
+    EXPECT_EQ(std::string(dict["quote"].as<string>()), "\"");
+    EXPECT_EQ(std::string(dict["empty"].as<string>()), "");
+    EXPECT_EQ(dict["a b"].as<dictionary>()["c"].as<number>(), number{ 1 });
+    EXPECT_EQ(dict["t.u"].as<dictionary>()["x"].as<number>(), number{ 1 });
+
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = 'a\n", "line 1, column 7: Control character in literal string" },
+        { "x = 'a", "line 1, column 7: Unterminated literal string" },
+        { "x = 'a\x01'\n", "line 1, column 7: Control character in literal string" },
+        { "'a\n = 1\n", "line 1, column 3: Control character in literal key" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
+// A multi-line string drops a newline right after its opening delimiter, and
+// a basic one also drops the whitespace after a backslash that ends a line.
+TEST(toml_test, multi_line_strings)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = \"\"\"a\"\"\"\n", "a" },
+        { "x = \"\"\"\na\nb\"\"\"\n", "a\nb" },
+        { "x = \"\"\"\r\na\r\nb\"\"\"\n", "a\r\nb" },
+        { "x = \"\"\"a\\tb\\u00e9\"\"\"\n", "a\tb\xc3\xa9" },
+        { "x = \"\"\"a \\\n   \n  b\"\"\"\n", "a b" },
+        { "x = \"\"\"a \\  \r\n  b\"\"\"\n", "a b" },
+        { "x = \"\"\"a\"b\"\"c\"\"\"\n", "a\"b\"\"c" },
+        { "x = \"\"\"a\"\"\"\"\"\n", "a\"\"" },
+        { "x = \"\"\"\"\"\"\n", "" },
+        { "x = '''a\\b'''\n", "a\\b" },
+        { "x = '''\nC:\\Users\n'''\n", "C:\\Users\n" },
+        { "x = '''a'b''c''''\n", "a'b''c'" },
+        { "x = '''\ta'''\n", "\ta" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        EXPECT_EQ(std::string(result.value()["x"].as<string>()), expected) << content;
+    }
+
+    const std::vector<std::pair<std::string, std::string>> invalid_cases = {
+        { "x = \"\"\"a\n", "line 2, column 1: Unterminated multi-line string" },
+        { "x = '''a", "line 1, column 9: Unterminated multi-line literal string" },
+        { "x = \"\"\"a\x01\"\"\"\n", "line 1, column 9: Control character in multi-line string" },
+        { "x = '''a\rb'''\n", "line 1, column 9: Control character in multi-line literal string" },
+        { "x = \"\"\"a\\q\"\"\"\n", "line 1, column 10: Invalid escape sequence" },
+        { "x = \"\"\"a\\", "line 1, column 10: Unterminated multi-line string" },
+        { "x = \"\"\"a\\   ", "line 1, column 13: Unterminated multi-line string" },
+        { "x = \"\"\"a\"\"\"\"\"\"\n", "line 1, column 14: Expected a newline" },
+    };
+    for (const auto& [content, detail] : invalid_cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
+// A dotted key creates the tables before its last part, which later dotted
+// keys in the same table can add to, as TOML v1.0.0 says.
+TEST(toml_test, dotted_keys_create_tables)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a.b = 1\na.c = 2\n", "a = {b = 1, c = 2}\n" },
+        { "a . b = 1\n", "a = {b = 1}\n" },
+        { "\"a.b\".c = 1\n", "\"a.b\" = {c = 1}\n" },
+        { "[t]\na.b.c = 1\na.d = 2\n", "t = {a = {b = {c = 1}, d = 2}}\n" },
+        { "x = {a.b = 1, a.c = 2}\n", "x = {a = {b = 1, c = 2}}\n" },
+        { "a.b = 1\n[a.c]\nx = 1\n", "a = {b = 1, c = {x = 1}}\n" },
+        { "[fruit]\napple.color = 1\napple.taste.sweet = true\n[fruit.apple.texture]\nsmooth = true\n", "fruit = {apple = {color = 1, taste = {sweet = true}, texture = {smooth = true}}}\n" },
+    };
+    for (const auto& [content, expected_text] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_TRUE(result.has_value()) << content << result.error().detail();
+        auto expected = toml::deserialize(make_data(expected_text));
+        ASSERT_TRUE(expected.has_value()) << expected_text;
+        EXPECT_EQ(result.value(), expected.value()) << content;
+    }
+}
+
+// A dotted key cannot add to a table that a header or an inline table
+// defined, and a header cannot name a table that dotted keys defined.
+TEST(toml_test, dotted_keys_do_not_redefine_tables)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a = 1\na.b = 2\n", "line 2, column 1: Key defined twice" },
+        { "a.b = 1\na = 2\n", "line 2, column 1: Key defined twice" },
+        { "a.b = 1\na.b = 2\n", "line 2, column 1: Key defined twice" },
+        { "a = {}\na.b = 1\n", "line 2, column 1: Key defined twice" },
+        { "x = {a = {}, a.b = 1}\n", "line 1, column 14: Key defined twice" },
+        { "[a.b.c]\nz = 9\n[a]\nb.c.t = 1\n", "line 4, column 1: Key defined twice" },
+        { "a.b = 1\n[a]\n", "line 2, column 1: Table defined twice" },
+        { "[fruit]\napple.color = 1\n[fruit.apple]\n", "line 3, column 1: Table defined twice" },
+        { "[fruit]\napple.taste.sweet = true\n[fruit.apple.taste]\n", "line 3, column 1: Table defined twice" },
     };
     for (const auto& [content, detail] : cases) {
         auto result = toml::deserialize(make_data(content));

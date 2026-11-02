@@ -28,8 +28,10 @@ namespace dross::toml {
  * - TOML Boolean → dross::boolean
  * - TOML Array → dross::array
  * - TOML Table → dross::dictionary
+ * - TOML Offset Date-Time → dross::timestamp
  *
- * TOML Datetime values are not supported in either direction.
+ * A timestamp always has an offset, so a local date-time, a local date and
+ * a local time are not read.
  *
  * @example
  * @code
@@ -78,19 +80,24 @@ namespace dross::toml {
  * - Numbers that number cannot hold: an exponent that expands the number
  *   past 4096 digits, such as 1e5000
  * - A key or table defined twice, including a table header that names a
- *   key already set by a key/value pair or an inline table
+ *   key already set by a key/value pair or an inline table, a table header
+ *   that names a table dotted keys created, and a dotted key that adds to a
+ *   table a header or an inline table defined
  * - Numbers with a leading zero or without a digit on both sides of the
  *   decimal point, such as 01, 1. and -.5
+ * - Datetimes that do not exist, such as February 30
  * - A newline or a comment inside an inline table, outside its values
  *
  * Valid TOML that fails to read:
- * - Literal strings and multi-line strings
- * - Datetimes of every kind
- * - Dotted keys such as a.b = 1 (a [a.b] table header is read)
- * - Integers in hexadecimal, octal or binary
- * - Integers and floats with underscores, such as 1_000 or 1e1_0
- * - The floats inf and nan, with or without a sign
+ * - Local date-times, local dates and local times, which timestamp cannot
+ *   hold, fail with "timestamp cannot hold a datetime without an offset"
+ * - The floats inf and nan, with or without a sign, fail with "number has
+ *   no infinity and keeps nan for errors"
+ * - A leap second, written as second 60, which timestamp cannot hold,
+ *   fails with "Invalid datetime"
  * - Arrays of tables, written with [[name]] headers
+ *
+ * A newline in a multi-line string is kept as it is written, LF or CRLF.
  *
  * @note Comments are skipped and are not kept in the result.
  */
@@ -109,7 +116,7 @@ std::expected<dictionary, error> deserialize(const data& input);
  *         such as "NaN cannot be written as a TOML value".
  *
  * Error conditions:
- * - Unsupported value types, such as a timestamp
+ * - Unsupported value types, such as data
  * - Values that cannot be represented in TOML format, such as a NaN number
  * - Strings or keys that are not valid UTF-8
  *
@@ -117,8 +124,12 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Dictionary keys are sorted alphabetically for consistent output
  * - Arrays are formatted with proper spacing
  * - Nested tables use dotted notation when appropriate
- * - Strings are properly escaped according to TOML rules
+ * - Strings are properly escaped according to TOML rules. A string read
+ *   from a literal or multi-line string is written as a basic string with
+ *   the same text
  * - Numbers are written in number's canonical form, without trailing zeros.
+ *   An integer read in hexadecimal, octal or binary is written in decimal,
+ *   and a number read with underscores, such as 1_000, without them.
  *   A floating-point number (number::is_floating_point()) whose value is
  *   integral is written with ".0", so a float read as 1.0 or 1e2 is written
  *   as 1.0 or 100.0, and an integer as an integer.

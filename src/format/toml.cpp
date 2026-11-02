@@ -5,7 +5,10 @@
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
+#include "dross/type/timestamp.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <new>
@@ -94,6 +97,20 @@ bool is_ascii_xdigit(char c)
     return is_ascii_digit(c) || ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F'));
 }
 
+// The value of a digit in base 2, 8, 10 or 16, or -1 for a character that is not one.
+int digit_value(char c, int base)
+{
+    int digit = -1;
+    if (is_ascii_digit(c)) {
+        digit = c - '0';
+    } else if ((c >= 'a') && (c <= 'f')) {
+        digit = c - 'a' + 10;
+    } else if ((c >= 'A') && (c <= 'F')) {
+        digit = c - 'A' + 10;
+    }
+    return (digit < base) ? digit : -1;
+}
+
 // The reader and the writer share this rule, so every key written bare reads back.
 bool is_bare_key_char(char c)
 {
@@ -163,13 +180,16 @@ private:
     size_t _column;
 
     // The tables that headers create, either named or as the parent of a named
-    // one, are kept apart from their key/value pairs so that a header updates
-    // its table in place, and become a dictionary once the document is read.
+    // one, are kept apart from their key/value pairs so that a header and its
+    // pairs update the table in place, and become a dictionary once the
+    // document is read.
     struct table_node {
         dictionary pairs;
         std::map<std::string, std::unique_ptr<table_node>> tables;
         // Whether a header named this table, rather than only passing through it
         bool named = false;
+        // Whether dotted keys created this table, which only they can add to
+        bool dotted = false;
     };
 
     struct position {
@@ -259,6 +279,7 @@ private:
     std::expected<dictionary, error> parse_document()
     {
         table_node result;
+        table_node* current = &result;
 
         while (_pos < _input.size()) {
             skip_whitespace_and_comments();
@@ -278,16 +299,11 @@ private:
                     return std::unexpected(line_end.error());
                 }
 
-                auto key_path = table_result.value();
-                auto table_content = parse_table_content();
-                if (! table_content) {
-                    return std::unexpected(table_content.error());
+                auto table = open_table(result, table_result.value(), header_start);
+                if (! table) {
+                    return std::unexpected(table.error());
                 }
-
-                auto inserted = insert_table(result, key_path, 0, table_content.value(), header_start);
-                if (! inserted) {
-                    return std::unexpected(inserted.error());
-                }
+                current = table.value();
             } else {
                 const position pair_start = current_position();
                 auto kv_result = parse_key_value();
@@ -299,24 +315,25 @@ private:
                     return std::unexpected(line_end.error());
                 }
 
-                auto [key, val] = kv_result.value();
-                auto added = add_key(result, key, val, pair_start);
+                auto [key_path, val] = kv_result.value();
+                auto added = add_pair(*current, key_path, val, pair_start);
                 if (! added) {
                     return std::unexpected(added.error());
                 }
             }
         }
 
-        return to_dictionary(result);
+        merge_tables(result);
+        return result.pairs;
     }
 
-    static dictionary to_dictionary(const table_node& node)
+    // Puts each table into the pairs of its parent, so node.pairs holds the whole tree.
+    static void merge_tables(table_node& node)
     {
-        dictionary result = node.pairs;
-        for (const auto& [key, table] : node.tables) {
-            result[key] = to_dictionary(*table);
+        for (auto& [key, table] : node.tables) {
+            merge_tables(*table);
+            node.pairs[key] = table->pairs;
         }
-        return result;
     }
 
     std::expected<std::vector<std::string>, error> parse_table_header()
@@ -356,36 +373,6 @@ private:
         return key_path;
     }
 
-    std::expected<dictionary, error> parse_table_content()
-    {
-        dictionary result;
-
-        while (_pos < _input.size()) {
-            skip_whitespace_and_comments();
-            if ((_pos >= _input.size()) || (current_char() == '[')) {
-                break;
-            }
-
-            const position pair_start = current_position();
-            auto kv_result = parse_key_value();
-            if (! kv_result) {
-                return std::unexpected(kv_result.error());
-            }
-            auto line_end = expect_line_end();
-            if (! line_end) {
-                return std::unexpected(line_end.error());
-            }
-
-            auto [key, val] = kv_result.value();
-            auto added = add_key(result, key, val, pair_start);
-            if (! added) {
-                return std::unexpected(added.error());
-            }
-        }
-
-        return result;
-    }
-
     std::expected<void, error> add_key(dictionary& table, const std::string& key, const value& val, const position& at)
     {
         if (table.contains(key)) {
@@ -403,51 +390,68 @@ private:
         return add_key(table.pairs, key, val, at);
     }
 
-    // Only a table that headers created can take a header, and only one header can name it.
-    // A failure names the start of the header, as the content has no positions.
-    std::expected<void, error> insert_table(table_node& parent, const std::vector<std::string>& key_path, size_t index, const dictionary& content, const position& header_start)
+    // A dotted key creates the tables before its last part, and can only pass
+    // through a table that dotted keys created.
+    std::expected<void, error> add_pair(table_node& table, const std::vector<std::string>& key_path, const value& val, const position& at)
     {
-        const std::string& current_key = key_path[index];
-        if (parent.pairs.contains(current_key)) {
-            return std::unexpected(create_error("Table header names a key that is not a table", header_start));
-        }
-        auto& child = parent.tables[current_key];
-        if (! child) {
-            child = std::make_unique<table_node>();
-        }
-        table_node& table = *child;
-
-        if (index == (key_path.size() - 1)) {
-            if (table.named) {
-                return std::unexpected(create_error("Table defined twice", header_start));
+        table_node* node = &table;
+        for (size_t i = 0; (i + 1) < key_path.size(); ++i) {
+            const std::string& key = key_path[i];
+            if (node->pairs.contains(key)) {
+                return std::unexpected(create_error("Key defined twice", at));
             }
-            table.named = true;
-            for (const auto& [key, val] : content) {
-                auto added = add_key(table, key, val, header_start);
-                if (! added) {
-                    return added;
-                }
+            auto& child = node->tables[key];
+            if (! child) {
+                child = std::make_unique<table_node>();
+                child->dotted = true;
+            } else if (! child->dotted) {
+                return std::unexpected(create_error("Key defined twice", at));
             }
-        } else {
-            auto inserted = insert_table(table, key_path, index + 1, content, header_start);
-            if (! inserted) {
-                return inserted;
-            }
+            node = child.get();
         }
-
-        return {};
+        return add_key(*node, key_path.back(), val, at);
     }
 
-    std::expected<std::pair<std::string, value>, error> parse_key_value()
+    // Only a table that headers created can take a header, and only one header can name it.
+    std::expected<table_node*, error> open_table(table_node& root, const std::vector<std::string>& key_path, const position& header_start)
     {
-        auto key_result = parse_key();
-        if (! key_result) {
-            return std::unexpected(key_result.error());
+        table_node* table = &root;
+        for (const std::string& key : key_path) {
+            if (table->pairs.contains(key)) {
+                return std::unexpected(create_error("Table header names a key that is not a table", header_start));
+            }
+            auto& child = table->tables[key];
+            if (! child) {
+                child = std::make_unique<table_node>();
+            }
+            table = child.get();
         }
 
-        std::string key = key_result.value();
+        if (table->named || table->dotted) {
+            return std::unexpected(create_error("Table defined twice", header_start));
+        }
+        table->named = true;
+        return table;
+    }
 
-        skip_whitespace();
+    std::expected<std::pair<std::vector<std::string>, value>, error> parse_key_value()
+    {
+        std::vector<std::string> key_path;
+        while (true) {
+            auto key_result = parse_key();
+            if (! key_result) {
+                return std::unexpected(key_result.error());
+            }
+            key_path.push_back(key_result.value());
+
+            skip_whitespace();
+            if (current_char() != '.') {
+                break;
+            }
+            advance();  // skip '.'
+            skip_whitespace();
+        }
+
         if (current_char() != '=') {
             return std::unexpected(create_error("Expected '='"));
         }
@@ -459,13 +463,15 @@ private:
             return std::unexpected(value_result.error());
         }
 
-        return std::make_pair(key, value_result.value());
+        return std::make_pair(key_path, value_result.value());
     }
 
     std::expected<std::string, error> parse_key()
     {
         if (current_char() == '"') {
             return parse_quoted_key();
+        } else if (current_char() == '\'') {
+            return parse_literal_string("literal key");
         } else if (is_bare_key_char(current_char())) {
             return parse_bare_key();
         } else {
@@ -489,6 +495,55 @@ private:
         return parse_basic_string("quoted key");
     }
 
+    // Reads the escape whose letter is the current character, after a backslash.
+    std::expected<void, error> append_escape(std::string& result)
+    {
+        switch (current_char()) {
+        case '"':
+            result += '"';
+            return {};
+        case '\\':
+            result += '\\';
+            return {};
+        case 'n':
+            result += '\n';
+            return {};
+        case 't':
+            result += '\t';
+            return {};
+        case 'r':
+            result += '\r';
+            return {};
+        case 'b':
+            result += '\b';
+            return {};
+        case 'f':
+            result += '\f';
+            return {};
+        case 'u':
+        case 'U': {
+            // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
+            const size_t digits = (current_char() == 'u') ? 4 : 8;
+            for (size_t k = 1; k <= digits; ++k) {
+                if (! is_ascii_xdigit(peek_char(k))) {
+                    return std::unexpected(create_error("Invalid unicode escape"));
+                }
+            }
+            const auto code_point = static_cast<char32_t>(std::stoul(_input.substr(_pos + 1, digits), nullptr, 16));
+            if (((code_point >= 0xD800) && (code_point <= 0xDFFF)) || (code_point > 0x10FFFF)) {
+                return std::unexpected(create_error("Invalid unicode escape"));
+            }
+            append_utf8(result, code_point);
+            for (size_t k = 0; k < digits; ++k) {
+                advance();
+            }
+            return {};
+        }
+        default:
+            return std::unexpected(create_error("Invalid escape sequence"));
+        }
+    }
+
     // Reads a double-quoted string, which TOML uses for both values and keys.
     std::expected<std::string, error> parse_basic_string(const std::string& kind)
     {
@@ -504,50 +559,9 @@ private:
                 if (_pos >= _input.size()) {
                     return std::unexpected(create_error("Unterminated " + kind));
                 }
-                // Handle escape sequences
-                switch (current_char()) {
-                case '"':
-                    result += '"';
-                    break;
-                case '\\':
-                    result += '\\';
-                    break;
-                case 'n':
-                    result += '\n';
-                    break;
-                case 't':
-                    result += '\t';
-                    break;
-                case 'r':
-                    result += '\r';
-                    break;
-                case 'b':
-                    result += '\b';
-                    break;
-                case 'f':
-                    result += '\f';
-                    break;
-                case 'u':
-                case 'U': {
-                    // \uXXXX or \UXXXXXXXX, naming a Unicode scalar value.
-                    const size_t digits = (current_char() == 'u') ? 4 : 8;
-                    for (size_t k = 1; k <= digits; ++k) {
-                        if (! is_ascii_xdigit(peek_char(k))) {
-                            return std::unexpected(create_error("Invalid unicode escape"));
-                        }
-                    }
-                    const auto code_point = static_cast<char32_t>(std::stoul(_input.substr(_pos + 1, digits), nullptr, 16));
-                    if (((code_point >= 0xD800) && (code_point <= 0xDFFF)) || (code_point > 0x10FFFF)) {
-                        return std::unexpected(create_error("Invalid unicode escape"));
-                    }
-                    append_utf8(result, code_point);
-                    for (size_t k = 0; k < digits; ++k) {
-                        advance();
-                    }
-                    break;
-                }
-                default:
-                    return std::unexpected(create_error("Invalid escape sequence"));
+                auto escaped = append_escape(result);
+                if (! escaped) {
+                    return std::unexpected(escaped.error());
                 }
             } else if (is_forbidden_control(current_char())) {
                 return std::unexpected(create_error("Control character in " + kind));
@@ -565,32 +579,154 @@ private:
         return result;
     }
 
+    // Reads a single-quoted string, which has no escapes.
+    std::expected<std::string, error> parse_literal_string(const std::string& kind)
+    {
+        advance();  // skip opening quote
+
+        std::string result;
+        while ((_pos < _input.size()) && (current_char() != '\'')) {
+            if (is_forbidden_control(current_char())) {
+                return std::unexpected(create_error("Control character in " + kind));
+            }
+            result += current_char();
+            advance();
+        }
+
+        if (current_char() != '\'') {
+            return std::unexpected(create_error("Unterminated " + kind));
+        }
+        advance();  // skip closing quote
+
+        return result;
+    }
+
+    bool at_line_end(size_t offset = 0) const
+    {
+        return (peek_char(offset) == '\n') || ((peek_char(offset) == '\r') && (peek_char(offset + 1) == '\n'));
+    }
+
+    void skip_line_end()
+    {
+        if (current_char() == '\r') {
+            advance();
+        }
+        advance();
+    }
+
+    // Reads a string between three quotes, which may span lines. A newline
+    // right after the opening quotes is dropped, and up to two quotes may
+    // come right before the closing ones. A basic string, between """, also
+    // reads escapes and drops the whitespace after a backslash that ends a
+    // line; a literal one, between ''', reads its text as it is.
+    std::expected<std::string, error> parse_multi_line_string(char quote, const std::string& kind)
+    {
+        const bool basic = (quote == '"');
+        for (int k = 0; k < 3; ++k) {
+            advance();  // skip opening quotes
+        }
+        if (at_line_end()) {
+            skip_line_end();
+        }
+
+        std::string result;
+        while (_pos < _input.size()) {
+            const char ch = current_char();
+            if ((ch == quote) && (peek_char(1) == quote) && (peek_char(2) == quote)) {
+                size_t extra = 0;
+                while ((extra < 2) && (peek_char(3 + extra) == quote)) {
+                    ++extra;
+                }
+                result.append(extra, quote);
+                for (size_t k = 0; k < (3 + extra); ++k) {
+                    advance();  // skip closing quotes
+                }
+                return result;
+            }
+            if (basic && (ch == '\\')) {
+                size_t k = 1;
+                while ((peek_char(k) == ' ') || (peek_char(k) == '\t')) {
+                    ++k;
+                }
+                if (at_line_end(k) || ((_pos + k) >= _input.size())) {
+                    advance();  // skip backslash
+                    while ((current_char() == ' ') || (current_char() == '\t') || at_line_end()) {
+                        if (at_line_end()) {
+                            skip_line_end();
+                        } else {
+                            advance();
+                        }
+                    }
+                    continue;
+                }
+                advance();  // skip backslash
+                auto escaped = append_escape(result);
+                if (! escaped) {
+                    return std::unexpected(escaped.error());
+                }
+                advance();
+                continue;
+            }
+            if (at_line_end()) {
+                if (ch == '\r') {
+                    result += '\r';
+                }
+                result += '\n';
+                skip_line_end();
+                continue;
+            }
+            if (is_forbidden_control(ch)) {
+                return std::unexpected(create_error("Control character in " + kind));
+            }
+            result += ch;
+            advance();
+        }
+
+        return std::unexpected(create_error("Unterminated " + kind));
+    }
+
+    // The floats inf and nan, with or without a sign, ending the word.
+    bool at_inf_or_nan() const
+    {
+        const size_t start = ((current_char() == '+') || (current_char() == '-')) ? 1 : 0;
+        const auto is_word = [&](const char* word) {
+            return (_input.compare(_pos + start, 3, word) == 0) && ! is_bare_key_char(peek_char(start + 3));
+        };
+        return is_word("inf") || is_word("nan");
+    }
+
     std::expected<value, error> parse_value()
     {
         skip_whitespace();
 
         char ch = current_char();
 
-        if (ch == '"') {
-            return parse_string();
+        if (at_inf_or_nan()) {
+            return std::unexpected(create_error("number has no infinity and keeps nan for errors"));
+        }
+
+        const auto to_value = [](const std::string& text) {
+            return value(string{ text });
+        };
+        if (((ch == '"') || (ch == '\'')) && (peek_char(1) == ch) && (peek_char(2) == ch)) {
+            return parse_multi_line_string(ch, (ch == '"') ? "multi-line string" : "multi-line literal string").transform(to_value);
+        } else if (ch == '"') {
+            return parse_basic_string("string").transform(to_value);
+        } else if (ch == '\'') {
+            return parse_literal_string("literal string").transform(to_value);
         } else if (ch == '[') {
             return parse_array();
         } else if (ch == '{') {
             return parse_inline_table();
         } else if ((ch == 't') || (ch == 'f')) {
             return parse_boolean();
+        } else if (at_date() || at_time()) {
+            return parse_datetime();
         } else if (is_ascii_digit(ch) || (ch == '-') || (ch == '+')) {
             return parse_number();
         } else {
             return std::unexpected(create_error("Invalid value format"));
         }
-    }
-
-    std::expected<value, error> parse_string()
-    {
-        return parse_basic_string("string").transform([](const std::string& text) {
-            return value(string{ text });
-        });
     }
 
     std::expected<value, error> parse_array()
@@ -643,12 +779,12 @@ private:
         }
         advance();  // skip '{'
 
-        dictionary result;
+        table_node result;
 
         skip_whitespace();
         if (current_char() == '}') {
             advance();
-            return value(result);
+            return value(dictionary{});
         }
 
         while (true) {
@@ -658,8 +794,8 @@ private:
                 return std::unexpected(kv_result.error());
             }
 
-            auto [key, val] = kv_result.value();
-            auto added = add_key(result, key, val, pair_start);
+            auto [key_path, val] = kv_result.value();
+            auto added = add_pair(result, key_path, val, pair_start);
             if (! added) {
                 return std::unexpected(added.error());
             }
@@ -681,7 +817,8 @@ private:
             }
         }
 
-        return value(result);
+        merge_tables(result);
+        return value(result.pairs);
     }
 
     std::expected<value, error> parse_boolean()
@@ -699,40 +836,192 @@ private:
         }
     }
 
+    bool digits_ahead(size_t offset, size_t count) const
+    {
+        for (size_t k = 0; k < count; ++k) {
+            if (! is_ascii_digit(peek_char(offset + k))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool at_date() const
+    {
+        return digits_ahead(0, 4) && (peek_char(4) == '-');
+    }
+
+    bool at_time() const
+    {
+        return digits_ahead(0, 2) && (peek_char(2) == ':');
+    }
+
+    // Reads a datetime with an offset, as RFC 3339 writes it, into a timestamp.
+    // timestamp has an offset, so a local datetime, date or time fails.
+    std::expected<value, error> parse_datetime()
+    {
+        const position start = current_position();
+        const auto invalid = [&] {
+            return std::unexpected(create_error("Invalid datetime", start));
+        };
+        const auto without_offset = [&] {
+            return std::unexpected(create_error("timestamp cannot hold a datetime without an offset", start));
+        };
+        if (at_time()) {
+            return without_offset();
+        }
+
+        std::string text;
+        const auto take_digits = [&](size_t count) {
+            if (! digits_ahead(0, count)) {
+                return false;
+            }
+            for (size_t k = 0; k < count; ++k) {
+                text += current_char();
+                advance();
+            }
+            return true;
+        };
+        const auto take = [&](char c) {
+            if (current_char() != c) {
+                return false;
+            }
+            text += c;
+            advance();
+            return true;
+        };
+
+        if (! (take_digits(4) && take('-') && take_digits(2) && take('-') && take_digits(2))) {
+            return invalid();
+        }
+        const bool time_follows = (current_char() == 'T') || (current_char() == 't') || ((current_char() == ' ') && digits_ahead(1, 2) && (peek_char(3) == ':'));
+        if (! time_follows) {
+            return without_offset();
+        }
+        text += 'T';
+        advance();
+        if (! (take_digits(2) && take(':') && take_digits(2) && take(':') && take_digits(2))) {
+            return invalid();
+        }
+        if (take('.')) {
+            while (is_ascii_digit(current_char())) {
+                take_digits(1);
+            }
+        }
+
+        if ((current_char() == 'Z') || (current_char() == 'z')) {
+            text += 'Z';
+            advance();
+        } else if ((current_char() == '+') || (current_char() == '-')) {
+            if (! (take(current_char()) && take_digits(2) && take(':') && take_digits(2))) {
+                return invalid();
+            }
+        } else {
+            return without_offset();
+        }
+
+        auto parsed = timestamp::from_string(text);
+        if (! parsed) {
+            return invalid();
+        }
+        return value(*parsed);
+    }
+
+    bool at_integer_prefix() const
+    {
+        return (current_char() == '0') && ((peek_char() == 'x') || (peek_char() == 'o') || (peek_char() == 'b'));
+    }
+
+    // Reads an integer after a 0x, 0o or 0b prefix, which may start with zeros.
+    std::expected<value, error> parse_prefixed_integer()
+    {
+        const char prefix = peek_char();
+        const int base = (prefix == 'x') ? 16 : ((prefix == 'o') ? 8 : 2);
+        advance();
+        advance();
+
+        std::string digits;
+        const auto count = read_digits(digits, base);
+        if (! count) {
+            return std::unexpected(count.error());
+        }
+        if (*count == 0) {
+            return std::unexpected(create_error(std::string("Expected a digit after '0") + prefix + "'"));
+        }
+
+        // A chunk of digits fits in 63 bits, so number multiplies once per chunk.
+        const int bits = (base == 16) ? 4 : ((base == 8) ? 3 : 1);
+        const size_t chunk = 63 / bits;
+        number result{ 0 };
+        for (size_t start = 0; start < digits.size(); start += chunk) {
+            const size_t length = std::min(chunk, digits.size() - start);
+            std::uint64_t part = 0;
+            for (size_t k = 0; k < length; ++k) {
+                part = (part << bits) | static_cast<std::uint64_t>(digit_value(digits[start + k], base));
+            }
+            result = result * number{ std::uint64_t{ 1 } << (bits * length) } + number{ part };
+        }
+        return value(result);
+    }
+
+    // Reads the digits of a base onto text. An underscore separates two digits and is not kept.
+    std::expected<size_t, error> read_digits(std::string& text, int base)
+    {
+        size_t count = 0;
+        while (true) {
+            if (current_char() == '_') {
+                if ((count == 0) || (digit_value(peek_char(), base) < 0)) {
+                    return std::unexpected(create_error("An underscore must be between digits"));
+                }
+                advance();
+            }
+            if (digit_value(current_char(), base) < 0) {
+                return count;
+            }
+            text += current_char();
+            advance();
+            ++count;
+        }
+    }
+
     std::expected<value, error> parse_number()
     {
+        if (at_integer_prefix()) {
+            return parse_prefixed_integer();
+        }
+
         std::string num_str;
 
         // Handle sign
         if ((current_char() == '+') || (current_char() == '-')) {
             num_str += current_char();
             advance();
-        }
-
-        const auto read_digits = [&] {
-            size_t count = 0;
-            while (is_ascii_digit(current_char())) {
-                num_str += current_char();
-                advance();
-                ++count;
+            if (at_integer_prefix()) {
+                return std::unexpected(create_error("An integer with a prefix has no sign"));
             }
-            return count;
-        };
+        }
 
         // The integer part has no leading zero, a decimal point has a digit on both sides,
         // and an exponent has a digit.
         const bool leading_zero = (current_char() == '0');
-        const size_t integer_digits = read_digits();
-        if (integer_digits == 0) {
+        const auto integer_digits = read_digits(num_str, 10);
+        if (! integer_digits) {
+            return std::unexpected(integer_digits.error());
+        }
+        if (*integer_digits == 0) {
             return std::unexpected(create_error("Invalid number format"));
         }
-        if (leading_zero && (integer_digits > 1)) {
+        if (leading_zero && (*integer_digits > 1)) {
             return std::unexpected(create_error("Leading zero in a number"));
         }
         if (current_char() == '.') {
             num_str += current_char();
             advance();
-            if (read_digits() == 0) {
+            const auto fraction_digits = read_digits(num_str, 10);
+            if (! fraction_digits) {
+                return std::unexpected(fraction_digits.error());
+            }
+            if (*fraction_digits == 0) {
                 return std::unexpected(create_error("Expected a digit after '.'"));
             }
         }
@@ -744,7 +1033,11 @@ private:
                 num_str += current_char();
                 advance();
             }
-            if (read_digits() == 0) {
+            const auto exponent_digits = read_digits(num_str, 10);
+            if (! exponent_digits) {
+                return std::unexpected(exponent_digits.error());
+            }
+            if (*exponent_digits == 0) {
                 return std::unexpected(create_error("Expected a digit in the exponent"));
             }
         }
@@ -837,6 +1130,8 @@ private:
             }
         } else if (val.is<boolean>()) {
             _output += val.as<boolean>() ? "true" : "false";
+        } else if (val.is<timestamp>()) {
+            _output += std::string(val.as<timestamp>());
         } else if (val.is<array>()) {
             serialize_array(val.as<array>());
         } else if (val.is<dictionary>()) {

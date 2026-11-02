@@ -149,6 +149,46 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads a datetime with an offset, such as
+  ``1979-05-27T07:32:00Z`` or ``1979-05-27 00:32:00.5-07:00``, as a
+  ``timestamp`` that keeps the offset, and ``toml::serialize()`` writes a
+  ``timestamp`` back in that form. A local date-time, a local date and a
+  local time fail with ``timestamp cannot hold a datetime without an
+  offset``, since a ``timestamp`` always has an offset. Reading used to
+  fail with ``Expected a newline`` or ``Leading zero in a number``, and
+  writing with ``Unsupported value type for TOML serialization``
+
+- ``toml::deserialize()`` fails on the floats ``inf`` and ``nan``, with
+  or without a sign, with the detail
+  ``number has no infinity and keeps nan for errors``. It used to say
+  ``Invalid value format`` or ``Invalid number format``
+
+- ``toml::deserialize()`` reads underscores between the digits of a
+  number, such as ``1_000``, ``3.14_15``, ``1e1_0`` and ``0xDEAD_beef``,
+  and rejects one without a digit on each side. ``toml::serialize()``
+  writes the number back without them. They used to fail with
+  ``Expected a newline``
+
+- ``toml::deserialize()`` reads integers in hexadecimal, octal and
+  binary, such as ``0xff``, ``0o755`` and ``0b1010``, and
+  ``toml::serialize()`` writes them back in decimal. They used to fail
+  with ``Expected a newline``
+
+- ``toml::deserialize()`` reads multi-line strings, between ``"""`` or
+  ``'''``, keeping each newline as it is written. ``toml::serialize()``
+  writes the text back as a basic string. They used to fail with
+  ``Expected a newline`` or ``Invalid value format``
+
+- ``toml::deserialize()`` reads literal strings, such as
+  ``'C:\Users'``, as values and as keys. ``toml::serialize()`` writes
+  the text back as a basic string. They used to fail with
+  ``Invalid value format`` or ``Invalid key format``
+
+- ``toml::deserialize()`` reads dotted keys, such as ``a.b = 1``, at the
+  top level, under a table header and in an inline table, and rejects one
+  that would add to a table a header or an inline table defined, as
+  TOML v1.0.0 says. They used to fail with ``Expected '='``
+
 - ``toml::serialize()`` writes a float whose value is integral with
   ``.0``, so ``x = 1.0`` and ``x = 1e2`` read and written back are
   ``x = 1.0`` and ``x = 100.0``. They used to be written as the integers
