@@ -20,6 +20,7 @@ concept error_enum_type = std::is_error_code_enum_v<E>;
  *
  * Wraps a std::error_code: a numeric value and the category it belongs to.
  * The detail is text that says what failed and where. Comparisons ignore it.
+ * Only the constructor that takes a std::errc and a detail sets it.
  */
 class error {
 public:
@@ -139,7 +140,7 @@ public:
 
     /**
      * @brief Check whether this holds an error.
-     * @return True when the value of the code is not 0
+     * @return true when the value of the code is not 0
      */
     explicit operator bool() const noexcept;
 
@@ -147,7 +148,7 @@ public:
      * @brief Compare with an error code enum.
      * @tparam E The enum type
      * @param e The enum value to compare with
-     * @return True when the category and the value both match, as
+     * @return true when the category and the value both match, as
      *         std::error_code compares with an error code enum
      */
     template <error_enum_type E>
@@ -159,20 +160,19 @@ public:
     /**
      * @brief Compare with a std::errc.
      * @param e The error condition to compare with
-     * @return True when either category reports e as equivalent, as
+     * @return true when either category reports e as equivalent, as
      *         std::error_code compares with an error condition, so a
      *         system_category() code matches the std::errc it maps to
-     *
-     * Kept beside the std::error_condition overload: std::errc converts to
-     * both std::error_condition and error, so without an exact match the
-     * comparison would be ambiguous.
      */
+    // Kept beside the std::error_condition overload: std::errc converts to
+    // both std::error_condition and error, so without an exact match the
+    // comparison would be ambiguous.
     bool operator==(std::errc e) const noexcept;
 
     /**
      * @brief Compare with a std::error_condition.
      * @param c The error condition to compare with
-     * @return True when either category reports c as equivalent, the same as
+     * @return true when either category reports c as equivalent, the same as
      *         for std::errc
      *
      * An error condition enum from any library converts to it.
@@ -182,21 +182,21 @@ public:
     /**
      * @brief Check whether the code belongs to a category.
      * @param c The category to compare with
-     * @return True when the code's category is c
+     * @return true when the code's category is c
      */
     bool operator==(const std::error_category& c) const noexcept;
 
     /**
      * @brief Check whether the code belongs to another category.
      * @param c The category to compare with
-     * @return True when the code's category is not c
+     * @return true when the code's category is not c
      */
     bool operator!=(const std::error_category& c) const noexcept;
 
     /**
      * @brief Equality comparison operator.
      * @param e The error to compare with
-     * @return True when the category and the value both match; the detail is
+     * @return true when the category and the value both match; the detail is
      *         ignored
      */
     bool operator==(const error& e) const noexcept;
@@ -204,7 +204,7 @@ public:
     /**
      * @brief Inequality comparison operator.
      * @param e The error to compare with
-     * @return True when the category or the value differs; the detail is
+     * @return true when the category or the value differs; the detail is
      *         ignored
      */
     bool operator!=(const error& e) const noexcept;
@@ -212,10 +212,11 @@ public:
     /**
      * @brief Three-way comparison operator.
      * @param e The error to compare with
-     * @return The order of the codes
+     * @return The order of the categories, then of the values
      *
-     * Weak, as errors that differ only in their detail are equivalent but
-     * can be told apart.
+     * Categories order by address, so the order of errors from different
+     * categories can differ from one program to another. Weak, as errors
+     * that differ only in their detail are equivalent but can be told apart.
      */
     std::weak_ordering operator<=>(const error& e) const noexcept;
 
@@ -227,7 +228,7 @@ private:
 
 /**
  * @brief Write an error to a stream.
- * @tparam C The character type of the stream
+ * @tparam C The character type of the stream, which has to be char
  * @tparam T The character traits of the stream
  * @param os The stream to write to
  * @param e The error to write

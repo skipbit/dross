@@ -41,6 +41,9 @@ Added
 Changed
 ~~~~~~~
 
+- The API page describes the members of ``error``, which it used to list
+  by name only
+
 - ``toml::serialize()`` writes an array whose elements are all
   dictionaries as an array of tables, with a ``[[name]]`` header for each
   element, instead of inline on one line. An empty array and an array
@@ -153,9 +156,6 @@ Changed
 
 Fixed
 ~~~~~
-
-- The API page describes the members of ``error``, which it used to list
-  by name only
 
 - ``toml::deserialize()`` reads an array of tables, written with
   ``[[name]]`` headers, as an ``array`` of ``dictionary`` values. Each
