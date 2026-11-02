@@ -710,7 +710,7 @@ private:
         if (((ch == '"') || (ch == '\'')) && (peek_char(1) == ch) && (peek_char(2) == ch)) {
             return parse_multi_line_string(ch, (ch == '"') ? "multi-line string" : "multi-line literal string").transform(to_value);
         } else if (ch == '"') {
-            return parse_string();
+            return parse_basic_string("string").transform(to_value);
         } else if (ch == '\'') {
             return parse_literal_string("literal string").transform(to_value);
         } else if (ch == '[') {
@@ -726,13 +726,6 @@ private:
         } else {
             return std::unexpected(create_error("Invalid value format"));
         }
-    }
-
-    std::expected<value, error> parse_string()
-    {
-        return parse_basic_string("string").transform([](const std::string& text) {
-            return value(string{ text });
-        });
     }
 
     std::expected<value, error> parse_array()

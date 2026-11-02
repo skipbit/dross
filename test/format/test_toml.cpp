@@ -934,6 +934,21 @@ TEST(toml_test, a_key_or_table_defined_twice_is_named_where_it_starts)
     }
 }
 
+// A basic string names its kind when it fails, as a value and as a key.
+TEST(toml_test, basic_strings_name_their_kind_when_they_fail)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "x = \"a", "line 1, column 7: Unterminated string" },
+        { "x = \"a\x01\"\n", "line 1, column 7: Control character in string" },
+        { "\"a\x01\" = 1\n", "line 1, column 3: Control character in quoted key" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto invalid = toml::deserialize(make_data(content));
+        ASSERT_FALSE(invalid.has_value()) << content;
+        EXPECT_EQ(invalid.error().detail(), detail) << content;
+    }
+}
+
 // A literal string reads its characters as they are, with no escapes, as a
 // value and as a key.
 TEST(toml_test, literal_strings)
