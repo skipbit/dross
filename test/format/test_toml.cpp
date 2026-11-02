@@ -125,13 +125,14 @@ TEST(toml_test, empty_keys_are_written_quoted)
     dictionary a;
     a[""] = value(inner);
     a["list"] = value(array{ value(leaf) });
+    a["mixed"] = value(array{ value(leaf), value(number{ "2" }) });
     dictionary tables;
     tables[""] = value(inner);
     tables["a"] = value(a);
 
     const std::vector<std::pair<dictionary, std::string>> cases = {
         { keys, "\"\" = 2\n\n[a]\n\"\" = 1\n" },
-        { tables, "\n[\"\"]\nx = 1\n\n[a]\n\n[a.\"\"]\nx = 1\n\n[[a.list]]\n\"\" = 1\n" },
+        { tables, "\n[\"\"]\nx = 1\n\n[a]\nmixed = [{\"\" = 1}, 2]\n\n[a.\"\"]\nx = 1\n\n[[a.list]]\n\"\" = 1\n" },
     };
     for (const auto& [input, expected] : cases) {
         auto output = toml::serialize(input);
@@ -682,6 +683,8 @@ TEST(toml_test, arrays_of_tables_do_not_mix_with_other_definitions)
         { "[[a]]\n[[a.b]]\n[a.b]\n", "line 3, column 1: Table defined twice" },
         { "[[t.a]]\n[t]\na = 1\n", "line 3, column 1: Key defined twice" },
         { "[[t.a]]\n[t]\na.x = 1\n", "line 3, column 1: Key defined twice" },
+        { "[[a]]\nb = 1\n[[a.b]]\n", "line 3, column 1: Table header names a key that is not a table" },
+        { "[[a]]\nb.c = 1\n[[a.b]]\n", "line 3, column 1: Table defined twice" },
         { "[[a]\n", "line 1, column 5: Expected ']]'" },
         { "[[a] ]\n", "line 1, column 5: Expected ']]'" },
     };
@@ -794,6 +797,7 @@ TEST(toml_test, serialize_writes_arrays_of_dictionaries_as_arrays_of_tables)
         { "a = [{x = 1}, 2]\n", "a = [{x = 1}, 2]\n" },
         { "a = [[{x = 1}]]\n", "a = [[{x = 1}]]\n" },
         { "a = {b = [{x = [{y = 1}]}]}\n", "\n[a]\n\n[[a.b]]\n\n[[a.b.x]]\ny = 1\n" },
+        { "a = [{b = {}}]\n", "\n[[a]]\n\n[a.b]\n" },
     };
     for (const auto& [content, expected] : cases) {
         auto read = toml::deserialize(make_data(content));
