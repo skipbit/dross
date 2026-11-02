@@ -323,16 +323,17 @@ private:
             }
         }
 
-        return to_dictionary(result);
+        merge_tables(result);
+        return result.pairs;
     }
 
-    static dictionary to_dictionary(const table_node& node)
+    // Puts each table into the pairs of its parent, so node.pairs holds the whole tree.
+    static void merge_tables(table_node& node)
     {
-        dictionary result = node.pairs;
-        for (const auto& [key, table] : node.tables) {
-            result[key] = to_dictionary(*table);
+        for (auto& [key, table] : node.tables) {
+            merge_tables(*table);
+            node.pairs[key] = table->pairs;
         }
-        return result;
     }
 
     std::expected<std::vector<std::string>, error> parse_table_header()
@@ -816,7 +817,8 @@ private:
             }
         }
 
-        return value(to_dictionary(result));
+        merge_tables(result);
+        return value(result.pairs);
     }
 
     std::expected<value, error> parse_boolean()
