@@ -85,8 +85,7 @@ namespace dross::toml {
  *   table a header or an inline table defined
  * - Numbers with a leading zero or without a digit on both sides of the
  *   decimal point, such as 01, 1. and -.5
- * - Datetimes that timestamp rejects, such as February 30 or a leap
- *   second written as second 60
+ * - Datetimes that do not exist, such as February 30
  * - A newline or a comment inside an inline table, outside its values
  *
  * Valid TOML that fails to read:
@@ -94,6 +93,8 @@ namespace dross::toml {
  *   hold, fail with "timestamp cannot hold a datetime without an offset"
  * - The floats inf and nan, with or without a sign, which number cannot
  *   hold, fail with "number cannot hold inf or nan"
+ * - A leap second, written as second 60, which timestamp cannot hold,
+ *   fails with "Invalid datetime"
  * - Arrays of tables, written with [[name]] headers
  *
  * A newline in a multi-line string is kept as it is written, LF or CRLF.
