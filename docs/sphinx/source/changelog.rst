@@ -154,6 +154,9 @@ Changed
 Fixed
 ~~~~~
 
+- The API page describes the members of ``error``, which it used to list
+  by name only
+
 - ``toml::deserialize()`` reads an array of tables, written with
   ``[[name]]`` headers, as an ``array`` of ``dictionary`` values. Each
   header appends a table, and the headers and pairs after it fill that
