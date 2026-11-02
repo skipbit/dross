@@ -190,6 +190,15 @@ private:
         bool named = false;
         // Whether dotted keys created this table, which only they can add to
         bool dotted = false;
+        // Whether [[name]] headers made this an array of tables, whose last
+        // element takes the headers and pairs that follow
+        bool array = false;
+        std::vector<std::unique_ptr<table_node>> elements;
+    };
+
+    struct table_header {
+        std::vector<std::string> key_path;
+        bool array;
     };
 
     struct position {
@@ -331,20 +340,30 @@ private:
     static void merge_tables(table_node& node)
     {
         for (auto& [key, table] : node.tables) {
-            merge_tables(*table);
-            node.pairs[key] = table->pairs;
+            if (table->array) {
+                array elements;
+                for (auto& element : table->elements) {
+                    merge_tables(*element);
+                    elements.append(element->pairs);
+                }
+                node.pairs[key] = elements;
+            } else {
+                merge_tables(*table);
+                node.pairs[key] = table->pairs;
+            }
         }
     }
 
-    std::expected<std::vector<std::string>, error> parse_table_header()
+    std::expected<table_header, error> parse_table_header()
     {
         if (current_char() != '[') {
             return std::unexpected(create_error("Expected '['"));
         }
         advance();  // skip '['
 
-        if (current_char() == '[') {
-            return std::unexpected(create_error("Arrays of tables are not supported"));
+        const bool array = (current_char() == '[');
+        if (array) {
+            advance();
         }
 
         std::vector<std::string> key_path;
@@ -370,7 +389,14 @@ private:
             }
         }
 
-        return key_path;
+        if (array) {
+            if (current_char() != ']') {
+                return std::unexpected(create_error("Expected ']]'"));
+            }
+            advance();
+        }
+
+        return table_header{ key_path, array };
     }
 
     std::expected<void, error> add_key(dictionary& table, const std::string& key, const value& val, const position& at)
@@ -413,21 +439,35 @@ private:
     }
 
     // Only a table that headers created can take a header, and only one header can name it.
-    std::expected<table_node*, error> open_table(table_node& root, const std::vector<std::string>& key_path, const position& header_start)
+    // An array of tables takes a new table for each [[name]] header and no [name] header.
+    std::expected<table_node*, error> open_table(table_node& root, const table_header& header, const position& header_start)
     {
         table_node* table = &root;
-        for (const std::string& key : key_path) {
+        for (size_t i = 0; i < header.key_path.size(); ++i) {
+            const std::string& key = header.key_path[i];
+            const bool last = ((i + 1) == header.key_path.size());
             if (table->pairs.contains(key)) {
                 return std::unexpected(create_error("Table header names a key that is not a table", header_start));
             }
             auto& child = table->tables[key];
             if (! child) {
                 child = std::make_unique<table_node>();
+                child->array = (header.array && last);
             }
             table = child.get();
+            if (table->array && ! last) {
+                table = table->elements.back().get();
+            }
         }
 
-        if (table->named || table->dotted) {
+        if (header.array) {
+            if (! table->array) {
+                return std::unexpected(create_error("Table defined twice", header_start));
+            }
+            table->elements.push_back(std::make_unique<table_node>());
+            return table->elements.back().get();
+        }
+        if (table->named || table->dotted || table->array) {
             return std::unexpected(create_error("Table defined twice", header_start));
         }
         table->named = true;
@@ -1082,24 +1122,55 @@ private:
     std::string _output;
     size_t _indent_level;
 
+    // An array whose elements are all dictionaries, written with [[name]] headers.
+    static bool is_array_of_tables(const value& val)
+    {
+        if (! val.is<array>()) {
+            return false;
+        }
+        const auto& arr = val.as<array>();
+        if (arr.length() == 0) {
+            return false;
+        }
+        for (size_t i = 0; i < arr.length(); ++i) {
+            if (! arr[i].is<dictionary>()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // A value written under a header rather than as a key/value pair.
+    static bool is_written_as_table(const value& val)
+    {
+        return val.is<dictionary>() || is_array_of_tables(val);
+    }
+
     void serialize_dictionary(const dictionary& dict, const std::vector<std::string>& path)
     {
         // First, output simple key-value pairs
         for (const auto& [key, val] : dict) {
-            if (! val.is<dictionary>()) {
+            if (! is_written_as_table(val)) {
                 serialize_key_value(key, val);
             }
         }
 
-        // Then output nested tables
+        // Then output nested tables and arrays of tables
         for (const auto& [key, val] : dict) {
+            if (! is_written_as_table(val)) {
+                continue;
+            }
+            auto nested_path = path;
+            nested_path.push_back(key);
             if (val.is<dictionary>()) {
-                auto nested_path = path;
-                nested_path.push_back(key);
-
                 _output += "\n[" + join_path(nested_path) + "]\n";
-
                 serialize_dictionary(val.as<dictionary>(), nested_path);
+            } else {
+                const auto& arr = val.as<array>();
+                for (size_t i = 0; i < arr.length(); ++i) {
+                    _output += "\n[[" + join_path(nested_path) + "]]\n";
+                    serialize_dictionary(arr[i].as<dictionary>(), nested_path);
+                }
             }
         }
     }

@@ -28,6 +28,7 @@ namespace dross::toml {
  * - TOML Boolean → dross::boolean
  * - TOML Array → dross::array
  * - TOML Table → dross::dictionary
+ * - TOML Array of Tables → dross::array of dross::dictionary
  * - TOML Offset Date-Time → dross::timestamp
  *
  * A timestamp always has an offset, so a local date-time, a local date and
@@ -83,6 +84,10 @@ namespace dross::toml {
  *   key already set by a key/value pair or an inline table, a table header
  *   that names a table dotted keys created, and a dotted key that adds to a
  *   table a header or an inline table defined
+ * - An array of tables and another definition of the same key: a [[name]]
+ *   header that names a key a key/value pair set or a table that other
+ *   headers or dotted keys created, and a [name] header, a key/value pair
+ *   or a dotted key that names an array of tables
  * - Numbers with a leading zero or without a digit on both sides of the
  *   decimal point, such as 01, 1. and -.5
  * - Datetimes that do not exist, such as February 30
@@ -95,7 +100,6 @@ namespace dross::toml {
  *   no infinity and keeps nan for errors"
  * - A leap second, written as second 60, which timestamp cannot hold,
  *   fails with "Invalid datetime"
- * - Arrays of tables, written with [[name]] headers
  *
  * A newline in a multi-line string is kept as it is written, LF or CRLF.
  *
@@ -124,6 +128,10 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Dictionary keys are sorted alphabetically for consistent output
  * - Arrays are formatted with proper spacing
  * - Nested tables use dotted notation when appropriate
+ * - An array whose elements are all dictionaries is written as an array
+ *   of tables, with a [[name]] header for each element. An empty array
+ *   and an array that mixes dictionaries with other values are written
+ *   inline
  * - Strings are properly escaped according to TOML rules. A string read
  *   from a literal or multi-line string is written as a basic string with
  *   the same text
