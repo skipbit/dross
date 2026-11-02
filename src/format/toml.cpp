@@ -7,6 +7,8 @@
 #include "dross/type/string.h"
 #include "dross/type/timestamp.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <new>
@@ -952,9 +954,17 @@ private:
             return std::unexpected(create_error(std::string("Expected a digit after '0") + prefix + "'"));
         }
 
+        // A chunk of digits fits in 63 bits, so number multiplies once per chunk.
+        const int bits = (base == 16) ? 4 : ((base == 8) ? 3 : 1);
+        const size_t chunk = 63 / bits;
         number result{ 0 };
-        for (const char c : digits) {
-            result = result * number{ base } + number{ digit_value(c, base) };
+        for (size_t start = 0; start < digits.size(); start += chunk) {
+            const size_t length = std::min(chunk, digits.size() - start);
+            std::uint64_t part = 0;
+            for (size_t k = 0; k < length; ++k) {
+                part = (part << bits) | static_cast<std::uint64_t>(digit_value(digits[start + k], base));
+            }
+            result = result * number{ std::uint64_t{ 1 } << (bits * length) } + number{ part };
         }
         return value(result);
     }
