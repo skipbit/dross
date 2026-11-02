@@ -95,6 +95,20 @@ bool is_ascii_xdigit(char c)
     return is_ascii_digit(c) || ((c >= 'a') && (c <= 'f')) || ((c >= 'A') && (c <= 'F'));
 }
 
+// The value of a digit in base 2, 8, 10 or 16, or -1 for a character that is not one.
+int digit_value(char c, int base)
+{
+    int digit = -1;
+    if (is_ascii_digit(c)) {
+        digit = c - '0';
+    } else if ((c >= 'a') && (c <= 'f')) {
+        digit = c - 'a' + 10;
+    } else if ((c >= 'A') && (c <= 'F')) {
+        digit = c - 'A' + 10;
+    }
+    return (digit < base) ? digit : -1;
+}
+
 // The reader and the writer share this rule, so every key written bare reads back.
 bool is_bare_key_char(char c)
 {
@@ -929,39 +943,40 @@ private:
         advance();
         advance();
 
-        const auto digit_value = [base](char c) {
-            int digit = -1;
-            if (is_ascii_digit(c)) {
-                digit = c - '0';
-            } else if ((c >= 'a') && (c <= 'f')) {
-                digit = c - 'a' + 10;
-            } else if ((c >= 'A') && (c <= 'F')) {
-                digit = c - 'A' + 10;
-            }
-            return (digit < base) ? digit : -1;
-        };
+        std::string digits;
+        const auto count = read_digits(digits, base);
+        if (! count) {
+            return std::unexpected(count.error());
+        }
+        if (*count == 0) {
+            return std::unexpected(create_error(std::string("Expected a digit after '0") + prefix + "'"));
+        }
 
         number result{ 0 };
-        size_t digits = 0;
+        for (const char c : digits) {
+            result = result * number{ base } + number{ digit_value(c, base) };
+        }
+        return value(result);
+    }
+
+    // Reads the digits of a base onto text. An underscore separates two digits and is not kept.
+    std::expected<size_t, error> read_digits(std::string& text, int base)
+    {
+        size_t count = 0;
         while (true) {
             if (current_char() == '_') {
-                if ((digits == 0) || (digit_value(peek_char()) < 0)) {
+                if ((count == 0) || (digit_value(peek_char(), base) < 0)) {
                     return std::unexpected(create_error("An underscore must be between digits"));
                 }
                 advance();
             }
-            const int digit = digit_value(current_char());
-            if (digit < 0) {
-                break;
+            if (digit_value(current_char(), base) < 0) {
+                return count;
             }
-            result = result * number{ base } + number{ digit };
+            text += current_char();
             advance();
-            ++digits;
+            ++count;
         }
-        if (digits == 0) {
-            return std::unexpected(create_error(std::string("Expected a digit after '0") + prefix + "'"));
-        }
-        return value(result);
     }
 
     std::expected<value, error> parse_number()
@@ -981,29 +996,10 @@ private:
             }
         }
 
-        // An underscore separates two digits and is not kept.
-        const auto read_digits = [&]() -> std::expected<size_t, error> {
-            size_t count = 0;
-            while (true) {
-                if (current_char() == '_') {
-                    if ((count == 0) || ! is_ascii_digit(peek_char())) {
-                        return std::unexpected(create_error("An underscore must be between digits"));
-                    }
-                    advance();
-                }
-                if (! is_ascii_digit(current_char())) {
-                    return count;
-                }
-                num_str += current_char();
-                advance();
-                ++count;
-            }
-        };
-
         // The integer part has no leading zero, a decimal point has a digit on both sides,
         // and an exponent has a digit.
         const bool leading_zero = (current_char() == '0');
-        const auto integer_digits = read_digits();
+        const auto integer_digits = read_digits(num_str, 10);
         if (! integer_digits) {
             return std::unexpected(integer_digits.error());
         }
@@ -1016,7 +1012,7 @@ private:
         if (current_char() == '.') {
             num_str += current_char();
             advance();
-            const auto fraction_digits = read_digits();
+            const auto fraction_digits = read_digits(num_str, 10);
             if (! fraction_digits) {
                 return std::unexpected(fraction_digits.error());
             }
@@ -1032,7 +1028,7 @@ private:
                 num_str += current_char();
                 advance();
             }
-            const auto exponent_digits = read_digits();
+            const auto exponent_digits = read_digits(num_str, 10);
             if (! exponent_digits) {
                 return std::unexpected(exponent_digits.error());
             }
