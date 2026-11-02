@@ -149,6 +149,15 @@ Changed
 Fixed
 ~~~~~
 
+- ``toml::deserialize()`` reads an array of tables, written with
+  ``[[name]]`` headers, as an ``array`` of ``dictionary`` values. Each
+  header appends a table, and the headers and pairs after it fill that
+  last table. A ``[[name]]`` header fails with ``Table defined twice``
+  when ``name`` is a table defined in another way, and with
+  ``Table header names a key that is not a table`` when a key/value pair
+  set ``name``. Reading used to fail with
+  ``Arrays of tables are not supported``
+
 - ``toml::deserialize()`` reads a datetime with an offset, such as
   ``1979-05-27T07:32:00Z`` or ``1979-05-27 00:32:00.5-07:00``, as a
   ``timestamp`` that keeps the offset, and ``toml::serialize()`` writes a

@@ -625,14 +625,70 @@ TEST(toml_test, keys_and_tables_defined_twice)
     }
 }
 
-TEST(toml_test, arrays_of_tables_are_not_read)
+// Each [[name]] header appends a table to the array, and the headers and
+// pairs after it fill that last table.
+TEST(toml_test, arrays_of_tables_are_read)
 {
-    for (const char* text : { "[[t]]\na = 1\n", "[[t]]\na = 1\n[[t]]\na = 2\n" }) {
-        auto result = toml::deserialize(make_data(text));
-        EXPECT_FALSE(result.has_value()) << text;
-        if (! result.has_value()) {
-            EXPECT_EQ(result.error(), std::errc::invalid_argument) << text;
-        }
+    auto result = toml::deserialize(make_data("[[fruit]]\nname = \"apple\"\n[[fruit]]\nname = \"banana\"\n"));
+    ASSERT_TRUE(result.has_value()) << result.error().detail();
+    const array fruit = result.value()["fruit"].as<array>();
+    ASSERT_EQ(fruit.length(), 2u);
+    EXPECT_EQ(std::string(fruit[0].as<dictionary>()["name"].as<string>()), "apple");
+    EXPECT_EQ(std::string(fruit[1].as<dictionary>()["name"].as<string>()), "banana");
+
+    // The example of TOML v1.0.0
+    auto nested = toml::deserialize(make_data(
+        "[[fruits]]\nname = \"apple\"\n\n[fruits.physical]\ncolor = \"red\"\nshape = \"round\"\n\n"
+        "[[fruits.varieties]]\nname = \"red delicious\"\n\n[[fruits.varieties]]\nname = \"granny smith\"\n\n\n"
+        "[[fruits]]\nname = \"banana\"\n\n[[fruits.varieties]]\nname = \"plantain\"\n"));
+    ASSERT_TRUE(nested.has_value()) << nested.error().detail();
+    auto expected = toml::deserialize(make_data(
+        "fruits = [\n"
+        "  { name = \"apple\", physical = { color = \"red\", shape = \"round\" }, varieties = [ { name = \"red delicious\" }, { name = \"granny smith\" } ] },\n"
+        "  { name = \"banana\", varieties = [ { name = \"plantain\" } ] },\n"
+        "]\n"));
+    ASSERT_TRUE(expected.has_value()) << expected.error().detail();
+    EXPECT_EQ(nested.value(), expected.value());
+
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "[[a]]\n[[a]]\nx = 1\n", "a = [{}, {x = 1}]\n" },
+        { "[[ a . b ]]\nx = 1\n", "a = {b = [{x = 1}]}\n" },
+        { "[[a]]\nb.c = 1\n[a.d]\ne = 2\n", "a = [{b = {c = 1}, d = {e = 2}}]\n" },
+        { "[[a]]\n[a.b]\nx = 1\n[[a]]\n[a.b]\nx = 2\n", "a = [{b = {x = 1}}, {b = {x = 2}}]\n" },
+        { "[[a.b]]\nx = 1\n[a]\ny = 2\n", "a = {b = [{x = 1}], y = 2}\n" },
+    };
+    for (const auto& [content, same] : cases) {
+        auto read = toml::deserialize(make_data(content));
+        ASSERT_TRUE(read.has_value()) << content << read.error().detail();
+        auto inline_form = toml::deserialize(make_data(same));
+        ASSERT_TRUE(inline_form.has_value()) << same << inline_form.error().detail();
+        EXPECT_EQ(read.value(), inline_form.value()) << content;
+    }
+}
+
+// An array of tables cannot add to a value, a table or an array that is
+// defined in another way, and no other definition can add to it.
+TEST(toml_test, arrays_of_tables_do_not_mix_with_other_definitions)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "a = [1]\n[[a]]\n", "line 2, column 1: Table header names a key that is not a table" },
+        { "a = []\n[[a]]\n", "line 2, column 1: Table header names a key that is not a table" },
+        { "a = [{x = 1}]\n[[a]]\n", "line 2, column 1: Table header names a key that is not a table" },
+        { "[a]\n[[a]]\n", "line 2, column 1: Table defined twice" },
+        { "[a.b]\n[[a]]\n", "line 2, column 1: Table defined twice" },
+        { "a.b = 1\n[[a]]\n", "line 2, column 1: Table defined twice" },
+        { "[[a]]\n[a]\n", "line 2, column 1: Table defined twice" },
+        { "[[a]]\n[a.b]\n[[a.b]]\n", "line 3, column 1: Table defined twice" },
+        { "[[a]]\n[[a.b]]\n[a.b]\n", "line 3, column 1: Table defined twice" },
+        { "[[t.a]]\n[t]\na = 1\n", "line 3, column 1: Key defined twice" },
+        { "[[t.a]]\n[t]\na.x = 1\n", "line 3, column 1: Key defined twice" },
+        { "[[a]\n", "line 1, column 5: Expected ']]'" },
+        { "[[a] ]\n", "line 1, column 5: Expected ']]'" },
+    };
+    for (const auto& [content, detail] : cases) {
+        auto result = toml::deserialize(make_data(content));
+        ASSERT_FALSE(result.has_value()) << content;
+        EXPECT_EQ(result.error().detail(), detail) << content;
     }
 }
 
