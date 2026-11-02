@@ -584,9 +584,9 @@ private:
         return result;
     }
 
-    bool at_line_end() const
+    bool at_line_end(size_t offset = 0) const
     {
-        return (current_char() == '\n') || ((current_char() == '\r') && (peek_char() == '\n'));
+        return (peek_char(offset) == '\n') || ((peek_char(offset) == '\r') && (peek_char(offset + 1) == '\n'));
     }
 
     void skip_line_end()
@@ -631,7 +631,7 @@ private:
                 while ((peek_char(k) == ' ') || (peek_char(k) == '\t')) {
                     ++k;
                 }
-                if ((peek_char(k) == '\n') || ((peek_char(k) == '\r') && (peek_char(k + 1) == '\n'))) {
+                if (at_line_end(k) || ((_pos + k) >= _input.size())) {
                     advance();  // skip backslash
                     while ((current_char() == ' ') || (current_char() == '\t') || at_line_end()) {
                         if (at_line_end()) {

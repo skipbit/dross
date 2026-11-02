@@ -980,6 +980,8 @@ TEST(toml_test, multi_line_strings)
         { "x = \"\"\"a\x01\"\"\"\n", "line 1, column 9: Control character in multi-line string" },
         { "x = '''a\rb'''\n", "line 1, column 9: Control character in multi-line literal string" },
         { "x = \"\"\"a\\q\"\"\"\n", "line 1, column 10: Invalid escape sequence" },
+        { "x = \"\"\"a\\", "line 1, column 10: Unterminated multi-line string" },
+        { "x = \"\"\"a\\   ", "line 1, column 13: Unterminated multi-line string" },
         { "x = \"\"\"a\"\"\"\"\"\"\n", "line 1, column 14: Expected a newline" },
     };
     for (const auto& [content, detail] : invalid_cases) {
