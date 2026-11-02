@@ -1140,18 +1140,24 @@ private:
         return true;
     }
 
+    // A value written under a header rather than as a key/value pair.
+    static bool is_written_as_table(const value& val)
+    {
+        return val.is<dictionary>() || is_array_of_tables(val);
+    }
+
     void serialize_dictionary(const dictionary& dict, const std::vector<std::string>& path)
     {
         // First, output simple key-value pairs
         for (const auto& [key, val] : dict) {
-            if (! val.is<dictionary>() && ! is_array_of_tables(val)) {
+            if (! is_written_as_table(val)) {
                 serialize_key_value(key, val);
             }
         }
 
         // Then output nested tables and arrays of tables
         for (const auto& [key, val] : dict) {
-            if (! val.is<dictionary>() && ! is_array_of_tables(val)) {
+            if (! is_written_as_table(val)) {
                 continue;
             }
             auto nested_path = path;
