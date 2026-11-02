@@ -297,7 +297,11 @@ public:
      *         years 0 to 9999
      *
      * system_clock reaches past those years where its duration counts
-     * microseconds.
+     * microseconds. A timestamp near their ends can be outside them as a time
+     * point, when its offset moves it there. A time_point with a coarser
+     * duration, such as std::chrono::sys_days, converts before the call, and
+     * can overflow there where the duration of system_clock counts
+     * nanoseconds.
      */
     static std::optional<timestamp> from_time_point(const std::chrono::system_clock::time_point& tp);
 
@@ -317,7 +321,9 @@ public:
      * @param tp The time point to construct from
      *
      * The resulting timestamp will be in UTC (no timezone offset). A time
-     * point that from_time_point() rejects results in epoch time.
+     * point that from_time_point() rejects results in the nearer of the first
+     * and the last nanosecond of the years 0 to 9999, so it does not order on
+     * the wrong side of another timestamp.
      */
     timestamp(const std::chrono::system_clock::time_point& tp);
 

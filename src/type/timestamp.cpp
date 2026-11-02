@@ -14,8 +14,8 @@ namespace dross {
 
 namespace {
 
-// The years 0 to 9999 that parsing accepts, as the first second and the one
-// after the last.
+// The years 0 to 9999 that a timestamp stays within, as the first second and
+// the one after the last.
 constexpr std::chrono::sys_seconds first_second{ std::chrono::sys_days{ std::chrono::year{ 0 } / std::chrono::January / 1 } };
 constexpr std::chrono::sys_seconds end_second{ std::chrono::sys_days{ std::chrono::year{ 10000 } / std::chrono::January / 1 } };
 
@@ -363,8 +363,16 @@ timestamp::timestamp(const std::chrono::system_clock::time_point& tp)
 {
     if (auto parsed = from_time_point(tp)) {
         _store = std::move(parsed->_store);
+        return;
+    }
+
+    // The nearer end keeps a time point used as a limit, such as
+    // time_point::max() for a deadline that never comes, on its side of others.
+    _store = std::make_unique<storage>();
+    if (std::chrono::floor<std::chrono::seconds>(tp) < first_second) {
+        _store->set_local(first_second, std::chrono::nanoseconds{ 0 });
     } else {
-        _store = std::make_unique<storage>();
+        _store->set_local(end_second - std::chrono::seconds{ 1 }, std::chrono::nanoseconds{ 999'999'999 });
     }
 }
 
