@@ -128,6 +128,10 @@ std::expected<dictionary, error> deserialize(const data& input);
  * - Dictionary keys are sorted alphabetically for consistent output
  * - Arrays are formatted with proper spacing
  * - Nested tables use dotted notation when appropriate
+ * - An array whose elements are all dictionaries is written as an array
+ *   of tables, with a [[name]] header for each element. An empty array
+ *   and an array that mixes dictionaries with other values are written
+ *   inline
  * - Strings are properly escaped according to TOML rules. A string read
  *   from a literal or multi-line string is written as a basic string with
  *   the same text

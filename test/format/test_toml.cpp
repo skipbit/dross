@@ -131,7 +131,7 @@ TEST(toml_test, empty_keys_are_written_quoted)
 
     const std::vector<std::pair<dictionary, std::string>> cases = {
         { keys, "\"\" = 2\n\n[a]\n\"\" = 1\n" },
-        { tables, "\n[\"\"]\nx = 1\n\n[a]\nlist = [{\"\" = 1}]\n\n[a.\"\"]\nx = 1\n" },
+        { tables, "\n[\"\"]\nx = 1\n\n[a]\n\n[a.\"\"]\nx = 1\n\n[[a.list]]\n\"\" = 1\n" },
     };
     for (const auto& [input, expected] : cases) {
         auto output = toml::serialize(input);
@@ -774,6 +774,38 @@ TEST(toml_test, serialize_nested_table)
     EXPECT_TRUE(output.find("[database]") != std::string::npos);
     EXPECT_TRUE(output.find("host = \"localhost\"") != std::string::npos);
     EXPECT_TRUE(output.find("port = 5432") != std::string::npos);
+}
+
+// An array whose elements are all dictionaries is written as an array of
+// tables, and any other array inline.
+TEST(toml_test, serialize_writes_arrays_of_dictionaries_as_arrays_of_tables)
+{
+    const std::vector<std::pair<std::string, std::string>> cases = {
+        { "fruits = [\n"
+          "  { name = \"apple\", physical = { color = \"red\", shape = \"round\" }, varieties = [ { name = \"red delicious\" }, { name = \"granny smith\" } ] },\n"
+          "  { name = \"banana\", varieties = [ { name = \"plantain\" } ] },\n"
+          "]\n",
+          "\n[[fruits]]\nname = \"apple\"\n\n[fruits.physical]\ncolor = \"red\"\nshape = \"round\"\n"
+          "\n[[fruits.varieties]]\nname = \"red delicious\"\n\n[[fruits.varieties]]\nname = \"granny smith\"\n"
+          "\n[[fruits]]\nname = \"banana\"\n\n[[fruits.varieties]]\nname = \"plantain\"\n" },
+        { "points = [{x = 1}, {}]\n", "\n[[points]]\nx = 1\n\n[[points]]\n" },
+        { "a = 1\n[t]\nlist = [{x = 1}]\nz = {y = 2}\n", "a = 1\n\n[t]\n\n[[t.list]]\nx = 1\n\n[t.z]\ny = 2\n" },
+        { "a = []\n", "a = []\n" },
+        { "a = [{x = 1}, 2]\n", "a = [{x = 1}, 2]\n" },
+        { "a = [[{x = 1}]]\n", "a = [[{x = 1}]]\n" },
+        { "a = {b = [{x = [{y = 1}]}]}\n", "\n[a]\n\n[[a.b]]\n\n[[a.b.x]]\ny = 1\n" },
+    };
+    for (const auto& [content, expected] : cases) {
+        auto read = toml::deserialize(make_data(content));
+        ASSERT_TRUE(read.has_value()) << content << read.error().detail();
+        auto written = toml::serialize(read.value());
+        ASSERT_TRUE(written.has_value()) << content;
+        EXPECT_EQ(std::string(*written), expected) << content;
+
+        auto read_back = toml::deserialize(*written);
+        ASSERT_TRUE(read_back.has_value()) << expected << read_back.error().detail();
+        EXPECT_EQ(read_back.value(), read.value()) << expected;
+    }
 }
 
 // Roundtrip Tests

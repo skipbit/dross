@@ -41,6 +41,11 @@ Added
 Changed
 ~~~~~~~
 
+- ``toml::serialize()`` writes an array whose elements are all
+  dictionaries as an array of tables, with a ``[[name]]`` header for each
+  element, instead of inline on one line. An empty array and an array
+  that mixes dictionaries with other values are still written inline
+
 - The ``xdg`` accessors ignore a relative path in an ``XDG_*`` variable,
   as the XDG Base Directory specification asks, and use the default under
   the home directory as for an empty one. ``path::home()`` ignores a

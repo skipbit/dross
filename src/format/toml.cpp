@@ -1122,24 +1122,49 @@ private:
     std::string _output;
     size_t _indent_level;
 
+    // An array whose elements are all dictionaries, written with [[name]] headers.
+    static bool is_array_of_tables(const value& val)
+    {
+        if (! val.is<array>()) {
+            return false;
+        }
+        const auto& arr = val.as<array>();
+        if (arr.length() == 0) {
+            return false;
+        }
+        for (size_t i = 0; i < arr.length(); ++i) {
+            if (! arr[i].is<dictionary>()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     void serialize_dictionary(const dictionary& dict, const std::vector<std::string>& path)
     {
         // First, output simple key-value pairs
         for (const auto& [key, val] : dict) {
-            if (! val.is<dictionary>()) {
+            if (! val.is<dictionary>() && ! is_array_of_tables(val)) {
                 serialize_key_value(key, val);
             }
         }
 
-        // Then output nested tables
+        // Then output nested tables and arrays of tables
         for (const auto& [key, val] : dict) {
+            if (! val.is<dictionary>() && ! is_array_of_tables(val)) {
+                continue;
+            }
+            auto nested_path = path;
+            nested_path.push_back(key);
             if (val.is<dictionary>()) {
-                auto nested_path = path;
-                nested_path.push_back(key);
-
                 _output += "\n[" + join_path(nested_path) + "]\n";
-
                 serialize_dictionary(val.as<dictionary>(), nested_path);
+            } else {
+                const auto& arr = val.as<array>();
+                for (size_t i = 0; i < arr.length(); ++i) {
+                    _output += "\n[[" + join_path(nested_path) + "]]\n";
+                    serialize_dictionary(arr[i].as<dictionary>(), nested_path);
+                }
             }
         }
     }
