@@ -13,7 +13,8 @@
  * timestamp's arithmetic operators for a result outside the years 0 to
  * 9999, which timestamp::add() and timestamp::subtract() report as
  * std::nullopt instead. The core types use the Pimpl idiom for ABI
- * stability; error wraps a std::error_code directly.
+ * stability; error wraps a std::error_code directly, and timestamp and
+ * timezone hold their values directly.
  *
  * Key features:
  * - Arbitrary precision arithmetic with number

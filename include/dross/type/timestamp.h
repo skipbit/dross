@@ -4,9 +4,9 @@
 
 #include <chrono>
 #include <compare>
-#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace dross {
 
@@ -25,7 +25,7 @@ namespace dross {
  * - Type-safe timezone operations with timezone class
  * - Integration with std::chrono for duration arithmetic, kept within the
  *   years 0 to 9999 that parsing accepts
- * - Value semantics (copyable and assignable)
+ * - Value semantics (copyable and assignable, without allocating)
  * - Thread-safe for read operations
  * - A date alone is read as midnight and written in full
  * - Factory methods for common timestamp patterns
@@ -98,30 +98,13 @@ public:
         friend class timestamp;
 
     private:
-        class impl;
-        std::unique_ptr<impl> _impl;
+        std::chrono::year_month_day _ymd;
 
         // Private constructors - only timestamp can create date objects
         date_part();
-        date_part(int year, int month, int day);
         date_part(const std::chrono::year_month_day& ymd);
 
     public:
-        /**
-         * @brief Copy constructor.
-         */
-        date_part(const date_part& other);
-
-        /**
-         * @brief Destructor.
-         */
-        ~date_part();
-
-        /**
-         * @brief Copy assignment operator.
-         */
-        date_part& operator=(const date_part& other);
-
         /**
          * @brief Get the year component.
          * @return Year (e.g., 2024)
@@ -178,35 +161,17 @@ public:
         friend class timestamp;
 
     private:
-        class impl;
-        std::unique_ptr<impl> _impl;
+        std::chrono::nanoseconds _since_midnight;
 
         // Private constructors - only timestamp can create time objects
         time_part();
-        time_part(int hour, int minute, int second);
-        template <typename Duration>
-        time_part(const std::chrono::hh_mm_ss<Duration>& hms);
+        explicit time_part(std::chrono::nanoseconds since_midnight);
 
     public:
         /**
          * @brief Static midnight constant.
          */
         static const time_part midnight;
-
-        /**
-         * @brief Copy constructor.
-         */
-        time_part(const time_part& other);
-
-        /**
-         * @brief Destructor.
-         */
-        ~time_part();
-
-        /**
-         * @brief Copy assignment operator.
-         */
-        time_part& operator=(const time_part& other);
 
         /**
          * @brief Get the hour component.
@@ -311,12 +276,6 @@ public:
     timestamp();
 
     /**
-     * @brief Copy constructor.
-     * @param other The timestamp to copy from
-     */
-    timestamp(const timestamp& other);
-
-    /**
      * @brief Construct from std::chrono::system_clock::time_point.
      * @param tp The time point to construct from
      *
@@ -375,16 +334,6 @@ public:
      * Components that from_components() rejects result in epoch time.
      */
     timestamp(int year, int month, int day, int hour, int minute, int second, const timezone& tz);
-
-    /**
-     * @brief Destructor.
-     */
-    ~timestamp();
-
-    /**
-     * @brief Copy assignment operator.
-     */
-    timestamp& operator=(const timestamp& other);
 
     /**
      * @brief Implicit conversion to std::chrono::system_clock::time_point.
@@ -542,10 +491,21 @@ public:
     const dross::timezone& timezone() const noexcept;
 
 private:
-    class storage;
-    std::unique_ptr<storage> _store;
+    // The two 4-byte members side by side keep this to 16 bytes.
+    date_part _date;
+    dross::timezone _timezone;
+    time_part _time;
 
-    explicit timestamp(std::unique_ptr<storage> store);
+    // Wall-clock seconds since the epoch, before the offset is applied.
+    std::chrono::sys_seconds local_seconds() const noexcept;
+
+    std::chrono::nanoseconds subseconds() const noexcept;
+
+    // The instant in UTC, kept in seconds so that no year from 0 to 9999 overflows.
+    std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> instant() const noexcept;
+
+    // Splits wall-clock seconds and a fraction into the date and time parts.
+    void set_local(std::chrono::sys_seconds local, std::chrono::nanoseconds subseconds);
 
     /**
      * @brief Private helper method for ISO 8601 formatting.

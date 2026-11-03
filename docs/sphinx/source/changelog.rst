@@ -45,6 +45,11 @@ Added
 Changed
 ~~~~~~~
 
+- ``timestamp``, ``timestamp::date_part``, ``timestamp::time_part`` and
+  ``timezone`` hold their values directly instead of behind a pointer, so
+  building, copying and moving one allocates nothing, apart from parsing a
+  string. This changes their size and layout, and so the ABI
+
 - The ``timestamp`` constructor that takes a
   ``std::chrono::system_clock::time_point`` results in the nearer end of
   the years 0 to 9999 for one outside them, so ``time_point::max()`` does
@@ -166,6 +171,11 @@ Changed
 
 Fixed
 ~~~~~
+
+- ``timestamp`` no longer overflows a signed integer where
+  ``system_clock`` counts nanoseconds, near its ends: building one from a
+  time point within a second of ``time_point::min()``, converting one back,
+  or taking a difference whose seconds alone do not fit in the duration
 
 - ``toml::deserialize()`` reads an array of tables, written with
   ``[[name]]`` headers, as an ``array`` of ``dictionary`` values. Each

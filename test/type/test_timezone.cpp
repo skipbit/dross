@@ -349,3 +349,10 @@ TEST(timezone_test, zero_offset_vs_utc)
     EXPECT_EQ(utc.format(), "Z");
     EXPECT_EQ(zero_offset.format(), "Z");
 }
+
+TEST(timezone_test, default_constructed_is_utc)
+{
+    const dross::timezone tz;
+    EXPECT_TRUE(tz.is_utc());
+    EXPECT_EQ(tz, dross::timezone::utc());
+}

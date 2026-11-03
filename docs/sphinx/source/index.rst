@@ -44,8 +44,9 @@ designed to be a general-purpose library similar to Boost with a focus on:
   ``path`` calls that let ``std::filesystem`` exceptions through and the
   ``timestamp`` arithmetic operators, which throw outside the years 0 to 9999
 - **Pimpl idiom** - Types keep their representation behind an opaque pointer,
-  apart from ``error``, ``path``, ``xdg`` and the ``data`` iterators, which
-  hold theirs directly; the ABI can change in any 0.x release
+  apart from ``error``, ``path``, ``xdg``, ``timestamp``, ``timezone`` and the
+  ``data`` iterators, which hold theirs directly; the ABI can change in any
+  0.x release
 - **Comprehensive type system** - Dynamic types with value semantics
 
 .. grid:: 2

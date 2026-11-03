@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
+#include <utility>
 
 // Test static factory method
 TEST(timestamp_test, now)
@@ -799,4 +801,89 @@ TEST(timestamp_test, midnight_utc_is_written_in_full)
     EXPECT_EQ(std::string(dross::timestamp("2024-01-21T00:00:00Z")), "2024-01-21T00:00:00Z");
     EXPECT_EQ(std::string(dross::timestamp("2024-01-21")), "2024-01-21T00:00:00Z");
     EXPECT_EQ(std::string(dross::timestamp("2024-01-21T23:59:59.5Z") + std::chrono::seconds(1)), "2024-01-22T00:00:00.5Z");
+}
+
+TEST(timestamp_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timestamp>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timestamp>);
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timestamp::date_part>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timestamp::date_part>);
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timestamp::time_part>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timestamp::time_part>);
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timezone>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timezone>);
+}
+
+TEST(timestamp_test, a_timestamp_stays_usable_after_being_moved_from)
+{
+    const std::string text = "2024-01-21T15:30:00.5+09:00";
+    dross::timestamp source(text);
+
+    const dross::timestamp target(std::move(source));
+    EXPECT_EQ(std::string(target), text);
+    EXPECT_EQ(std::string(source), text);
+    EXPECT_EQ(source, target);
+
+    dross::timestamp assigned;
+    assigned = std::move(source);
+    EXPECT_EQ(std::string(assigned), text);
+    EXPECT_EQ(std::string(source), text);
+}
+
+TEST(timestamp_test, parts_compare_by_their_values)
+{
+    const dross::timestamp earlier("2024-01-21T15:30:00Z");
+    const dross::timestamp later("2024-02-01T16:00:00Z");
+
+    EXPECT_LT(earlier.date(), later.date());
+    EXPECT_GT(later.date(), earlier.date());
+    EXPECT_EQ(earlier.date(), dross::timestamp("2024-01-21T00:00:00Z").date());
+    EXPECT_NE(earlier.date(), later.date());
+
+    EXPECT_LT(earlier.time(), later.time());
+    EXPECT_GT(later.time(), earlier.time());
+    EXPECT_EQ(earlier.time(), dross::timestamp("2020-01-01T15:30:00Z").time());
+    EXPECT_NE(earlier.time(), later.time());
+    EXPECT_NE(earlier.time(), dross::timestamp("2024-01-21T15:30:01Z").time());
+    EXPECT_NE(earlier.time(), dross::timestamp("2024-01-21T15:30:00.5Z").time());
+}
+
+TEST(timestamp_test, the_ends_of_the_clock_convert_without_overflow)
+{
+    using clock = std::chrono::system_clock;
+    const auto earliest = dross::timestamp::from_time_point(clock::time_point::min());
+    const auto latest = dross::timestamp::from_time_point(clock::time_point::max());
+    if (! earliest || ! latest) {
+        GTEST_SKIP() << "the clock reaches past the years 0 to 9999";
+    }
+
+    EXPECT_EQ(static_cast<clock::time_point>(*earliest), clock::time_point::min());
+    EXPECT_EQ(static_cast<clock::time_point>(*latest), clock::time_point::max());
+
+    const dross::timestamp epoch;
+    EXPECT_EQ(*earliest - epoch, clock::time_point::min().time_since_epoch());
+    EXPECT_EQ(*latest - epoch, clock::time_point::max().time_since_epoch());
+}
+
+TEST(timestamp_test, a_difference_near_the_limit_of_the_clock_is_exact)
+{
+    using clock = std::chrono::system_clock;
+    const auto whole = std::chrono::floor<std::chrono::seconds>(clock::time_point::max());
+    const auto later = dross::timestamp::from_time_point(whole);
+    if (! later) {
+        GTEST_SKIP() << "the clock reaches past the years 0 to 9999";
+    }
+
+    const dross::timestamp before_epoch{ clock::time_point{} - std::chrono::milliseconds(100) };
+    EXPECT_EQ(*later - before_epoch, whole.time_since_epoch() + std::chrono::milliseconds(100));
+    EXPECT_EQ(before_epoch - *later, -(whole.time_since_epoch() + std::chrono::milliseconds(100)));
+}
+
+TEST(timestamp_test, a_time_point_with_a_fraction_before_the_epoch_is_written_correctly)
+{
+    const std::chrono::system_clock::time_point tp = std::chrono::system_clock::time_point{} - std::chrono::milliseconds(100);
+    const dross::timestamp before_epoch(tp);
+    EXPECT_EQ(std::string(before_epoch), "1969-12-31T23:59:59.9Z");
+    EXPECT_EQ(static_cast<std::chrono::system_clock::time_point>(before_epoch), tp);
 }
