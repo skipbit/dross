@@ -776,3 +776,87 @@ TEST(dictionary_test, const_dictionary_access)
     EXPECT_EQ(dross::value_cast<dross::string>(const_d["alpha"]), dross::string("a"));
     EXPECT_EQ(dross::value_cast<dross::string>(const_d["beta"]), dross::string("b"));
 }
+
+namespace {
+
+dross::dictionary two_entries()
+{
+    dross::dictionary d;
+    d["a"] = dross::value(dross::number(1));
+    d["b"] = dross::value(dross::string("two"));
+    return d;
+}
+
+}  // namespace
+
+TEST(dictionary_test, move_construction_takes_the_entries)
+{
+    dross::dictionary original = two_entries();
+    const dross::dictionary moved(std::move(original));
+    EXPECT_EQ(moved, two_entries());
+    EXPECT_TRUE(original.empty());
+}
+
+TEST(dictionary_test, move_assignment_takes_the_entries)
+{
+    dross::dictionary original = two_entries();
+    dross::dictionary target;
+    target["old"] = dross::value(dross::number(0));
+    target = std::move(original);
+    EXPECT_EQ(target, two_entries());
+    EXPECT_FALSE(target.contains("old"));
+    EXPECT_TRUE(original.empty());
+}
+
+TEST(dictionary_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::dictionary>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::dictionary>);
+}
+
+TEST(dictionary_test, move_assigning_to_itself_keeps_the_entries)
+{
+    dross::dictionary d = two_entries();
+    dross::dictionary& same = d;
+    d = std::move(same);
+    EXPECT_EQ(d, two_entries());
+}
+
+// Every operation with no precondition has to work on a moved-from dictionary.
+TEST(dictionary_test, moved_from_can_be_used_as_an_empty_dictionary)
+{
+    dross::dictionary original = two_entries();
+    const dross::dictionary moved(std::move(original));
+
+    EXPECT_EQ(original.size(), 0u);
+    EXPECT_TRUE(original.empty());
+    EXPECT_FALSE(original.contains("a"));
+    EXPECT_EQ(original.begin(), original.end());
+    EXPECT_EQ(dross::dictionary(original), dross::dictionary());
+    EXPECT_EQ(original, dross::dictionary());
+}
+
+TEST(dictionary_test, moved_from_can_be_assigned_and_filled_again)
+{
+    dross::dictionary original = two_entries();
+    dross::dictionary moved(std::move(original));
+
+    original["c"] = dross::value(dross::number(3));
+    EXPECT_EQ(original.size(), 1u);
+    original = two_entries();
+    EXPECT_EQ(original, two_entries());
+
+    dross::dictionary emptied;
+    moved = std::move(emptied);
+    EXPECT_TRUE(moved.empty());
+    emptied = std::move(moved);
+    EXPECT_TRUE(emptied.empty());
+}
+
+TEST(dictionary_test, iterators_follow_the_entries_to_the_target_of_a_move)
+{
+    dross::dictionary original = two_entries();
+    const auto first = original.begin();
+    dross::dictionary moved(std::move(original));
+    EXPECT_EQ(first, moved.begin());
+}

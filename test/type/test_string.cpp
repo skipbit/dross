@@ -4,6 +4,9 @@
 
 #include <algorithm>
 #include <limits>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -480,4 +483,70 @@ TEST(string_test, mixed_operations)
     EXPECT_EQ(s, "base + more");
     EXPECT_EQ(copy, "base + more + copy");
     EXPECT_NE(s, copy);
+}
+
+namespace {
+
+const std::string long_text = "a string long enough that it does not fit in the small string buffer";
+
+}  // namespace
+
+TEST(string_test, move_construction_takes_the_text)
+{
+    dross::string original{ long_text };
+    const dross::string moved(std::move(original));
+    EXPECT_EQ(moved, long_text);
+    EXPECT_EQ(original.length(), 0u);
+}
+
+TEST(string_test, move_assignment_takes_the_text)
+{
+    dross::string original{ long_text };
+    dross::string target{ "old" };
+    target = std::move(original);
+    EXPECT_EQ(target, long_text);
+    EXPECT_EQ(original.length(), 0u);
+}
+
+TEST(string_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::string>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::string>);
+}
+
+TEST(string_test, move_assigning_to_itself_keeps_the_text)
+{
+    dross::string s{ long_text };
+    dross::string& same = s;
+    s = std::move(same);
+    EXPECT_EQ(s, long_text);
+}
+
+// Every operation with no precondition has to work on a moved-from string.
+TEST(string_test, moved_from_can_be_used_as_an_empty_string)
+{
+    dross::string original{ long_text };
+    const dross::string moved(std::move(original));
+
+    EXPECT_EQ(original.length(), 0u);
+    EXPECT_EQ(original, "");
+    EXPECT_EQ(std::string(original), "");
+    EXPECT_EQ(dross::string(original), dross::string());
+}
+
+TEST(string_test, moved_from_can_be_assigned_and_appended_to)
+{
+    dross::string original{ long_text };
+    dross::string moved(std::move(original));
+
+    original += "more";
+    EXPECT_EQ(original, "more");
+    original = long_text;
+    EXPECT_EQ(original, long_text);
+
+    dross::string emptied;
+    moved = std::move(emptied);
+    EXPECT_EQ(moved.length(), 0u);
+    emptied = std::move(moved);
+    EXPECT_EQ(emptied.length(), 0u);
 }

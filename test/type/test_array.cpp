@@ -503,3 +503,100 @@ TEST(array_test, many_operations)
         EXPECT_EQ(val % 2, 1);  // Only odd numbers remain
     }
 }
+
+namespace {
+
+dross::array three_elements()
+{
+    return dross::array{ dross::value(dross::number(1)), dross::value(dross::string("two")), dross::value(dross::number(3)) };
+}
+
+}  // namespace
+
+TEST(array_test, move_construction_takes_the_elements)
+{
+    dross::array original = three_elements();
+    const dross::array moved(std::move(original));
+    EXPECT_EQ(moved, three_elements());
+    EXPECT_TRUE(original.empty());
+}
+
+TEST(array_test, move_assignment_takes_the_elements)
+{
+    dross::array original = three_elements();
+    dross::array target{ dross::value(dross::number(0)) };
+    target = std::move(original);
+    EXPECT_EQ(target, three_elements());
+    EXPECT_TRUE(original.empty());
+}
+
+TEST(array_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::array>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::array>);
+}
+
+TEST(array_test, move_assigning_to_itself_keeps_the_elements)
+{
+    dross::array a = three_elements();
+    dross::array& same = a;
+    a = std::move(same);
+    EXPECT_EQ(a, three_elements());
+}
+
+// Every operation with no precondition has to work on a moved-from array.
+TEST(array_test, moved_from_can_be_used_as_an_empty_array)
+{
+    dross::array original = three_elements();
+    const dross::array moved(std::move(original));
+
+    EXPECT_EQ(original.length(), 0u);
+    EXPECT_TRUE(original.empty());
+    EXPECT_EQ(original.begin(), original.end());
+    EXPECT_EQ(dross::array(original), dross::array());
+    EXPECT_EQ(original, dross::array());
+}
+
+TEST(array_test, appending_a_temporary_takes_its_contents)
+{
+    dross::value element{ three_elements() };
+    dross::array a;
+    a.append(std::move(element));
+    EXPECT_EQ(a[0], dross::value(three_elements()));
+    EXPECT_EQ(element, dross::value());
+}
+
+TEST(array_test, appending_a_named_value_leaves_it_alone)
+{
+    const dross::value expected{ three_elements() };
+    dross::value element{ three_elements() };
+    dross::array a;
+    a.append(element);
+    EXPECT_EQ(a[0], expected);
+    EXPECT_EQ(element, expected);
+}
+
+TEST(array_test, moved_from_can_be_assigned_and_filled_again)
+{
+    dross::array original = three_elements();
+    dross::array moved(std::move(original));
+
+    original.append(dross::value(dross::number(4)));
+    EXPECT_EQ(original.length(), 1u);
+    original = three_elements();
+    EXPECT_EQ(original, three_elements());
+
+    dross::array emptied;
+    moved = std::move(emptied);
+    EXPECT_TRUE(moved.empty());
+    emptied = std::move(moved);
+    EXPECT_TRUE(emptied.empty());
+}
+
+TEST(array_test, iterators_follow_the_elements_to_the_target_of_a_move)
+{
+    dross::array original = three_elements();
+    const auto first = original.begin();
+    dross::array moved(std::move(original));
+    EXPECT_EQ(first, moved.begin());
+}

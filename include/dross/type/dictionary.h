@@ -71,6 +71,12 @@ public:
     dictionary(const dictionary& other);
 
     /**
+     * @brief Move constructor.
+     * @param other The dictionary to move from
+     */
+    dictionary(dictionary&& other) noexcept;
+
+    /**
      * @brief Destructor.
      */
     ~dictionary();
@@ -121,6 +127,13 @@ public:
      * @return Reference to this dictionary
      */
     dictionary& operator=(const dictionary& other);
+
+    /**
+     * @brief Move assignment operator.
+     * @param other The dictionary to move from
+     * @return Reference to this dictionary
+     */
+    dictionary& operator=(dictionary&& other) noexcept;
 
     /**
      * @brief Access or create a value by key (non-const version).

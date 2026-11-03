@@ -79,6 +79,12 @@ public:
     string(const string& other);
 
     /**
+     * @brief Move constructor.
+     * @param other The string to move from
+     */
+    string(string&& other) noexcept;
+
+    /**
      * @brief Construct from std::string.
      * @param str The std::string to copy from
      *
@@ -189,6 +195,13 @@ public:
      * @return Reference to this string
      */
     string& operator=(const string& other);
+
+    /**
+     * @brief Move assignment operator.
+     * @param other The string to move from
+     * @return Reference to this string
+     */
+    string& operator=(string&& other) noexcept;
 
     /**
      * @brief Assignment from std::string.

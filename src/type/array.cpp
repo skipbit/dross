@@ -3,6 +3,7 @@
 #include "dross/type/value.h"
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 namespace dross {
@@ -26,6 +27,14 @@ array::array()
 array::array(const array& v)
     : _store(std::make_unique<storage>(*(v._store)))
 {
+}
+
+// The accessors dereference _store without checking, so a moved-from array
+// keeps an empty storage rather than a null one.
+array::array(array&& a) noexcept
+    : _store(std::move(a._store))
+{
+    a._store = std::make_unique<storage>();
 }
 
 array::array(const std::initializer_list<value>& list)
@@ -69,6 +78,11 @@ const value& array::value_at(const size_t i) const
 void array::append(const value& v)
 {
     _store->contents.push_back(v);
+}
+
+void array::append(value&& v)
+{
+    _store->contents.push_back(std::move(v));
 }
 
 void array::append(iterator first, iterator last)
@@ -133,6 +147,18 @@ bool array::operator!=(const array& a) const
 array& array::operator=(const array& a)
 {
     _store->contents = a._store->contents;
+    return *this;
+}
+
+array& array::operator=(array&& a) noexcept
+{
+    if (this != &a) {
+        // Handing our storage to the source keeps both usable without
+        // allocating. Assigning an empty vector releases the buffer that
+        // storage was carrying, which clear() would leave held.
+        _store.swap(a._store);
+        a._store->contents = std::vector<value>{};
+    }
     return *this;
 }
 

@@ -109,6 +109,12 @@ public:
     value(const value& other);
 
     /**
+     * @brief Move constructor.
+     * @param other The value to move from
+     */
+    value(value&& other) noexcept;
+
+    /**
      * @brief Construct from a boolean.
      * @param bool_val The boolean to store
      */
@@ -127,16 +133,34 @@ public:
     value(const string& str);
 
     /**
+     * @brief Construct from a string, taking its contents.
+     * @param str The string to move from
+     */
+    value(string&& str);
+
+    /**
      * @brief Construct from an array.
      * @param arr The array to store
      */
     value(const array& arr);
 
     /**
+     * @brief Construct from an array, taking its contents.
+     * @param arr The array to move from
+     */
+    value(array&& arr);
+
+    /**
      * @brief Construct from a dictionary.
      * @param dict The dictionary to store
      */
     value(const dictionary& dict);
+
+    /**
+     * @brief Construct from a dictionary, taking its contents.
+     * @param dict The dictionary to move from
+     */
+    value(dictionary&& dict);
 
     /**
      * @brief Construct from a timestamp.
@@ -149,6 +173,12 @@ public:
      * @param d The data to store
      */
     value(const data& d);
+
+    /**
+     * @brief Construct from data, taking its contents.
+     * @param d The data to move from
+     */
+    value(data&& d);
 
     /**
      * @brief Destructor.
@@ -246,6 +276,13 @@ public:
     value& operator=(const value& other);
 
     /**
+     * @brief Move assignment operator.
+     * @param other The value to move from
+     * @return Reference to this value
+     */
+    value& operator=(value&& other) noexcept;
+
+    /**
      * @brief Assignment from boolean.
      * @param bool_val The boolean to assign
      * @return Reference to this value
@@ -267,6 +304,13 @@ public:
     value& operator=(const string& str);
 
     /**
+     * @brief Assignment from string, taking its contents.
+     * @param str The string to move from
+     * @return Reference to this value
+     */
+    value& operator=(string&& str);
+
+    /**
      * @brief Assignment from array.
      * @param arr The array to assign
      * @return Reference to this value
@@ -274,11 +318,25 @@ public:
     value& operator=(const array& arr);
 
     /**
+     * @brief Assignment from array, taking its contents.
+     * @param arr The array to move from
+     * @return Reference to this value
+     */
+    value& operator=(array&& arr);
+
+    /**
      * @brief Assignment from dictionary.
      * @param dict The dictionary to assign
      * @return Reference to this value
      */
     value& operator=(const dictionary& dict);
+
+    /**
+     * @brief Assignment from dictionary, taking its contents.
+     * @param dict The dictionary to move from
+     * @return Reference to this value
+     */
+    value& operator=(dictionary&& dict);
 
     /**
      * @brief Assign a timestamp to this value.
@@ -293,6 +351,13 @@ public:
      * @return Reference to this value
      */
     value& operator=(const data& d);
+
+    /**
+     * @brief Assignment from data, taking its contents.
+     * @param d The data to move from
+     * @return Reference to this value
+     */
+    value& operator=(data&& d);
 
     /**
      * @brief Assignment from an arithmetic type other than bool or a character.

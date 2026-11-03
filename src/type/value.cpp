@@ -9,6 +9,7 @@
 #include "dross/type/timestamp.h"
 
 #include <memory>
+#include <utility>
 #include <variant>
 
 namespace dross {
@@ -42,6 +43,14 @@ value::value(const value& v)
 {
 }
 
+// The accessors dereference _store without checking, so a moved-from value
+// keeps an empty storage rather than a null one.
+value::value(value&& v) noexcept
+    : _store(std::move(v._store))
+{
+    v._store = std::make_unique<storage>();
+}
+
 value::value(const boolean& b)
     : _store(std::make_unique<storage>())
 {
@@ -60,16 +69,34 @@ value::value(const string& s)
     _store->value = s;
 }
 
+value::value(string&& s)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(s);
+}
+
 value::value(const array& a)
     : _store(std::make_unique<storage>())
 {
     _store->value = a;
 }
 
+value::value(array&& a)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(a);
+}
+
 value::value(const dictionary& d)
     : _store(std::make_unique<storage>())
 {
     _store->value = d;
+}
+
+value::value(dictionary&& d)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(d);
 }
 
 value::value(const timestamp& ts)
@@ -82,6 +109,12 @@ value::value(const data& d)
     : _store(std::make_unique<storage>())
 {
     _store->value = d;
+}
+
+value::value(data&& d)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(d);
 }
 
 value::~value() = default;
@@ -118,6 +151,17 @@ value& value::operator=(const value& v)
     return *this;
 }
 
+value& value::operator=(value&& v) noexcept
+{
+    if (this != &v) {
+        // Handing our storage to the source keeps both usable without
+        // allocating, and releases what it held here.
+        _store.swap(v._store);
+        v._store->value = std::monostate{};
+    }
+    return *this;
+}
+
 value& value::operator=(const boolean& b)
 {
     _store->value = b;
@@ -136,15 +180,33 @@ value& value::operator=(const string& s)
     return *this;
 }
 
+value& value::operator=(string&& s)
+{
+    _store->value = std::move(s);
+    return *this;
+}
+
 value& value::operator=(const array& a)
 {
     _store->value = a;
     return *this;
 }
 
+value& value::operator=(array&& a)
+{
+    _store->value = std::move(a);
+    return *this;
+}
+
 value& value::operator=(const dictionary& d)
 {
     _store->value = d;
+    return *this;
+}
+
+value& value::operator=(dictionary&& d)
+{
+    _store->value = std::move(d);
     return *this;
 }
 
@@ -157,6 +219,12 @@ value& value::operator=(const timestamp& ts)
 value& value::operator=(const data& d)
 {
     _store->value = d;
+    return *this;
+}
+
+value& value::operator=(data&& d)
+{
+    _store->value = std::move(d);
     return *this;
 }
 
