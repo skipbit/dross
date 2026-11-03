@@ -306,6 +306,23 @@ TEST(value_allocation_test, assigning_a_temporary_does_not_copy_its_contents)
     EXPECT_LE(from_dictionary, 1);
 }
 
+// One allocation for the array to hold the element, and one for the empty
+// storage the moved-from value keeps.
+TEST(array_allocation_test, appending_a_temporary_does_not_copy_its_contents)
+{
+    dross::array elements;
+    for (int i = 0; i < 10; ++i) {
+        elements.append(dross::value(dross::number(i)));
+    }
+    dross::value element{ std::move(elements) };
+    dross::array target;
+
+    const long count = count_allocations([&] {
+        target.append(std::move(element));
+    });
+    EXPECT_LE(count, 2);
+}
+
 // The target of a move assignment gives up what it held there and then,
 // rather than when the source goes away.
 TEST(string_allocation_test, move_assignment_releases_the_old_text)

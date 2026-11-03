@@ -138,6 +138,12 @@ public:
     void append(const value& val);
 
     /**
+     * @brief Append a value to the end of the array, taking its contents.
+     * @param val The value to append
+     */
+    void append(value&& val);
+
+    /**
      * @brief Append a range of values from iterators.
      * @param first Iterator pointing to the beginning of the range
      * @param last Iterator pointing to the end of the range

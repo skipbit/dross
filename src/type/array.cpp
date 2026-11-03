@@ -80,6 +80,11 @@ void array::append(const value& v)
     _store->contents.push_back(v);
 }
 
+void array::append(value&& v)
+{
+    _store->contents.push_back(std::move(v));
+}
+
 void array::append(iterator first, iterator last)
 {
     std::for_each(first, last, [this](const value& v) {

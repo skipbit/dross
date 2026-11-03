@@ -557,6 +557,25 @@ TEST(array_test, moved_from_can_be_used_as_an_empty_array)
     EXPECT_EQ(original, dross::array());
 }
 
+TEST(array_test, appending_a_temporary_takes_its_contents)
+{
+    dross::value element{ three_elements() };
+    dross::array a;
+    a.append(std::move(element));
+    EXPECT_EQ(a[0], dross::value(three_elements()));
+    EXPECT_EQ(element, dross::value());
+}
+
+TEST(array_test, appending_a_named_value_leaves_it_alone)
+{
+    const dross::value expected{ three_elements() };
+    dross::value element{ three_elements() };
+    dross::array a;
+    a.append(element);
+    EXPECT_EQ(a[0], expected);
+    EXPECT_EQ(element, expected);
+}
+
 TEST(array_test, moved_from_can_be_assigned_and_filled_again)
 {
     dross::array original = three_elements();
