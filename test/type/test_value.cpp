@@ -597,3 +597,41 @@ TEST(value_test, building_from_a_named_object_leaves_it_alone)
     const dross::value copied_too(also_kept);
     EXPECT_EQ(also_kept, three_elements());
 }
+
+TEST(value_test, assigning_a_temporary_takes_its_contents)
+{
+    dross::value v;
+
+    dross::array elements = three_elements();
+    v = std::move(elements);
+    EXPECT_EQ(v, dross::value(three_elements()));
+    EXPECT_TRUE(elements.empty());
+
+    dross::dictionary entries;
+    entries["a"] = dross::value(dross::number(1));
+    const dross::dictionary expected_entries(entries);
+    v = std::move(entries);
+    EXPECT_EQ(v, dross::value(expected_entries));
+    EXPECT_TRUE(entries.empty());
+
+    dross::string text{ "a string long enough that it does not fit in the small string buffer" };
+    const dross::string expected_text(text);
+    v = std::move(text);
+    EXPECT_EQ(v, dross::value(expected_text));
+    EXPECT_EQ(text.length(), 0u);
+
+    dross::data bytes{ "Hello" };
+    const dross::data expected_bytes(bytes);
+    v = std::move(bytes);
+    EXPECT_EQ(v, dross::value(expected_bytes));
+    EXPECT_TRUE(bytes.empty());
+}
+
+TEST(value_test, assigning_a_named_object_leaves_it_alone)
+{
+    dross::array elements = three_elements();
+    dross::value v;
+    v = elements;
+    EXPECT_EQ(v, dross::value(three_elements()));
+    EXPECT_EQ(elements, three_elements());
+}

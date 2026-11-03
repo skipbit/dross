@@ -304,6 +304,13 @@ public:
     value& operator=(const string& str);
 
     /**
+     * @brief Assignment from string, taking its contents.
+     * @param str The string to move from
+     * @return Reference to this value
+     */
+    value& operator=(string&& str);
+
+    /**
      * @brief Assignment from array.
      * @param arr The array to assign
      * @return Reference to this value
@@ -311,11 +318,25 @@ public:
     value& operator=(const array& arr);
 
     /**
+     * @brief Assignment from array, taking its contents.
+     * @param arr The array to move from
+     * @return Reference to this value
+     */
+    value& operator=(array&& arr);
+
+    /**
      * @brief Assignment from dictionary.
      * @param dict The dictionary to assign
      * @return Reference to this value
      */
     value& operator=(const dictionary& dict);
+
+    /**
+     * @brief Assignment from dictionary, taking its contents.
+     * @param dict The dictionary to move from
+     * @return Reference to this value
+     */
+    value& operator=(dictionary&& dict);
 
     /**
      * @brief Assign a timestamp to this value.
@@ -330,6 +351,13 @@ public:
      * @return Reference to this value
      */
     value& operator=(const data& d);
+
+    /**
+     * @brief Assignment from data, taking its contents.
+     * @param d The data to move from
+     * @return Reference to this value
+     */
+    value& operator=(data&& d);
 
     /**
      * @brief Assignment from an arithmetic type other than bool or a character.

@@ -48,7 +48,7 @@ Changed
 - ``dictionary``, ``array``, ``string`` and ``value`` have move
   constructors and move assignment operators, where moving used to copy.
   ``value`` also takes a ``dictionary``, ``array``, ``string`` or ``data``
-  by rvalue reference. Moving ten entries of a dictionary makes one
+  by rvalue reference, in its constructors and its assignment. Moving ten entries of a dictionary makes one
   allocation instead of 31. The source of a move is left usable and empty, or
   null for a ``value``, so code that goes on reading what it moved from sees
   that instead of the old contents

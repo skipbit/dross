@@ -180,15 +180,33 @@ value& value::operator=(const string& s)
     return *this;
 }
 
+value& value::operator=(string&& s)
+{
+    _store->value = std::move(s);
+    return *this;
+}
+
 value& value::operator=(const array& a)
 {
     _store->value = a;
     return *this;
 }
 
+value& value::operator=(array&& a)
+{
+    _store->value = std::move(a);
+    return *this;
+}
+
 value& value::operator=(const dictionary& d)
 {
     _store->value = d;
+    return *this;
+}
+
+value& value::operator=(dictionary&& d)
+{
+    _store->value = std::move(d);
     return *this;
 }
 
@@ -201,6 +219,12 @@ value& value::operator=(const timestamp& ts)
 value& value::operator=(const data& d)
 {
     _store->value = d;
+    return *this;
+}
+
+value& value::operator=(data&& d)
+{
+    _store->value = std::move(d);
     return *this;
 }
 
