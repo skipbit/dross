@@ -848,3 +848,42 @@ TEST(timestamp_test, parts_compare_by_their_values)
     EXPECT_NE(earlier.time(), dross::timestamp("2024-01-21T15:30:01Z").time());
     EXPECT_NE(earlier.time(), dross::timestamp("2024-01-21T15:30:00.5Z").time());
 }
+
+TEST(timestamp_test, the_ends_of_the_clock_convert_without_overflow)
+{
+    using clock = std::chrono::system_clock;
+    const auto earliest = dross::timestamp::from_time_point(clock::time_point::min());
+    const auto latest = dross::timestamp::from_time_point(clock::time_point::max());
+    if (! earliest || ! latest) {
+        GTEST_SKIP() << "the clock reaches past the years 0 to 9999";
+    }
+
+    EXPECT_EQ(static_cast<clock::time_point>(*earliest), clock::time_point::min());
+    EXPECT_EQ(static_cast<clock::time_point>(*latest), clock::time_point::max());
+
+    const dross::timestamp epoch;
+    EXPECT_EQ(*earliest - epoch, clock::time_point::min().time_since_epoch());
+    EXPECT_EQ(*latest - epoch, clock::time_point::max().time_since_epoch());
+}
+
+TEST(timestamp_test, a_difference_near_the_limit_of_the_clock_is_exact)
+{
+    using clock = std::chrono::system_clock;
+    const auto whole = std::chrono::floor<std::chrono::seconds>(clock::time_point::max());
+    const auto later = dross::timestamp::from_time_point(whole);
+    if (! later) {
+        GTEST_SKIP() << "the clock reaches past the years 0 to 9999";
+    }
+
+    const dross::timestamp before_epoch{ clock::time_point{} - std::chrono::milliseconds(100) };
+    EXPECT_EQ(*later - before_epoch, whole.time_since_epoch() + std::chrono::milliseconds(100));
+    EXPECT_EQ(before_epoch - *later, -(whole.time_since_epoch() + std::chrono::milliseconds(100)));
+}
+
+TEST(timestamp_test, a_time_point_with_a_fraction_before_the_epoch_is_written_correctly)
+{
+    const std::chrono::system_clock::time_point tp = std::chrono::system_clock::time_point{} - std::chrono::milliseconds(100);
+    const dross::timestamp before_epoch(tp);
+    EXPECT_EQ(std::string(before_epoch), "1969-12-31T23:59:59.9Z");
+    EXPECT_EQ(static_cast<std::chrono::system_clock::time_point>(before_epoch), tp);
+}

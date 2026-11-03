@@ -172,6 +172,11 @@ Changed
 Fixed
 ~~~~~
 
+- ``timestamp`` no longer overflows a signed integer where
+  ``system_clock`` counts nanoseconds, near its ends: building one from a
+  time point within a second of ``time_point::min()``, converting one back,
+  or taking a difference whose seconds alone do not fit in the duration
+
 - ``toml::deserialize()`` reads an array of tables, written with
   ``[[name]]`` headers, as an ``array`` of ``dictionary`` values. Each
   header appends a table, and the headers and pairs after it fill that

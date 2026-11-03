@@ -35,6 +35,21 @@ std::chrono::year_month_day year_month_day_of(int year, int month, int day)
     return { std::chrono::year{ year }, std::chrono::month{ static_cast<unsigned>(month) }, std::chrono::day{ static_cast<unsigned>(day) } };
 }
 
+// A sum whose terms have opposite signs can fit in the duration of the clock
+// when its seconds alone do not, so a second moves from one term to the other.
+std::chrono::system_clock::duration clock_duration(std::chrono::seconds seconds, std::chrono::nanoseconds subseconds)
+{
+    if ((seconds < std::chrono::seconds{ 0 }) && (subseconds > std::chrono::nanoseconds{ 0 })) {
+        seconds += std::chrono::seconds{ 1 };
+        subseconds -= std::chrono::seconds{ 1 };
+    } else if ((seconds > std::chrono::seconds{ 0 }) && (subseconds < std::chrono::nanoseconds{ 0 })) {
+        seconds -= std::chrono::seconds{ 1 };
+        subseconds += std::chrono::seconds{ 1 };
+    }
+    return std::chrono::duration_cast<std::chrono::system_clock::duration>(seconds)
+           + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds);
+}
+
 timestamp value_or_throw(std::optional<timestamp> result)
 {
     if (! result) {
@@ -274,15 +289,25 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
 
 std::optional<timestamp> timestamp::from_time_point(const std::chrono::system_clock::time_point& tp)
 {
+    // Truncated and then borrowed from, since the floor of the earliest time
+    // points does not fit in the duration of the clock.
+    const auto since_epoch = tp.time_since_epoch();
+    auto whole = std::chrono::duration_cast<std::chrono::seconds>(since_epoch);
+    auto fraction = since_epoch - whole;
+    if (fraction < std::chrono::seconds{ 0 }) {
+        whole -= std::chrono::seconds{ 1 };
+        fraction += std::chrono::seconds{ 1 };
+    }
+
     // Compared as seconds: std::chrono::year holds 16 bits, so a year far
     // outside the range can wrap around to one inside it.
-    const auto seconds = std::chrono::floor<std::chrono::seconds>(tp);
+    const std::chrono::sys_seconds seconds{ whole };
     if ((seconds < first_second) || (seconds >= end_second)) {
         return std::nullopt;
     }
 
     timestamp result;
-    result.set_local(seconds, std::chrono::duration_cast<std::chrono::nanoseconds>(tp - seconds));
+    result.set_local(seconds, std::chrono::duration_cast<std::chrono::nanoseconds>(fraction));
     return result;
 }
 
@@ -331,8 +356,7 @@ void timestamp::set_local(std::chrono::sys_seconds local, std::chrono::nanosecon
 timestamp::operator std::chrono::system_clock::time_point() const
 {
     auto [seconds, subseconds] = instant();
-    return std::chrono::time_point_cast<std::chrono::system_clock::duration>(seconds)
-           + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds);
+    return std::chrono::system_clock::time_point{ clock_duration(seconds.time_since_epoch(), subseconds) };
 }
 
 timestamp::operator std::string() const
@@ -354,8 +378,7 @@ std::chrono::system_clock::duration timestamp::operator-(const timestamp& other)
 {
     auto [seconds, subseconds] = instant();
     auto [other_seconds, other_subseconds] = other.instant();
-    return std::chrono::duration_cast<std::chrono::system_clock::duration>(seconds - other_seconds)
-           + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds - other_subseconds);
+    return clock_duration(seconds - other_seconds, subseconds - other_subseconds);
 }
 
 timestamp timestamp::operator+(const std::chrono::minutes& duration) const
