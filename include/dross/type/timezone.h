@@ -3,7 +3,6 @@
 #include <chrono>
 #include <compare>
 #include <iosfwd>
-#include <memory>
 #include <optional>
 #include <string>
 
@@ -21,7 +20,7 @@ namespace dross {
  * - Clear factory methods for common timezone types
  * - ISO 8601 compliant formatting
  * - Integration with timestamp class
- * - Value semantics (copyable and assignable)
+ * - Value semantics (copyable and assignable, without allocating)
  *
  * Supported timezone types:
  * - UTC: Coordinated Universal Time (offset +00:00)
@@ -97,17 +96,17 @@ public:
      * @brief Copy constructor.
      * @param other The timezone to copy from
      */
-    timezone(const timezone& other);
+    timezone(const timezone& other) = default;
 
     /**
      * @brief Destructor.
      */
-    ~timezone();
+    ~timezone() = default;
 
     /**
      * @brief Copy assignment operator.
      */
-    timezone& operator=(const timezone& other);
+    timezone& operator=(const timezone& other) = default;
 
     /**
      * @brief Check if this is UTC timezone.
@@ -151,8 +150,7 @@ public:
     std::strong_ordering operator<=>(const timezone& other) const noexcept;
 
 private:
-    class storage;
-    std::unique_ptr<storage> _store;
+    std::chrono::minutes _offset;
 
     /**
      * @brief Private constructor for internal use.

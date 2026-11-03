@@ -115,7 +115,8 @@ Code Organization
 ~~~~~~~~~~~~~~~~~
 
 - Separate headers (``.h``) and implementation (``.cpp``)
-- Use Pimpl idiom for ABI stability in public classes
+- Use Pimpl idiom for ABI stability in public classes, apart from those that
+  hold a few small values directly so that copying them does not allocate
 - No exceptions - use ``std::optional`` and ``std::expected``
 - Apply ``const``, ``constexpr``, and ``noexcept`` appropriately
 

@@ -6,9 +6,11 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <new>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -20,6 +22,12 @@ long count_allocations(Function function)
     const long before = allocations.load();
     function();
     return allocations.load() - before;
+}
+
+template <typename Function>
+void expect_no_allocation(const char* what, Function function)
+{
+    EXPECT_EQ(count_allocations(function), 0) << what;
 }
 
 }  // namespace
@@ -56,27 +64,59 @@ void operator delete(void* p, const std::nothrow_t&) noexcept
     std::free(p);
 }
 
-// Building a timestamp from its parts allocates what a copy does, and the
-// optional that from_components() returns holds a copy of it, so neither
-// allocates more than two copies.
-TEST(timestamp_allocation_test, building_from_components_allocates_no_more_than_two_copies)
+// A timestamp holds its date, time and timezone directly.
+TEST(timestamp_allocation_test, building_and_copying_allocate_nothing)
 {
-    const auto tz = dross::timezone::utc();
+    const auto tz = dross::timezone::offset(9);
     const dross::timestamp original(2024, 1, 21, 15, 30, 0, tz);
+    const std::chrono::system_clock::time_point tp = original;
 
-    const long copy = count_allocations([&] {
-        const dross::timestamp copied(original);
+    expect_no_allocation("default", [&] {
+        const dross::timestamp built;
     });
-    const long from_components = count_allocations([&] {
-        (void)dross::timestamp::from_components(2024, 1, 21, 15, 30, 0, tz);
-    });
-    const long constructor = count_allocations([&] {
+    expect_no_allocation("components", [&] {
         const dross::timestamp built(2024, 1, 21, 15, 30, 0, tz);
     });
+    expect_no_allocation("from_components", [&] {
+        (void)dross::timestamp::from_components(2024, 1, 21, 15, 30, 0, tz);
+    });
+    expect_no_allocation("time point", [&] {
+        const dross::timestamp built(tp);
+    });
+    expect_no_allocation("from_time_point", [&] {
+        (void)dross::timestamp::from_time_point(tp);
+    });
+    expect_no_allocation("now", [&] {
+        (void)dross::timestamp::now();
+    });
+    expect_no_allocation("add", [&] {
+        (void)original.add(std::chrono::seconds(1));
+    });
+    expect_no_allocation("copy and move", [&] {
+        dross::timestamp copied(original);
+        dross::timestamp moved(std::move(copied));
+        copied = moved;
+        moved = std::move(copied);
+    });
+}
 
-    ASSERT_GT(copy, 0);
-    EXPECT_LE(from_components, 2 * copy);
-    EXPECT_LE(constructor, 2 * copy);
+TEST(timestamp_allocation_test, copying_the_parts_allocates_nothing)
+{
+    const dross::timestamp original(2024, 1, 21, 15, 30, 0, dross::timezone::offset(9));
+
+    expect_no_allocation("date", [&] {
+        auto date = original.date();
+        date = original.date();
+    });
+    expect_no_allocation("time", [&] {
+        auto time = original.time();
+        time = original.time();
+    });
+    expect_no_allocation("timezone", [&] {
+        auto tz = original.timezone();
+        tz = dross::timezone::utc();
+        tz = dross::timezone::offset(9);
+    });
 }
 
 namespace {

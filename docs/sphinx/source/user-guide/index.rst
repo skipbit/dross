@@ -26,8 +26,9 @@ The dross library is designed around several core principles:
    ``timestamp`` arithmetic operators, which throw outside the years 0 to 9999
 4. **Modern C++**: Leverages C++23 features throughout
 5. **Pimpl Idiom**: Types keep their representation behind an opaque pointer,
-   apart from ``error``, ``path``, ``xdg`` and the ``data`` iterators, which
-   hold theirs directly; the ABI can change in any 0.x release
+   apart from ``error``, ``path``, ``xdg``, ``timestamp``, ``timezone`` and the
+   ``data`` iterators, which hold theirs directly; the ABI can change in any
+   0.x release
 
 Topics Covered
 --------------

@@ -4,7 +4,6 @@
 
 #include <chrono>
 #include <compare>
-#include <memory>
 #include <optional>
 #include <string>
 
@@ -25,7 +24,7 @@ namespace dross {
  * - Type-safe timezone operations with timezone class
  * - Integration with std::chrono for duration arithmetic, kept within the
  *   years 0 to 9999 that parsing accepts
- * - Value semantics (copyable and assignable)
+ * - Value semantics (copyable and assignable, without allocating)
  * - Thread-safe for read operations
  * - A date alone is read as midnight and written in full
  * - Factory methods for common timestamp patterns
@@ -98,29 +97,27 @@ public:
         friend class timestamp;
 
     private:
-        class impl;
-        std::unique_ptr<impl> _impl;
+        std::chrono::year_month_day _ymd;
 
         // Private constructors - only timestamp can create date objects
         date_part();
-        date_part(int year, int month, int day);
         date_part(const std::chrono::year_month_day& ymd);
 
     public:
         /**
          * @brief Copy constructor.
          */
-        date_part(const date_part& other);
+        date_part(const date_part& other) = default;
 
         /**
          * @brief Destructor.
          */
-        ~date_part();
+        ~date_part() = default;
 
         /**
          * @brief Copy assignment operator.
          */
-        date_part& operator=(const date_part& other);
+        date_part& operator=(const date_part& other) = default;
 
         /**
          * @brief Get the year component.
@@ -178,14 +175,11 @@ public:
         friend class timestamp;
 
     private:
-        class impl;
-        std::unique_ptr<impl> _impl;
+        std::chrono::nanoseconds _since_midnight;
 
         // Private constructors - only timestamp can create time objects
         time_part();
-        time_part(int hour, int minute, int second);
-        template <typename Duration>
-        time_part(const std::chrono::hh_mm_ss<Duration>& hms);
+        explicit time_part(std::chrono::nanoseconds since_midnight);
 
     public:
         /**
@@ -196,17 +190,17 @@ public:
         /**
          * @brief Copy constructor.
          */
-        time_part(const time_part& other);
+        time_part(const time_part& other) = default;
 
         /**
          * @brief Destructor.
          */
-        ~time_part();
+        ~time_part() = default;
 
         /**
          * @brief Copy assignment operator.
          */
-        time_part& operator=(const time_part& other);
+        time_part& operator=(const time_part& other) = default;
 
         /**
          * @brief Get the hour component.
@@ -314,7 +308,7 @@ public:
      * @brief Copy constructor.
      * @param other The timestamp to copy from
      */
-    timestamp(const timestamp& other);
+    timestamp(const timestamp& other) = default;
 
     /**
      * @brief Construct from std::chrono::system_clock::time_point.
@@ -379,12 +373,12 @@ public:
     /**
      * @brief Destructor.
      */
-    ~timestamp();
+    ~timestamp() = default;
 
     /**
      * @brief Copy assignment operator.
      */
-    timestamp& operator=(const timestamp& other);
+    timestamp& operator=(const timestamp& other) = default;
 
     /**
      * @brief Implicit conversion to std::chrono::system_clock::time_point.
@@ -542,10 +536,12 @@ public:
     const dross::timezone& timezone() const noexcept;
 
 private:
-    class storage;
-    std::unique_ptr<storage> _store;
+    date_part _date;
+    time_part _time;
+    dross::timezone _timezone;
 
-    explicit timestamp(std::unique_ptr<storage> store);
+    // Splits wall-clock seconds and a fraction into the date and time parts.
+    void set_local(std::chrono::sys_seconds local, std::chrono::nanoseconds subseconds);
 
     /**
      * @brief Private helper method for ISO 8601 formatting.

@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
+#include <utility>
 
 // Test static factory method
 TEST(timestamp_test, now)
@@ -799,4 +801,50 @@ TEST(timestamp_test, midnight_utc_is_written_in_full)
     EXPECT_EQ(std::string(dross::timestamp("2024-01-21T00:00:00Z")), "2024-01-21T00:00:00Z");
     EXPECT_EQ(std::string(dross::timestamp("2024-01-21")), "2024-01-21T00:00:00Z");
     EXPECT_EQ(std::string(dross::timestamp("2024-01-21T23:59:59.5Z") + std::chrono::seconds(1)), "2024-01-22T00:00:00.5Z");
+}
+
+TEST(timestamp_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timestamp>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timestamp>);
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timestamp::date_part>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timestamp::date_part>);
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timestamp::time_part>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timestamp::time_part>);
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::timezone>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::timezone>);
+}
+
+TEST(timestamp_test, a_timestamp_stays_usable_after_being_moved_from)
+{
+    const std::string text = "2024-01-21T15:30:00.5+09:00";
+    dross::timestamp source(text);
+
+    const dross::timestamp target(std::move(source));
+    EXPECT_EQ(std::string(target), text);
+    EXPECT_EQ(std::string(source), text);
+    EXPECT_EQ(source, target);
+
+    dross::timestamp assigned;
+    assigned = std::move(source);
+    EXPECT_EQ(std::string(assigned), text);
+    EXPECT_EQ(std::string(source), text);
+}
+
+TEST(timestamp_test, parts_compare_by_their_values)
+{
+    const dross::timestamp earlier("2024-01-21T15:30:00Z");
+    const dross::timestamp later("2024-02-01T16:00:00Z");
+
+    EXPECT_LT(earlier.date(), later.date());
+    EXPECT_GT(later.date(), earlier.date());
+    EXPECT_EQ(earlier.date(), dross::timestamp("2024-01-21T00:00:00Z").date());
+    EXPECT_NE(earlier.date(), later.date());
+
+    EXPECT_LT(earlier.time(), later.time());
+    EXPECT_GT(later.time(), earlier.time());
+    EXPECT_EQ(earlier.time(), dross::timestamp("2020-01-01T15:30:00Z").time());
+    EXPECT_NE(earlier.time(), later.time());
+    EXPECT_NE(earlier.time(), dross::timestamp("2024-01-21T15:30:01Z").time());
+    EXPECT_NE(earlier.time(), dross::timestamp("2024-01-21T15:30:00.5Z").time());
 }

@@ -3,7 +3,8 @@ Type System
 
 The dross type system provides dynamic typing with strong value semantics. The
 core types use the Pimpl idiom for ABI stability and provide consistent
-interfaces; ``error`` wraps a ``std::error_code`` directly.
+interfaces; ``error`` wraps a ``std::error_code`` directly, and ``timestamp``
+and ``timezone`` hold their values directly.
 
 Core Types
 ----------

@@ -4,7 +4,6 @@
 #include <cmath>
 #include <iomanip>
 #include <locale>
-#include <memory>
 #include <regex>
 #include <sstream>
 
@@ -21,26 +20,6 @@ bool in_range(std::chrono::minutes offset)
 }
 
 }  // namespace
-
-class timezone::storage {
-public:
-    int offset_minutes;
-
-    storage()
-        : offset_minutes(0)
-    {
-    }  // Default UTC
-
-    storage(int offset)
-        : offset_minutes(offset)
-    {
-    }
-
-    storage(const storage& other)
-        : offset_minutes(other.offset_minutes)
-    {
-    }
-};
 
 timezone timezone::utc()
 {
@@ -104,43 +83,28 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
 }
 
 timezone::timezone()
-    : _store(std::make_unique<storage>())
-{
-}
-
-timezone::timezone(const timezone& other)
-    : _store(std::make_unique<storage>(*other._store))
+    : _offset(0)
 {
 }
 
 timezone::timezone(std::chrono::minutes offset)
-    : _store(std::make_unique<storage>(offset.count()))
+    : _offset(offset)
 {
-}
-
-timezone::~timezone() = default;
-
-timezone& timezone::operator=(const timezone& other)
-{
-    if (this != &other) {
-        _store = std::make_unique<storage>(*other._store);
-    }
-    return *this;
 }
 
 bool timezone::is_utc() const noexcept
 {
-    return (_store->offset_minutes == 0);
+    return (_offset == std::chrono::minutes(0));
 }
 
 std::chrono::minutes timezone::offset() const noexcept
 {
-    return std::chrono::minutes(_store->offset_minutes);
+    return _offset;
 }
 
 std::string timezone::format() const
 {
-    int offset = _store->offset_minutes;
+    int offset = static_cast<int>(_offset.count());
     if (offset == 0) {
         return "Z";  // UTC
     }
@@ -165,13 +129,12 @@ timezone::operator std::string() const
 
 bool timezone::operator==(const timezone& other) const noexcept
 {
-    return (_store->offset_minutes == other._store->offset_minutes);
+    return (_offset == other._offset);
 }
 
 std::strong_ordering timezone::operator<=>(const timezone& other) const noexcept
 {
-    // Simply compare offset minutes
-    return _store->offset_minutes <=> other._store->offset_minutes;
+    return _offset <=> other._offset;
 }
 
 std::ostream& operator<<(std::ostream& os, const timezone& tz)
