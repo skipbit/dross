@@ -1,7 +1,10 @@
 // Replaces operator new to count allocations, which would reach every test
 // in the program, so this file is a test executable of its own.
 #include "dross/format/toml.h"
+#include "dross/type/dictionary.h"
+#include "dross/type/number.h"
 #include "dross/type/timestamp.h"
+#include "dross/type/value.h"
 
 #include <gtest/gtest.h>
 
@@ -135,6 +138,29 @@ TEST(timestamp_allocation_test, copying_the_parts_allocates_nothing)
         tz = dross::timezone::utc();
         tz = dross::timezone::offset(9);
     });
+}
+
+// Moving hands the source one new, empty storage, whatever it held.
+TEST(dictionary_allocation_test, moving_allocates_at_most_once)
+{
+    dross::dictionary original;
+    for (int i = 0; i < 10; ++i) {
+        original[std::to_string(i)] = dross::value(dross::number(i));
+    }
+
+    dross::dictionary source(original);
+    const long construction = count_allocations([&] {
+        const dross::dictionary moved(std::move(source));
+    });
+    EXPECT_LE(construction, 1);
+
+    dross::dictionary assigned_from(original);
+    dross::dictionary target;
+    const long assignment = count_allocations([&] {
+        target = std::move(assigned_from);
+    });
+    EXPECT_EQ(assignment, 0);
+    EXPECT_EQ(target, original);
 }
 
 namespace {

@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace dross {
 
@@ -21,6 +22,12 @@ dictionary::dictionary()
 dictionary::dictionary(const dictionary& v)
     : _store(std::make_unique<storage>(*(v._store)))
 {
+}
+
+dictionary::dictionary(dictionary&& d) noexcept
+    : _store(std::move(d._store))
+{
+    d._store = std::make_unique<storage>();
 }
 
 dictionary::~dictionary() = default;
@@ -58,6 +65,17 @@ bool dictionary::operator!=(const dictionary& d) const
 dictionary& dictionary::operator=(const dictionary& d)
 {
     _store->properties = d._store->properties;
+    return *this;
+}
+
+dictionary& dictionary::operator=(dictionary&& d) noexcept
+{
+    if (this != &d) {
+        // Handing our storage to the source keeps both usable without
+        // allocating, and releases what it held here.
+        _store.swap(d._store);
+        d._store->properties.clear();
+    }
     return *this;
 }
 
