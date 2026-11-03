@@ -1,6 +1,7 @@
 // Replaces operator new to count allocations, which would reach every test
 // in the program, so this file is a test executable of its own.
 #include "dross/format/toml.h"
+#include "dross/type/array.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/timestamp.h"
@@ -156,6 +157,28 @@ TEST(dictionary_allocation_test, moving_allocates_at_most_once)
 
     dross::dictionary assigned_from(original);
     dross::dictionary target;
+    const long assignment = count_allocations([&] {
+        target = std::move(assigned_from);
+    });
+    EXPECT_EQ(assignment, 0);
+    EXPECT_EQ(target, original);
+}
+
+TEST(array_allocation_test, moving_allocates_at_most_once)
+{
+    dross::array original;
+    for (int i = 0; i < 10; ++i) {
+        original.append(dross::value(dross::number(i)));
+    }
+
+    dross::array source(original);
+    const long construction = count_allocations([&] {
+        const dross::array moved(std::move(source));
+    });
+    EXPECT_LE(construction, 1);
+
+    dross::array assigned_from(original);
+    dross::array target;
     const long assignment = count_allocations([&] {
         target = std::move(assigned_from);
     });

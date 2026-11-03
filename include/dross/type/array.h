@@ -71,6 +71,12 @@ public:
     array(const array& other);
 
     /**
+     * @brief Move constructor.
+     * @param other The array to move from
+     */
+    array(array&& other) noexcept;
+
+    /**
      * @brief Construct from initializer list.
      * @param values Initializer list of values to populate the array
      *
@@ -210,6 +216,13 @@ public:
      * @return Reference to this array
      */
     array& operator=(const array& other);
+
+    /**
+     * @brief Move assignment operator.
+     * @param other The array to move from
+     * @return Reference to this array
+     */
+    array& operator=(array&& other) noexcept;
 
     /**
      * @brief Access element by index (const version).
