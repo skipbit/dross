@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <ratio>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -878,6 +879,45 @@ TEST(timestamp_test, a_difference_near_the_limit_of_the_clock_is_exact)
     const dross::timestamp before_epoch{ clock::time_point{} - std::chrono::milliseconds(100) };
     EXPECT_EQ(*later - before_epoch, whole.time_since_epoch() + std::chrono::milliseconds(100));
     EXPECT_EQ(before_epoch - *later, -(whole.time_since_epoch() + std::chrono::milliseconds(100)));
+}
+
+// Where the clock counts nanoseconds, these convert exactly. Where it counts
+// microseconds, the next tick down is the expected one on both sides of 1970.
+TEST(timestamp_test, converting_to_a_time_point_rounds_down)
+{
+    using clock = std::chrono::system_clock;
+    constexpr bool nanoseconds = std::ratio_equal_v<clock::period, std::nano>;
+    constexpr bool microseconds = std::ratio_equal_v<clock::period, std::micro>;
+    if (! nanoseconds && ! microseconds) {
+        GTEST_SKIP() << "the clock counts neither nanoseconds nor microseconds";
+    }
+
+    const struct {
+        const char* text;
+        const char* on_microseconds;
+    } cases[] = {
+        { "1969-12-31T23:59:59.999999999Z", "1969-12-31T23:59:59.999999Z" },
+        { "1969-12-31T23:59:59.000000001Z", "1969-12-31T23:59:59Z" },
+        { "1900-01-01T00:00:00.1234567Z", "1900-01-01T00:00:00.123456Z" },
+        { "2024-01-01T00:00:00.1234567Z", "2024-01-01T00:00:00.123456Z" },
+    };
+    for (const auto& c : cases) {
+        const dross::timestamp original{ c.text };
+        const dross::timestamp converted{ static_cast<clock::time_point>(original) };
+        EXPECT_EQ(std::string(converted), microseconds ? c.on_microseconds : c.text);
+    }
+}
+
+// A difference rounds toward zero, so swapping the two only changes its sign.
+TEST(timestamp_test, a_difference_rounds_toward_zero)
+{
+    using clock = std::chrono::system_clock;
+    const dross::timestamp later{ "2024-01-21T15:30:01.000000000Z" };
+    const dross::timestamp earlier{ "2024-01-21T15:30:00.000000500Z" };
+    const auto expected = std::chrono::duration_cast<clock::duration>(std::chrono::nanoseconds{ 999999500 });
+
+    EXPECT_EQ(later - earlier, expected);
+    EXPECT_EQ(earlier - later, -expected);
 }
 
 TEST(timestamp_test, a_time_point_with_a_fraction_before_the_epoch_is_written_correctly)

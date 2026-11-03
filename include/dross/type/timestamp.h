@@ -337,7 +337,8 @@ public:
 
     /**
      * @brief Implicit conversion to std::chrono::system_clock::time_point.
-     * @return The time point representation (always in UTC)
+     * @return The time point representation (always in UTC), rounded down to
+     *         a tick of the clock
      *
      * Comparison and duration arithmetic work for every year from 0 to 9999,
      * but this conversion is limited to the range of system_clock, which is
@@ -448,7 +449,8 @@ public:
     /**
      * @brief Calculate the duration between two timestamps.
      * @param other The other timestamp
-     * @return Duration from other to this timestamp
+     * @return Duration from other to this timestamp, rounded toward zero to a
+     *         tick of the clock
      *
      * Limited to what system_clock::duration can hold, which is about 292
      * years where it counts nanoseconds.

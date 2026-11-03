@@ -54,6 +54,11 @@ Changed
   left usable and empty, or null for a ``value``, so code that goes on reading
   what it moved from sees that instead of the old contents
 
+- The difference of two ``timestamp`` values rounds toward zero as a whole,
+  where ``system_clock`` counts more coarsely than the timestamps. Their seconds
+  and fractions used to round apart, so 0.9999995 seconds came to one second on
+  a clock counting microseconds, and now comes to 999,999 microseconds
+
 - ``timestamp``, ``timestamp::date_part``, ``timestamp::time_part`` and
   ``timezone`` hold their values directly instead of behind a pointer, so
   building, copying and moving one allocates nothing, apart from parsing a
