@@ -2,6 +2,7 @@
 // in the program, so this file is a test executable of its own.
 #include "dross/format/toml.h"
 #include "dross/type/array.h"
+#include "dross/type/data.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
@@ -20,6 +21,7 @@
 namespace {
 
 std::atomic<long> allocations{ 0 };
+std::atomic<long> deallocations{ 0 };
 
 template <typename Function>
 long count_allocations(Function function)
@@ -27,6 +29,14 @@ long count_allocations(Function function)
     const long before = allocations.load();
     function();
     return allocations.load() - before;
+}
+
+template <typename Function>
+long count_deallocations(Function function)
+{
+    const long before = deallocations.load();
+    function();
+    return deallocations.load() - before;
 }
 
 template <typename Function>
@@ -56,16 +66,19 @@ void* operator new(std::size_t size, const std::nothrow_t&) noexcept
 
 void operator delete(void* p) noexcept
 {
+    deallocations.fetch_add(1);
     std::free(p);
 }
 
 void operator delete(void* p, std::size_t) noexcept
 {
+    deallocations.fetch_add(1);
     std::free(p);
 }
 
 void operator delete(void* p, const std::nothrow_t&) noexcept
 {
+    deallocations.fetch_add(1);
     std::free(p);
 }
 
@@ -227,6 +240,16 @@ TEST(value_allocation_test, moving_allocates_at_most_once)
     });
     EXPECT_EQ(assignment, 0);
     EXPECT_EQ(target, original);
+
+    dross::dictionary entries;
+    for (int i = 0; i < 10; ++i) {
+        entries[std::to_string(i)] = dross::value(dross::number(i));
+    }
+    dross::value holding_a_dictionary{ entries };
+    const long from_a_dictionary = count_allocations([&] {
+        const dross::value moved(std::move(holding_a_dictionary));
+    });
+    EXPECT_LE(from_a_dictionary, 1);
 }
 
 // One storage for the value and one that the source of the move is left with.
@@ -248,6 +271,73 @@ TEST(value_allocation_test, building_from_a_temporary_does_not_copy_its_contents
         const dross::value built(std::move(entries));
     });
     EXPECT_LE(from_dictionary, 2);
+
+    dross::string text{ std::string(1000, 'x') };
+    const long from_string = count_allocations([&] {
+        const dross::value built(std::move(text));
+    });
+    EXPECT_LE(from_string, 2);
+
+    dross::data bytes{ std::string(1000, 'x') };
+    const long from_data = count_allocations([&] {
+        const dross::value built(std::move(bytes));
+    });
+    EXPECT_LE(from_data, 2);
+}
+
+// The target of a move assignment gives up what it held there and then,
+// rather than when the source goes away.
+TEST(string_allocation_test, move_assignment_releases_the_old_text)
+{
+    const std::string text(1000, 'x');
+    dross::string source{ text };
+    dross::string target{ text };
+    const long released = count_deallocations([&] {
+        target = std::move(source);
+    });
+    EXPECT_GE(released, 1);
+}
+
+TEST(array_allocation_test, move_assignment_releases_the_old_elements)
+{
+    dross::array source;
+    dross::array target;
+    for (int i = 0; i < 10; ++i) {
+        source.append(dross::value(dross::number(i)));
+        target.append(dross::value(dross::number(i)));
+    }
+    const long released = count_deallocations([&] {
+        target = std::move(source);
+    });
+    EXPECT_GE(released, 10);
+}
+
+TEST(dictionary_allocation_test, move_assignment_releases_the_old_entries)
+{
+    dross::dictionary source;
+    dross::dictionary target;
+    for (int i = 0; i < 10; ++i) {
+        source[std::to_string(i)] = dross::value(dross::number(i));
+        target[std::to_string(i)] = dross::value(dross::number(i));
+    }
+    const long released = count_deallocations([&] {
+        target = std::move(source);
+    });
+    EXPECT_GE(released, 10);
+}
+
+TEST(value_allocation_test, move_assignment_releases_what_was_held)
+{
+    dross::array elements;
+    for (int i = 0; i < 10; ++i) {
+        elements.append(dross::value(dross::number(i)));
+    }
+    dross::value source{ elements };
+    dross::value target{ elements };
+    const long released = count_deallocations([&] {
+        target = std::move(source);
+    });
+    EXPECT_GE(released, 10);
 }
 
 namespace {

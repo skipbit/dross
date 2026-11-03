@@ -529,7 +529,6 @@ TEST(string_test, moved_from_can_be_used_as_an_empty_string)
     const dross::string moved(std::move(original));
 
     EXPECT_EQ(original.length(), 0u);
-    EXPECT_EQ(original.length(), 0u);
     EXPECT_EQ(original, "");
     EXPECT_EQ(std::string(original), "");
     EXPECT_EQ(dross::string(original), dross::string());

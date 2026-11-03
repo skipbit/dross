@@ -24,6 +24,8 @@ dictionary::dictionary(const dictionary& v)
 {
 }
 
+// The accessors dereference _store without checking, so a moved-from dictionary
+// keeps an empty storage rather than a null one.
 dictionary::dictionary(dictionary&& d) noexcept
     : _store(std::move(d._store))
 {

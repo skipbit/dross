@@ -29,6 +29,8 @@ array::array(const array& v)
 {
 }
 
+// The accessors dereference _store without checking, so a moved-from array
+// keeps an empty storage rather than a null one.
 array::array(array&& a) noexcept
     : _store(std::move(a._store))
 {

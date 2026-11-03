@@ -27,6 +27,8 @@ string::string(const string& s)
 {
 }
 
+// The accessors dereference _store without checking, so a moved-from string
+// keeps an empty storage rather than a null one.
 string::string(string&& s) noexcept
     : _store(std::move(s._store))
 {
@@ -110,10 +112,10 @@ string& string::operator=(string&& s) noexcept
 {
     if (this != &s) {
         // Handing our storage to the source keeps both usable without
-        // allocating. Assigning an empty string releases the buffer that
-        // storage was carrying, which clear() would leave held.
+        // allocating. Swapping with an empty string releases the buffer that
+        // storage was carrying, which assigning or clear() can leave held.
         _store.swap(s._store);
-        s._store->buffer = std::string{};
+        std::string{}.swap(s._store->buffer);
     }
     return *this;
 }

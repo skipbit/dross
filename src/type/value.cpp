@@ -43,6 +43,8 @@ value::value(const value& v)
 {
 }
 
+// The accessors dereference _store without checking, so a moved-from value
+// keeps an empty storage rather than a null one.
 value::value(value&& v) noexcept
     : _store(std::move(v._store))
 {
