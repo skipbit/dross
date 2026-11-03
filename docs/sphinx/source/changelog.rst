@@ -56,8 +56,10 @@ Changed
 
 - The difference of two ``timestamp`` values rounds toward zero as a whole,
   where ``system_clock`` counts more coarsely than the timestamps. Their seconds
-  and fractions used to round apart, so 0.9999995 seconds came to one second on
-  a clock counting microseconds, and now comes to 999,999 microseconds
+  and fractions used to round apart. On a clock counting microseconds, 0.9999995
+  seconds came to one second and now comes to 999,999 microseconds, and
+  0.0000005 seconds came to one microsecond and now comes to zero, so two
+  different timestamps can have a difference of zero
 
 - ``timestamp``, ``timestamp::date_part``, ``timestamp::time_part`` and
   ``timezone`` hold their values directly instead of behind a pointer, so

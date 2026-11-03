@@ -912,12 +912,35 @@ TEST(timestamp_test, converting_to_a_time_point_rounds_down)
 TEST(timestamp_test, a_difference_rounds_toward_zero)
 {
     using clock = std::chrono::system_clock;
-    const dross::timestamp later{ "2024-01-21T15:30:01.000000000Z" };
-    const dross::timestamp earlier{ "2024-01-21T15:30:00.000000500Z" };
-    const auto expected = std::chrono::duration_cast<clock::duration>(std::chrono::nanoseconds{ 999999500 });
+    constexpr bool nanoseconds = std::ratio_equal_v<clock::period, std::nano>;
+    constexpr bool microseconds = std::ratio_equal_v<clock::period, std::micro>;
+    if (! nanoseconds && ! microseconds) {
+        GTEST_SKIP() << "the clock counts neither nanoseconds nor microseconds";
+    }
 
-    EXPECT_EQ(later - earlier, expected);
-    EXPECT_EQ(earlier - later, -expected);
+    const struct {
+        const char* later;
+        const char* earlier;
+        long long on_nanoseconds;
+        long long on_microseconds;
+    } cases[] = {
+        { "2024-01-21T15:30:01.0000000Z", "2024-01-21T15:30:00.0000005Z", 999999500, 999999 },
+        { "2024-01-21T15:30:01.0000015Z", "2024-01-21T15:30:00.0000000Z", 1000001500, 1000001 },
+        { "2024-01-21T15:30:00.0000015Z", "2024-01-21T15:30:00.0000000Z", 1500, 1 },
+        { "2024-01-21T15:30:00.0000025Z", "2024-01-21T15:30:00.0000010Z", 1500, 1 },
+        { "2024-01-21T15:30:00.0000000Z", "2024-01-21T15:29:59.9999995Z", 500, 0 },
+        { "1969-12-31T23:59:59.0000000Z", "1969-12-31T23:59:58.0000005Z", 999999500, 999999 },
+        { "1970-01-01T00:00:00.0000005Z", "1969-12-31T23:59:59.9999995Z", 1000, 1 },
+        { "1970-01-01T00:00:00.0000000Z", "1969-12-31T23:59:59.9999995Z", 500, 0 },
+    };
+    for (const auto& c : cases) {
+        SCOPED_TRACE(c.later);
+        const dross::timestamp later{ c.later };
+        const dross::timestamp earlier{ c.earlier };
+        const clock::duration expected{ microseconds ? c.on_microseconds : c.on_nanoseconds };
+        EXPECT_EQ(later - earlier, expected);
+        EXPECT_EQ(earlier - later, -expected);
+    }
 }
 
 TEST(timestamp_test, a_time_point_with_a_fraction_before_the_epoch_is_written_correctly)

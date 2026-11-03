@@ -453,7 +453,9 @@ public:
      *         tick of the clock
      *
      * Limited to what system_clock::duration can hold, which is about 292
-     * years where it counts nanoseconds.
+     * years where it counts nanoseconds. A conversion to time_point rounds
+     * down instead, so subtracting the converted time points can differ by a
+     * tick.
      */
     std::chrono::system_clock::duration operator-(const timestamp& other) const;
 
