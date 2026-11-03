@@ -92,6 +92,24 @@ TEST(timestamp_allocation_test, building_and_copying_allocate_nothing)
     expect_no_allocation("add", [&] {
         (void)original.add(std::chrono::seconds(1));
     });
+    expect_no_allocation("subtract", [&] {
+        (void)original.subtract(std::chrono::seconds(1));
+    });
+    expect_no_allocation("arithmetic operators", [&] {
+        (void)(original + std::chrono::seconds(1));
+        (void)(original - std::chrono::seconds(1));
+        (void)(original + std::chrono::minutes(1));
+        (void)(original - std::chrono::minutes(1));
+        (void)(original + std::chrono::hours(1));
+        (void)(original - std::chrono::hours(1));
+    });
+    expect_no_allocation("rejected components", [&] {
+        const dross::timestamp built(2024, 13, 1);
+    });
+    expect_no_allocation("time point limits", [&] {
+        const dross::timestamp latest(std::chrono::system_clock::time_point::max());
+        const dross::timestamp earliest(std::chrono::system_clock::time_point::min());
+    });
     expect_no_allocation("copy and move", [&] {
         dross::timestamp copied(original);
         dross::timestamp moved(std::move(copied));
