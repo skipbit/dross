@@ -9,6 +9,7 @@
 #include "dross/type/timestamp.h"
 
 #include <memory>
+#include <utility>
 #include <variant>
 
 namespace dross {
@@ -42,6 +43,12 @@ value::value(const value& v)
 {
 }
 
+value::value(value&& v) noexcept
+    : _store(std::move(v._store))
+{
+    v._store = std::make_unique<storage>();
+}
+
 value::value(const boolean& b)
     : _store(std::make_unique<storage>())
 {
@@ -60,16 +67,34 @@ value::value(const string& s)
     _store->value = s;
 }
 
+value::value(string&& s)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(s);
+}
+
 value::value(const array& a)
     : _store(std::make_unique<storage>())
 {
     _store->value = a;
 }
 
+value::value(array&& a)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(a);
+}
+
 value::value(const dictionary& d)
     : _store(std::make_unique<storage>())
 {
     _store->value = d;
+}
+
+value::value(dictionary&& d)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(d);
 }
 
 value::value(const timestamp& ts)
@@ -82,6 +107,12 @@ value::value(const data& d)
     : _store(std::make_unique<storage>())
 {
     _store->value = d;
+}
+
+value::value(data&& d)
+    : _store(std::make_unique<storage>())
+{
+    _store->value = std::move(d);
 }
 
 value::~value() = default;
@@ -115,6 +146,17 @@ value& value::operator=(const std::nullptr_t)
 value& value::operator=(const value& v)
 {
     _store->value = v._store->value;
+    return *this;
+}
+
+value& value::operator=(value&& v) noexcept
+{
+    if (this != &v) {
+        // Handing our storage to the source keeps both usable without
+        // allocating, and releases what it held here.
+        _store.swap(v._store);
+        v._store->value = std::monostate{};
+    }
     return *this;
 }
 

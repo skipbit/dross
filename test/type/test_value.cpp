@@ -1,5 +1,6 @@
 #include "dross/type/array.h"
 #include "dross/type/boolean.h"
+#include "dross/type/data.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
@@ -9,6 +10,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <utility>
 
 TEST(value_test, init_with_raw_int)
 {
@@ -488,4 +490,110 @@ TEST(value_test, chain_assignments)
     EXPECT_EQ(v1, 42);
     EXPECT_EQ(v2, 42);
     EXPECT_EQ(v3, 42);
+}
+
+namespace {
+
+dross::array three_elements()
+{
+    return dross::array{ dross::value(dross::number(1)), dross::value(dross::number(2)), dross::value(dross::number(3)) };
+}
+
+}  // namespace
+
+TEST(value_test, move_construction_takes_what_is_held)
+{
+    dross::value original{ three_elements() };
+    const dross::value moved(std::move(original));
+    EXPECT_EQ(moved, dross::value(three_elements()));
+    EXPECT_FALSE(original);
+}
+
+TEST(value_test, move_assignment_takes_what_is_held)
+{
+    dross::value original{ three_elements() };
+    dross::value target{ dross::number(0) };
+    target = std::move(original);
+    EXPECT_EQ(target, dross::value(three_elements()));
+    EXPECT_FALSE(original);
+}
+
+TEST(value_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::value>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::value>);
+}
+
+TEST(value_test, move_assigning_to_itself_keeps_what_is_held)
+{
+    dross::value v{ three_elements() };
+    dross::value& same = v;
+    v = std::move(same);
+    EXPECT_EQ(v, dross::value(three_elements()));
+}
+
+// Every operation with no precondition has to work on a moved-from value,
+// which holds nothing.
+TEST(value_test, moved_from_can_be_used_as_a_null_value)
+{
+    dross::value original{ dross::number(1) };
+    const dross::value moved(std::move(original));
+
+    EXPECT_FALSE(original);
+    EXPECT_EQ(original, dross::value());
+    EXPECT_EQ(dross::value(original), dross::value());
+}
+
+TEST(value_test, moved_from_can_be_assigned_again)
+{
+    dross::value original{ three_elements() };
+    dross::value moved(std::move(original));
+
+    original = dross::number(4);
+    EXPECT_EQ(original, dross::value(dross::number(4)));
+
+    dross::value emptied;
+    moved = std::move(emptied);
+    EXPECT_FALSE(moved);
+    emptied = std::move(moved);
+    EXPECT_FALSE(emptied);
+}
+
+TEST(value_test, building_from_a_temporary_takes_its_contents)
+{
+    dross::array elements = three_elements();
+    const dross::value from_array(std::move(elements));
+    EXPECT_EQ(from_array, dross::value(three_elements()));
+    EXPECT_TRUE(elements.empty());
+
+    dross::dictionary entries;
+    entries["a"] = dross::value(dross::number(1));
+    const dross::dictionary expected_entries(entries);
+    const dross::value from_dictionary(std::move(entries));
+    EXPECT_EQ(from_dictionary, dross::value(expected_entries));
+    EXPECT_TRUE(entries.empty());
+
+    dross::string text{ "a string long enough that it does not fit in the small string buffer" };
+    const dross::string expected_text(text);
+    const dross::value from_string(std::move(text));
+    EXPECT_EQ(from_string, dross::value(expected_text));
+    EXPECT_EQ(text.length(), 0u);
+
+    dross::data bytes{ "Hello" };
+    const dross::data expected_bytes(bytes);
+    const dross::value from_data(std::move(bytes));
+    EXPECT_EQ(from_data, dross::value(expected_bytes));
+    EXPECT_TRUE(bytes.empty());
+}
+
+TEST(value_test, building_from_a_named_object_leaves_it_alone)
+{
+    const dross::array kept = three_elements();
+    const dross::value copied(kept);
+    EXPECT_EQ(copied, dross::value(kept));
+    EXPECT_EQ(kept, three_elements());
+
+    dross::array also_kept = three_elements();
+    const dross::value copied_too(also_kept);
+    EXPECT_EQ(also_kept, three_elements());
 }

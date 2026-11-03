@@ -206,6 +206,50 @@ TEST(string_allocation_test, moving_allocates_at_most_once)
     EXPECT_EQ(target, original);
 }
 
+TEST(value_allocation_test, moving_allocates_at_most_once)
+{
+    dross::array elements;
+    for (int i = 0; i < 10; ++i) {
+        elements.append(dross::value(dross::number(i)));
+    }
+    const dross::value original{ elements };
+
+    dross::value source(original);
+    const long construction = count_allocations([&] {
+        const dross::value moved(std::move(source));
+    });
+    EXPECT_LE(construction, 1);
+
+    dross::value assigned_from(original);
+    dross::value target;
+    const long assignment = count_allocations([&] {
+        target = std::move(assigned_from);
+    });
+    EXPECT_EQ(assignment, 0);
+    EXPECT_EQ(target, original);
+}
+
+// One storage for the value and one that the source of the move is left with.
+TEST(value_allocation_test, building_from_a_temporary_does_not_copy_its_contents)
+{
+    dross::array elements;
+    dross::dictionary entries;
+    for (int i = 0; i < 10; ++i) {
+        elements.append(dross::value(dross::number(i)));
+        entries[std::to_string(i)] = dross::value(dross::number(i));
+    }
+
+    const long from_array = count_allocations([&] {
+        const dross::value built(std::move(elements));
+    });
+    EXPECT_LE(from_array, 2);
+
+    const long from_dictionary = count_allocations([&] {
+        const dross::value built(std::move(entries));
+    });
+    EXPECT_LE(from_dictionary, 2);
+}
+
 namespace {
 
 std::string tables(const std::string& parent, int count)
