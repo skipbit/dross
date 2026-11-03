@@ -8,6 +8,7 @@
 #include <regex>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace dross {
 
@@ -35,9 +36,13 @@ std::chrono::year_month_day year_month_day_of(int year, int month, int day)
     return { std::chrono::year{ year }, std::chrono::month{ static_cast<unsigned>(month) }, std::chrono::day{ static_cast<unsigned>(day) } };
 }
 
+using clock_duration = std::chrono::system_clock::duration;
+
 // A sum whose terms have opposite signs can fit in the duration of the clock
 // when its seconds alone do not, so a second moves from one term to the other.
-std::chrono::system_clock::duration clock_duration(std::chrono::seconds seconds, std::chrono::nanoseconds subseconds)
+// Within the range of the clock the seconds convert exactly, so how the
+// subseconds convert decides how the sum rounds.
+std::pair<std::chrono::seconds, std::chrono::nanoseconds> with_the_same_sign(std::chrono::seconds seconds, std::chrono::nanoseconds subseconds)
 {
     if ((seconds < std::chrono::seconds{ 0 }) && (subseconds > std::chrono::nanoseconds{ 0 })) {
         seconds += std::chrono::seconds{ 1 };
@@ -46,8 +51,7 @@ std::chrono::system_clock::duration clock_duration(std::chrono::seconds seconds,
         seconds -= std::chrono::seconds{ 1 };
         subseconds += std::chrono::seconds{ 1 };
     }
-    return std::chrono::duration_cast<std::chrono::system_clock::duration>(seconds)
-           + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds);
+    return { seconds, subseconds };
 }
 
 timestamp value_or_throw(std::optional<timestamp> result)
@@ -355,8 +359,10 @@ void timestamp::set_local(std::chrono::sys_seconds local, std::chrono::nanosecon
 
 timestamp::operator std::chrono::system_clock::time_point() const
 {
-    auto [seconds, subseconds] = instant();
-    return std::chrono::system_clock::time_point{ clock_duration(seconds.time_since_epoch(), subseconds) };
+    auto [floor_seconds, fraction] = instant();
+    auto [seconds, subseconds] = with_the_same_sign(floor_seconds.time_since_epoch(), fraction);
+    return std::chrono::system_clock::time_point{ std::chrono::duration_cast<clock_duration>(seconds)
+                                                  + std::chrono::floor<clock_duration>(subseconds) };
 }
 
 timestamp::operator std::string() const
@@ -378,7 +384,8 @@ std::chrono::system_clock::duration timestamp::operator-(const timestamp& other)
 {
     auto [seconds, subseconds] = instant();
     auto [other_seconds, other_subseconds] = other.instant();
-    return clock_duration(seconds - other_seconds, subseconds - other_subseconds);
+    auto [whole, rest] = with_the_same_sign(seconds - other_seconds, subseconds - other_subseconds);
+    return std::chrono::duration_cast<clock_duration>(whole) + std::chrono::duration_cast<clock_duration>(rest);
 }
 
 timestamp timestamp::operator+(const std::chrono::minutes& duration) const
