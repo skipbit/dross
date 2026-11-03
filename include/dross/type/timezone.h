@@ -93,22 +93,6 @@ public:
     timezone();
 
     /**
-     * @brief Copy constructor.
-     * @param other The timezone to copy from
-     */
-    timezone(const timezone& other) = default;
-
-    /**
-     * @brief Destructor.
-     */
-    ~timezone() = default;
-
-    /**
-     * @brief Copy assignment operator.
-     */
-    timezone& operator=(const timezone& other) = default;
-
-    /**
      * @brief Check if this is UTC timezone.
      * @return True if timezone represents UTC (+00:00)
      */
@@ -150,7 +134,8 @@ public:
     std::strong_ordering operator<=>(const timezone& other) const noexcept;
 
 private:
-    std::chrono::minutes _offset;
+    // Within -23:59..+23:59, so 32 bits keep a timestamp small.
+    int _offset_minutes;
 
     /**
      * @brief Private constructor for internal use.

@@ -6,6 +6,7 @@
 #include <compare>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace dross {
 
@@ -105,21 +106,6 @@ public:
 
     public:
         /**
-         * @brief Copy constructor.
-         */
-        date_part(const date_part& other) = default;
-
-        /**
-         * @brief Destructor.
-         */
-        ~date_part() = default;
-
-        /**
-         * @brief Copy assignment operator.
-         */
-        date_part& operator=(const date_part& other) = default;
-
-        /**
          * @brief Get the year component.
          * @return Year (e.g., 2024)
          */
@@ -186,21 +172,6 @@ public:
          * @brief Static midnight constant.
          */
         static const time_part midnight;
-
-        /**
-         * @brief Copy constructor.
-         */
-        time_part(const time_part& other) = default;
-
-        /**
-         * @brief Destructor.
-         */
-        ~time_part() = default;
-
-        /**
-         * @brief Copy assignment operator.
-         */
-        time_part& operator=(const time_part& other) = default;
 
         /**
          * @brief Get the hour component.
@@ -305,12 +276,6 @@ public:
     timestamp();
 
     /**
-     * @brief Copy constructor.
-     * @param other The timestamp to copy from
-     */
-    timestamp(const timestamp& other) = default;
-
-    /**
      * @brief Construct from std::chrono::system_clock::time_point.
      * @param tp The time point to construct from
      *
@@ -369,16 +334,6 @@ public:
      * Components that from_components() rejects result in epoch time.
      */
     timestamp(int year, int month, int day, int hour, int minute, int second, const timezone& tz);
-
-    /**
-     * @brief Destructor.
-     */
-    ~timestamp() = default;
-
-    /**
-     * @brief Copy assignment operator.
-     */
-    timestamp& operator=(const timestamp& other) = default;
 
     /**
      * @brief Implicit conversion to std::chrono::system_clock::time_point.
@@ -536,9 +491,18 @@ public:
     const dross::timezone& timezone() const noexcept;
 
 private:
+    // The two 4-byte members side by side keep this to 16 bytes.
     date_part _date;
-    time_part _time;
     dross::timezone _timezone;
+    time_part _time;
+
+    // Wall-clock seconds since the epoch, before the offset is applied.
+    std::chrono::sys_seconds local_seconds() const noexcept;
+
+    std::chrono::nanoseconds subseconds() const noexcept;
+
+    // The instant in UTC, kept in seconds so that no year from 0 to 9999 overflows.
+    std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> instant() const noexcept;
 
     // Splits wall-clock seconds and a fraction into the date and time parts.
     void set_local(std::chrono::sys_seconds local, std::chrono::nanoseconds subseconds);

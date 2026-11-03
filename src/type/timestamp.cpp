@@ -8,7 +8,6 @@
 #include <regex>
 #include <sstream>
 #include <stdexcept>
-#include <utility>
 
 namespace dross {
 
@@ -41,7 +40,7 @@ timestamp value_or_throw(std::optional<timestamp> result)
     if (! result) {
         throw std::out_of_range("timestamp arithmetic leaves the years 0 to 9999");
     }
-    return std::move(*result);
+    return *result;
 }
 
 // The year in four digits. A timestamp stays within the years 0 to 9999.
@@ -74,25 +73,6 @@ std::string expand_date_conversions(const std::string& format, const timestamp::
         }
     }
     return result;
-}
-
-// Wall-clock seconds since the epoch, before the offset is applied.
-std::chrono::sys_seconds local_seconds_of(const timestamp& ts)
-{
-    const auto time_of_day = std::chrono::floor<std::chrono::seconds>(ts.time().to_hh_mm_ss().to_duration());
-    return std::chrono::sys_days{ static_cast<std::chrono::year_month_day>(ts.date()) } + time_of_day;
-}
-
-std::chrono::nanoseconds subseconds_of(const timestamp& ts)
-{
-    const auto time_of_day = ts.time().to_hh_mm_ss().to_duration();
-    return time_of_day - std::chrono::floor<std::chrono::seconds>(time_of_day);
-}
-
-// The instant in UTC, kept in seconds so that no year from 0 to 9999 overflows.
-std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> instant_of(const timestamp& ts)
-{
-    return { local_seconds_of(ts) - ts.timezone().offset(), subseconds_of(ts) };
 }
 
 }  // namespace
@@ -210,8 +190,8 @@ timestamp timestamp::now()
 
 timestamp::timestamp()
     : _date()
-    , _time()
     , _timezone(dross::timezone::utc())
+    , _time()
 {
 }
 
@@ -287,7 +267,7 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
         // Digits below a nanosecond are dropped.
         std::string digits = match[7].str().substr(0, 9);
         digits.resize(9, '0');
-        result->set_local(local_seconds_of(*result), std::chrono::nanoseconds(std::stoll(digits)));
+        result->_time._since_midnight += std::chrono::nanoseconds(std::stoll(digits));
     }
     return result;
 }
@@ -326,16 +306,31 @@ std::optional<timestamp> timestamp::from_components(int year, int month, int day
     return result;
 }
 
-void timestamp::set_local(std::chrono::sys_seconds local, std::chrono::nanoseconds subseconds)
+std::chrono::sys_seconds timestamp::local_seconds() const noexcept
+{
+    return std::chrono::sys_days{ _date._ymd } + std::chrono::floor<std::chrono::seconds>(_time._since_midnight);
+}
+
+std::chrono::nanoseconds timestamp::subseconds() const noexcept
+{
+    return _time._since_midnight - std::chrono::floor<std::chrono::seconds>(_time._since_midnight);
+}
+
+std::pair<std::chrono::sys_seconds, std::chrono::nanoseconds> timestamp::instant() const noexcept
+{
+    return { local_seconds() - _timezone.offset(), subseconds() };
+}
+
+void timestamp::set_local(std::chrono::sys_seconds local, std::chrono::nanoseconds fraction)
 {
     const auto days = std::chrono::floor<std::chrono::days>(local);
     _date = date_part{ std::chrono::year_month_day{ days } };
-    _time = time_part{ local - days + subseconds };
+    _time = time_part{ local - days + fraction };
 }
 
 timestamp::operator std::chrono::system_clock::time_point() const
 {
-    auto [seconds, subseconds] = instant_of(*this);
+    auto [seconds, subseconds] = instant();
     return std::chrono::time_point_cast<std::chrono::system_clock::duration>(seconds)
            + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds);
 }
@@ -347,18 +342,18 @@ timestamp::operator std::string() const
 
 std::strong_ordering timestamp::operator<=>(const timestamp& other) const
 {
-    return instant_of(*this) <=> instant_of(other);
+    return instant() <=> other.instant();
 }
 
 bool timestamp::operator==(const timestamp& other) const
 {
-    return instant_of(*this) == instant_of(other);
+    return instant() == other.instant();
 }
 
 std::chrono::system_clock::duration timestamp::operator-(const timestamp& other) const
 {
-    auto [seconds, subseconds] = instant_of(*this);
-    auto [other_seconds, other_subseconds] = instant_of(other);
+    auto [seconds, subseconds] = instant();
+    auto [other_seconds, other_subseconds] = other.instant();
     return std::chrono::duration_cast<std::chrono::system_clock::duration>(seconds - other_seconds)
            + std::chrono::duration_cast<std::chrono::system_clock::duration>(subseconds - other_subseconds);
 }
@@ -400,13 +395,13 @@ timestamp timestamp::operator-(const std::chrono::seconds& duration) const
 std::optional<timestamp> timestamp::add(std::chrono::seconds duration) const
 {
     // Compared as distances from here, which cannot overflow, before adding.
-    const auto local = local_seconds_of(*this);
+    const auto local = local_seconds();
     if ((duration < first_second - local) || (duration >= end_second - local)) {
         return std::nullopt;
     }
 
     timestamp result(*this);
-    result.set_local(local + duration, subseconds_of(*this));
+    result.set_local(local + duration, subseconds());
     return result;
 }
 
@@ -431,7 +426,7 @@ std::string timestamp::format(format_type fmt) const
 
 std::string timestamp::format(const std::string& custom_format) const
 {
-    auto time_c = static_cast<std::time_t>(local_seconds_of(*this).time_since_epoch().count());
+    auto time_c = static_cast<std::time_t>(local_seconds().time_since_epoch().count());
     // gmtime_r rather than std::gmtime, whose result is shared by every thread.
     std::tm tm{};
     if (! ::gmtime_r(&time_c, &tm)) {
@@ -467,7 +462,7 @@ std::string timestamp::format_iso8601() const
     oss << static_cast<std::string>(_date) << "T" << std::setfill('0') << std::setw(2) << _time.hour() << ":" << std::setw(2) << _time.minute() << ":" << std::setw(2)
         << _time.second();
 
-    if (auto fraction = subseconds_of(*this).count(); fraction != 0) {
+    if (auto fraction = subseconds().count(); fraction != 0) {
         std::string digits = std::to_string(fraction);
         digits.insert(0, 9 - digits.size(), '0');
         digits.erase(digits.find_last_not_of('0') + 1);

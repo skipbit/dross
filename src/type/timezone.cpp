@@ -83,28 +83,28 @@ std::optional<timezone> timezone::from_string(const std::string& tz_str)
 }
 
 timezone::timezone()
-    : _offset(0)
+    : _offset_minutes(0)
 {
 }
 
 timezone::timezone(std::chrono::minutes offset)
-    : _offset(offset)
+    : _offset_minutes(static_cast<int>(offset.count()))
 {
 }
 
 bool timezone::is_utc() const noexcept
 {
-    return (_offset == std::chrono::minutes(0));
+    return (_offset_minutes == 0);
 }
 
 std::chrono::minutes timezone::offset() const noexcept
 {
-    return _offset;
+    return std::chrono::minutes(_offset_minutes);
 }
 
 std::string timezone::format() const
 {
-    int offset = static_cast<int>(_offset.count());
+    int offset = _offset_minutes;
     if (offset == 0) {
         return "Z";  // UTC
     }
@@ -129,12 +129,12 @@ timezone::operator std::string() const
 
 bool timezone::operator==(const timezone& other) const noexcept
 {
-    return (_offset == other._offset);
+    return (_offset_minutes == other._offset_minutes);
 }
 
 std::strong_ordering timezone::operator<=>(const timezone& other) const noexcept
 {
-    return _offset <=> other._offset;
+    return _offset_minutes <=> other._offset_minutes;
 }
 
 std::ostream& operator<<(std::ostream& os, const timezone& tz)
