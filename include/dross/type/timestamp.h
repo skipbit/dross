@@ -291,6 +291,21 @@ public:
     static std::optional<timestamp> from_components(int year, int month, int day, int hour = 0, int minute = 0, int second = 0, const dross::timezone& tz = dross::timezone::utc());
 
     /**
+     * @brief Build a timestamp from a time point, reporting one out of range.
+     * @param tp The time point, read as UTC
+     * @return The timestamp, or nullopt if the time point is outside the
+     *         years 0 to 9999
+     *
+     * system_clock reaches past those years where its duration counts
+     * microseconds. A timestamp near their ends can be outside them as a time
+     * point, when its offset moves it there. A time_point with a coarser
+     * duration, such as std::chrono::sys_days, converts before the call, and
+     * can overflow there where the duration of system_clock counts
+     * nanoseconds.
+     */
+    static std::optional<timestamp> from_time_point(const std::chrono::system_clock::time_point& tp);
+
+    /**
      * @brief Default constructor creating epoch time (1970-01-01T00:00:00Z).
      */
     timestamp();
@@ -305,10 +320,10 @@ public:
      * @brief Construct from std::chrono::system_clock::time_point.
      * @param tp The time point to construct from
      *
-     * The resulting timestamp will be in UTC (no timezone offset). Where the
-     * range of system_clock reaches past the years 0 to 9999, as it does
-     * where its duration counts microseconds, a time point outside them
-     * gives a timestamp whose string does not read back.
+     * The resulting timestamp will be in UTC (no timezone offset). A time
+     * point that from_time_point() rejects results in the nearer of the first
+     * and the last nanosecond of the years 0 to 9999, so it does not order on
+     * the wrong side of another timestamp.
      */
     timestamp(const std::chrono::system_clock::time_point& tp);
 
@@ -503,9 +518,8 @@ public:
      * @param custom_format strftime-style format string
      * @return Formatted string representation
      *
-     * %Y and %F write the year as the ISO 8601 form does: in at least four
-     * digits, so the year 999 is "0999", and with a minus sign before a year
-     * below 0. The other conversions are those of std::put_time.
+     * %Y and %F write the year as the ISO 8601 form does: in four digits, so
+     * the year 999 is "0999". The other conversions are those of std::put_time.
      */
     std::string format(const std::string& custom_format) const;
 

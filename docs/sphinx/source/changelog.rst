@@ -12,6 +12,10 @@ Unreleased
 Added
 ~~~~~
 
+- ``timestamp::from_time_point()``, which reports a
+  ``std::chrono::system_clock::time_point`` outside the years 0 to 9999 as
+  ``std::nullopt``
+
 - ``timestamp::add()`` and ``timestamp::subtract()``, which take a
   ``std::chrono::seconds`` and report a result outside the years 0 to
   9999 as ``std::nullopt`` instead of throwing
@@ -41,6 +45,13 @@ Added
 Changed
 ~~~~~~~
 
+- The ``timestamp`` constructor that takes a
+  ``std::chrono::system_clock::time_point`` results in the nearer end of
+  the years 0 to 9999 for one outside them, so ``time_point::max()`` does
+  not order before another timestamp. With libc++, whose ``system_clock``
+  reaches past those years, it used to give a timestamp whose string did
+  not read back, and adding to it threw
+
 - The API page describes the members of ``error``, which it used to list
   by name only
 
@@ -68,8 +79,7 @@ Changed
   return it, and its string did not read back; far enough out the year
   wrapped and the result compared on the wrong side of where it started.
   Minutes and hours with more seconds than ``std::chrono::seconds`` holds
-  throw as well instead of overflowing. Arithmetic no longer reaches the
-  signed year that ``%Y``, ``%F`` and the ISO 8601 form write below 0
+  throw as well instead of overflowing
 
 - The examples in the README, the Sphinx guides and the header comments
   write ``dross::`` before each name instead of ``using namespace dross;``.
@@ -234,10 +244,6 @@ Fixed
   copies it. The assignment the compiler declared was deprecated because
   ``error`` has its own copy constructor, which also kept the compiler
   from declaring the moves
-
-- The ISO 8601 form of a ``timestamp`` and the string of its
-  ``date_part`` write a year below 0 with a minus sign before four
-  digits, such as ``-0001-12-31``, instead of ``00-1-12-31``
 
 - ``error`` compared with ``std::errc`` asks both categories through
   ``equivalent()``, as ``std::error_code`` does, so a code whose category

@@ -64,6 +64,129 @@ TEST(timestamp_test, time_point_constructor)
     EXPECT_TRUE(ts.timezone().is_utc());  // Default UTC timezone
 }
 
+// system_clock reaches outside the years 0 to 9999 only where its duration
+// counts microseconds, so these skip where it counts nanoseconds.
+namespace {
+
+using time_point = std::chrono::system_clock::time_point;
+
+bool clock_reaches(std::chrono::sys_seconds seconds)
+{
+    return (seconds >= std::chrono::floor<std::chrono::seconds>(time_point::min()))
+           && (seconds <= std::chrono::floor<std::chrono::seconds>(time_point::max()));
+}
+
+constexpr std::chrono::sys_seconds first_second{ std::chrono::sys_days{ std::chrono::year{ 0 } / 1 / 1 } };
+constexpr std::chrono::sys_seconds end_second{ std::chrono::sys_days{ std::chrono::year{ 10000 } / 1 / 1 } };
+
+}  // namespace
+
+TEST(timestamp_test, from_time_point_reads_a_time_point_as_utc)
+{
+    const auto tp = std::chrono::system_clock::now();
+    const auto ts = dross::timestamp::from_time_point(tp);
+
+    ASSERT_TRUE(ts.has_value());
+    EXPECT_EQ(static_cast<time_point>(*ts), tp);
+    EXPECT_EQ(*ts, dross::timestamp(tp));
+    EXPECT_TRUE(ts->timezone().is_utc());
+}
+
+TEST(timestamp_test, from_time_point_accepts_the_ends_of_the_years)
+{
+    if (! clock_reaches(first_second) || ! clock_reaches(end_second)) {
+        GTEST_SKIP() << "system_clock does not reach the years 0 to 9999";
+    }
+    const auto tick = time_point::duration{ 1 };
+    const auto first = dross::timestamp::from_time_point(time_point(first_second));
+    const auto last = dross::timestamp::from_time_point(time_point(end_second) - tick);
+
+    ASSERT_TRUE(first.has_value());
+    EXPECT_EQ(static_cast<std::string>(*first), "0000-01-01T00:00:00Z");
+    ASSERT_TRUE(last.has_value());
+    EXPECT_EQ(last->date().year(), 9999);
+    EXPECT_EQ(last->time().second(), 59);
+}
+
+TEST(timestamp_test, from_time_point_rejects_what_is_outside_the_years)
+{
+    if (! clock_reaches(first_second) || ! clock_reaches(end_second)) {
+        GTEST_SKIP() << "system_clock does not reach the years 0 to 9999";
+    }
+    const auto tick = time_point::duration{ 1 };
+
+    EXPECT_FALSE(dross::timestamp::from_time_point(time_point(first_second) - tick).has_value());
+    EXPECT_FALSE(dross::timestamp::from_time_point(time_point(end_second)).has_value());
+    EXPECT_FALSE(dross::timestamp::from_time_point(time_point::min()).has_value());
+    EXPECT_FALSE(dross::timestamp::from_time_point(time_point::max()).has_value());
+}
+
+// std::chrono::year holds 16 bits, so a year compared after conversion can wrap
+// around to one inside the range: 2024 + 65600 wraps around to 2088.
+TEST(timestamp_test, from_time_point_rejects_a_year_that_wraps_around_into_the_years)
+{
+    const std::chrono::sys_seconds far{ std::chrono::sys_days{ std::chrono::year{ 2024 } / 1 / 1 } + std::chrono::days{ 146097 * 164 } };
+    if (! clock_reaches(far)) {
+        GTEST_SKIP() << "system_clock does not reach that year";
+    }
+
+    EXPECT_FALSE(dross::timestamp::from_time_point(time_point(far)).has_value());
+}
+
+TEST(timestamp_test, time_point_constructor_results_in_the_nearer_end_outside_the_years)
+{
+    if (! clock_reaches(first_second) || ! clock_reaches(end_second)) {
+        GTEST_SKIP() << "system_clock does not reach the years 0 to 9999";
+    }
+    const auto tick = time_point::duration{ 1 };
+    const std::string first = "0000-01-01T00:00:00Z";
+    const std::string last = "9999-12-31T23:59:59.999999999Z";
+
+    EXPECT_EQ(static_cast<std::string>(dross::timestamp(time_point(first_second) - tick)), first);
+    EXPECT_EQ(static_cast<std::string>(dross::timestamp(time_point::min())), first);
+    EXPECT_EQ(static_cast<std::string>(dross::timestamp(time_point(end_second))), last);
+    EXPECT_EQ(static_cast<std::string>(dross::timestamp(time_point::max())), last);
+}
+
+TEST(timestamp_test, time_point_constructor_keeps_a_limit_on_the_same_side)
+{
+    if (! clock_reaches(first_second) || ! clock_reaches(end_second)) {
+        GTEST_SKIP() << "system_clock does not reach the years 0 to 9999";
+    }
+    const auto now = dross::timestamp::now();
+    const auto tick = time_point::duration{ 1 };
+
+    EXPECT_GT(dross::timestamp(time_point::max()), now);
+    EXPECT_LT(dross::timestamp(time_point::min()), now);
+    EXPECT_GT(dross::timestamp(time_point::max()), dross::timestamp(time_point(end_second) - tick));
+}
+
+// What the constructor gives reads back, and arithmetic accepts it.
+TEST(timestamp_test, time_point_constructor_gives_a_usable_timestamp_outside_the_years)
+{
+    if (! clock_reaches(end_second)) {
+        GTEST_SKIP() << "system_clock does not reach past the year 9999";
+    }
+    const dross::timestamp ts(time_point::max());
+
+    EXPECT_EQ(dross::timestamp(static_cast<std::string>(ts)), ts);
+    EXPECT_EQ(ts + std::chrono::seconds(0), ts);
+}
+
+// As a time point this is in the year before the first, so it comes back as
+// the first moment rather than as itself.
+TEST(timestamp_test, an_offset_that_moves_a_timestamp_outside_the_years_comes_back_at_the_end)
+{
+    if (! clock_reaches(first_second)) {
+        GTEST_SKIP() << "system_clock does not reach the year 0";
+    }
+    const dross::timestamp ts("0000-01-01T00:00:00+09:00");
+    const auto tp = static_cast<time_point>(ts);
+
+    EXPECT_FALSE(dross::timestamp::from_time_point(tp).has_value());
+    EXPECT_EQ(static_cast<std::string>(dross::timestamp(tp)), "0000-01-01T00:00:00Z");
+}
+
 // Test component constructor without timezone
 TEST(timestamp_test, component_constructor_without_timezone_is_utc)
 {
