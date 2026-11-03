@@ -1,6 +1,8 @@
 #include "dross/type/string.h"
 
 #include <memory>
+#include <string>
+#include <utility>
 
 namespace dross {
 
@@ -23,6 +25,12 @@ string::string()
 string::string(const string& s)
     : _store(std::make_unique<storage>(*(s._store)))
 {
+}
+
+string::string(string&& s) noexcept
+    : _store(std::move(s._store))
+{
+    s._store = std::make_unique<storage>();
 }
 
 string::string(const std::string& s)
@@ -95,6 +103,18 @@ bool string::operator!=(const char* c) const
 string& string::operator=(const string& s)
 {
     _store->buffer = s._store->buffer;
+    return *this;
+}
+
+string& string::operator=(string&& s) noexcept
+{
+    if (this != &s) {
+        // Handing our storage to the source keeps both usable without
+        // allocating. Assigning an empty string releases the buffer that
+        // storage was carrying, which clear() would leave held.
+        _store.swap(s._store);
+        s._store->buffer = std::string{};
+    }
     return *this;
 }
 

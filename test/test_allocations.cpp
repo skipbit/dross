@@ -4,6 +4,7 @@
 #include "dross/type/array.h"
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
+#include "dross/type/string.h"
 #include "dross/type/timestamp.h"
 #include "dross/type/value.h"
 
@@ -179,6 +180,25 @@ TEST(array_allocation_test, moving_allocates_at_most_once)
 
     dross::array assigned_from(original);
     dross::array target;
+    const long assignment = count_allocations([&] {
+        target = std::move(assigned_from);
+    });
+    EXPECT_EQ(assignment, 0);
+    EXPECT_EQ(target, original);
+}
+
+TEST(string_allocation_test, moving_allocates_at_most_once)
+{
+    const dross::string original{ "a string long enough that it does not fit in the small string buffer" };
+
+    dross::string source(original);
+    const long construction = count_allocations([&] {
+        const dross::string moved(std::move(source));
+    });
+    EXPECT_LE(construction, 1);
+
+    dross::string assigned_from(original);
+    dross::string target;
     const long assignment = count_allocations([&] {
         target = std::move(assigned_from);
     });
