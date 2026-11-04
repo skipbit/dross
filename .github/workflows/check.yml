@@ -1,8 +1,9 @@
 # Checks a commit against the Requirements in the README: every supported
 # compiler and standard library pairing, in both build types, the two ways the
 # library is packaged, what the sanitizers find, that the documentation still
-# builds, and that the sources match the formatting configuration. `required`
-# waits for all of them, so one name stands for the whole list.
+# builds and is well formed, and that the sources match the formatting
+# configuration. `required` waits for all of them, so one name stands for the
+# whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -445,13 +446,13 @@ jobs:
           echo "$(find docs/build/doxygen/xml -name '*.xml' | wc -l) Doxygen files"
           echo "$(find docs/build/sphinx/html -name '*.html' | wc -l) HTML pages"
 
-  # sphinx-lint is pinned, so its verdict changes with the sources or with the
-  # pull request that raises the pin. The documentation build reports a broken
-  # literal as a warning and still succeeds.
+  # sphinx-lint and its dependencies are pinned, so its verdict changes with the
+  # sources or with the pull request that raises a pin. The documentation build
+  # reports a broken literal as a warning and still succeeds.
   docs-lint:
     name: docs (lint)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
