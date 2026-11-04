@@ -446,7 +446,7 @@ convert to ``std::string`` in two ways:
 Stream output is provided for ``boolean``, ``number``, ``data``, ``timestamp``,
 ``timezone`` and ``error``. ``string`` and ``value`` have no ``operator<<``:
 convert a ``string`` to ``std::string`` first, and unwrap a ``value`` before
-printing it. An ``error`` writes ``domain:code``, followed by ``: `` and the
+printing it. An ``error`` writes ``domain:code``, followed by ``": "`` and the
 detail when there is one.
 
 ``value`` is inspected and unwrapped with member templates:
