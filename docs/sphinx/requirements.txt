@@ -1,6 +1,7 @@
 # Pinned: a required check installs these, so a release on its own must not
 # be able to fail a pull request. Dependabot proposes the updates, and the
-# documentation build in check.yml decides whether they hold.
+# documentation build and the formatting check in check.yml decide whether
+# they hold.
 
 # Sphinx and theme
 sphinx==9.2.0
@@ -13,5 +14,7 @@ sphinx-tabs==3.5.0
 sphinx-design==0.7.0
 sphinx-autobuild==2025.8.25
 
-# Optional for development
+# Formatting check, with the packages sphinx-lint depends on
 sphinx-lint==1.0.2
+polib==1.2.0
+regex==2026.9.29

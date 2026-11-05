@@ -1,8 +1,9 @@
 # Checks a commit against the Requirements in the README: every supported
 # compiler and standard library pairing, in both build types, the two ways the
 # library is packaged, what the sanitizers find, that the documentation still
-# builds, and that the sources match the formatting configuration. `required`
-# waits for all of them, so one name stands for the whole list.
+# builds and is well formed, and that the sources match the formatting
+# configuration. `required` waits for all of them, so one name stands for the
+# whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -386,8 +387,8 @@ jobs:
 
   # The documentation is built from the same sources the library is, so a
   # change that breaks it is caught here rather than when it is published.
-  # Its links and formatting are checked nightly instead: both follow
-  # releases and sites this repository does not control.
+  # Its links are checked nightly instead: they follow sites this repository
+  # does not control.
   docs:
     name: docs
     runs-on: ubuntu-24.04
@@ -444,6 +445,34 @@ jobs:
           test -s docs/build/sphinx/html/index.html
           echo "$(find docs/build/doxygen/xml -name '*.xml' | wc -l) Doxygen files"
           echo "$(find docs/build/sphinx/html -name '*.html' | wc -l) HTML pages"
+
+  # sphinx-lint and its dependencies are pinned, so its verdict changes with the
+  # sources or with the pull request that raises a pin. The documentation build
+  # reports a broken literal as a warning and still succeeds.
+  docs-lint:
+    name: docs (lint)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      # Only sphinx-lint: checking the formatting does not need the
+      # documentation built. The requirements file goes in as constraints, so
+      # this installs the release that build would install.
+      - name: Install sphinx-lint
+        run: pip install -c docs/sphinx/requirements.txt sphinx-lint
+
+      - name: Check the formatting
+        run: sphinx-lint docs/sphinx/source/
 
   # The examples in the README, the Sphinx sources and the header comments,
   # compiled one by one with the rules scripts/check-examples.py describes.
@@ -520,7 +549,7 @@ jobs:
   required:
     name: required
     if: always()
-    needs: [build-and-test, packaging, sanitize, docs, examples, format-check]
+    needs: [build-and-test, packaging, sanitize, docs, docs-lint, examples, format-check]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 

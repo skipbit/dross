@@ -20,10 +20,9 @@ permissions:
 # that range too but is never checked against it. They never gate a pull
 # request and must not be added to required status checks.
 #
-# The documentation's links and formatting are checked here rather than in
-# front of a pull request. A link breaks with an external site rather than with
-# a change, and the formatting check follows whatever sphinx-lint enforces once
-# its pin is raised. The documentation build itself is a pull request check,
+# The documentation's links are checked here rather than in front of a pull
+# request, because a link breaks with an external site rather than with a
+# change. The documentation build and its formatting are pull request checks,
 # in check.yml.
 
 jobs:
@@ -341,26 +340,3 @@ jobs:
       run: |
         cd docs/sphinx
         make linkcheck
-
-  docs-lint:
-    name: docs (lint)
-    runs-on: ubuntu-24.04
-    # The package index can stall this job's install the same way.
-    timeout-minutes: 30
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Set up Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: '3.13'
-
-    # Only sphinx-lint: checking the formatting does not need the
-    # documentation built. The requirements file goes in as constraints, so
-    # this installs the release that build would install.
-    - name: Install sphinx-lint
-      run: pip install -c docs/sphinx/requirements.txt sphinx-lint
-
-    - name: Check the formatting
-      run: sphinx-lint docs/sphinx/source/
