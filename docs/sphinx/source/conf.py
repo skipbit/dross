@@ -29,7 +29,6 @@ version = release
 
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
@@ -60,8 +59,6 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'furo'
 html_static_path = ['_static']
-html_logo = '_static/logo.png'  # Optional: Add your logo here
-html_favicon = '_static/favicon.ico'  # Optional: Add favicon here
 
 # Theme options
 html_theme_options = {
@@ -102,13 +99,6 @@ html_static_path = ['_static']
 html_css_files = [
     'custom.css',
 ]
-
-# -- Options for intersphinx extension ---------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html#configuration
-
-intersphinx_mapping = {
-    'cppreference': ('https://en.cppreference.com/', None),
-}
 
 # -- Options for todo extension ----------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/extensions/todo.html#configuration

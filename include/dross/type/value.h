@@ -264,7 +264,6 @@ public:
 
     /**
      * @brief Assignment from nullptr (creates null value).
-     * @param nullptr value to assign
      * @return Reference to this value
      */
     value& operator=(const std::nullptr_t);
