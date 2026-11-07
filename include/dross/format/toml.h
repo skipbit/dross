@@ -42,8 +42,8 @@ namespace dross::toml {
  * if (result) {
  *     auto& config = result.value();
  *     // Access parsed data through dictionary interface
- *     const auto& title = config["title"].as<dross::string>();
- *     const auto& version = config["version"].as<dross::number>();
+ *     auto title = config["title"].as<dross::string>();
+ *     auto version = config["version"].as<dross::number>();
  * }
  *
  * // Serialize dictionary structure to TOML format

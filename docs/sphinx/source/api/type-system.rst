@@ -39,14 +39,14 @@ The ``value`` class is the central polymorphic type that can hold any supported 
     // number, so the boolean above is wrapped explicitly.
 
     // Ask is<T>() first: when the value holds another type, as<T>() hands
-    // back an empty T instead of the contained object
+    // back a default-constructed T instead of the contained object
     if (v1.is<dross::number>()) {
-        const auto& num = v1.as<dross::number>();
+        auto num = v1.as<dross::number>();
         std::cout << num << std::endl;  // number has operator<<
     }
 
     if (v5.is<dross::timestamp>()) {
-        const auto& ts = v5.as<dross::timestamp>();
+        auto ts = v5.as<dross::timestamp>();
         std::cout << "Meeting time: " << ts << std::endl;
     }
 
@@ -452,13 +452,14 @@ detail when there is one.
 ``value`` is inspected and unwrapped with member templates:
 
 - ``is<T>()`` - Check whether the value currently holds type ``T``
-- ``as<T>()`` - Read the held ``T`` without copying it. It returns a
-  reference that stays valid until the value is assigned to, moved from or
-  destroyed; on a temporary value it returns the object itself, moved out.
-  When the value holds another type it returns an empty ``T`` rather than
-  the contained object, so check ``is<T>()`` first. It does not throw
-- ``value_cast<T>(v)`` - Copy the held ``T`` out of the value, with the same
-  answer as ``as<T>()`` for another type
+- ``as<T>()`` - Retrieve the value as type ``T``. When the value holds
+  another type it returns a default-constructed ``T`` rather than the
+  contained object, so check ``is<T>()`` first. It does not throw. It
+  copies what is held
+- ``get_if<T>()`` - Read the held ``T`` without copying it: a pointer to
+  it, or ``nullptr`` when the value holds another type. The pointer stays
+  valid until the value is assigned to or destroyed, and a temporary value
+  is refused
 
 Example:
 
@@ -490,14 +491,14 @@ Example:
     // Value type conversion
     dross::value v = 42;
     if (v.is<dross::number>()) {
-        const dross::number& num = v.as<dross::number>();
+        dross::number num = v.as<dross::number>();
         std::string s = to_string(num);  // STL-style conversion
     }
 
     // Timestamp in value
     dross::value ts_value = dross::timestamp::now();
     if (ts_value.is<dross::timestamp>()) {
-        const auto& ts = ts_value.as<dross::timestamp>();
+        auto ts = ts_value.as<dross::timestamp>();
         std::cout << "Current time: " << ts.format("%Y-%m-%d %H:%M:%S") << std::endl;
     }
 

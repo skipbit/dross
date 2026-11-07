@@ -104,9 +104,9 @@ Type System
 
     dross::value doc = root;
 
-    // Safe access: ask contains() before reading, is<T>() before as<T>()
+    // Safe access: ask contains() before reading, is<T>() before casting
     if (doc.is<dross::dictionary>()) {
-        const dross::dictionary& top = doc.as<dross::dictionary>();
+        dross::dictionary top = doc.as<dross::dictionary>();
         if (top.contains("users") && top["users"].is<dross::array>()) {
             for (const auto& user : top["users"].as<dross::array>()) {
                 // Process each user

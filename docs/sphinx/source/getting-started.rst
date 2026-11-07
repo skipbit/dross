@@ -181,7 +181,7 @@ Here's a simple example using the dross type system:
         }
 
         if (config.contains("features") && config["features"].is<dross::array>()) {
-            const dross::array& feature_array = config["features"].as<dross::array>();
+            dross::array feature_array = config["features"].as<dross::array>();
             std::cout << "Features:" << std::endl;
             for (const auto& feature : feature_array) {
                 // value has no operator<<; unwrap it first
