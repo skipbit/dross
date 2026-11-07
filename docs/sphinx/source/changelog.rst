@@ -9,16 +9,13 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Unreleased
 ----------
 
-Changed
-~~~~~~~
+Added
+~~~~~
 
-- ``value::as<T>()`` returns a reference to the held object instead of a
-  copy, so reading what a ``value`` holds no longer copies it. The
-  reference stays valid until the value is assigned to, moved from or
-  destroyed; on a temporary ``value`` it returns the object itself, moved
-  out. Storing the result in a variable of type ``T`` still copies, and
-  ``value_cast<T>()`` still returns a copy. With libstdc++, writing one
-  TOML key holding 1000 numbers takes 32 allocations instead of 7,036
+- ``value::get_if<T>()``, which reads what a ``value`` holds without
+  copying it: a pointer to the held ``T``, or ``nullptr`` when the value
+  holds another type. It cannot be called on a temporary ``value``.
+  ``as<T>()`` and ``value_cast<T>()`` still return a copy
 
 0.2.0 - 2026-11-03
 ------------------

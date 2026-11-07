@@ -66,8 +66,8 @@ concept value_number_type = number_type<T> && (! std::same_as<T, bool>) && (! ch
  * Performance characteristics:
  * - Construction: O(1) for simple types, O(n) for complex types
  * - Type checking: O(1) compile-time and runtime checks
- * - Reading with as<T>(): O(1), without copying
- * - value_cast: O(n), a copy of what is held
+ * - Casting with as<T>() or value_cast: O(n), a copy of what is held
+ * - Reading with get_if<T>(): O(1), without copying
  * - Memory usage: Size of largest possible type plus small overhead
  *
  * Thread safety:
@@ -404,43 +404,48 @@ public:
      * @tparam T The type to check for
      * @return true if the value contains type T, false otherwise
      *
-     * Use this before reading: as<T>() hands back an empty T when the value
-     * holds something else.
+     * Use this before casting: as<T>() hands back a default-constructed T
+     * when the value holds something else.
      * Supports checking for boolean, number, string, array, dictionary, timestamp, and data types.
      */
     template <class T>
     bool is() const noexcept;
 
     /**
+     * @brief Cast the value to a specific type.
+     * @tparam T The type to cast to
+     * @return The value as the specified type
+     *
+     * This is a convenience method that delegates to value_cast, and it
+     * copies what is held: use get_if<T>() to read without copying.
+     * When the value holds another type this returns a default-constructed
+     * T rather than the contained object, so call is<T>() first. It does
+     * not throw.
+     */
+    template <class T>
+    T as() const noexcept;
+
+    /**
      * @brief Read the held object without copying it.
      * @tparam T The type to read
-     * @return A reference to the held object
+     * @return A pointer to the held object, or nullptr when the value holds
+     *         another type
      *
-     * The reference stays valid until this value is assigned to, moved from
-     * or destroyed. When the value holds another type this returns a
-     * reference to an empty T rather than the held object, so call is<T>()
-     * first. Use value_cast for a copy. It does not throw.
+     * The pointer stays valid until this value is assigned to or destroyed.
+     * A temporary value is refused, as the pointer would outlive it.
      *
      * @code
      * dross::value val = dross::array{ 1, 2 };
-     * const auto& items = val.as<dross::array>();   // no copy
-     * dross::array copied = val.as<dross::array>(); // a copy
+     * if (const auto* items = val.get_if<dross::array>()) {
+     *     std::size_t count = items->length();
+     * }
      * @endcode
      */
     template <class T>
-    const T& as() const& noexcept;
+    const T* get_if() const& noexcept;
 
-    /**
-     * @brief Take the held object out of a value about to be destroyed.
-     * @tparam T The type to take
-     * @return The held object
-     *
-     * A reference into a temporary value would outlive it, so this returns
-     * the object itself, moving it out. When the value holds another type
-     * this returns a default-constructed T. It does not throw.
-     */
     template <class T>
-    T as() && noexcept;
+    const T* get_if() const&& = delete;
 
 private:
     template <class T>
@@ -451,12 +456,11 @@ private:
 };
 
 /**
- * @brief Copy the held object out of a value.
+ * @brief Cast a value to a specific type.
  * @tparam T The target type to cast to
  * @param val The value to cast from
- * @return A copy of the contained object of type T
+ * @return The contained object of type T
  *
- * To read without copying, use value.as<T>().
  * When the value holds another type this returns a default-constructed T
  * rather than the contained object, so call value.is<T>() first. It does
  * not throw.
