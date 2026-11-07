@@ -150,9 +150,9 @@ jobs:
           carries CMAKE_EXE_LINKER_FLAGS "$LDFLAGS"
           carries CMAKE_SHARED_LINKER_FLAGS "$LDFLAGS"
 
-  # The two ways the library reaches a consumer: built as a static library,
-  # and installed for find_package and pkg-config to describe. Both are the
-  # same on either platform, so one job covers them with the runner's own
+  # The two kinds of library a consumer receives, static and shared, each
+  # installed for find_package and pkg-config to describe. Both are the same
+  # on either platform, so one job covers them with the runner's own
   # compiler.
   packaging:
     name: packaging (${{ matrix.platform.name }}, ${{ matrix.kind }})
@@ -181,11 +181,12 @@ jobs:
           if [ "$RUNNER_OS" = macOS ]; then xcrun --show-sdk-version; fi
           cmake --version
 
-      - name: Build and test the static library
+      - name: Build, test and install the static library
         if: matrix.kind == 'static'
         run: |
           jobs=$(getconf _NPROCESSORS_ONLN)
           CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset static
+          sudo cmake --install build/static
 
       - name: Build and install
         if: matrix.kind == 'install'
@@ -220,7 +221,6 @@ jobs:
           echo "the install wrote $(wc -l < "$installed") files, none of them GoogleTest's"
 
       - name: Build a consumer through find_package
-        if: matrix.kind == 'install'
         run: |
           mkdir consumer && cd consumer
           cat > CMakeLists.txt << 'EOF'
@@ -256,7 +256,6 @@ jobs:
       # What was installed has to describe the version the build describes,
       # which comes from the tags through the one implementation of it.
       - name: Query pkg-config
-        if: matrix.kind == 'install'
         run: |
           pkg-config --version
           pkg-config --exists dross
@@ -270,6 +269,21 @@ jobs:
           echo "pkg-config reports $reported"
           pkg-config --cflags dross
           pkg-config --libs dross
+
+      # A static library leaves its own dependencies to the consumer's link,
+      # which pkg-config names only when asked for a static one.
+      - name: Link a consumer through pkg-config
+        if: matrix.kind == 'static'
+        run: |
+          found=$(pkg-config --cflags --static --libs dross)
+          read -r -a flags <<< "$found"
+          c++ -std=c++23 consumer/main.cpp "${flags[@]}" -o "$RUNNER_TEMP/pkg-config-consumer"
+          printed=$("$RUNNER_TEMP/pkg-config-consumer")
+          if [ "$printed" != "Test passed: 42" ]; then
+            echo "::error::the consumer printed '$printed'"
+            exit 1
+          fi
+          echo "the consumer printed $printed"
 
       # What drossConfigVersion.cmake accepts depends on the COMPATIBILITY in
       # CMakeLists.txt, and while the version is 0.0.0 every mode answers the
