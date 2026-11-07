@@ -17,12 +17,25 @@ Added
   holds another type. It cannot be called on a temporary ``value``.
   ``as<T>()`` and ``value_cast<T>()`` still return a copy
 
+- ``timestamp::to_time_point()`` and ``timestamp::duration_since()``,
+  which report a time point or a duration that ``system_clock`` cannot
+  hold as ``std::nullopt``
+
 Changed
 ~~~~~~~
 
 - ``toml::serialize`` reads the values it writes without copying them.
   With libstdc++, writing one key holding 1000 numbers takes 30
   allocations instead of 7,036
+
+Fixed
+~~~~~
+
+- Converting a ``timestamp`` to ``std::chrono::system_clock::time_point``,
+  and subtracting one ``timestamp`` from another, result in the nearer end
+  of the clock where ``system_clock`` cannot hold the result, instead of
+  overflowing a signed integer. With libstdc++, which counts nanoseconds,
+  the year 1000 used to convert to 2169. Both are ``noexcept``
 
 0.2.0 - 2026-11-03
 ------------------

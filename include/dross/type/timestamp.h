@@ -336,16 +336,28 @@ public:
     timestamp(int year, int month, int day, int hour, int minute, int second, const timezone& tz);
 
     /**
-     * @brief Implicit conversion to std::chrono::system_clock::time_point.
-     * @return The time point representation (always in UTC), rounded down to
-     *         a tick of the clock
+     * @brief Convert to std::chrono::system_clock::time_point, reporting a
+     * timestamp outside the range of the clock.
+     * @return The time point (always in UTC), rounded down to a tick of the
+     *         clock, or nullopt if it is outside the range of system_clock
      *
-     * Comparison and duration arithmetic work for every year from 0 to 9999,
-     * but this conversion is limited to the range of system_clock, which is
-     * about 292 years either side of 1970 where its duration counts
-     * nanoseconds.
+     * Comparison and adding or subtracting a duration work for every year
+     * from 0 to 9999, but system_clock reaches only about 292 years either
+     * side of 1970 where its duration counts nanoseconds, and so does a
+     * difference between two timestamps: see duration_since().
      */
-    operator std::chrono::system_clock::time_point() const;
+    std::optional<std::chrono::system_clock::time_point> to_time_point() const noexcept;
+
+    /**
+     * @brief Implicit conversion to std::chrono::system_clock::time_point.
+     * @return The time point (always in UTC), rounded down to a tick of the
+     *         clock
+     *
+     * A timestamp that to_time_point() rejects results in the nearer of
+     * time_point::min() and time_point::max(), so it does not order on the
+     * wrong side of another time point.
+     */
+    operator std::chrono::system_clock::time_point() const noexcept;
 
     /**
      * @brief Implicit conversion to std::string in ISO 8601 format.
@@ -447,17 +459,31 @@ public:
     std::optional<timestamp> subtract(std::chrono::seconds duration) const;
 
     /**
+     * @brief Calculate the duration from another timestamp, reporting one
+     * that system_clock::duration cannot hold.
+     * @param other The other timestamp
+     * @return Duration from other to this timestamp, rounded toward zero to a
+     *         tick of the clock, or nullopt if system_clock::duration cannot
+     *         hold it
+     *
+     * system_clock::duration holds about 292 years where it counts
+     * nanoseconds. A conversion to time_point rounds down instead, so
+     * subtracting the converted time points can differ by a tick.
+     */
+    std::optional<std::chrono::system_clock::duration> duration_since(const timestamp& other) const noexcept;
+
+    /**
      * @brief Calculate the duration between two timestamps.
      * @param other The other timestamp
      * @return Duration from other to this timestamp, rounded toward zero to a
      *         tick of the clock
      *
-     * Limited to what system_clock::duration can hold, which is about 292
-     * years where it counts nanoseconds. A conversion to time_point rounds
-     * down instead, so subtracting the converted time points can differ by a
-     * tick.
+     * A duration that duration_since() rejects results in the nearer of
+     * duration::min() and duration::max(). Negating duration::min()
+     * overflows, as it has no positive counterpart, so take a difference
+     * that may be outside the duration with duration_since().
      */
-    std::chrono::system_clock::duration operator-(const timestamp& other) const;
+    std::chrono::system_clock::duration operator-(const timestamp& other) const noexcept;
 
     /**
      * @brief Format the timestamp using predefined format.

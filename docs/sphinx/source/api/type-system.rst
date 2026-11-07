@@ -157,6 +157,7 @@ The ``timestamp`` class provides comprehensive date and time handling with timez
 
     #include <chrono>
     #include <iostream>
+    #include <optional>
     #include <string>
 
     #include <dross/type/timestamp.h>
@@ -184,6 +185,12 @@ The ``timestamp`` class provides comprehensive date and time handling with timez
     auto tomorrow = now + std::chrono::hours(24);
     auto next_week = now + std::chrono::hours(24 * 7);
     std::cout << tomorrow << " " << next_week << std::endl;
+
+    // Conversion to std::chrono, reporting what system_clock cannot hold.
+    // Where it counts nanoseconds, it reaches the years 1677 to 2262.
+    std::optional<std::chrono::system_clock::time_point> tp = meeting.to_time_point();
+    std::optional<std::chrono::system_clock::duration> since = now.duration_since(meeting);
+    std::cout << tp.has_value() << " " << since.has_value() << std::endl;  // 1 1
 
     // Formatting
     std::string iso_str = meeting.format();  // ISO 8601 format
