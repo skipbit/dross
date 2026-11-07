@@ -421,6 +421,7 @@ jobs:
 
   # The documentation is built from the same sources the library is, so a
   # change that breaks it is caught here rather than when it is published.
+  # On a push to main this build is the one documentation.yml publishes.
   # Its links are checked nightly instead: they follow sites this repository
   # does not control.
   docs:
@@ -479,6 +480,15 @@ jobs:
           test -s docs/build/sphinx/html/index.html
           echo "$(find docs/build/doxygen/xml -name '*.xml' | wc -l) Doxygen files"
           echo "$(find docs/build/sphinx/html -name '*.html' | wc -l) HTML pages"
+
+      # A release calls this workflow on a tag, which is not published.
+      - name: Keep the documentation for publishing
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: documentation-html
+          path: docs/build/sphinx/html/
+          retention-days: 30
 
   # sphinx-lint and its dependencies are pinned, so its verdict changes with the
   # sources or with the pull request that raises a pin. The documentation build

@@ -1,15 +1,12 @@
 name: Documentation
 
+# Publishes the documentation Check built, once every check on a push to main
+# has passed, so the pages never come from a commit that failed one.
 on:
-  push:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'include/**'
-      - 'src/**'
-      # The documented version is resolved from here.
-      - 'cmake/**'
-      - '.github/workflows/documentation.yml'
 
 permissions:
   contents: read
@@ -20,83 +17,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # The same image the documentation check uses, so what passes there is what
-  # publishes here.
-  build:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          # The documented version comes from git tags, which a shallow
-          # checkout does not carry.
-          fetch-depth: 0
-
-      # $GITHUB_ENV rather than an export: each run block is its own shell,
-      # so the Sphinx step would not see a variable the Doxygen step set.
-      # Through the same implementation the library build uses, so the
-      # documented version cannot describe a different tag.
-      - name: Resolve the documented version
-        run: |
-          cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
-          resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
-          echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
-          echo "Version: $resolved"
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
-
-      - name: Install Python dependencies
-        run: |
-          cd docs/sphinx
-          pip install -r requirements.txt
-
-      - name: Generate Doxygen documentation
-        run: |
-          mkdir -p docs/build/doxygen
-          cd docs/doxygen
-          doxygen Doxyfile
-
-      - name: Build Sphinx documentation
-        run: |
-          cd docs/sphinx
-          make html
-
-      - name: Upload documentation artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: documentation-html
-          path: docs/build/sphinx/html/
-          retention-days: 30
-
   deploy:
-    needs: build
+    # The branch filter above matches the head branch of a run, so a pull
+    # request from a fork's main would match it too.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04
-    
+
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
+      actions: read     # to download the documentation from the Check run
       pages: write      # to deploy to Pages
       id-token: write   # to verify the deployment originates from an appropriate source
-      
+
     # Deploy to the github-pages environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-      
+
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v8
         with:
           name: documentation-html
           path: ./html
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

@@ -87,7 +87,7 @@ Quick local build script (optional):
 
 ### Deployment
 
-Documentation is automatically built and deployed to GitHub Pages via GitHub Actions when changes are pushed to the main branch.
+Documentation is built by the checks on every push to the main branch, and deployed to GitHub Pages once all of them pass.
 
 ## Writing Documentation
 
