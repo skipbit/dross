@@ -28,6 +28,10 @@ Changed
   With libstdc++, writing one key holding 1000 numbers takes 30
   allocations instead of 7,036
 
+- ``timestamp::from_time_point()`` and the ``timestamp`` constructor from
+  a ``std::chrono::system_clock::time_point`` are ``noexcept``, as
+  converting a ``timestamp`` back to a time point is
+
 Fixed
 ~~~~~
 

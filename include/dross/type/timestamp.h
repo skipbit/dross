@@ -268,7 +268,7 @@ public:
      * can overflow there where the duration of system_clock counts
      * nanoseconds.
      */
-    static std::optional<timestamp> from_time_point(const std::chrono::system_clock::time_point& tp);
+    static std::optional<timestamp> from_time_point(const std::chrono::system_clock::time_point& tp) noexcept;
 
     /**
      * @brief Default constructor creating epoch time (1970-01-01T00:00:00Z).
@@ -284,7 +284,7 @@ public:
      * and the last nanosecond of the years 0 to 9999, so it does not order on
      * the wrong side of another timestamp.
      */
-    timestamp(const std::chrono::system_clock::time_point& tp);
+    timestamp(const std::chrono::system_clock::time_point& tp) noexcept;
 
     /**
      * @brief Construct from ISO 8601 string.
