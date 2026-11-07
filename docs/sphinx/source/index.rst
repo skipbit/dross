@@ -55,7 +55,6 @@ designed to be a general-purpose library similar to Boost with a focus on:
     :class-container: sd-text-center
 
     .. grid-item-card:: Getting Started
-        :img-top: _static/icons/rocket.svg
         :class-card: intro-card
         :shadow: md
 
@@ -71,7 +70,6 @@ designed to be a general-purpose library similar to Boost with a focus on:
             Get Started
 
     .. grid-item-card:: User Guide
-        :img-top: _static/icons/book.svg
         :class-card: intro-card
         :shadow: md
 
@@ -87,7 +85,6 @@ designed to be a general-purpose library similar to Boost with a focus on:
             Read the Guide
 
     .. grid-item-card:: API Reference
-        :img-top: _static/icons/code.svg
         :class-card: intro-card
         :shadow: md
 
@@ -103,7 +100,6 @@ designed to be a general-purpose library similar to Boost with a focus on:
             Browse API
 
     .. grid-item-card:: Examples
-        :img-top: _static/icons/clipboard.svg
         :class-card: intro-card
         :shadow: md
 
