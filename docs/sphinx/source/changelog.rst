@@ -32,6 +32,10 @@ Changed
   a ``std::chrono::system_clock::time_point`` are ``noexcept``, as
   converting a ``timestamp`` back to a time point is
 
+- ``number`` and ``boolean`` can be moved, and moving does not throw, as
+  for the other types. Moving one used to copy it, and a moved-from one
+  now holds zero or false
+
 Fixed
 ~~~~~
 

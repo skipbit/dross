@@ -8,6 +8,7 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace dross {
 
@@ -869,6 +870,14 @@ number::number(const number& n)
 {
 }
 
+// The accessors dereference _store without checking, so a moved-from number
+// keeps an empty storage rather than a null one.
+number::number(number&& n) noexcept
+    : _store(std::move(n._store))
+{
+    n._store = std::make_unique<storage>();
+}
+
 number::number(const char* s)
     : _store(std::make_unique<storage>(s))
 {
@@ -950,6 +959,17 @@ number& number::operator=(const number& n)
 {
     _store->number = n._store->number;
     _store->floating_point = n._store->floating_point;
+    return *this;
+}
+
+number& number::operator=(number&& n) noexcept
+{
+    if (this != &n) {
+        // Handing our storage to the source keeps both usable without
+        // allocating, and leaves the source holding zero.
+        _store.swap(n._store);
+        *n._store = storage{};
+    }
     return *this;
 }
 

@@ -7,6 +7,7 @@
 #include <compare>
 #include <limits>
 #include <sstream>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -672,6 +673,70 @@ TEST(number_test, copy_constructor_nan)
 
     EXPECT_TRUE(copy.is_nan());
     EXPECT_EQ(original, copy);
+}
+
+namespace {
+
+const std::string long_number = "1234567890123456789012345678901234567890.5";
+
+}  // namespace
+
+TEST(number_test, move_construction_takes_the_value)
+{
+    dross::number original{ long_number };
+    const dross::number moved(std::move(original));
+
+    EXPECT_EQ(std::string(moved), long_number);
+    EXPECT_TRUE(moved.is_floating_point());
+    EXPECT_EQ(std::string(original), "0");
+}
+
+TEST(number_test, move_assignment_takes_the_value)
+{
+    dross::number original{ long_number };
+    dross::number target{ "7" };
+    target = std::move(original);
+
+    EXPECT_EQ(std::string(target), long_number);
+    EXPECT_TRUE(target.is_floating_point());
+    EXPECT_EQ(std::string(original), "0");
+    EXPECT_FALSE(original.is_floating_point());
+}
+
+TEST(number_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::number>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::number>);
+}
+
+TEST(number_test, move_assigning_to_itself_keeps_the_value)
+{
+    dross::number n{ long_number };
+    dross::number& same = n;
+    n = std::move(same);
+
+    EXPECT_EQ(std::string(n), long_number);
+}
+
+TEST(number_test, moving_keeps_nan)
+{
+    dross::number original = dross::number::nan();
+    const dross::number moved(std::move(original));
+
+    EXPECT_TRUE(moved.is_nan());
+    EXPECT_FALSE(original.is_nan());
+}
+
+// Every operation with no precondition has to work on a moved-from number.
+TEST(number_test, moved_from_can_be_used_as_zero)
+{
+    dross::number original{ long_number };
+    dross::number moved(std::move(original));
+
+    EXPECT_EQ(original, dross::number(0));
+    EXPECT_EQ(original + dross::number(1), dross::number(1));
+    original = dross::number{ "2.5" };
+    EXPECT_EQ(std::string(original), "2.5");
 }
 
 TEST(number_test, assignment_operator_number)
