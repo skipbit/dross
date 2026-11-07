@@ -91,6 +91,12 @@ public:
     boolean(const boolean& other);
 
     /**
+     * @brief Move constructor.
+     * @param other The boolean to move from
+     */
+    boolean(boolean&& other) noexcept;
+
+    /**
      * @brief Construct from native bool.
      * @param value The boolean value
      */
@@ -231,6 +237,13 @@ public:
      * @return Reference to this boolean
      */
     boolean& operator=(const boolean& other);
+
+    /**
+     * @brief Move assignment operator.
+     * @param other The boolean to move from
+     * @return Reference to this boolean
+     */
+    boolean& operator=(boolean&& other) noexcept;
 
     /**
      * @brief Assignment from native bool.

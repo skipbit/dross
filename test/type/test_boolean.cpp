@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 // =============================================================================
 // Basic Construction and Properties
@@ -149,6 +150,56 @@ TEST(boolean_test, copy_constructor)
     EXPECT_NE(original, copy);
     EXPECT_TRUE(original.value());
     EXPECT_FALSE(copy.value());
+}
+
+TEST(boolean_test, move_construction_takes_the_value)
+{
+    dross::boolean original{ true };
+    const dross::boolean moved(std::move(original));
+
+    EXPECT_TRUE(moved.value());
+    EXPECT_FALSE(original.value());
+}
+
+// The target holds the other value first, so a source that kept what it was
+// handed back would show it.
+TEST(boolean_test, move_assignment_takes_the_value)
+{
+    for (const bool value : { true, false }) {
+        SCOPED_TRACE(value);
+        dross::boolean original{ value };
+        dross::boolean target{ ! value };
+        target = std::move(original);
+
+        EXPECT_EQ(target.value(), value);
+        EXPECT_FALSE(original.value());
+    }
+}
+
+TEST(boolean_test, moving_cannot_throw)
+{
+    EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::boolean>);
+    EXPECT_TRUE(std::is_nothrow_move_assignable_v<dross::boolean>);
+}
+
+TEST(boolean_test, move_assigning_to_itself_keeps_the_value)
+{
+    dross::boolean b{ true };
+    dross::boolean& same = b;
+    b = std::move(same);
+
+    EXPECT_TRUE(b.value());
+}
+
+// Every operation with no precondition has to work on a moved-from boolean.
+TEST(boolean_test, moved_from_can_be_used_as_false)
+{
+    dross::boolean original{ true };
+    dross::boolean moved(std::move(original));
+
+    EXPECT_EQ(original, false);
+    original = true;
+    EXPECT_TRUE(original.value());
 }
 
 // =============================================================================

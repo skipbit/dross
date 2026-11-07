@@ -86,6 +86,12 @@ public:
     number(const number& other);
 
     /**
+     * @brief Move constructor.
+     * @param other The number to move from
+     */
+    number(number&& other) noexcept;
+
+    /**
      * @brief Construct from C-style string.
      * @param str Null-terminated string representation of the number
      *
@@ -265,6 +271,13 @@ public:
      * @return Reference to this number
      */
     number& operator=(const number& other);
+
+    /**
+     * @brief Move assignment operator.
+     * @param other The number to move from
+     * @return Reference to this number
+     */
+    number& operator=(number&& other) noexcept;
 
     /**
      * @brief Assignment from C-style string.

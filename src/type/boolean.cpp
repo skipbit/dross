@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 namespace dross {
 
@@ -49,6 +50,14 @@ boolean::boolean()
 boolean::boolean(const boolean& other)
     : _store(std::make_unique<storage>(*other._store))
 {
+}
+
+// The accessors dereference _store without checking, so a moved-from boolean
+// keeps an empty storage rather than a null one.
+boolean::boolean(boolean&& other) noexcept
+    : _store(std::move(other._store))
+{
+    other._store = std::make_unique<storage>();
 }
 
 boolean::boolean(bool value)
@@ -124,6 +133,17 @@ boolean& boolean::operator=(const boolean& other)
 {
     if (this != &other) {
         _store->value = other._store->value;
+    }
+    return *this;
+}
+
+boolean& boolean::operator=(boolean&& other) noexcept
+{
+    if (this != &other) {
+        // Handing our storage to the source keeps both usable without
+        // allocating, and leaves the source holding false.
+        _store.swap(other._store);
+        other._store->value = false;
     }
     return *this;
 }
