@@ -17,6 +17,13 @@ Added
   holds another type. It cannot be called on a temporary ``value``.
   ``as<T>()`` and ``value_cast<T>()`` still return a copy
 
+Changed
+~~~~~~~
+
+- ``toml::serialize`` reads the values it writes without copying them.
+  With libstdc++, writing one key holding 1000 numbers takes 30
+  allocations instead of 7,036
+
 0.2.0 - 2026-11-03
 ------------------
 
