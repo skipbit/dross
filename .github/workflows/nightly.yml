@@ -47,25 +47,23 @@ jobs:
           exit 1
         fi
         sudo apt-get install -y "gcc-$version" "g++-$version"
-        echo "GCC_VERSION=$version" >> "$GITHUB_ENV"
+        # The toolchain goes through the environment, as in check.yml, so
+        # the presets stay free of compilers.
+        {
+          echo "GCC_VERSION=$version"
+          echo "CC=gcc-$version"
+          echo "CXX=g++-$version"
+        } >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
       run: |
         gcc-"$GCC_VERSION" --version
         cmake --version
 
-    - name: Configure CMake
+    - name: Build and test
       run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=gcc-"$GCC_VERSION" \
-          -DCMAKE_CXX_COMPILER=g++-"$GCC_VERSION"
-
-    - name: Build
-      run: cmake --build build -j"$(nproc)"
-
-    - name: Test
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+        jobs=$(getconf _NPROCESSORS_ONLN)
+        CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
 
   newest-clang:
     name: watch (next clang)
@@ -264,21 +262,14 @@ jobs:
         clang-"$CLANG_WATCH_VERSION" --version
         cmake --version
 
-    - name: Configure CMake
+    - name: Build and test
       if: steps.watch.outputs.available == 'true'
+      env:
+        CC: clang-${{ env.CLANG_WATCH_VERSION }}
+        CXX: clang++-${{ env.CLANG_WATCH_VERSION }}
       run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=clang-"$CLANG_WATCH_VERSION" \
-          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_WATCH_VERSION"
-
-    - name: Build
-      if: steps.watch.outputs.available == 'true'
-      run: cmake --build build -j"$(nproc)"
-
-    - name: Test
-      if: steps.watch.outputs.available == 'true'
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+        jobs=$(getconf _NPROCESSORS_ONLN)
+        CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
 
   floating-runners:
     name: watch (${{ matrix.os }})
@@ -296,15 +287,10 @@ jobs:
         cc --version
         cmake --version
 
-    - name: Configure CMake
+    - name: Build and test
       run: |
-        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build
-      run: cmake --build build --parallel
-
-    - name: Test
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+        jobs=$(getconf _NPROCESSORS_ONLN)
+        CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
 
   docs-links:
     name: docs (links)
