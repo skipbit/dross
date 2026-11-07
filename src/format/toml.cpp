@@ -1125,15 +1125,12 @@ private:
     // An array whose elements are all dictionaries, written with [[name]] headers.
     static bool is_array_of_tables(const value& val)
     {
-        if (! val.is<array>()) {
+        const auto* arr = val.get_if<array>();
+        if (arr == nullptr || arr->length() == 0) {
             return false;
         }
-        const auto& arr = val.as<array>();
-        if (arr.length() == 0) {
-            return false;
-        }
-        for (size_t i = 0; i < arr.length(); ++i) {
-            if (! arr[i].is<dictionary>()) {
+        for (size_t i = 0; i < arr->length(); ++i) {
+            if (! (*arr)[i].is<dictionary>()) {
                 return false;
             }
         }
@@ -1162,14 +1159,14 @@ private:
             }
             auto nested_path = path;
             nested_path.push_back(key);
-            if (val.is<dictionary>()) {
+            if (const auto* table = val.get_if<dictionary>()) {
                 _output += "\n[" + join_path(nested_path) + "]\n";
-                serialize_dictionary(val.as<dictionary>(), nested_path);
+                serialize_dictionary(*table, nested_path);
             } else {
-                const auto& arr = val.as<array>();
+                const auto& arr = *val.get_if<array>();
                 for (size_t i = 0; i < arr.length(); ++i) {
                     _output += "\n[[" + join_path(nested_path) + "]]\n";
-                    serialize_dictionary(arr[i].as<dictionary>(), nested_path);
+                    serialize_dictionary(*arr[i].get_if<dictionary>(), nested_path);
                 }
             }
         }
@@ -1184,10 +1181,10 @@ private:
 
     void serialize_value(const value& val)
     {
-        if (val.is<string>()) {
-            _output += "\"" + escape_string(val.as<string>()) + "\"";
-        } else if (val.is<number>()) {
-            const auto& n = val.as<number>();
+        if (const auto* s = val.get_if<string>()) {
+            _output += "\"" + escape_string(*s) + "\"";
+        } else if (const auto* num = val.get_if<number>()) {
+            const auto& n = *num;
             if (n.is_nan()) {
                 throw std::runtime_error("NaN cannot be written as a TOML value");
             }
@@ -1199,14 +1196,14 @@ private:
             if (n.is_integer() && (n.is_floating_point() || n > int64_max || n < int64_min)) {
                 _output += ".0";
             }
-        } else if (val.is<boolean>()) {
-            _output += val.as<boolean>() ? "true" : "false";
-        } else if (val.is<timestamp>()) {
-            _output += std::string(val.as<timestamp>());
-        } else if (val.is<array>()) {
-            serialize_array(val.as<array>());
-        } else if (val.is<dictionary>()) {
-            serialize_inline_table(val.as<dictionary>());
+        } else if (const auto* b = val.get_if<boolean>()) {
+            _output += *b ? "true" : "false";
+        } else if (const auto* ts = val.get_if<timestamp>()) {
+            _output += std::string(*ts);
+        } else if (const auto* arr = val.get_if<array>()) {
+            serialize_array(*arr);
+        } else if (const auto* table = val.get_if<dictionary>()) {
+            serialize_inline_table(*table);
         } else {
             throw std::runtime_error("Unsupported value type for TOML serialization");
         }

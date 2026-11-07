@@ -6,6 +6,24 @@ All notable changes to the dross project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+Unreleased
+----------
+
+Added
+~~~~~
+
+- ``value::get_if<T>()``, which reads what a ``value`` holds without
+  copying it: a pointer to the held ``T``, or ``nullptr`` when the value
+  holds another type. It cannot be called on a temporary ``value``.
+  ``as<T>()`` and ``value_cast<T>()`` still return a copy
+
+Changed
+~~~~~~~
+
+- ``toml::serialize`` reads the values it writes without copying them.
+  With libstdc++, writing one key holding 1000 numbers takes 30
+  allocations instead of 7,036
+
 0.2.0 - 2026-11-03
 ------------------
 

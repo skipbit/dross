@@ -454,7 +454,12 @@ detail when there is one.
 - ``is<T>()`` - Check whether the value currently holds type ``T``
 - ``as<T>()`` - Retrieve the value as type ``T``. When the value holds
   another type it returns a default-constructed ``T`` rather than the
-  contained object, so check ``is<T>()`` first. It does not throw
+  contained object, so check ``is<T>()`` first. It does not throw. It
+  copies what is held
+- ``get_if<T>()`` - Read the held ``T`` without copying it: a pointer to
+  it, or ``nullptr`` when the value holds another type. The pointer stays
+  valid until the value is assigned to or destroyed, and a temporary value
+  is refused
 
 Example:
 

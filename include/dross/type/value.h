@@ -66,7 +66,8 @@ concept value_number_type = number_type<T> && (! std::same_as<T, bool>) && (! ch
  * Performance characteristics:
  * - Construction: O(1) for simple types, O(n) for complex types
  * - Type checking: O(1) compile-time and runtime checks
- * - Casting: O(1) with type safety validation
+ * - Casting with as<T>() or value_cast: O(n), a copy of what is held
+ * - Reading with get_if<T>(): O(1), without copying
  * - Memory usage: Size of largest possible type plus small overhead
  *
  * Thread safety:
@@ -415,13 +416,36 @@ public:
      * @tparam T The type to cast to
      * @return The value as the specified type
      *
-     * This is a convenience method that delegates to value_cast.
+     * This is a convenience method that delegates to value_cast, and it
+     * copies what is held: use get_if<T>() to read without copying.
      * When the value holds another type this returns a default-constructed
      * T rather than the contained object, so call is<T>() first. It does
      * not throw.
      */
     template <class T>
     T as() const noexcept;
+
+    /**
+     * @brief Read the held object without copying it.
+     * @tparam T The type to read
+     * @return A pointer to the held object, or nullptr when the value holds
+     *         another type
+     *
+     * The pointer stays valid until this value is assigned to or destroyed.
+     * A temporary value is refused, as the pointer would outlive it.
+     *
+     * @code
+     * dross::value val = dross::array{ 1, 2 };
+     * if (const auto* items = val.get_if<dross::array>()) {
+     *     std::size_t count = items->length();
+     * }
+     * @endcode
+     */
+    template <class T>
+    const T* get_if() const& noexcept;
+
+    template <class T>
+    const T* get_if() const&& = delete;
 
 private:
     template <class T>

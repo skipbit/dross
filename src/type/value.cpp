@@ -241,6 +241,12 @@ T value::as() const noexcept
 }
 
 template <class T>
+const T* value::get_if() const& noexcept
+{
+    return std::get_if<T>(&_store->value);
+}
+
+template <class T>
 T value_cast(const value& original) noexcept
 {
     return (std::holds_alternative<T>(original._store->value) ? std::get<T>(original._store->value) : T());
@@ -262,6 +268,14 @@ template array value::as<array>() const noexcept;
 template dictionary value::as<dictionary>() const noexcept;
 template timestamp value::as<timestamp>() const noexcept;
 template data value::as<data>() const noexcept;
+
+template const boolean* value::get_if<boolean>() const& noexcept;
+template const number* value::get_if<number>() const& noexcept;
+template const string* value::get_if<string>() const& noexcept;
+template const array* value::get_if<array>() const& noexcept;
+template const dictionary* value::get_if<dictionary>() const& noexcept;
+template const timestamp* value::get_if<timestamp>() const& noexcept;
+template const data* value::get_if<data>() const& noexcept;
 
 template boolean value_cast<boolean>(const value&) noexcept;
 template number value_cast<number>(const value&) noexcept;
