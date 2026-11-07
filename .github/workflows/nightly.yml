@@ -355,6 +355,7 @@ jobs:
     # checked too, and the two Markdown files readers find on GitHub. The
     # _sources copies are left out: links in code examples are not followed.
     # A host that rate-limits the runner (429) is not a broken link.
+    # cppreference answers the runner with 403.
     - name: Check for broken links
       uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
       with:
@@ -362,5 +363,6 @@ jobs:
           --no-progress
           --max-retries 3
           --accept '100..=103,200..=299,429'
+          --exclude '^https://en\.cppreference\.com/'
           --exclude-path docs/build/sphinx/html/_sources
           docs/build/sphinx/html README.md SECURITY.md
