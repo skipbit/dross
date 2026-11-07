@@ -151,8 +151,10 @@ jobs:
           carries CMAKE_SHARED_LINKER_FLAGS "$LDFLAGS"
 
   # The two kinds of library a consumer receives, static and shared, each
-  # installed for find_package and pkg-config to describe. Both are the same
-  # on either platform, so one job covers them with the runner's own
+  # installed, checked for what the install writes, and linked by a consumer
+  # through find_package and pkg-config. Which versions find_package accepts
+  # does not depend on the kind, so only the shared job checks it. Both are
+  # the same on either platform, so one job covers them with the runner's own
   # compiler.
   packaging:
     name: packaging (${{ matrix.platform.name }}, ${{ matrix.kind }})
@@ -164,7 +166,7 @@ jobs:
         platform:
           - { name: linux, os: ubuntu-24.04 }
           - { name: macos, os: macos-15 }
-        kind: [static, install]
+        kind: [static, shared]
 
     steps:
       - name: Checkout
@@ -189,7 +191,7 @@ jobs:
           sudo cmake --install build/static
 
       - name: Build and install
-        if: matrix.kind == 'install'
+        if: matrix.kind == 'shared'
         run: |
           cmake --preset release
           cmake --build --preset release --parallel "$(getconf _NPROCESSORS_ONLN)"
@@ -198,11 +200,12 @@ jobs:
       # A prefix of its own, because only this install writes there: what
       # lands in it is exactly what a user receives.
       - name: Check what the install writes
-        if: matrix.kind == 'install'
+        env:
+          BUILD_DIR: ${{ matrix.kind == 'static' && 'build/static' || 'build/release' }}
         run: |
           prefix="$RUNNER_TEMP/install-check"
           sudo rm -rf "$prefix"
-          sudo cmake --install build/release --prefix "$prefix" > /dev/null
+          sudo cmake --install "$BUILD_DIR" --prefix "$prefix" > /dev/null
           targets="$prefix/lib/cmake/dross/drossTargets.cmake"
           if grep -q INTERFACE_COMPILE_OPTIONS "$targets"; then
             echo "::error::the exported target carries this project's own compile options"
@@ -271,10 +274,27 @@ jobs:
           pkg-config --libs dross
 
       # A static library leaves its own dependencies to the consumer's link,
-      # which pkg-config names only when asked for a static one.
+      # which pkg-config names only when asked for a static one. The thread
+      # library is in the C library on both runners, so a link without it
+      # succeeds: the flags themselves are checked.
       - name: Link a consumer through pkg-config
         if: matrix.kind == 'static'
         run: |
+          if [ ! -f consumer/main.cpp ]; then
+            echo "::error::consumer/main.cpp is written by the find_package step, which has to run first"
+            exit 1
+          fi
+          static=$(pkg-config --static --libs dross)
+          shared=$(pkg-config --libs dross)
+          if [[ " $static " != *" -pthread "* ]]; then
+            echo "::error::pkg-config --static --libs gives '$static', without -pthread"
+            exit 1
+          fi
+          if [[ " $shared " == *" -pthread "* ]]; then
+            echo "::error::pkg-config --libs gives '$shared', with -pthread a shared link does not need"
+            exit 1
+          fi
+          echo "the static link adds -pthread: $static"
           found=$(pkg-config --cflags --static --libs dross)
           read -r -a flags <<< "$found"
           c++ -std=c++23 consumer/main.cpp "${flags[@]}" -o "$RUNNER_TEMP/pkg-config-consumer"
@@ -293,7 +313,7 @@ jobs:
       # only in that copy. The probe searches that prefix alone, since the
       # install above left a 0.0.0 in the system one.
       - name: Check which versions find_package accepts
-        if: matrix.kind == 'install'
+        if: matrix.kind == 'shared'
         run: |
           copy="$RUNNER_TEMP/versioned"
           prefix="$RUNNER_TEMP/versioned-install"
