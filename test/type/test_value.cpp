@@ -4,10 +4,12 @@
 #include "dross/type/dictionary.h"
 #include "dross/type/number.h"
 #include "dross/type/string.h"
+#include "dross/type/timestamp.h"
 #include "dross/type/value.h"
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 #include <utility>
@@ -634,4 +636,58 @@ TEST(value_test, assigning_a_named_object_leaves_it_alone)
     v = elements;
     EXPECT_EQ(v, dross::value(three_elements()));
     EXPECT_EQ(elements, three_elements());
+}
+
+// as<T>() hands back the held object itself, so asking twice gives the same
+// address, where a copy would give two.
+TEST(value_test, as_reads_what_is_held_without_copying)
+{
+    const dross::value from_boolean{ dross::boolean(true) };
+    const dross::value from_number{ dross::number(1) };
+    const dross::value from_string{ dross::string("text") };
+    const dross::value from_array{ three_elements() };
+    dross::dictionary entries;
+    entries["a"] = dross::value(dross::number(1));
+    const dross::value from_dictionary{ entries };
+    const dross::value from_timestamp{ dross::timestamp("2024-01-21T15:30:00Z") };
+    const dross::value from_data{ dross::data{ "Hello" } };
+
+    EXPECT_EQ(&from_boolean.as<dross::boolean>(), &from_boolean.as<dross::boolean>());
+    EXPECT_EQ(&from_number.as<dross::number>(), &from_number.as<dross::number>());
+    EXPECT_EQ(&from_string.as<dross::string>(), &from_string.as<dross::string>());
+    EXPECT_EQ(&from_array.as<dross::array>(), &from_array.as<dross::array>());
+    EXPECT_EQ(&from_dictionary.as<dross::dictionary>(), &from_dictionary.as<dross::dictionary>());
+    EXPECT_EQ(&from_timestamp.as<dross::timestamp>(), &from_timestamp.as<dross::timestamp>());
+    EXPECT_EQ(&from_data.as<dross::data>(), &from_data.as<dross::data>());
+
+    EXPECT_EQ(from_array.as<dross::array>(), three_elements());
+    EXPECT_EQ(from_dictionary.as<dross::dictionary>(), entries);
+}
+
+TEST(value_test, as_another_type_reads_an_empty_object)
+{
+    const dross::value v{ dross::number(1) };
+    EXPECT_TRUE(v.as<dross::array>().empty());
+    EXPECT_TRUE(v.as<dross::dictionary>().empty());
+    EXPECT_EQ(v.as<dross::string>().length(), 0u);
+    EXPECT_EQ(dross::value().as<dross::number>(), dross::number());
+}
+
+// A reference into a temporary value would dangle, so a temporary hands over
+// what it holds instead.
+TEST(value_test, as_on_a_temporary_takes_what_is_held)
+{
+    EXPECT_TRUE((std::is_same_v<decltype(std::declval<dross::value>().as<dross::array>()), dross::array>));
+
+    std::size_t seen = 0;
+    for (const auto& element : dross::value{ three_elements() }.as<dross::array>()) {
+        EXPECT_TRUE(element.is<dross::number>());
+        ++seen;
+    }
+    EXPECT_EQ(seen, 3u);
+
+    dross::value original{ three_elements() };
+    const dross::array taken = std::move(original).as<dross::array>();
+    EXPECT_EQ(taken, three_elements());
+    EXPECT_TRUE(original.as<dross::array>().empty());
 }

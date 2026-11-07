@@ -6,6 +6,20 @@ All notable changes to the dross project will be documented here.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+Unreleased
+----------
+
+Changed
+~~~~~~~
+
+- ``value::as<T>()`` returns a reference to the held object instead of a
+  copy, so reading what a ``value`` holds no longer copies it. The
+  reference stays valid until the value is assigned to, moved from or
+  destroyed; on a temporary ``value`` it returns the object itself, moved
+  out. Storing the result in a variable of type ``T`` still copies, and
+  ``value_cast<T>()`` still returns a copy. With libstdc++, writing one
+  TOML key holding 1000 numbers takes 32 allocations instead of 7,036
+
 0.2.0 - 2026-11-03
 ------------------
 

@@ -235,9 +235,18 @@ bool value::is() const noexcept
 }
 
 template <class T>
-T value::as() const noexcept
+const T& value::as() const& noexcept
 {
-    return value_cast<T>(*this);
+    static const T empty{};
+    const T* held = std::get_if<T>(&_store->value);
+    return held ? *held : empty;
+}
+
+template <class T>
+T value::as() && noexcept
+{
+    T* held = std::get_if<T>(&_store->value);
+    return held ? std::move(*held) : T();
 }
 
 template <class T>
@@ -255,13 +264,21 @@ template bool value::is<dictionary>() const noexcept;
 template bool value::is<timestamp>() const noexcept;
 template bool value::is<data>() const noexcept;
 
-template boolean value::as<boolean>() const noexcept;
-template number value::as<number>() const noexcept;
-template string value::as<string>() const noexcept;
-template array value::as<array>() const noexcept;
-template dictionary value::as<dictionary>() const noexcept;
-template timestamp value::as<timestamp>() const noexcept;
-template data value::as<data>() const noexcept;
+template const boolean& value::as<boolean>() const& noexcept;
+template const number& value::as<number>() const& noexcept;
+template const string& value::as<string>() const& noexcept;
+template const array& value::as<array>() const& noexcept;
+template const dictionary& value::as<dictionary>() const& noexcept;
+template const timestamp& value::as<timestamp>() const& noexcept;
+template const data& value::as<data>() const& noexcept;
+
+template boolean value::as<boolean>() && noexcept;
+template number value::as<number>() && noexcept;
+template string value::as<string>() && noexcept;
+template array value::as<array>() && noexcept;
+template dictionary value::as<dictionary>() && noexcept;
+template timestamp value::as<timestamp>() && noexcept;
+template data value::as<data>() && noexcept;
 
 template boolean value_cast<boolean>(const value&) noexcept;
 template number value_cast<number>(const value&) noexcept;
