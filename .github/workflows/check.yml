@@ -421,9 +421,9 @@ jobs:
 
   # The documentation is built from the same sources the library is, so a
   # change that breaks it is caught here rather than when it is published.
-  # On a push to main this build is the one documentation.yml publishes.
   # Its links are checked nightly instead: they follow sites this repository
-  # does not control.
+  # does not control. On a push to main this build is the one
+  # documentation.yml publishes.
   docs:
     name: docs
     runs-on: ubuntu-24.04
