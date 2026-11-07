@@ -115,7 +115,7 @@ Building Data Structures
 
         // Access and print data
         if (database.contains("people") && database["people"].is<dross::array>()) {
-            dross::array people_array = database["people"].as<dross::array>();
+            const dross::array& people_array = database["people"].as<dross::array>();
 
             for (size_t i = 0; i < people_array.length(); ++i) {
                 const dross::value& entry = people_array[i];
@@ -123,7 +123,7 @@ Building Data Structures
                     continue;
                 }
 
-                dross::dictionary person = entry.as<dross::dictionary>();
+                const dross::dictionary& person = entry.as<dross::dictionary>();
                 if (person.contains("name") && person["name"].is<dross::string>()) {
                     std::string name = person["name"].as<dross::string>();
                     std::cout << "Person " << i + 1 << ": "
@@ -344,7 +344,7 @@ Data Processing Pipeline
         // Filter expensive items (price > 200)
         auto expensive = processor.filter(products, [](const dross::value& v) {
             if (v.is<dross::dictionary>()) {
-                dross::dictionary product = v.as<dross::dictionary>();
+                const dross::dictionary& product = v.as<dross::dictionary>();
                 if (product.contains("price") &&
                     product["price"].is<dross::number>()) {
                     return product["price"].as<dross::number>() > dross::number(200);
@@ -357,7 +357,7 @@ Data Processing Pipeline
         auto total = processor.reduce(products,
             [](const dross::value& sum, const dross::value& item) {
                 if (item.is<dross::dictionary>()) {
-                    dross::dictionary product = item.as<dross::dictionary>();
+                    const dross::dictionary& product = item.as<dross::dictionary>();
                     if (product.contains("price") &&
                         product["price"].is<dross::number>()) {
                         return dross::value(sum.as<dross::number>() +
@@ -372,7 +372,7 @@ Data Processing Pipeline
         // Group by category
         auto by_category = processor.group_by(products, [](const dross::value& v) {
             if (v.is<dross::dictionary>()) {
-                dross::dictionary product = v.as<dross::dictionary>();
+                const dross::dictionary& product = v.as<dross::dictionary>();
                 if (product.contains("category") &&
                     product["category"].is<dross::string>()) {
                     return product["category"].as<dross::string>();

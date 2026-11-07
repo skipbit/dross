@@ -145,9 +145,9 @@ The dross type system provides dynamic typing with strong value semantics:
     dross::value v4 = dict;                     // dictionary
     dross::value v5 = dross::boolean{true};     // boolean
 
-    // Type checking, then casting
+    // Type checking, then reading
     if (v1.is<dross::number>()) {
-        auto n = v1.as<dross::number>();
+        const auto& n = v1.as<dross::number>();
         std::cout << "Number: " << n << std::endl;  // number has operator<<
     }
 
