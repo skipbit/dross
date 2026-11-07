@@ -232,7 +232,7 @@ timestamp::timestamp()
 {
 }
 
-timestamp::timestamp(const std::chrono::system_clock::time_point& tp)
+timestamp::timestamp(const std::chrono::system_clock::time_point& tp) noexcept
     : timestamp()
 {
     if (auto converted = from_time_point(tp)) {
@@ -309,7 +309,7 @@ std::optional<timestamp> timestamp::from_string(const std::string& iso8601_str)
     return result;
 }
 
-std::optional<timestamp> timestamp::from_time_point(const std::chrono::system_clock::time_point& tp)
+std::optional<timestamp> timestamp::from_time_point(const std::chrono::system_clock::time_point& tp) noexcept
 {
     // Truncated and then borrowed from, since the floor of the earliest time
     // points does not fit in the duration of the clock.

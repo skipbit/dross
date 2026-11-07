@@ -986,6 +986,14 @@ TEST(timestamp_test, the_conversion_and_the_difference_do_not_throw)
     static_assert(noexcept(ts - ts));
 }
 
+TEST(timestamp_test, building_from_a_time_point_does_not_throw)
+{
+    const std::chrono::system_clock::time_point tp;
+
+    static_assert(noexcept(dross::timestamp::from_time_point(tp)));
+    static_assert(std::is_nothrow_constructible_v<dross::timestamp, std::chrono::system_clock::time_point>);
+}
+
 TEST(timestamp_test, to_time_point_gives_what_the_conversion_gives)
 {
     const auto ts = dross::timestamp::now();
