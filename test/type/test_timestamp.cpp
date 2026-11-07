@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <limits>
 #include <ratio>
 #include <stdexcept>
 #include <string>
@@ -940,6 +941,173 @@ TEST(timestamp_test, a_difference_rounds_toward_zero)
         const clock::duration expected{ microseconds ? c.on_microseconds : c.on_nanoseconds };
         EXPECT_EQ(later - earlier, expected);
         EXPECT_EQ(earlier - later, -expected);
+    }
+}
+
+namespace {
+
+// Where system_clock counts nanoseconds in 64 bits, it reaches from the first
+// to the last of these, and the others are a nanosecond outside it.
+bool clock_counts_nanoseconds_in_64_bits()
+{
+    using clock = std::chrono::system_clock;
+    return std::ratio_equal_v<clock::period, std::nano> && (std::numeric_limits<clock::rep>::digits == 63);
+}
+
+dross::timestamp clock_first()
+{
+    return dross::timestamp{ "1677-09-21T00:12:43.145224192Z" };
+}
+
+dross::timestamp clock_last()
+{
+    return dross::timestamp{ "2262-04-11T23:47:16.854775807Z" };
+}
+
+dross::timestamp before_clock_first()
+{
+    return dross::timestamp{ "1677-09-21T00:12:43.145224191Z" };
+}
+
+dross::timestamp after_clock_last()
+{
+    return dross::timestamp{ "2262-04-11T23:47:16.854775808Z" };
+}
+
+}  // namespace
+
+TEST(timestamp_test, the_conversion_and_the_difference_do_not_throw)
+{
+    const dross::timestamp ts;
+
+    static_assert(noexcept(ts.to_time_point()));
+    static_assert(noexcept(static_cast<std::chrono::system_clock::time_point>(ts)));
+    static_assert(noexcept(ts.duration_since(ts)));
+    static_assert(noexcept(ts - ts));
+}
+
+TEST(timestamp_test, to_time_point_gives_what_the_conversion_gives)
+{
+    const auto ts = dross::timestamp::now();
+
+    ASSERT_TRUE(ts.to_time_point().has_value());
+    EXPECT_EQ(*ts.to_time_point(), static_cast<std::chrono::system_clock::time_point>(ts));
+}
+
+TEST(timestamp_test, to_time_point_reaches_the_ends_of_the_clock)
+{
+    using clock = std::chrono::system_clock;
+    if (! clock_counts_nanoseconds_in_64_bits()) {
+        GTEST_SKIP() << "the clock does not count nanoseconds in 64 bits";
+    }
+
+    EXPECT_EQ(clock_first().to_time_point(), clock::time_point::min());
+    EXPECT_EQ(clock_last().to_time_point(), clock::time_point::max());
+    EXPECT_EQ(dross::timestamp("2262-04-12T08:47:16.854775807+09:00").to_time_point(), clock::time_point::max());
+}
+
+TEST(timestamp_test, to_time_point_rejects_what_is_outside_the_clock)
+{
+    if (! clock_counts_nanoseconds_in_64_bits()) {
+        GTEST_SKIP() << "the clock does not count nanoseconds in 64 bits";
+    }
+
+    EXPECT_FALSE(before_clock_first().to_time_point().has_value());
+    EXPECT_FALSE(after_clock_last().to_time_point().has_value());
+    EXPECT_FALSE(dross::timestamp("2262-04-12T08:47:16.854775808+09:00").to_time_point().has_value());
+    EXPECT_FALSE(dross::timestamp("1000-01-01T00:00:00Z").to_time_point().has_value());
+    EXPECT_FALSE(dross::timestamp("0000-01-01T00:00:00Z").to_time_point().has_value());
+    EXPECT_FALSE(dross::timestamp("9999-12-31T23:59:59.999999999Z").to_time_point().has_value());
+}
+
+TEST(timestamp_test, converting_outside_the_clock_results_in_the_nearer_end)
+{
+    using clock = std::chrono::system_clock;
+    if (! clock_counts_nanoseconds_in_64_bits()) {
+        GTEST_SKIP() << "the clock does not count nanoseconds in 64 bits";
+    }
+
+    EXPECT_EQ(static_cast<clock::time_point>(before_clock_first()), clock::time_point::min());
+    EXPECT_EQ(static_cast<clock::time_point>(dross::timestamp("0000-01-01T00:00:00Z")), clock::time_point::min());
+    EXPECT_EQ(static_cast<clock::time_point>(after_clock_last()), clock::time_point::max());
+    EXPECT_EQ(static_cast<clock::time_point>(dross::timestamp("9999-12-31T23:59:59.999999999Z")), clock::time_point::max());
+}
+
+TEST(timestamp_test, to_time_point_holds_the_years_where_the_clock_reaches_them)
+{
+    if (! clock_reaches(first_second) || ! clock_reaches(end_second)) {
+        GTEST_SKIP() << "system_clock does not reach the years 0 to 9999";
+    }
+    const auto tick = time_point::duration{ 1 };
+
+    EXPECT_EQ(dross::timestamp("0000-01-01T00:00:00Z").to_time_point(), time_point(first_second));
+    EXPECT_EQ(dross::timestamp("9999-12-31T23:59:59.999999999Z").to_time_point(), time_point(end_second) - tick);
+}
+
+TEST(timestamp_test, duration_since_reaches_the_ends_of_the_duration)
+{
+    using clock = std::chrono::system_clock;
+    if (! clock_counts_nanoseconds_in_64_bits()) {
+        GTEST_SKIP() << "the clock does not count nanoseconds in 64 bits";
+    }
+    const dross::timestamp epoch;
+
+    EXPECT_EQ(clock_last().duration_since(epoch), clock::duration::max());
+    EXPECT_EQ(clock_first().duration_since(epoch), clock::duration::min());
+    EXPECT_EQ(dross::timestamp("2262-04-12T00:47:16.854775807Z").duration_since(dross::timestamp("1970-01-01T01:00:00Z")),
+              clock::duration::max());
+    // The fractions have opposite signs to the seconds here.
+    EXPECT_EQ(dross::timestamp("2262-04-11T23:47:17Z").duration_since(dross::timestamp("1970-01-01T00:00:00.145224193Z")),
+              clock::duration::max());
+}
+
+TEST(timestamp_test, duration_since_rejects_what_the_duration_cannot_hold)
+{
+    if (! clock_counts_nanoseconds_in_64_bits()) {
+        GTEST_SKIP() << "the clock does not count nanoseconds in 64 bits";
+    }
+    const dross::timestamp epoch;
+
+    EXPECT_FALSE(after_clock_last().duration_since(epoch).has_value());
+    EXPECT_FALSE(before_clock_first().duration_since(epoch).has_value());
+    EXPECT_FALSE(dross::timestamp("2262-04-12T00:47:16.854775808Z").duration_since(dross::timestamp("1970-01-01T01:00:00Z")).has_value());
+    EXPECT_FALSE(dross::timestamp("2262-04-11T23:47:17Z").duration_since(dross::timestamp("1970-01-01T00:00:00.145224192Z")).has_value());
+}
+
+TEST(timestamp_test, a_difference_the_duration_cannot_hold_results_in_the_nearer_end)
+{
+    using clock = std::chrono::system_clock;
+    if (! clock_counts_nanoseconds_in_64_bits()) {
+        GTEST_SKIP() << "the clock does not count nanoseconds in 64 bits";
+    }
+    const dross::timestamp epoch;
+
+    EXPECT_EQ(after_clock_last() - epoch, clock::duration::max());
+    EXPECT_EQ(epoch - after_clock_last(), clock::duration::min());
+    EXPECT_EQ(before_clock_first() - epoch, clock::duration::min());
+    EXPECT_EQ(epoch - before_clock_first(), clock::duration::max());
+}
+
+// From the first moment of the year 0 to the last of the year 9999.
+TEST(timestamp_test, a_difference_across_all_the_years)
+{
+    using clock = std::chrono::system_clock;
+    const dross::timestamp first{ "0000-01-01T00:00:00Z" };
+    const dross::timestamp last{ "9999-12-31T23:59:59.999999999Z" };
+
+    if (clock_counts_nanoseconds_in_64_bits()) {
+        EXPECT_FALSE(last.duration_since(first).has_value());
+        EXPECT_FALSE(first.duration_since(last).has_value());
+        EXPECT_EQ(last - first, clock::duration::max());
+        EXPECT_EQ(first - last, clock::duration::min());
+    } else if (std::ratio_equal_v<clock::period, std::micro>) {
+        const std::chrono::microseconds expected{ 315569519999999999 };
+        EXPECT_EQ(last.duration_since(first), expected);
+        EXPECT_EQ(first.duration_since(last), -expected);
+        EXPECT_EQ(last - first, expected);
+        EXPECT_EQ(first - last, -expected);
+    } else {
+        GTEST_SKIP() << "the clock counts neither nanoseconds in 64 bits nor microseconds";
     }
 }
 

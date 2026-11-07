@@ -54,6 +54,24 @@ std::pair<std::chrono::seconds, std::chrono::nanoseconds> with_the_same_sign(std
     return { seconds, subseconds };
 }
 
+// The sum of seconds and subseconds of the same sign, or nullopt when the
+// duration of the clock cannot hold it. Checked before converting, since
+// the conversion overflows.
+std::optional<clock_duration> in_clock_duration(std::chrono::seconds seconds, clock_duration subseconds)
+{
+    constexpr auto max_seconds = std::chrono::duration_cast<std::chrono::seconds>(clock_duration::max());
+    constexpr auto min_seconds = std::chrono::duration_cast<std::chrono::seconds>(clock_duration::min());
+    if ((seconds > max_seconds) || (seconds < min_seconds)) {
+        return std::nullopt;
+    }
+    const auto whole = std::chrono::duration_cast<clock_duration>(seconds);
+    if (((whole > clock_duration::zero()) && (subseconds > clock_duration::max() - whole))
+        || ((whole < clock_duration::zero()) && (subseconds < clock_duration::min() - whole))) {
+        return std::nullopt;
+    }
+    return whole + subseconds;
+}
+
 timestamp value_or_throw(std::optional<timestamp> result)
 {
     if (! result) {
@@ -357,12 +375,24 @@ void timestamp::set_local(std::chrono::sys_seconds local, std::chrono::nanosecon
     _time = time_part{ local - days + fraction };
 }
 
-timestamp::operator std::chrono::system_clock::time_point() const
+std::optional<std::chrono::system_clock::time_point> timestamp::to_time_point() const noexcept
 {
     auto [floor_seconds, fraction] = instant();
     auto [seconds, subseconds] = with_the_same_sign(floor_seconds.time_since_epoch(), fraction);
-    return std::chrono::system_clock::time_point{ std::chrono::duration_cast<clock_duration>(seconds)
-                                                  + std::chrono::floor<clock_duration>(subseconds) };
+    const auto since_epoch = in_clock_duration(seconds, std::chrono::floor<clock_duration>(subseconds));
+    if (! since_epoch) {
+        return std::nullopt;
+    }
+    return std::chrono::system_clock::time_point{ *since_epoch };
+}
+
+timestamp::operator std::chrono::system_clock::time_point() const noexcept
+{
+    if (const auto tp = to_time_point()) {
+        return *tp;
+    }
+    return (instant().first < std::chrono::sys_seconds{}) ? std::chrono::system_clock::time_point::min()
+                                                          : std::chrono::system_clock::time_point::max();
 }
 
 timestamp::operator std::string() const
@@ -380,12 +410,20 @@ bool timestamp::operator==(const timestamp& other) const
     return instant() == other.instant();
 }
 
-std::chrono::system_clock::duration timestamp::operator-(const timestamp& other) const
+std::optional<std::chrono::system_clock::duration> timestamp::duration_since(const timestamp& other) const noexcept
 {
     auto [seconds, subseconds] = instant();
     auto [other_seconds, other_subseconds] = other.instant();
     auto [whole, rest] = with_the_same_sign(seconds - other_seconds, subseconds - other_subseconds);
-    return std::chrono::duration_cast<clock_duration>(whole) + std::chrono::duration_cast<clock_duration>(rest);
+    return in_clock_duration(whole, std::chrono::duration_cast<clock_duration>(rest));
+}
+
+std::chrono::system_clock::duration timestamp::operator-(const timestamp& other) const noexcept
+{
+    if (const auto duration = duration_since(other)) {
+        return *duration;
+    }
+    return (instant() < other.instant()) ? clock_duration::min() : clock_duration::max();
 }
 
 timestamp timestamp::operator+(const std::chrono::minutes& duration) const
