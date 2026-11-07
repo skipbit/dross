@@ -1,15 +1,16 @@
 name: Documentation
 
+# Publishes the documentation Check built, once every check on a push to main
+# has passed, so the pages never come from a commit that failed one.
+#
+# The two files meet only by name: the workflow name Check, and the
+# documentation-html artifact the docs job in check.yml keeps. Renaming either
+# side stops publishing.
 on:
-  push:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'include/**'
-      - 'src/**'
-      # The documented version is resolved from here.
-      - 'cmake/**'
-      - '.github/workflows/documentation.yml'
 
 permissions:
   contents: read
@@ -20,83 +21,60 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # The same image the documentation check uses, so what passes there is what
-  # publishes here.
-  build:
+  # A slower Check of an earlier push, or one re-run later, would otherwise
+  # publish older pages over newer ones.
+  tip:
+    name: still the tip of main
+    # Only a push: the branch filter above matches the head branch of a run,
+    # which a pull request from a fork's main also has.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      current: ${{ steps.compare.outputs.current }}
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          # The documented version comes from git tags, which a shallow
-          # checkout does not carry.
-          fetch-depth: 0
-
-      # $GITHUB_ENV rather than an export: each run block is its own shell,
-      # so the Sphinx step would not see a variable the Doxygen step set.
-      # Through the same implementation the library build uses, so the
-      # documented version cannot describe a different tag.
-      - name: Resolve the documented version
+      - name: Compare the checked commit with main
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED: ${{ github.event.workflow_run.head_sha }}
         run: |
-          cmake -D "SOURCE_DIR=$PWD" -D "OUTPUT=$RUNNER_TEMP/version" -P cmake/PrintVersion.cmake
-          resolved="$(sed -n 1p "$RUNNER_TEMP/version")"
-          echo "DROSS_VERSION=$resolved" >> "$GITHUB_ENV"
-          echo "Version: $resolved"
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
-
-      - name: Install Python dependencies
-        run: |
-          cd docs/sphinx
-          pip install -r requirements.txt
-
-      - name: Generate Doxygen documentation
-        run: |
-          mkdir -p docs/build/doxygen
-          cd docs/doxygen
-          doxygen Doxyfile
-
-      - name: Build Sphinx documentation
-        run: |
-          cd docs/sphinx
-          make html
-
-      - name: Upload documentation artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: documentation-html
-          path: docs/build/sphinx/html/
-          retention-days: 30
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$tip" = "$CHECKED" ]; then
+            echo "publishing $CHECKED"
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "not publishing $CHECKED: main is now at $tip"
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
 
   deploy:
-    needs: build
+    needs: tip
+    if: needs.tip.outputs.current == 'true'
     runs-on: ubuntu-24.04
-    
+
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
+      actions: read     # to download the documentation from the Check run
       pages: write      # to deploy to Pages
       id-token: write   # to verify the deployment originates from an appropriate source
-      
+
     # Deploy to the github-pages environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-      
+
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v8
         with:
           name: documentation-html
           path: ./html
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
