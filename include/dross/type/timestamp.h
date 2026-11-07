@@ -341,9 +341,10 @@ public:
      * @return The time point (always in UTC), rounded down to a tick of the
      *         clock, or nullopt if it is outside the range of system_clock
      *
-     * Comparison and duration arithmetic work for every year from 0 to 9999,
-     * but system_clock reaches only about 292 years either side of 1970 where
-     * its duration counts nanoseconds.
+     * Comparison and adding or subtracting a duration work for every year
+     * from 0 to 9999, but system_clock reaches only about 292 years either
+     * side of 1970 where its duration counts nanoseconds, and so does a
+     * difference between two timestamps: see duration_since().
      */
     std::optional<std::chrono::system_clock::time_point> to_time_point() const noexcept;
 
@@ -478,7 +479,9 @@ public:
      *         tick of the clock
      *
      * A duration that duration_since() rejects results in the nearer of
-     * duration::min() and duration::max().
+     * duration::min() and duration::max(). Negating duration::min()
+     * overflows, as it has no positive counterpart, so take a difference
+     * that may be outside the duration with duration_since().
      */
     std::chrono::system_clock::duration operator-(const timestamp& other) const noexcept;
 
