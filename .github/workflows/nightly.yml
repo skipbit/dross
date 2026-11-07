@@ -47,25 +47,32 @@ jobs:
           exit 1
         fi
         sudo apt-get install -y "gcc-$version" "g++-$version"
-        echo "GCC_VERSION=$version" >> "$GITHUB_ENV"
+        # The presets name no compiler, so the build takes it from CC and CXX.
+        {
+          echo "CC=gcc-$version"
+          echo "CXX=g++-$version"
+        } >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
       run: |
-        gcc-"$GCC_VERSION" --version
+        "${CXX:-c++}" --version
         cmake --version
 
-    - name: Configure CMake
+    - name: Build and test
       run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=gcc-"$GCC_VERSION" \
-          -DCMAKE_CXX_COMPILER=g++-"$GCC_VERSION"
+        jobs=$(getconf _NPROCESSORS_ONLN)
+        CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
 
-    - name: Build
-      run: cmake --build build -j"$(nproc)"
-
-    - name: Test
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+    # The job exists to build with the compiler it watches, and the
+    # environment is all that names it: CMake's own record is the evidence.
+    - name: Check the compiler the build used
+      run: |
+        used=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' build/release/CMakeCache.txt)
+        if [ "${used##*/}" != "$CXX" ]; then
+          echo "::error::the build used $used, not $CXX"
+          exit 1
+        fi
+        echo "the build used $used"
 
   newest-clang:
     name: watch (next clang)
@@ -257,28 +264,35 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y "clang-$CLANG_WATCH_VERSION"
         echo "available=true" >> "$GITHUB_OUTPUT"
+        # The presets name no compiler, so the build takes it from CC and CXX.
+        {
+          echo "CC=clang-$CLANG_WATCH_VERSION"
+          echo "CXX=clang++-$CLANG_WATCH_VERSION"
+        } >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
       if: steps.watch.outputs.available == 'true'
       run: |
-        clang-"$CLANG_WATCH_VERSION" --version
+        "${CXX:-c++}" --version
         cmake --version
 
-    - name: Configure CMake
+    - name: Build and test
       if: steps.watch.outputs.available == 'true'
       run: |
-        cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_C_COMPILER=clang-"$CLANG_WATCH_VERSION" \
-          -DCMAKE_CXX_COMPILER=clang++-"$CLANG_WATCH_VERSION"
+        jobs=$(getconf _NPROCESSORS_ONLN)
+        CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
 
-    - name: Build
+    # The job exists to build with the compiler it watches, and the
+    # environment is all that names it: CMake's own record is the evidence.
+    - name: Check the compiler the build used
       if: steps.watch.outputs.available == 'true'
-      run: cmake --build build -j"$(nproc)"
-
-    - name: Test
-      if: steps.watch.outputs.available == 'true'
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+      run: |
+        used=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' build/release/CMakeCache.txt)
+        if [ "${used##*/}" != "$CXX" ]; then
+          echo "::error::the build used $used, not $CXX"
+          exit 1
+        fi
+        echo "the build used $used"
 
   floating-runners:
     name: watch (${{ matrix.os }})
@@ -293,18 +307,13 @@ jobs:
 
     - name: Report toolchain versions
       run: |
-        cc --version
+        "${CXX:-c++}" --version
         cmake --version
 
-    - name: Configure CMake
+    - name: Build and test
       run: |
-        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-    - name: Build
-      run: cmake --build build --parallel
-
-    - name: Test
-      run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
+        jobs=$(getconf _NPROCESSORS_ONLN)
+        CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
 
   docs-links:
     name: docs (links)
