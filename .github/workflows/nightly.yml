@@ -47,23 +47,32 @@ jobs:
           exit 1
         fi
         sudo apt-get install -y "gcc-$version" "g++-$version"
-        # The toolchain goes through the environment, as in check.yml, so
-        # the presets stay free of compilers.
+        # The presets name no compiler, so the build takes it from CC and CXX.
         {
-          echo "GCC_VERSION=$version"
           echo "CC=gcc-$version"
           echo "CXX=g++-$version"
         } >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
       run: |
-        gcc-"$GCC_VERSION" --version
+        "${CXX:-c++}" --version
         cmake --version
 
     - name: Build and test
       run: |
         jobs=$(getconf _NPROCESSORS_ONLN)
         CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
+
+    # The job exists to build with the compiler it watches, and the
+    # environment is all that names it: CMake's own record is the evidence.
+    - name: Check the compiler the build used
+      run: |
+        used=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' build/release/CMakeCache.txt)
+        if [ "${used##*/}" != "$CXX" ]; then
+          echo "::error::the build used $used, not $CXX"
+          exit 1
+        fi
+        echo "the build used $used"
 
   newest-clang:
     name: watch (next clang)
@@ -255,21 +264,35 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y "clang-$CLANG_WATCH_VERSION"
         echo "available=true" >> "$GITHUB_OUTPUT"
+        # The presets name no compiler, so the build takes it from CC and CXX.
+        {
+          echo "CC=clang-$CLANG_WATCH_VERSION"
+          echo "CXX=clang++-$CLANG_WATCH_VERSION"
+        } >> "$GITHUB_ENV"
 
     - name: Report toolchain versions
       if: steps.watch.outputs.available == 'true'
       run: |
-        clang-"$CLANG_WATCH_VERSION" --version
+        "${CXX:-c++}" --version
         cmake --version
 
     - name: Build and test
       if: steps.watch.outputs.available == 'true'
-      env:
-        CC: clang-${{ env.CLANG_WATCH_VERSION }}
-        CXX: clang++-${{ env.CLANG_WATCH_VERSION }}
       run: |
         jobs=$(getconf _NPROCESSORS_ONLN)
         CMAKE_BUILD_PARALLEL_LEVEL=$jobs CTEST_PARALLEL_LEVEL=$jobs cmake --workflow --preset release
+
+    # The job exists to build with the compiler it watches, and the
+    # environment is all that names it: CMake's own record is the evidence.
+    - name: Check the compiler the build used
+      if: steps.watch.outputs.available == 'true'
+      run: |
+        used=$(sed -n 's/^CMAKE_CXX_COMPILER:FILEPATH=//p' build/release/CMakeCache.txt)
+        if [ "${used##*/}" != "$CXX" ]; then
+          echo "::error::the build used $used, not $CXX"
+          exit 1
+        fi
+        echo "the build used $used"
 
   floating-runners:
     name: watch (${{ matrix.os }})
@@ -284,7 +307,7 @@ jobs:
 
     - name: Report toolchain versions
       run: |
-        cc --version
+        "${CXX:-c++}" --version
         cmake --version
 
     - name: Build and test
