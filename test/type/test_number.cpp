@@ -703,6 +703,18 @@ TEST(number_test, move_assignment_takes_the_value)
     EXPECT_FALSE(original.is_floating_point());
 }
 
+TEST(number_test, move_assignment_onto_a_longer_value_leaves_zero)
+{
+    dross::number original{ "7" };
+    dross::number target{ long_number };
+    target = std::move(original);
+
+    EXPECT_EQ(std::string(target), "7");
+    EXPECT_FALSE(target.is_floating_point());
+    EXPECT_EQ(std::string(original), "0");
+    EXPECT_FALSE(original.is_floating_point());
+}
+
 TEST(number_test, moving_cannot_throw)
 {
     EXPECT_TRUE(std::is_nothrow_move_constructible_v<dross::number>);

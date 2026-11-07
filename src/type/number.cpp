@@ -966,9 +966,12 @@ number& number::operator=(number&& n) noexcept
 {
     if (this != &n) {
         // Handing our storage to the source keeps both usable without
-        // allocating, and leaves the source holding zero.
+        // allocating. Swapping with a new zero releases the digits that
+        // storage was carrying, which assigning would leave held.
         _store.swap(n._store);
-        *n._store = storage{};
+        storage zero;
+        n._store->number.swap(zero.number);
+        n._store->floating_point = false;
     }
     return *this;
 }
