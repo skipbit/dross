@@ -455,24 +455,34 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
+      # Doxygen and Graphviz are pinned to their upstream releases for the
+      # reason the Python packages are: a warning fails this job, so a new
+      # release has to come in through a pull request.
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
+          sudo apt-get install -y 'doxygen=1.9.8+ds-*' 'graphviz=2.42.2-*'
           pip install -r docs/sphinx/requirements.txt
 
-      # A warning fails the check once all of them are reported. Only here: a
-      # local build may use a Doxygen release that warns about other settings.
+      # Any warning fails the job. It is read from the log because
+      # WARN_AS_ERROR does not fail on a warning about the Doxyfile itself.
+      # Only here: a local build may use a Doxygen release that warns about
+      # other settings. The Sphinx Makefile fails on a warning by default.
       - name: Generate Doxygen documentation
         run: |
+          set -o pipefail
           mkdir -p docs/build/doxygen
           cd docs/doxygen
-          { cat Doxyfile; printf '\nWARN_AS_ERROR = FAIL_ON_WARNINGS\n'; } | doxygen -
+          doxygen Doxyfile 2>&1 | tee "$RUNNER_TEMP/doxygen.log"
+          if grep -q -E '(warning|error):' "$RUNNER_TEMP/doxygen.log"; then
+            echo "::error::Doxygen warned; the warnings are in the output above"
+            exit 1
+          fi
 
       - name: Build Sphinx documentation
         run: |
           cd docs/sphinx
-          make html SPHINXOPTS="-W --keep-going"
+          make html
 
       # The exit status says nothing was warned about, not that anything was
       # written.
@@ -493,7 +503,9 @@ jobs:
           retention-days: 30
 
   # sphinx-lint and its dependencies are pinned, so its verdict changes with the
-  # sources or with the pull request that raises a pin.
+  # sources or with the pull request that raises a pin. It finds what the
+  # documentation build does not warn about, such as trailing whitespace or a
+  # role written without backticks.
   docs-lint:
     name: docs (lint)
     runs-on: ubuntu-24.04
