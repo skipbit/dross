@@ -1,7 +1,7 @@
-prefix=@CMAKE_INSTALL_PREFIX@
+prefix=@DROSS_PC_PREFIX@
 exec_prefix=${prefix}
-libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+libdir=@DROSS_PC_LIBDIR@
+includedir=@DROSS_PC_INCLUDEDIR@
 
 Name: @PROJECT_NAME@
 Description: A modern C++23 general-purpose library

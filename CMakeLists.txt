@@ -55,7 +55,24 @@ install(EXPORT drossTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/dross
 )
 
-# pkg-config support
+# pkg-config support. The prefix is found from where dross.pc lands, so an
+# install moved with --prefix still names its own files. An absolute
+# directory is written as it is, since it does not move with the prefix.
+set(DROSS_PC_PREFIX "${CMAKE_INSTALL_PREFIX}")
+if(NOT IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
+    file(RELATIVE_PATH pc_to_prefix "/${CMAKE_INSTALL_LIBDIR}/pkgconfig" "/")
+    string(REGEX REPLACE "/$" "" pc_to_prefix "${pc_to_prefix}")
+    set(DROSS_PC_PREFIX "\${pcfiledir}/${pc_to_prefix}")
+endif()
+set(DROSS_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+if(NOT IS_ABSOLUTE "${DROSS_PC_LIBDIR}")
+    set(DROSS_PC_LIBDIR "\${exec_prefix}/${DROSS_PC_LIBDIR}")
+endif()
+set(DROSS_PC_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+if(NOT IS_ABSOLUTE "${DROSS_PC_INCLUDEDIR}")
+    set(DROSS_PC_INCLUDEDIR "\${prefix}/${DROSS_PC_INCLUDEDIR}")
+endif()
+
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/dross.pc.in"
     "${CMAKE_CURRENT_BINARY_DIR}/dross.pc"

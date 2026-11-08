@@ -305,6 +305,28 @@ jobs:
           fi
           echo "the consumer printed $printed"
 
+      # The install checked above was configured for /usr/local and written
+      # elsewhere with --prefix. Its dross.pc has to name the files beside it:
+      # the ones in /usr/local exist too, and would link just the same.
+      - name: Link a consumer through pkg-config from another prefix
+        run: |
+          prefix="$RUNNER_TEMP/install-check"
+          export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+          for pair in libdir:lib includedir:include; do
+            variable=${pair%%:*}
+            reported=$(pkg-config --variable="$variable" dross)
+            resolved=$(cd "$reported" && pwd -P)
+            expected=$(cd "$prefix/${pair#*:}" && pwd -P)
+            if [ "$resolved" != "$expected" ]; then
+              echo "::error::pkg-config gives $variable $reported, not $expected"
+              exit 1
+            fi
+          done
+          found=$(pkg-config --cflags --static --libs dross)
+          read -r -a flags <<< "$found"
+          c++ -std=c++23 consumer/main.cpp "${flags[@]}" -o "$RUNNER_TEMP/moved-consumer"
+          echo "the consumer links with $found"
+
       # What drossConfigVersion.cmake accepts depends on the COMPATIBILITY in
       # CMakeLists.txt, and while the version is 0.0.0 every mode answers the
       # same. So a copy of this commit, fetched without the tags, is tagged
