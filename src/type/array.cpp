@@ -19,6 +19,26 @@ public:
     }
 };
 
+class array::iterator::impl {
+public:
+    impl(std::vector<value>::iterator i)
+        : cursor(i)
+    {
+    }
+
+    std::vector<value>::iterator cursor;
+};
+
+class array::const_iterator::impl {
+public:
+    impl(std::vector<value>::const_iterator i)
+        : cursor(i)
+    {
+    }
+
+    std::vector<value>::const_iterator cursor;
+};
+
 array::array()
     : _store(std::make_unique<storage>())
 {
@@ -106,32 +126,32 @@ void array::remove(const value& v)
 
 array::iterator array::begin()
 {
-    return iterator(std::make_any<std::vector<value>::iterator>(_store->contents.begin()));
+    return iterator(std::make_unique<iterator::impl>(_store->contents.begin()));
 }
 
 array::iterator array::end()
 {
-    return iterator(std::make_any<std::vector<value>::iterator>(_store->contents.end()));
+    return iterator(std::make_unique<iterator::impl>(_store->contents.end()));
 }
 
 array::const_iterator array::begin() const
 {
-    return const_iterator(std::make_any<std::vector<value>::const_iterator>(_store->contents.cbegin()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->contents.cbegin()));
 }
 
 array::const_iterator array::end() const
 {
-    return const_iterator(std::make_any<std::vector<value>::const_iterator>(_store->contents.cend()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->contents.cend()));
 }
 
 array::const_iterator array::cbegin() const
 {
-    return const_iterator(std::make_any<std::vector<value>::const_iterator>(_store->contents.cbegin()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->contents.cbegin()));
 }
 
 array::const_iterator array::cend() const
 {
-    return const_iterator(std::make_any<std::vector<value>::const_iterator>(_store->contents.cend()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->contents.cend()));
 }
 
 bool array::operator==(const array& a) const
@@ -172,18 +192,8 @@ value& array::operator[](const size_t i) &
     return value_at(i);
 }
 
-class array::iterator::impl {
-public:
-    impl(std::vector<value>::iterator i)
-        : cursor(i)
-    {
-    }
-
-    std::vector<value>::iterator cursor;
-};
-
-array::iterator::iterator(const std::any& a)
-    : _impl(std::make_unique<impl>(std::any_cast<std::vector<value>::iterator>(a)))
+array::iterator::iterator(std::unique_ptr<impl> i)
+    : _impl(std::move(i))
 {
 }
 
@@ -228,18 +238,8 @@ bool operator==(const array::iterator& lhs, const array::iterator& rhs)
     return (lhs._impl->cursor == rhs._impl->cursor);
 }
 
-class array::const_iterator::impl {
-public:
-    impl(std::vector<value>::const_iterator i)
-        : cursor(i)
-    {
-    }
-
-    std::vector<value>::const_iterator cursor;
-};
-
-array::const_iterator::const_iterator(const std::any& a)
-    : _impl(std::make_unique<impl>(std::any_cast<std::vector<value>::const_iterator>(a)))
+array::const_iterator::const_iterator(std::unique_ptr<impl> i)
+    : _impl(std::move(i))
 {
 }
 

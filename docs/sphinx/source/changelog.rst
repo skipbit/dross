@@ -36,6 +36,9 @@ Changed
   for the other types. Moving one used to copy it, and a moved-from one
   now holds zero or false
 
+- ``dross/type/array.h`` and ``dross/type/dictionary.h`` no longer include
+  ``<any>``. Code that uses ``std::any`` includes ``<any>`` itself
+
 Fixed
 ~~~~~
 
