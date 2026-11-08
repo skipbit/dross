@@ -119,9 +119,11 @@ Check documentation quality:
 
 ```bash
 cd docs/sphinx
-make linkcheck  # Check for broken links
+make linkcheck  # Check the links in the reStructuredText prose
 make spelling   # Check spelling (requires sphinxcontrib-spelling)
 ```
+
+The nightly workflow checks every link in the built pages, `README.md` and `SECURITY.md` with lychee; see `.github/workflows/nightly.yml`.
 
 ## Contributing
 
