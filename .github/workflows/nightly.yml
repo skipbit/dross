@@ -315,7 +315,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
       with:
-        # As above.
+        # As above: without the history the build calls itself 0.0.0.
         fetch-depth: 0
 
     - name: Report toolchain versions
