@@ -29,9 +29,14 @@ jobs:
   newest-gcc:
     name: watch (newest gcc)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
     - uses: actions/checkout@v7
+      with:
+        # The version comes from the tags, and main's tip is rarely tagged:
+        # only the full history reaches the nearest one.
+        fetch-depth: 0
 
     # Resolve the newest versioned g++ available once the toolchain PPA is in
     # place, rather than pinning a major, so this keeps tracking upstream
@@ -77,6 +82,7 @@ jobs:
   newest-clang:
     name: watch (next clang)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     # Watches the smallest "-N" apt.llvm.org suite above the declared Clang
     # range (CLANG_WATCH_VERSION below), not the largest one available:
@@ -100,6 +106,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+      with:
+        # As above: without the history the build calls itself 0.0.0.
+        fetch-depth: 0
 
     - name: Probe and install the watched Clang release
       id: watch
@@ -297,6 +306,7 @@ jobs:
   floating-runners:
     name: watch (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -304,6 +314,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+      with:
+        # As above.
+        fetch-depth: 0
 
     - name: Report toolchain versions
       run: |
