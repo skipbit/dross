@@ -351,9 +351,10 @@ jobs:
         cd docs/sphinx
         make html SPHINXOPTS=
 
-    # The pages as published, so links in raw HTML and in the theme are
-    # checked too, and the two Markdown files readers find on GitHub. The
-    # _sources copies are left out: links in code examples are not followed.
+    # The pages as built for publishing, so links in raw HTML and in the
+    # theme are checked too, and the two Markdown files readers find on
+    # GitHub. Only the HTML pages are read from the build: the _sources copies
+    # would have links in code examples followed. Anchors are checked as well.
     # A host that rate-limits the runner (429) is not a broken link.
     # cppreference answers the runner with 403.
     - name: Check for broken links
@@ -361,8 +362,8 @@ jobs:
       with:
         args: >-
           --no-progress
-          --max-retries 3
+          --include-fragments
           --accept '100..=103,200..=299,429'
           --exclude '^https://en\.cppreference\.com/'
-          --exclude-path docs/build/sphinx/html/_sources
+          --extensions html
           docs/build/sphinx/html README.md SECURITY.md
