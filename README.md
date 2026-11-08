@@ -7,53 +7,24 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)
 
-**Dross** is a comprehensive C++ library that provides fundamental building blocks for modern applications. Similar in spirit to Boost, but designed with C++23 features and minimal dependencies in mind.
+**Dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, and per-thread run loops with the threads, timers and operation queue built on them.
 
 ## ✨ Key Features
 
-- **🔢 Arbitrary Precision Arithmetic** - String-based number system supporting unlimited precision
-- **🧵 Dynamic Type System** - Unified `value` type using modern `std::variant`
-- **🔧 Platform Utilities** - Cross-platform environment, filesystem, and XDG support
-- **⚡ Zero Dependencies** - Self-contained with only standard library requirements
-- **🛡️ Memory Safe** - RAII principles with smart pointers throughout
-- **🎯 Modern C++23** - Leverages concepts, ranges, and latest language features
+- **🔢 Arbitrary Precision Arithmetic** - String-based numbers that do not overflow; a quotient that does not terminate within 4096 digits keeps 34 significant digits
+- **🧵 Dynamic Type System** - Unified `value` type using `std::variant`
+- **🔧 Platform Utilities** - Environment, filesystem, and XDG support on Linux and macOS
+- **⚡ No Third-Party Dependencies** - Only the C++ standard library and the system's threads
+- **🎯 Modern C++23** - Concepts for compile-time constraints, and failures returned through `std::expected`
 
 ## 🚀 Quick Start
 
 ### Requirements
 
-- **A compiler configured for C++23 or later.** The public headers use C++23,
-  so C++17 and C++20 are outside the supported range. C++26 consumers are best
-  effort: no required job builds one, so neither compiling these headers as
-  C++26 nor the ABI and ODR compatibility of linking such a consumer against a
-  C++23 build of the library is verified.
-- **A supported compiler and standard library pairing.** On Linux those are:
-  - GCC 13–15 with the libstdc++ it is paired with (13, 14 or 15)
-  - Clang 20–22 with libstdc++ 13, 14 or 15
-  - Clang 20–22 with libc++ 20 or 22
-
-  The version in each pairing is the version of the standard library headers
-  the compiler builds against. The shared runtime a resulting binary loads
-  comes from the system's own runtime package, which is versioned and updated
-  separately.
-
-  GCC with libc++ is not one of them, because upstream does not support that
-  pairing: GCC has no `-stdlib` option to select libc++ with in the first
-  place. It would be worth revisiting if GCC gained an equivalent option, or
-  if libc++ started supporting GCC officially. On macOS the compiler is the
-  Apple Clang shipped with macOS 15 or 26, and the standard library is not a
-  separate axis there, because libc++ comes with the OS toolchain.
-- **What the required Linux jobs build.** GCC 13 and 15, each against the
-  libstdc++ paired with it, and Clang 20 and 22 against libstdc++ 13, 14 and
-  15 (15 being the release Ubuntu 26.04 provides) as well as against libc++ 20
-  and 22. Every libstdc++ release in the supported range is therefore covered
-  in the Clang pairings; among the GCC ones only 13 and 15 are, since the
-  libstdc++ version follows the compiler version there. GCC 14 and Clang 21
-  are inside the declared range but are not built by a required job. On macOS
-  the required jobs build with the Apple Clang of macOS 15 and 26. Newer
-  versions are best effort: the nightly toolchain watch tracks the newest
-  versioned GCC available once the toolchain PPA is in place, and the specific
-  Clang release next in line to enter this range.
+- **A C++23 compiler and standard library.** On Linux, GCC 13–15, or Clang
+  20–22 with libstdc++ or libc++; on macOS, the Apple Clang of macOS 15 or 26.
+  [Getting Started](https://skipbit.github.io/dross/getting-started.html)
+  lists the supported pairings and what CI builds.
 - **CMake 3.20+**, or 3.25+ to build with the presets
 
 ### Installation
@@ -199,7 +170,6 @@ int main()
 - **`operation_queue`** - A fixed set of worker threads, each running its own loop, taking submitted tasks from one shared queue by priority, and in the order they were submitted within one priority, each only once the tasks it runs after have returned
 - **`operation_result`** - What a task given to `operation_queue::enqueue()` returned, to wait on and read as its own type
 
-
 ## 📖 Documentation
 
 **[📘 API Reference & User Guide](https://skipbit.github.io/dross/)**
@@ -215,9 +185,8 @@ Dross follows modern C++ best practices:
 
 - **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg`, `timestamp`, `timezone` and the `data` iterators, which hold theirs directly; the ABI can change in any 0.x release
 - **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
-- **Error Handling** - `std::expected` and `std::optional` for failures, apart from the bounds-checked accessors and the `path` calls that let `std::filesystem` exceptions through, `timestamp`'s `+` and `-` with a duration, which throw `std::out_of_range` for a result outside the years 0 to 9999 that `add()` and `subtract()` report as `std::nullopt`, `runloop::perform()`, which reports failure as a `bool`, the runloop running calls, which let an exception thrown by a task or a timer's callback propagate out, `thread`'s constructors, which let `std::system_error` from a failure to start the underlying OS thread propagate out, the `timer` factory functions, which report a callback that cannot be installed, because it is empty or the loop has already finished, as a handle that is already invalid rather than a failure, and `operation_queue`, whose constructor throws `std::invalid_argument` for zero workers and lets `std::system_error` from a failure to start one propagate out, and whose `submit()`, `cancel()`, `wait_for()` and `shutdown()` report their outcome as a `bool`
+- **Error Handling** - Failures are returned through `std::expected` and `std::optional`. Where a call throws, lets an exception through, or reports its outcome another way, its comment in the public headers says so
 - **Type Safety** - Concepts for compile-time constraints
-- **Zero-Cost Abstractions** - Performance without compromise
 
 ## 🧪 Testing
 
@@ -237,37 +206,19 @@ ctest --preset release -V
 
 ## 🗺️ Roadmap
 
-### Current Modules
-- ✅ Type System (boolean, number, string, timestamp, timezone, array, dictionary, data, value, error)
-- ✅ Platform utilities (environment, path, xdg)
-- ✅ Thread utilities (runloop, thread, timer, operation_queue, operation_result)
-- ✅ Format (TOML)
-
 ### Planned Features
-- **Configuration** - JSON, XML, YAML parsers
+- **Format** - JSON, XML, YAML
 - **Concurrency** - Coroutines
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-See [CODINGSTYLE.md](CODINGSTYLE.md) for coding guidelines.
+See the [Contributing guide](https://skipbit.github.io/dross/contributing.html) for the workflow, and [CODINGSTYLE.md](CODINGSTYLE.md) for coding guidelines.
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Inspired by the Boost libraries
-- Built with modern C++23 features
-- Designed for real-world applications
 
 ---
 
