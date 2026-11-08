@@ -4,6 +4,10 @@
 # a release is cut by pushing one. Every check a pull request runs is run
 # again on the tagged commit: a tag can point at a commit no pull request
 # checked, and the version it names only exists once the tag does.
+#
+# A tag runs this file as it stands at the tagged commit, so a tag on an old
+# commit releases through that commit's steps, or not at all if it predates
+# this file.
 
 name: Release
 
