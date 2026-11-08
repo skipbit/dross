@@ -48,11 +48,9 @@ Fixed
   overflowing a signed integer. With libstdc++, which counts nanoseconds,
   the year 1000 used to convert to 2169. Both are ``noexcept``
 
-- ``dross.pc`` finds the prefix from its own location, so pkg-config
-  names the installed files after ``cmake --install --prefix`` moves them.
-  It used to name the prefix given at configure time. An absolute
-  ``CMAKE_INSTALL_LIBDIR`` or ``CMAKE_INSTALL_INCLUDEDIR`` is written as
-  it is, instead of being appended to the prefix
+- ``dross.pc`` writes an absolute ``CMAKE_INSTALL_LIBDIR`` or
+  ``CMAKE_INSTALL_INCLUDEDIR`` as it is, instead of appending it to the
+  prefix
 
 0.2.0 - 2026-11-03
 ------------------

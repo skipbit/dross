@@ -1,4 +1,4 @@
-prefix=@DROSS_PC_PREFIX@
+prefix=@CMAKE_INSTALL_PREFIX@
 exec_prefix=${prefix}
 libdir=@DROSS_PC_LIBDIR@
 includedir=@DROSS_PC_INCLUDEDIR@
