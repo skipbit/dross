@@ -34,20 +34,20 @@ Welcome to dross
    contributing
    changelog
 
-**dross** is a modern C++23 library providing fundamental building blocks for applications,
-designed to be a general-purpose library similar to Boost with a focus on:
+**dross** is a general-purpose C++23 library providing fundamental building
+blocks for applications, with a focus on:
 
-- **Zero external dependencies** - Only requires the standard library
+- **No third-party dependencies** - Only the C++ standard library and the
+  system's threads
 - **Modern C++ design** - Leveraging C++23 features throughout
 - **Errors in the return type** - ``std::optional`` and ``std::expected``
-  rather than exceptions, apart from the bounds-checked accessors, the
-  ``path`` calls that let ``std::filesystem`` exceptions through and the
-  ``timestamp`` arithmetic operators, which throw outside the years 0 to 9999
+  rather than exceptions. Where a call throws, lets an exception through, or
+  reports its outcome another way, its comment in the public headers says so
 - **Pimpl idiom** - Types keep their representation behind an opaque pointer,
   apart from ``error``, ``path``, ``xdg``, ``timestamp``, ``timezone`` and the
   ``data`` iterators, which hold theirs directly; the ABI can change in any
   0.x release
-- **Comprehensive type system** - Dynamic types with value semantics
+- **Type system** - Dynamic types with value semantics
 
 .. grid:: 2
     :gutter: 4

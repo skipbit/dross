@@ -55,7 +55,8 @@ To build and use dross, you need:
   either. From Clang 20 onwards both standard libraries work, which is why
   every pairing listed above starts there.
 
-- **Build System**: CMake 3.20 or later
+- **Build System**: CMake 3.20 or later, or 3.25 or later to build with the
+  presets
 - **Operating System**: Linux or macOS
 
 Installation
@@ -64,7 +65,7 @@ Installation
 From Source
 ~~~~~~~~~~~
 
-Clone the repository and build with CMake:
+Clone the repository and build with the CMake presets:
 
 .. code-block:: bash
 
@@ -72,33 +73,34 @@ Clone the repository and build with CMake:
     git clone https://github.com/skipbit/dross.git
     cd dross
 
-    # Create build directory
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-    # Build the library
-    cmake --build build
-
-    # Run tests (optional)
-    cd build && ctest
+    # Configure, build and test into build/release
+    cmake --workflow --preset release
 
     # Install (optional)
-    sudo cmake --install build
+    sudo cmake --install build/release --prefix /usr/local
+
+CMake 3.20 to 3.24 has no presets: configure with
+``cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release``, then run
+``cmake --build build/release``.
 
 Build Options
 ~~~~~~~~~~~~~
 
-You can customize the build with these CMake options:
+The presets are ``debug``, ``release``, ``static``, ``sanitize-address`` and
+``sanitize-thread``, each building into ``build/<preset>``. A CMake option can
+be added when configuring with one:
 
 .. code-block:: bash
 
     # Build as static library (default is shared)
-    cmake -S . -B build -DBUILD_SHARED_LIBS=OFF
+    cmake --workflow --preset static
 
     # Enable debug build
-    cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+    cmake --workflow --preset debug
 
-    # Specify installation prefix
-    cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr/local
+    # Specify installation prefix, then build
+    cmake --preset release -DCMAKE_INSTALL_PREFIX=/usr/local
+    cmake --build --preset release
 
 Using dross in Your Project
 ---------------------------
@@ -123,12 +125,16 @@ Or using FetchContent:
     FetchContent_Declare(
         dross
         GIT_REPOSITORY https://github.com/skipbit/dross.git
-        GIT_TAG        main
+        GIT_TAG        <version>
     )
     FetchContent_MakeAvailable(dross)
 
     add_executable(myapp main.cpp)
     target_link_libraries(myapp PRIVATE dross::dross)
+
+Replace ``<version>`` with a tag from
+`Releases <https://github.com/skipbit/dross/releases>`_. ``main`` is the
+development tip, and the ABI can change between 0.x releases.
 
 Manual Integration
 ~~~~~~~~~~~~~~~~~~

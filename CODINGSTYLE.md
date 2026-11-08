@@ -1,5 +1,13 @@
 # dross Coding Style Guide
 
+## Design Goals
+
+The library works toward these goals. They guide design decisions, but they are not yet met, so the README does not list them as features.
+
+*   **Memory Safety:** No use after free, out-of-bounds access or leak through the public API. The sanitizer builds check toward this.
+*   **No Cost for What Is Not Used:** A feature adds no cost to code that does not use it. The allocation and indirection of the `Pimpl` idiom are the accepted exception, traded for ABI stability (see 4. Coding Style).
+*   **Comprehensive Building Blocks:** The library grows toward the building blocks an application needs, as the README's Roadmap lists.
+
 ## 1. General
 
 *   **Language:** Use C++23.

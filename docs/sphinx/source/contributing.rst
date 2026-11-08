@@ -25,7 +25,10 @@ Getting Started
 
    .. code-block:: bash
 
-      git checkout -b feature/your-feature-name
+      git checkout -b fix/short-description
+
+   Start the name with the kind of change, as in the commit message:
+   ``fix/``, ``docs/``, ``ci/``, ``refactor/`` and so on.
 
 Development Setup
 -----------------
@@ -33,37 +36,8 @@ Development Setup
 Build Requirements
 ~~~~~~~~~~~~~~~~~~
 
-- A compiler configured for C++23 or later. The public headers use C++23, so
-  C++17 and C++20 are outside the supported range. C++26 consumers are best
-  effort: no required job builds one, so neither compiling these headers as
-  C++26 nor the ABI and ODR compatibility of linking such a consumer against a
-  C++23 build of the library is verified.
-- A supported compiler and standard library pairing. On Linux those are:
-
-  - GCC 13-15 with the libstdc++ it is paired with (13, 14 or 15)
-  - Clang 20-22 with libstdc++ 13, 14 or 15
-  - Clang 20-22 with libc++ 20 or 22
-
-  The version in each pairing is the version of the standard library headers
-  the compiler builds against. The shared runtime a resulting binary loads
-  comes from the system's own runtime package, which is versioned and updated
-  separately.
-
-  GCC with libc++ is not one of them, because upstream does not support that
-  pairing: GCC has no ``-stdlib`` option to select libc++ with in the first
-  place. It would be worth revisiting if GCC gained an equivalent option, or
-  if libc++ started supporting GCC officially. On macOS the compiler is the
-  Apple Clang shipped with macOS 15 or 26, and the standard library is not a
-  separate axis there, because libc++ comes with the OS toolchain.
-- The required Linux jobs build GCC 13/15, each against the libstdc++ paired
-  with it, and Clang 20/22 against libstdc++ 13, 14 and 15 (15 being the
-  release Ubuntu 26.04 provides) as well as against libc++ 20 and 22. Every
-  libstdc++ release in the supported range is therefore covered in the Clang
-  pairings; among the GCC ones only 13 and 15 are, since the libstdc++ version
-  follows the compiler version there. GCC 14 and Clang 21 are inside the
-  declared range but are not built by a required job either. Newer versions
-  are best effort.
-- CMake 3.20 or later
+- The compiler, standard library and CMake listed under System Requirements
+  in :doc:`getting-started`
 - Git
 
 Building the Project
@@ -71,12 +45,11 @@ Building the Project
 
 .. code-block:: bash
 
-    # Debug build (recommended for development)
-    cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
-    cmake --build build/debug
+    # Debug build (recommended for development): configure, build and test
+    cmake --workflow --preset debug
 
-    # Run tests
-    cd build/debug && ctest -V
+    # Run the tests again
+    ctest --preset debug
 
 Development Tools
 ~~~~~~~~~~~~~~~~~
