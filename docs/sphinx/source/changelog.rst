@@ -48,6 +48,10 @@ Fixed
   overflowing a signed integer. With libstdc++, which counts nanoseconds,
   the year 1000 used to convert to 2169. Both are ``noexcept``
 
+- ``dross.pc`` writes an absolute ``CMAKE_INSTALL_LIBDIR`` or
+  ``CMAKE_INSTALL_INCLUDEDIR`` as it is, instead of appending it to the
+  prefix
+
 0.2.0 - 2026-11-03
 ------------------
 

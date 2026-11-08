@@ -55,7 +55,17 @@ install(EXPORT drossTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/dross
 )
 
-# pkg-config support
+# pkg-config support. An absolute directory is written as it is rather than
+# appended to the prefix.
+set(DROSS_PC_LIBDIR "${CMAKE_INSTALL_LIBDIR}")
+if(NOT IS_ABSOLUTE "${DROSS_PC_LIBDIR}")
+    set(DROSS_PC_LIBDIR "\${exec_prefix}/${DROSS_PC_LIBDIR}")
+endif()
+set(DROSS_PC_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}")
+if(NOT IS_ABSOLUTE "${DROSS_PC_INCLUDEDIR}")
+    set(DROSS_PC_INCLUDEDIR "\${prefix}/${DROSS_PC_INCLUDEDIR}")
+endif()
+
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/dross.pc.in"
     "${CMAKE_CURRENT_BINARY_DIR}/dross.pc"

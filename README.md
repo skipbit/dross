@@ -128,6 +128,14 @@ pkg-config --libs dross
 pkg-config --modversion dross
 ```
 
+`dross.pc` names the prefix given at configure time. For an install written
+elsewhere with `cmake --install --prefix`, `--define-prefix` has pkg-config
+take the prefix from where it finds `dross.pc` in `<prefix>/lib/pkgconfig`:
+
+```bash
+PKG_CONFIG_PATH=<prefix>/lib/pkgconfig pkg-config --define-prefix --cflags --libs dross
+```
+
 #### Manual Compilation
 
 ```bash
