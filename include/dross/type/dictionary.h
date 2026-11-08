@@ -2,7 +2,6 @@
 
 #include "dross/type/value.h"
 
-#include <any>
 #include <memory>
 #include <string>
 
@@ -269,10 +268,9 @@ public:
 private:
     friend class dictionary;
     friend class const_iterator;
-    iterator(const std::any&);
-
-private:
     class impl;
+    explicit iterator(std::unique_ptr<impl>);
+
     std::unique_ptr<impl> _impl;
 };
 
@@ -357,10 +355,9 @@ public:
 
 private:
     friend class dictionary;
-    const_iterator(const std::any&);
-
-private:
     class impl;
+    explicit const_iterator(std::unique_ptr<impl>);
+
     std::unique_ptr<impl> _impl;
 };
 

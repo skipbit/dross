@@ -1,6 +1,5 @@
 #pragma once
 
-#include <any>
 #include <initializer_list>
 #include <memory>
 
@@ -317,10 +316,9 @@ public:
 private:
     friend class array;
     friend class const_iterator;
-    iterator(const std::any&);
-
-private:
     class impl;
+    explicit iterator(std::unique_ptr<impl>);
+
     std::unique_ptr<impl> _impl;
 };
 
@@ -399,10 +397,9 @@ public:
 
 private:
     friend class array;
-    const_iterator(const std::any&);
-
-private:
     class impl;
+    explicit const_iterator(std::unique_ptr<impl>);
+
     std::unique_ptr<impl> _impl;
 };
 

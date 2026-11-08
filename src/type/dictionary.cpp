@@ -101,8 +101,8 @@ public:
     std::map<std::string, dross::value>::iterator cursor;
 };
 
-dictionary::iterator::iterator(const std::any& a)
-    : _impl(std::make_unique<impl>(std::any_cast<std::map<std::string, dross::value>::iterator>(a)))
+dictionary::iterator::iterator(std::unique_ptr<impl> i)
+    : _impl(std::move(i))
 {
 }
 
@@ -157,8 +157,8 @@ public:
     std::map<std::string, dross::value>::const_iterator cursor;
 };
 
-dictionary::const_iterator::const_iterator(const std::any& a)
-    : _impl(std::make_unique<impl>(std::any_cast<std::map<std::string, dross::value>::const_iterator>(a)))
+dictionary::const_iterator::const_iterator(std::unique_ptr<impl> i)
+    : _impl(std::move(i))
 {
 }
 
@@ -210,32 +210,32 @@ bool operator==(const dictionary::const_iterator& lhs, const dictionary::const_i
 
 dictionary::iterator dictionary::begin()
 {
-    return iterator(std::make_any<std::map<std::string, dross::value>::iterator>(_store->properties.begin()));
+    return iterator(std::make_unique<iterator::impl>(_store->properties.begin()));
 }
 
 dictionary::iterator dictionary::end()
 {
-    return iterator(std::make_any<std::map<std::string, dross::value>::iterator>(_store->properties.end()));
+    return iterator(std::make_unique<iterator::impl>(_store->properties.end()));
 }
 
 dictionary::const_iterator dictionary::begin() const
 {
-    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cbegin()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->properties.cbegin()));
 }
 
 dictionary::const_iterator dictionary::end() const
 {
-    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cend()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->properties.cend()));
 }
 
 dictionary::const_iterator dictionary::cbegin() const
 {
-    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cbegin()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->properties.cbegin()));
 }
 
 dictionary::const_iterator dictionary::cend() const
 {
-    return const_iterator(std::make_any<std::map<std::string, dross::value>::const_iterator>(_store->properties.cend()));
+    return const_iterator(std::make_unique<const_iterator::impl>(_store->properties.cend()));
 }
 
 }  // namespace dross
