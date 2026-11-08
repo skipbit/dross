@@ -25,7 +25,10 @@ Getting Started
 
    .. code-block:: bash
 
-      git checkout -b feature/your-feature-name
+      git checkout -b fix/short-description
+
+   Start the name with the kind of change, as in the commit message:
+   ``fix/``, ``docs/``, ``ci/``, ``refactor/`` and so on.
 
 Development Setup
 -----------------
@@ -71,12 +74,11 @@ Building the Project
 
 .. code-block:: bash
 
-    # Debug build (recommended for development)
-    cmake -S . -B build/debug -DCMAKE_BUILD_TYPE=Debug
-    cmake --build build/debug
+    # Debug build (recommended for development): configure, build and test
+    cmake --workflow --preset debug
 
-    # Run tests
-    cd build/debug && ctest -V
+    # Run the tests again
+    ctest --preset debug
 
 Development Tools
 ~~~~~~~~~~~~~~~~~

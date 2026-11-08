@@ -54,47 +54,33 @@
   versions are best effort: the nightly toolchain watch tracks the newest
   versioned GCC available once the toolchain PPA is in place, and the specific
   Clang release next in line to enter this range.
-- **CMake 3.20+**
+- **CMake 3.20+**, or 3.25+ to build with the presets
 
 ### Installation
-
-#### Package Managers
-
-```bash
-# CPM (CMake Package Manager)
-CPMAddPackage("gh:skipbit/dross#main")
-```
 
 #### From Source
 
 ```bash
-# Clone and build
 git clone https://github.com/skipbit/dross.git
 cd dross
-
-# Configure with desired options
-cmake -S . -B build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=ON \
-    -DCMAKE_INSTALL_PREFIX=/usr/local
-
-# Build and install
-cmake --build build
-sudo cmake --install build
-
-# Run tests (optional)
-ctest --test-dir build -V
 ```
 
-#### Library Types
+##### With CMake
 
 ```bash
-# Shared library (default)
-cmake -DBUILD_SHARED_LIBS=ON ...
+# Configure, build and test into build/release
+cmake --workflow --preset release
 
-# Static library
-cmake -DBUILD_SHARED_LIBS=OFF ...
+# Install
+sudo cmake --install build/release --prefix /usr/local
 ```
+
+The presets are `debug`, `release`, `static`, `sanitize-address` and
+`sanitize-thread`, each building into `build/<preset>`. The library is shared
+by default; the `static` preset, or `-DBUILD_SHARED_LIBS=OFF`, builds a static
+one. CMake 3.20 to 3.24 has no presets: configure with
+`cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release`, then run
+`cmake --build build/release`.
 
 ### Using in Your Project
 
@@ -109,11 +95,19 @@ target_link_libraries(your_target PRIVATE dross::dross)
 include(FetchContent)
 FetchContent_Declare(dross
     GIT_REPOSITORY https://github.com/skipbit/dross.git
-    GIT_TAG main
+    GIT_TAG <version>
 )
 FetchContent_MakeAvailable(dross)
 target_link_libraries(your_target PRIVATE dross::dross)
+
+# Option 3: CPM (no installation needed)
+CPMAddPackage("gh:skipbit/dross#<version>")
+target_link_libraries(your_target PRIVATE dross::dross)
 ```
+
+Replace `<version>` with a tag from
+[Releases](https://github.com/skipbit/dross/releases). `main` is the
+development tip, and the ABI can change between 0.x releases.
 
 #### pkg-config Integration
 
@@ -227,18 +221,18 @@ Dross follows modern C++ best practices:
 
 ## 🧪 Testing
 
-Comprehensive test suite using GoogleTest:
+The tests use GoogleTest:
 
 ```bash
-# Run all tests, in the build directory configured above
-ctest --test-dir build
+# Run all tests, in the tree the release preset built
+ctest --preset release
 
 # Run specific test patterns
-ctest --test-dir build -R number
-./build/test/dross_test --gtest_filter="number_test.*"
+ctest --preset release -R number
+./build/release/test/dross_test --gtest_filter="number_test.*"
 
 # Verbose output
-ctest --test-dir build -V
+ctest --preset release -V
 ```
 
 ## 🗺️ Roadmap
