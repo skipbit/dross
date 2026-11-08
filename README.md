@@ -1,13 +1,13 @@
-# Dross 🧱
+# dross 🧱
 
-> A modern C++23 general-purpose library designed for robust, self-contained applications
+> A modern C++23 general-purpose library for self-contained applications
 
 [![Check](https://github.com/skipbit/dross/actions/workflows/check.yml/badge.svg)](https://github.com/skipbit/dross/actions/workflows/check.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)
 
-**Dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, and per-thread run loops with the threads, timers and operation queue built on them.
+**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, and per-thread run loops with the threads, timers and operation queue built on them.
 
 ## ✨ Key Features
 
@@ -125,7 +125,7 @@ int main()
     // Dynamic typing. dictionary has no initializer-list constructor, so
     // entries are assigned after construction.
     dross::dictionary config;
-    config["name"] = dross::string("Dross");
+    config["name"] = dross::string("dross");
     config["version"] = dross::string("0.1.0");
     config["features"] = dross::array{dross::string{"fast"}, dross::string{"safe"}};
     config["release_date"] = dross::timestamp{2024, 1, 21, 15, 30, 0, dross::timezone::utc()};
@@ -181,7 +181,7 @@ The documentation includes:
 
 ## 🏗️ Architecture
 
-Dross follows modern C++ best practices:
+dross follows modern C++ best practices:
 
 - **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg`, `timestamp`, `timezone` and the `data` iterators, which hold theirs directly; the ABI can change in any 0.x release
 - **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
