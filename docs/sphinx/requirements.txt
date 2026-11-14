@@ -11,7 +11,7 @@ furo==2025.12.19
 breathe==5.1.0
 sphinx-copybutton==0.5.2
 sphinx-tabs==3.5.0
-sphinx-design==0.7.0
+sphinx-design==0.8.0
 sphinx-autobuild==2025.8.25
 
 # Formatting check, with the packages sphinx-lint depends on
