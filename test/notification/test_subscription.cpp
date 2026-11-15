@@ -247,6 +247,30 @@ TEST(subscription_test, notifications_from_one_thread_start_in_the_order_sent)
     EXPECT_EQ(calls.values(), (std::vector<int>{ 0, 1, 2, 3, 4 }));
 }
 
+TEST(subscription_test, notifications_on_a_queue_with_one_worker_run_one_at_a_time_in_the_order_sent)
+{
+    record calls;
+    std::atomic<int> running{ 0 };
+    std::atomic<bool> overlapped{ false };
+    dross::operation_queue worker{ 1 };
+    auto [sender_side, token] = subscribe(dross::delivery::on(worker), [&calls, &running, &overlapped](int value) {
+        if (running.fetch_add(1) > 0) {
+            overlapped = true;
+        }
+        calls.add(value);
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
+        running.fetch_sub(1);
+    });
+
+    for (int value = 0; value < 5; ++value) {
+        send(*sender_side, value);
+    }
+    ASSERT_TRUE(worker.wait_for(std::chrono::duration_cast<std::chrono::milliseconds>(kTimeout)));
+
+    EXPECT_EQ(calls.values(), (std::vector<int>{ 0, 1, 2, 3, 4 }));
+    EXPECT_FALSE(overlapped.load());
+}
+
 TEST(subscription_test, every_subscriber_is_handed_the_same_value)
 {
     dross_test::reset_main_runloop();

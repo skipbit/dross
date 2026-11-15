@@ -19,13 +19,15 @@ namespace dross {
  *   call
  * - on() runs it on one of an operation_queue's workers
  *
- * Order:
- * - Notifications sent from one thread to one subscriber start in the order
- *   they were sent
- * - With queued() and direct() each also finishes before the next starts.
- *   On a queue with more than one worker, two of them can run at the same
- *   time, as two tasks submitted to the queue can, so a function given to
- *   on() is written to be safe for that
+ * Order, for notifications sent from one thread to one subscriber:
+ * - With queued() and direct(), the function runs for them one at a time,
+ *   in the order they were sent
+ * - With on(), they are taken from the queue in the order they were sent.
+ *   On a queue with more than one worker, which of them the function starts
+ *   on first is not fixed, and two of them can run at the same time, as two
+ *   tasks submitted to the queue can, so a function given to on() is
+ *   written to be safe for that. A queue with one worker keeps them in
+ *   order and one at a time
  *
  * Lifetime:
  * - A subscription does not keep its loop's thread or its queue going. Once
