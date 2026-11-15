@@ -13,6 +13,7 @@
 #include <memory>
 #include <string_view>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 
 namespace dross {
@@ -149,7 +150,7 @@ private:
 
     // subscribe() without its type: function is given a pointer to the value.
     subscription subscribe_any(std::string_view name,
-                               std::string_view type,
+                               const std::type_info& type,
                                std::function<void(const void*)> function,
                                const delivery& how);
 
@@ -164,7 +165,7 @@ std::expected<subscription, error> listener::subscribe(const topic<T>& which, F&
     }
     // Wrapped here, not in the library, so the value is taken out on the same
     // side of a shared library boundary as notify() puts it in.
-    return subscribe_any(which.name(), topic<T>::type_name(), [function = std::forward<F>(function)](const void* value) mutable {
+    return subscribe_any(which.name(), topic<T>::type(), [function = std::forward<F>(function)](const void* value) mutable {
         std::invoke(function, *static_cast<const T*>(value));
     }, how);
 }

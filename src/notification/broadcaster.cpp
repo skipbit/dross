@@ -9,13 +9,14 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <utility>
 
 namespace dross {
 
 topic_address broadcaster::storage::address::view() const noexcept
 {
-    return { name, type };
+    return { name, type, identity };
 }
 
 broadcaster::storage::address::operator topic_address() const noexcept
@@ -26,13 +27,13 @@ broadcaster::storage::address::operator topic_address() const noexcept
 std::size_t broadcaster::storage::address_hash::operator()(const topic_address& which) const noexcept
 {
     const std::size_t name = std::hash<std::string_view>{}(which.name);
-    const std::size_t type = std::hash<std::string_view>{}(which.type);
+    const std::size_t type = std::hash<std::string_view>{}(which.type) ^ std::hash<const std::type_info*>{}(which.identity);
     return name ^ (type + static_cast<std::size_t>(0x9e3779b97f4a7c15ULL) + (name << 6) + (name >> 2));
 }
 
 bool broadcaster::storage::address_equal::operator()(const topic_address& lhs, const topic_address& rhs) const noexcept
 {
-    return (lhs.name == rhs.name) && (lhs.type == rhs.type);
+    return (lhs.name == rhs.name) && (lhs.type == rhs.type) && (lhs.identity == rhs.identity);
 }
 
 void broadcaster::storage::add(const topic_address& where, std::shared_ptr<receiver> which)
@@ -42,7 +43,7 @@ void broadcaster::storage::add(const topic_address& where, std::shared_ptr<recei
         const std::lock_guard<std::mutex> guard{ _mutex };
         auto found = _topics.find(where);
         if (found == _topics.end()) {
-            found = _topics.emplace(address{ std::string{ where.name }, std::string{ where.type } }, std::make_shared<const receivers>()).first;
+            found = _topics.emplace(address{ std::string{ where.name }, std::string{ where.type }, where.identity }, std::make_shared<const receivers>()).first;
         }
         replaced = rebuild(found, std::move(which));
     }
@@ -116,10 +117,10 @@ bool broadcaster::operator==(const broadcaster& other) const noexcept
 }
 
 notification broadcaster::notify_any(std::string_view name,
-                                     std::string_view type,
+                                     const std::type_info& type,
                                      const std::function<std::shared_ptr<const void>()>& make)
 {
-    const topic_address where{ name, type };
+    const auto where = topic_address::of(name, type);
     const auto subscribers = _store->subscribers(where);
     if (! subscribers) {
         return notification{ nullptr };

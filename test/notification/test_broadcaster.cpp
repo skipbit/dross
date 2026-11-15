@@ -7,6 +7,7 @@
 #include "dross/notification/topic.h"
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
+#include "file_local_peer.h"
 
 #include <gtest/gtest.h>
 
@@ -38,6 +39,7 @@ inline constexpr dross::topic<progress> kProgress{ "com.example.test.progress" }
 inline constexpr dross::topic<ratio> kProgressAsRatio{ "com.example.test.progress" };
 inline constexpr dross::topic<progress> kOther{ "com.example.test.other" };
 inline constexpr dross::topic<int> kCount{ "com.example.test.count" };
+inline constexpr dross::topic<std::string> kText{ "com.example.test.text" };
 
 // Counts the copies and moves made of it, through counters it shares.
 struct counted final {
@@ -193,6 +195,39 @@ TEST(broadcaster_test, topics_of_one_name_and_different_types_do_not_reach_each_
     EXPECT_EQ(seen, (std::vector<std::string>{ "ratio", "progress" }));
 }
 
+TEST(broadcaster_test, types_of_one_name_in_the_unnamed_namespaces_of_two_files_do_not_reach_each_other)
+{
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    int mine = 0;
+    auto here = subscribe(ears, kProgress, [&mine](const progress&) {
+        ++mine;
+    }, dross::delivery::direct());
+    auto theirs = std::make_shared<std::atomic<int>>(0);
+    auto there = dross_test::file_local_peer::subscribe(ears, theirs);
+    ASSERT_TRUE(there.active());
+
+    news.notify(kProgress, progress{ 1, 2 });
+    dross_test::file_local_peer::notify(news);
+
+    EXPECT_EQ(mine, 1);
+    EXPECT_EQ(theirs->load(), 1);
+}
+
+TEST(broadcaster_test, a_value_that_converts_to_the_topics_type_is_sent_as_that_type)
+{
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    std::vector<std::string> seen;
+    auto token = subscribe(ears, kText, [&seen](const std::string& now) {
+        seen.push_back(now);
+    }, dross::delivery::direct());
+
+    news.notify(kText, "hello");
+
+    EXPECT_EQ(seen, (std::vector<std::string>{ "hello" }));
+}
+
 TEST(broadcaster_test, topics_of_different_names_do_not_reach_each_other)
 {
     auto news = dross::broadcaster::create();
@@ -298,6 +333,20 @@ TEST(broadcaster_test, an_ended_subscribers_function_is_let_go_when_it_ends)
     auto held = std::make_shared<int>(0);
     const std::weak_ptr<int> watch = held;
     auto token = subscribe(ears, kCount, [held = std::move(held)](const int&) {
+    }, dross::delivery::direct());
+
+    token.reset();
+
+    EXPECT_TRUE(watch.expired());
+}
+
+TEST(broadcaster_test, a_subscriber_on_a_type_from_an_unnamed_namespace_is_let_go_when_it_ends)
+{
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    auto held = std::make_shared<int>(0);
+    const std::weak_ptr<int> watch = held;
+    auto token = subscribe(ears, kProgress, [held = std::move(held)](const progress&) {
     }, dross::delivery::direct());
 
     token.reset();

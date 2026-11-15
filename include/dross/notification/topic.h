@@ -35,6 +35,19 @@ namespace dross {
  *   the writer controls, so that topics from different libraries do not
  *   share one
  *
+ * Types defined in an unnamed namespace:
+ * - Such a type exists only in its own source file, and two of them in two
+ *   files can share a name. They are still told apart, so a topic carrying
+ *   one never reaches the subscribers of a topic carrying the other
+ * - Defined in a header, it is a different type in each source file that
+ *   includes the header, so a notification sent from one of those files
+ *   does not reach a subscriber in another
+ *
+ * A type defined inside a function with internal linkage, such as a static
+ * function, is not told apart from a type of the same name inside a function
+ * of the same name in another source file. Such a type is not used for a
+ * topic.
+ *
  * Lifetime:
  * - The topic holds the name without copying it, so the characters it is
  *   made from outlive it; a string literal always does
@@ -68,9 +81,9 @@ public:
 private:
     // Topics are told apart by name and this together. Evaluated in the
     // caller's code, so the same type matches across shared libraries.
-    static const char* type_name() noexcept
+    static const std::type_info& type() noexcept
     {
-        return typeid(T).name();
+        return typeid(T);
     }
 
     friend class broadcaster;

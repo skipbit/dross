@@ -29,6 +29,11 @@ namespace dross {
  *   written to be safe for that. A queue with one worker keeps them in
  *   order and one at a time
  *
+ * Notifications sent from different threads have no order between them.
+ * With direct(), each runs the function on its own sending thread, so two of
+ * them can run it at the same time, and a function given to direct() for a
+ * topic sent from more than one thread is written to be safe for that.
+ *
  * Lifetime:
  * - A subscription does not keep its loop's thread or its queue going. Once
  *   the thread has ended, or the queue has stopped, whether by shutdown()

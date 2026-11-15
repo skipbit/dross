@@ -7,6 +7,8 @@
 #include <functional>
 #include <memory>
 #include <string_view>
+#include <type_traits>
+#include <typeinfo>
 #include <utility>
 
 namespace dross {
@@ -113,7 +115,7 @@ public:
      * once it is queued for the others.
      */
     template <std::move_constructible T>
-    notification notify(const topic<T>& which, T value);
+    notification notify(const topic<T>& which, std::type_identity_t<T> value);
 
     /**
      * @brief Test whether two handles name the same broadcaster.
@@ -130,7 +132,7 @@ private:
     // notify() without its type. make is called only when someone is
     // subscribed, so a notification no one receives allocates nothing.
     notification notify_any(std::string_view name,
-                            std::string_view type,
+                            const std::type_info& type,
                             const std::function<std::shared_ptr<const void>()>& make);
 
     std::shared_ptr<storage> _store;
@@ -139,11 +141,11 @@ private:
 };
 
 template <std::move_constructible T>
-notification broadcaster::notify(const topic<T>& which, T value)
+notification broadcaster::notify(const topic<T>& which, std::type_identity_t<T> value)
 {
     // Made here, not in the library, so the value is put in on the same side
     // of a shared library boundary as the subscriber's function takes it out.
-    return notify_any(which.name(), topic<T>::type_name(), [&value]() {
+    return notify_any(which.name(), topic<T>::type(), [&value]() {
         return std::shared_ptr<const void>{ std::make_shared<const T>(std::move(value)) };
     });
 }

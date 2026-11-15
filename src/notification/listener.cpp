@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <utility>
 
 namespace dross {
@@ -47,17 +48,17 @@ bool listener::operator==(const listener& other) const noexcept
 }
 
 subscription listener::subscribe_any(std::string_view name,
-                                     std::string_view type,
+                                     const std::type_info& type,
                                      std::function<void(const void*)> function,
                                      const delivery& how)
 {
     using receiver = subscription_access::receiver;
 
-    const topic_address where{ name, type };
+    const auto where = topic_address::of(name, type);
     receiver::origin from{ _store, _store->source, nullptr };
-    from.detach = [source = _store->source, name = std::string{ name }, type = std::string{ type }]() {
+    from.detach = [source = _store->source, name = std::string{ name }, type = &type]() {
         if (auto alive = source.lock()) {
-            alive->prune(topic_address{ name, type });
+            alive->prune(topic_address::of(name, *type));
         }
     };
 

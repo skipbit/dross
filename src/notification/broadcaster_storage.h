@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <typeinfo>
 #include <unordered_map>
 #include <vector>
 
@@ -37,6 +38,7 @@ private:
     struct address final {
         std::string name;
         std::string type;
+        const std::type_info* identity;
 
         topic_address view() const noexcept;
         operator topic_address() const noexcept;
