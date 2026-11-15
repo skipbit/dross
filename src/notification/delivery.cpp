@@ -57,17 +57,19 @@ delivery delivery::on(const operation_queue& queue)
 
 delivery_target delivery_access::resolve(const delivery& which)
 {
-    const auto& place = which._store->place;
-    if (std::holds_alternative<delivery::storage::subscribing_thread>(place)) {
+    const auto on_subscribing_thread = [](const delivery::storage::subscribing_thread&) -> delivery_target {
         return current_runloop();
-    }
-    if (const auto* loop = std::get_if<runloop>(&place)) {
-        return *loop;
-    }
-    if (const auto* queue = std::get_if<operation_queue_access::weak_queue>(&place)) {
-        return *queue;
-    }
-    return direct_target{};
+    };
+    const auto on_direct = [](const direct_target& target) -> delivery_target {
+        return target;
+    };
+    const auto on_loop = [](const runloop& loop) -> delivery_target {
+        return loop;
+    };
+    const auto on_queue = [](const operation_queue_access::weak_queue& queue) -> delivery_target {
+        return queue;
+    };
+    return std::visit(overloaded{ on_subscribing_thread, on_direct, on_loop, on_queue }, which._store->place);
 }
 
 }  // namespace dross

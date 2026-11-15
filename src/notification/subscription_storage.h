@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dross/notification/subscription.h"
-#include "notification/delivery_access.h"
+#include "notification/delivery_target.h"
 
 #include <atomic>
 #include <functional>
@@ -30,6 +30,9 @@ public:
     bool active() const;
 
 private:
+    // The queued form of deliver(): a task that holds value until it runs.
+    std::function<void()> make_task(const std::shared_ptr<const void>& value);
+
     // Runs the function unless the subscription has ended by now, which is
     // what keeps a task queued before end() from calling it after.
     void call(const void* value) const;

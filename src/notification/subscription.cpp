@@ -22,20 +22,19 @@ void subscription::storage::deliver(const std::shared_ptr<const void>& value)
     if (_ended.load()) {
         return;
     }
-    if (std::holds_alternative<direct_target>(_target)) {
+    const auto on_direct = [this, &value](const direct_target&) {
         call(value.get());
-        return;
-    }
-
-    auto task = [self = shared_from_this(), value]() {
-        self->call(value.get());
     };
-    if (const auto* loop = std::get_if<runloop>(&_target)) {
-        runloop target_loop = *loop;
-        target_loop.perform(std::move(task));
-    } else if (auto queue = operation_queue_access::lock(std::get<operation_queue_access::weak_queue>(_target))) {
-        queue->submit(std::move(task));
-    }
+    const auto on_loop = [this, &value](const runloop& loop) {
+        runloop target_loop = loop;
+        target_loop.perform(make_task(value));
+    };
+    const auto on_queue = [this, &value](const operation_queue_access::weak_queue& weak) {
+        if (auto queue = operation_queue_access::lock(weak)) {
+            queue->submit(make_task(value));
+        }
+    };
+    std::visit(overloaded{ on_direct, on_loop, on_queue }, _target);
 }
 
 void subscription::storage::end() noexcept
@@ -48,14 +47,24 @@ bool subscription::storage::active() const
     if (_ended.load()) {
         return false;
     }
-    if (const auto* loop = std::get_if<runloop>(&_target)) {
-        return (! runloop_access::finished(*loop));
-    }
-    if (const auto* weak = std::get_if<operation_queue_access::weak_queue>(&_target)) {
-        const auto queue = operation_queue_access::lock(*weak);
+    const auto on_direct = [](const direct_target&) {
+        return true;
+    };
+    const auto on_loop = [](const runloop& loop) {
+        return (! runloop_access::finished(loop));
+    };
+    const auto on_queue = [](const operation_queue_access::weak_queue& weak) {
+        const auto queue = operation_queue_access::lock(weak);
         return (queue && operation_queue_access::accepting(*queue));
-    }
-    return true;
+    };
+    return std::visit(overloaded{ on_direct, on_loop, on_queue }, _target);
+}
+
+std::function<void()> subscription::storage::make_task(const std::shared_ptr<const void>& value)
+{
+    return [self = shared_from_this(), value]() {
+        self->call(value.get());
+    };
 }
 
 void subscription::storage::call(const void* value) const
