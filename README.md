@@ -209,6 +209,7 @@ ctest --preset release -V
 ### Planned Features
 - **Format** - JSON, XML, YAML
 - **Concurrency** - Coroutines
+- **Notifications** - Typed notifications from a broadcaster to listeners, each delivered on the thread or queue the listener chose, within a process and between processes, and values that notify their observers when they change
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
 

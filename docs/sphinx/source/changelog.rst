@@ -12,6 +12,14 @@ Unreleased
 Added
 ~~~~~
 
+- ``delivery`` and ``subscription``, in a new notification module
+  (``<dross/notification.h>``). A ``delivery`` names where a subscriber's
+  function runs: ``queued()`` on a run loop, ``direct()`` on the sending
+  thread, or ``on()`` on one of an ``operation_queue``'s workers. A
+  ``subscription`` is the right to go on being called, ended by
+  ``reset()`` or its destructor. Nothing hands one out yet: the
+  broadcaster and listener that subscribe are still to come
+
 - ``value::get_if<T>()``, which reads what a ``value`` holds without
   copying it: a pointer to the held ``T``, or ``nullptr`` when the value
   holds another type. It cannot be called on a temporary ``value``.

@@ -143,6 +143,12 @@ public:
         return true;
     }
 
+    bool accepting()
+    {
+        const std::lock_guard<std::mutex> guard{ _mutex };
+        return _accepting;
+    }
+
     // Stops accepting and hands every worker a task that runs what is left
     // and then ends the worker. Under the same lock as submit(), so every
     // sweep submit() handed out is ahead of it on its worker's loop. It lets
@@ -457,6 +463,7 @@ public:
     bool shutdown(std::chrono::milliseconds timeout);
 
     std::size_t thread_count() const noexcept;
+    bool accepting() const;
 
 private:
     bool on_a_worker() const;
@@ -539,6 +546,11 @@ std::size_t operation_queue::storage::thread_count() const noexcept
     return _workers.size();
 }
 
+bool operation_queue::storage::accepting() const
+{
+    return _backlog->accepting();
+}
+
 bool operation_queue::storage::on_a_worker() const
 {
     return std::any_of(_workers.begin(), _workers.end(), [](const thread& worker) {
@@ -601,6 +613,24 @@ bool operation_queue::operator==(const operation_queue& other) const noexcept
 operation_queue operation_queue_access::make(std::size_t thread_count, std::shared_ptr<const time_source> source)
 {
     return operation_queue{ std::make_shared<operation_queue::storage>(thread_count, std::move(source)) };
+}
+
+operation_queue_access::weak_queue operation_queue_access::weaken(const operation_queue& queue)
+{
+    return queue._store;
+}
+
+std::optional<operation_queue> operation_queue_access::lock(const weak_queue& queue)
+{
+    if (auto store = queue.lock()) {
+        return operation_queue{ std::move(store) };
+    }
+    return std::nullopt;
+}
+
+bool operation_queue_access::accepting(const operation_queue& queue)
+{
+    return queue._store->accepting();
 }
 
 }  // namespace dross

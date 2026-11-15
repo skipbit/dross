@@ -413,6 +413,12 @@ bool runloop::storage::is_running() const
     return (_depth > 0);
 }
 
+bool runloop::storage::finished() const
+{
+    const std::lock_guard<std::mutex> guard{ _mutex };
+    return _finished;
+}
+
 runloop::runloop(std::shared_ptr<storage> store) noexcept
     : _store{ std::move(store) }
 {
@@ -505,6 +511,11 @@ runloop current_runloop()
 runloop runloop_access::standalone(std::shared_ptr<const time_source> source)
 {
     return runloop{ std::make_shared<runloop::storage>(std::move(source)) };
+}
+
+bool runloop_access::finished(const runloop& loop)
+{
+    return loop._store->finished();
 }
 
 }  // namespace dross

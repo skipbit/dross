@@ -5,9 +5,10 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 
-// Ways to make a queue that the public interface does not offer. Used by the
-// library's own tests.
+// Ways to make, refer to and inspect a queue that the public interface does
+// not offer. Used by the library's own tests and by the notification layer.
 namespace dross {
 
 class operation_queue_access final {
@@ -15,6 +16,19 @@ public:
     // A queue like operation_queue(thread_count) makes, except that its own
     // waits read the time and wait through source.
     static operation_queue make(std::size_t thread_count, std::shared_ptr<const time_source> source);
+
+    // A reference to a queue that does not keep it alive. lock() makes a
+    // handle for as long as it is held, so a queue whose last other handle
+    // goes meanwhile stops when that one does, on the thread that held it.
+    using weak_queue = std::weak_ptr<operation_queue::storage>;
+
+    static weak_queue weaken(const operation_queue& queue);
+
+    // A handle to the queue, or std::nullopt once its last handle has gone.
+    static std::optional<operation_queue> lock(const weak_queue& queue);
+
+    // Whether queue still takes tasks, which it stops doing on shutdown().
+    static bool accepting(const operation_queue& queue);
 };
 
 }  // namespace dross
