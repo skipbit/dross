@@ -40,6 +40,7 @@ public:
 
     std::size_t pending_count() const;
     bool is_running() const;
+    bool finished() const;
 
     // Adds which to this loop's installed timers, due at first_deadline.
     // Returns false, without installing it, once this loop is finished.
