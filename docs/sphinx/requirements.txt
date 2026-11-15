@@ -17,4 +17,4 @@ sphinx-autobuild==2025.8.25
 # Formatting check, with the packages sphinx-lint depends on
 sphinx-lint==1.0.2
 polib==1.2.0
-regex==2026.9.29
+regex==2026.11.9
