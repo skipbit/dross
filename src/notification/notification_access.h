@@ -4,7 +4,7 @@
 #include "notification/notification_storage.h"
 
 // Ways into a notification that the public interface does not offer. Used by
-// subscription and by the library's own tests.
+// subscription.
 namespace dross {
 
 class notification_access final {

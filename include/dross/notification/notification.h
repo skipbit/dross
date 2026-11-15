@@ -28,6 +28,8 @@ namespace dross {
  * - Calling it again, from any thread or from inside a subscriber's
  *   function, does nothing more. On a sending no one was subscribed to, it
  *   does nothing
+ * - A notify() that leaves by an exception returns none, so what it had
+ *   already handed on cannot be cancelled
  */
 class notification final {
 public:

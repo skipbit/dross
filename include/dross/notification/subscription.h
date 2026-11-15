@@ -33,8 +33,8 @@ namespace dross {
  * Exceptions:
  * - An exception thrown by the function is not caught. It propagates out of
  *   the call that ran the function: the sending call for
- *   dross::delivery::direct(), and the running call of the run loop or the
- *   worker otherwise
+ *   dross::delivery::direct() unless the sender deferred it, and the running
+ *   call of the run loop or the worker otherwise
  */
 class subscription final {
 public:

@@ -15,6 +15,7 @@
 #include <chrono>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -78,6 +79,36 @@ TEST(notification_test, deferred_direct_subscribers_run_in_the_order_they_subscr
     dross::current_runloop().run_pending();
 
     EXPECT_EQ(seen, (std::vector<std::string>{ "first 1", "second 1", "first 2", "second 2" }));
+}
+
+TEST(notification_test, a_deferred_notification_reaches_a_direct_subscriber_after_one_sent_later_without_deferring)
+{
+    dross_test::reset_main_runloop();
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    std::vector<int> seen;
+    auto token = subscribe(ears, kCount, [&seen](const int& value) {
+        seen.push_back(value);
+    }, dross::delivery::direct());
+
+    news.notify(kCount, 1, kDeferred);
+    news.notify(kCount, 2);
+    dross::current_runloop().run_pending();
+
+    EXPECT_EQ(seen, (std::vector<int>{ 2, 1 }));
+}
+
+TEST(notification_test, an_exception_from_a_deferred_direct_subscriber_propagates_out_of_the_running_loop)
+{
+    dross_test::reset_main_runloop();
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    auto token = subscribe(ears, kCount, [](const int&) {
+        throw std::runtime_error{ "from the subscriber" };
+    }, dross::delivery::direct());
+
+    EXPECT_NO_THROW(news.notify(kCount, 1, kDeferred));
+    EXPECT_THROW(dross::current_runloop().run_pending(), std::runtime_error);
 }
 
 TEST(notification_test, deferring_leaves_a_queued_subscriber_called_once)

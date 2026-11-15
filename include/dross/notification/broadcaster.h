@@ -52,6 +52,8 @@ enum class notify_timing {
  * - The calls are queued on the sending thread's run loop in the order of
  *   the subscribers, and run when that thread runs its loop. Until then the
  *   notification can still be cancelled
+ * - So a deferred notification reaches a direct subscriber after any sent
+ *   later from the same thread without deferring, before the loop runs
  * - A loop that is not running yet holds them until it runs, and drops them
  *   if its thread ends first, as it does any task
  */
@@ -118,7 +120,11 @@ struct notify_options final {
  * Exceptions:
  * - An exception thrown by a subscriber's function called with
  *   dross::delivery::direct() propagates out of notify(), and the
- *   subscribers after it are not handed the notification
+ *   subscribers after it are not handed the notification. Unless notify()
+ *   was deferred: the exception then propagates out of the running call of
+ *   the sending thread's loop
+ * - A notify() that leaves by an exception returns no dross::notification,
+ *   so what it had already handed on still runs and cannot be cancelled
  *
  * Type identity:
  * - Topic types are told apart through typeid, so code that sends or

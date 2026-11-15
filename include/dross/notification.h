@@ -49,7 +49,8 @@
  * - dross::delivery::queued() on a run loop, the subscribing thread's by
  *   default
  * - dross::delivery::direct() on the sending thread, inside the call that
- *   sends
+ *   sends, or on that thread's run loop once it has returned when the sender
+ *   defers it
  * - dross::delivery::on() on one of an operation_queue's workers
  *
  * There is no default, so reading a subscription tells which thread its
