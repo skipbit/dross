@@ -31,7 +31,10 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timezone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/listener.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
@@ -79,8 +82,12 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/format.h
     ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
     ${PROJECT_SOURCE_DIR}/include/dross/notification.h
+    ${PROJECT_SOURCE_DIR}/include/dross/notification/broadcaster.h
     ${PROJECT_SOURCE_DIR}/include/dross/notification/delivery.h
+    ${PROJECT_SOURCE_DIR}/include/dross/notification/listener.h
+    ${PROJECT_SOURCE_DIR}/include/dross/notification/notification.h
     ${PROJECT_SOURCE_DIR}/include/dross/notification/subscription.h
+    ${PROJECT_SOURCE_DIR}/include/dross/notification/topic.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread/operation.h
     ${PROJECT_SOURCE_DIR}/include/dross/thread/operation_queue.h

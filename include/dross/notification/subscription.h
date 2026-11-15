@@ -73,8 +73,11 @@ public:
 
     /**
      * @brief Test whether the function can still be called.
-     * @return false once this is empty, and once the run loop's thread has
-     * ended or the operation_queue has stopped that the delivery names
+     * @return false once this is empty, once the run loop's thread has ended
+     * or the operation_queue has stopped that the delivery names, and once
+     * the broadcaster subscribed to has gone
+     *
+     * Once false, it stays false: the function is never called again.
      */
     bool active() const;
 

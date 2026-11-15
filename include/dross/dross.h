@@ -21,7 +21,7 @@
  * - Platform Layer: environment, path, xdg utilities
  * - Format Layer: TOML parsing with type-safe dictionary API (dross::toml)
  * - Thread Layer: per-thread run loops that other threads can hand work to, and thread, a handle to an OS thread
- * - Notification Layer: where a subscriber is called (delivery), and the right to go on being called (subscription)
+ * - Notification Layer: typed notifications from a broadcaster to subscribers through a listener, each called where its delivery says
  *
  * @author Yuma Endo
  * @date 2025
@@ -48,7 +48,7 @@
  * - Platform layer: Cross-platform environment and filesystem utilities
  * - Format layer: Type-safe TOML parsing returning dictionary directly
  * - Thread layer: Run loops a thread owns and other threads can post to, and thread, a handle to an OS thread
- * - Notification layer: Where a subscriber is called, and the right to go on being called
+ * - Notification layer: Typed notifications from a broadcaster to subscribers, each on the thread it chose
  * - Modern C++23: Concepts, ranges, and errors reported in the return type
  *
  * @namespace dross
