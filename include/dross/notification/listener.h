@@ -2,6 +2,7 @@
 
 #include "dross/notification/broadcaster.h"
 #include "dross/notification/delivery.h"
+#include "dross/notification/error.h"
 #include "dross/notification/subscription.h"
 #include "dross/notification/topic.h"
 #include "dross/type/error.h"
@@ -11,37 +12,8 @@
 #include <functional>
 #include <memory>
 #include <string_view>
-#include <system_error>
 #include <type_traits>
-#include <typeinfo>
 #include <utility>
-
-namespace dross {
-
-/**
- * @brief Why listener::subscribe() made no subscription.
- */
-enum class notification_errc {
-    empty_function = 1,  ///< The function given was empty, so there is nothing to call
-};
-
-/**
- * @brief Get the category of notification_errc, named "dross.notification".
- * @return The one category object, the same on every call
- */
-const std::error_category& notification_category() noexcept;
-
-/**
- * @brief Make an error code from a notification_errc.
- * @param e The value
- * @return An error code of notification_category()
- */
-std::error_code make_error_code(notification_errc e) noexcept;
-
-}  // namespace dross
-
-template <>
-struct std::is_error_code_enum<dross::notification_errc> : std::true_type { };
 
 namespace dross {
 
@@ -168,7 +140,7 @@ private:
     template <typename F>
     static bool is_empty(const F& function) noexcept
     {
-        if constexpr (std::is_function_v<std::remove_pointer_t<F>> || is_std_function<F>::value) {
+        if constexpr (std::is_function_v<std::remove_pointer_t<F>> || std::is_member_pointer_v<F> || is_std_function<F>::value) {
             return (function == nullptr);
         } else {
             return false;
@@ -192,7 +164,7 @@ std::expected<subscription, error> listener::subscribe(const topic<T>& which, F&
     }
     // Wrapped here, not in the library, so the value is taken out on the same
     // side of a shared library boundary as notify() puts it in.
-    return subscribe_any(which.name(), typeid(T).name(), [function = std::forward<F>(function)](const void* value) mutable {
+    return subscribe_any(which.name(), topic<T>::type_name(), [function = std::forward<F>(function)](const void* value) mutable {
         std::invoke(function, *static_cast<const T*>(value));
     }, how);
 }

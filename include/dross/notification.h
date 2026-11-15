@@ -76,6 +76,7 @@
 
 #include <dross/notification/broadcaster.h>
 #include <dross/notification/delivery.h>
+#include <dross/notification/error.h>
 #include <dross/notification/listener.h>
 #include <dross/notification/notification.h>
 #include <dross/notification/subscription.h>

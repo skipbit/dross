@@ -2,6 +2,7 @@
 
 #include <string_view>
 #include <type_traits>
+#include <typeinfo>
 
 namespace dross {
 
@@ -65,6 +66,16 @@ public:
     }
 
 private:
+    // Topics are told apart by name and this together. Evaluated in the
+    // caller's code, so the same type matches across shared libraries.
+    static const char* type_name() noexcept
+    {
+        return typeid(T).name();
+    }
+
+    friend class broadcaster;
+    friend class listener;
+
     std::string_view _name;
 };
 

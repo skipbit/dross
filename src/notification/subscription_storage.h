@@ -24,6 +24,9 @@ public:
     struct origin final {
         std::shared_ptr<const void> listener;
         std::weak_ptr<const void> broadcaster;
+        // Takes the subscription out of the broadcaster's list, when the
+        // broadcaster still exists.
+        std::function<void()> detach;
     };
 
     storage(delivery_target target, function_type function, std::optional<origin> from = std::nullopt);
@@ -33,7 +36,8 @@ public:
     // Every subscriber can be handed the same value. Does nothing once ended.
     void deliver(const std::shared_ptr<const void>& value);
 
-    // Ends the subscription. A call already running is not waited for.
+    // Ends the subscription and detaches it from its broadcaster. A call
+    // already running is not waited for.
     void end() noexcept;
 
     bool ended() const noexcept;

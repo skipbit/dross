@@ -7,7 +7,6 @@
 #include <functional>
 #include <memory>
 #include <string_view>
-#include <typeinfo>
 #include <utility>
 
 namespace dross {
@@ -144,7 +143,7 @@ notification broadcaster::notify(const topic<T>& which, T value)
 {
     // Made here, not in the library, so the value is put in on the same side
     // of a shared library boundary as the subscriber's function takes it out.
-    return notify_any(which.name(), typeid(T).name(), [&value]() {
+    return notify_any(which.name(), topic<T>::type_name(), [&value]() {
         return std::shared_ptr<const void>{ std::make_shared<const T>(std::move(value)) };
     });
 }

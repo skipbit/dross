@@ -6,7 +6,7 @@
 #include <memory>
 
 // Ways into a broadcaster that the public interface does not offer. Used by
-// listener and by the library's own tests.
+// listener.
 namespace dross {
 
 class broadcaster_access final {

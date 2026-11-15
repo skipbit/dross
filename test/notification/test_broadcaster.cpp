@@ -67,6 +67,15 @@ struct counted final {
 
 inline constexpr dross::topic<counted> kCounted{ "com.example.test.counted" };
 
+// A type with a member function, for a pointer to member as a subscriber.
+struct has_member final {
+    void show() const
+    {
+    }
+};
+
+inline constexpr dross::topic<has_member> kHasMember{ "com.example.test.has_member" };
+
 // Subscribes and unwraps, failing the test when subscribing fails.
 template <typename T, typename F>
 dross::subscription subscribe(dross::listener& ears, const dross::topic<T>& which, F&& function, const dross::delivery& how)
@@ -282,7 +291,7 @@ TEST(broadcaster_test, nothing_sent_after_a_subscription_ends_is_received)
     EXPECT_EQ(called, 0);
 }
 
-TEST(broadcaster_test, an_ended_subscribers_function_is_let_go_once_its_topic_is_next_used)
+TEST(broadcaster_test, an_ended_subscribers_function_is_let_go_when_it_ends)
 {
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
@@ -292,7 +301,22 @@ TEST(broadcaster_test, an_ended_subscribers_function_is_let_go_once_its_topic_is
     }, dross::delivery::direct());
 
     token.reset();
-    news.notify(kCount, 1);
+
+    EXPECT_TRUE(watch.expired());
+}
+
+TEST(broadcaster_test, a_subscriber_that_holds_its_broadcaster_is_let_go_when_it_ends)
+{
+    std::optional<dross::broadcaster> news{ dross::broadcaster::create() };
+    std::optional<dross::listener> ears{ dross::listener::create(*news) };
+    auto held = std::make_shared<int>(0);
+    const std::weak_ptr<int> watch = held;
+    auto token = subscribe(*ears, kCount, [handle = *news, held = std::move(held)](const int&) {
+    }, dross::delivery::direct());
+
+    token.reset();
+    news.reset();
+    ears.reset();
 
     EXPECT_TRUE(watch.expired());
 }
@@ -355,6 +379,18 @@ TEST(broadcaster_test, subscribing_with_an_empty_function_is_an_error)
     EXPECT_EQ(from_pointer.error(), dross::notification_errc::empty_function);
     ASSERT_FALSE(from_function.has_value());
     EXPECT_EQ(from_function.error(), dross::notification_errc::empty_function);
+}
+
+TEST(broadcaster_test, subscribing_with_an_empty_member_pointer_is_an_error)
+{
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    void (has_member::*no_member)() const = nullptr;
+
+    auto made = ears.subscribe(kHasMember, no_member, dross::delivery::direct());
+
+    ASSERT_FALSE(made.has_value());
+    EXPECT_EQ(made.error(), dross::notification_errc::empty_function);
 }
 
 TEST(broadcaster_test, the_error_category_is_named_and_describes_its_values)

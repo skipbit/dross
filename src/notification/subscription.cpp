@@ -41,7 +41,14 @@ void subscription::storage::deliver(const std::shared_ptr<const void>& value)
 
 void subscription::storage::end() noexcept
 {
-    _ended.store(true);
+    if (_ended.exchange(true)) {
+        return;
+    }
+    if (_from && _from->detach) {
+        // Detaching allocates a new list; running out of memory here ends the
+        // program, as noexcept does.
+        _from->detach();
+    }
 }
 
 bool subscription::storage::ended() const noexcept
