@@ -66,7 +66,7 @@ bool subscription::storage::active() const
     if (_ended.load()) {
         return false;
     }
-    if (_from && _from->broadcaster.expired()) {
+    if (_from && _from->source.expired()) {
         return false;
     }
     const auto on_direct = [](const direct_target&) {

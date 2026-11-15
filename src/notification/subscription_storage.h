@@ -22,14 +22,15 @@ public:
     // One sending, which can be cancelled.
     using sending = notification_access::storage_type;
 
-    // Where a subscription made through a listener came from: the listener,
-    // which it keeps going, and the broadcaster the listener hears, which it
-    // does not.
+    // Where a subscription came from: for one made through a listener, the
+    // listener, which it keeps going, and the broadcaster the listener hears
+    // as its source; for one made on an observable, the observable as its
+    // source. It does not keep its source going.
     struct origin final {
         std::shared_ptr<const void> listener;
-        std::weak_ptr<const void> broadcaster;
-        // Takes the subscription out of the broadcaster's list, when the
-        // broadcaster still exists.
+        std::weak_ptr<const void> source;
+        // Takes the subscription out of the source's list, when the source
+        // still exists.
         std::function<void()> detach;
     };
 
@@ -49,8 +50,7 @@ public:
     bool ended() const noexcept;
 
     // False once the function can never be called again: the subscription
-    // has ended, its target no longer takes work, or the broadcaster it came
-    // from has gone.
+    // has ended, its target no longer takes work, or its source has gone.
     bool active() const;
 
 private:
