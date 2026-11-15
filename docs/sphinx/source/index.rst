@@ -60,14 +60,14 @@ blocks for applications, with a focus on:
 
         New to dross? Start here with installation instructions and a quick tutorial.
 
-        +++
+        .. card-footer::
 
-        .. button-ref:: getting-started
-            :expand:
-            :color: secondary
-            :click-parent:
+            .. button-ref:: getting-started
+                :expand:
+                :color: secondary
+                :click-parent:
 
-            Get Started
+                Get Started
 
     .. grid-item-card:: User Guide
         :class-card: intro-card
@@ -75,14 +75,14 @@ blocks for applications, with a focus on:
 
         Learn how to use dross effectively with in-depth guides and best practices.
 
-        +++
+        .. card-footer::
 
-        .. button-ref:: user-guide/index
-            :expand:
-            :color: secondary
-            :click-parent:
+            .. button-ref:: user-guide/index
+                :expand:
+                :color: secondary
+                :click-parent:
 
-            Read the Guide
+                Read the Guide
 
     .. grid-item-card:: API Reference
         :class-card: intro-card
@@ -90,14 +90,14 @@ blocks for applications, with a focus on:
 
         Complete API documentation for all dross modules and classes.
 
-        +++
+        .. card-footer::
 
-        .. button-ref:: api/index
-            :expand:
-            :color: secondary
-            :click-parent:
+            .. button-ref:: api/index
+                :expand:
+                :color: secondary
+                :click-parent:
 
-            Browse API
+                Browse API
 
     .. grid-item-card:: Examples
         :class-card: intro-card
@@ -105,14 +105,14 @@ blocks for applications, with a focus on:
 
         See dross in action with practical examples and use cases.
 
-        +++
+        .. card-footer::
 
-        .. button-ref:: examples/index
-            :expand:
-            :color: secondary
-            :click-parent:
+            .. button-ref:: examples/index
+                :expand:
+                :color: secondary
+                :click-parent:
 
-            View Examples
+                View Examples
 
 Core Modules
 ------------
