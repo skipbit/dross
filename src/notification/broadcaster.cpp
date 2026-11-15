@@ -2,6 +2,7 @@
 
 #include "notification/broadcaster_access.h"
 #include "notification/broadcaster_storage.h"
+#include "notification/notification_storage.h"
 #include "notification/topic_address.h"
 
 #include <functional>
@@ -118,7 +119,8 @@ bool broadcaster::operator==(const broadcaster& other) const noexcept
 
 notification broadcaster::notify_any(std::string_view name,
                                      const std::type_info& type,
-                                     const std::function<std::shared_ptr<const void>()>& make)
+                                     const std::function<std::shared_ptr<const void>()>& make,
+                                     const notify_options& how)
 {
     const auto where = topic_address::of(name, type);
     const auto subscribers = _store->subscribers(where);
@@ -129,10 +131,12 @@ notification broadcaster::notify_any(std::string_view name,
     // A subscription removes itself from the list when it ends, so one that
     // ends after this copy was taken is skipped by deliver() itself.
     const auto value = make();
+    auto sent = std::make_shared<notification::storage>();
+    const bool deferred = (how.timing == notify_timing::deferred);
     for (const auto& each : *subscribers) {
-        each->deliver(value);
+        each->deliver(value, sent, deferred);
     }
-    return notification{ nullptr };
+    return notification{ std::move(sent) };
 }
 
 std::weak_ptr<broadcaster_access::storage_type> broadcaster_access::weaken(const broadcaster& which)

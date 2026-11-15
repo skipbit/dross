@@ -45,9 +45,15 @@ subscribed subscribe(const dross::delivery& how, std::function<void(int)> functi
     return { std::move(which), std::move(token) };
 }
 
+// A sending no one cancels.
+std::shared_ptr<const receiver::sending> uncancelled()
+{
+    return std::make_shared<receiver::sending>();
+}
+
 void send(receiver& which, int value)
 {
-    which.deliver(std::make_shared<const int>(value));
+    which.deliver(std::make_shared<const int>(value), uncancelled(), false);
 }
 
 // Values a function was called with, from whichever thread called it.
@@ -285,8 +291,9 @@ TEST(subscription_test, every_subscriber_is_handed_the_same_value)
 
     auto value = std::make_shared<const int>(7);
     const void* const address = value.get();
-    first->deliver(value);
-    second->deliver(value);
+    const auto sent = uncancelled();
+    first->deliver(value, sent, false);
+    second->deliver(value, sent, false);
     value.reset();
     dross::current_runloop().run_pending();
 

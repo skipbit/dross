@@ -1,5 +1,6 @@
 #include "dross/notification/subscription.h"
 
+#include "dross/thread/runloop.h"
 #include "notification/subscription_access.h"
 #include "notification/subscription_storage.h"
 #include "thread/operation_queue_access.h"
@@ -19,21 +20,25 @@ subscription::storage::storage(delivery_target target, function_type function, s
 {
 }
 
-void subscription::storage::deliver(const std::shared_ptr<const void>& value)
+void subscription::storage::deliver(const std::shared_ptr<const void>& value, const std::shared_ptr<const sending>& sent, bool deferred)
 {
     if (_ended.load()) {
         return;
     }
-    const auto on_direct = [this, &value](const direct_target&) {
-        call(value.get());
+    const auto on_direct = [this, &value, &sent, deferred](const direct_target&) {
+        if (deferred) {
+            current_runloop().perform(make_task(value, sent));
+        } else {
+            call(value.get(), *sent);
+        }
     };
-    const auto on_loop = [this, &value](const runloop& loop) {
+    const auto on_loop = [this, &value, &sent](const runloop& loop) {
         runloop target_loop = loop;
-        target_loop.perform(make_task(value));
+        target_loop.perform(make_task(value, sent));
     };
-    const auto on_queue = [this, &value](const operation_queue_access::weak_queue& weak) {
+    const auto on_queue = [this, &value, &sent](const operation_queue_access::weak_queue& weak) {
         if (auto queue = operation_queue_access::lock(weak)) {
-            queue->submit(make_task(value));
+            queue->submit(make_task(value, sent));
         }
     };
     std::visit(overloaded{ on_direct, on_loop, on_queue }, _target);
@@ -77,16 +82,16 @@ bool subscription::storage::active() const
     return std::visit(overloaded{ on_direct, on_loop, on_queue }, _target);
 }
 
-std::function<void()> subscription::storage::make_task(const std::shared_ptr<const void>& value)
+std::function<void()> subscription::storage::make_task(const std::shared_ptr<const void>& value, const std::shared_ptr<const sending>& sent)
 {
-    return [self = shared_from_this(), value]() {
-        self->call(value.get());
+    return [self = shared_from_this(), value, sent]() {
+        self->call(value.get(), *sent);
     };
 }
 
-void subscription::storage::call(const void* value) const
+void subscription::storage::call(const void* value, const sending& sent) const
 {
-    if (_ended.load()) {
+    if (_ended.load() || sent.cancelled()) {
         return;
     }
     _function(value);

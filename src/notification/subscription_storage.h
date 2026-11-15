@@ -2,6 +2,7 @@
 
 #include "dross/notification/subscription.h"
 #include "notification/delivery_target.h"
+#include "notification/notification_access.h"
 
 #include <atomic>
 #include <functional>
@@ -18,6 +19,9 @@ public:
     // The subscriber's function, given a pointer to the notification's value.
     using function_type = std::function<void(const void*)>;
 
+    // One sending, which can be cancelled.
+    using sending = notification_access::storage_type;
+
     // Where a subscription made through a listener came from: the listener,
     // which it keeps going, and the broadcaster the listener hears, which it
     // does not.
@@ -32,9 +36,11 @@ public:
     storage(delivery_target target, function_type function, std::optional<origin> from = std::nullopt);
 
     // Runs the function for value the way target says: here and now for
-    // direct_target, and otherwise as a task that holds value until it runs.
-    // Every subscriber can be handed the same value. Does nothing once ended.
-    void deliver(const std::shared_ptr<const void>& value);
+    // direct_target unless deferred, and otherwise as a task that holds value
+    // until it runs, on the sending thread's loop for a deferred
+    // direct_target. Every subscriber can be handed the same value and the
+    // same sent. Does nothing once ended.
+    void deliver(const std::shared_ptr<const void>& value, const std::shared_ptr<const sending>& sent, bool deferred);
 
     // Ends the subscription and detaches it from its broadcaster. A call
     // already running is not waited for.
@@ -49,11 +55,12 @@ public:
 
 private:
     // The queued form of deliver(): a task that holds value until it runs.
-    std::function<void()> make_task(const std::shared_ptr<const void>& value);
+    std::function<void()> make_task(const std::shared_ptr<const void>& value, const std::shared_ptr<const sending>& sent);
 
-    // Runs the function unless the subscription has ended by now, which is
-    // what keeps a task queued before end() from calling it after.
-    void call(const void* value) const;
+    // Runs the function unless the subscription has ended or sent has been
+    // cancelled by now, which is what keeps a task queued before either from
+    // calling it after.
+    void call(const void* value, const sending& sent) const;
 
     // Set once, at construction, and never reassigned, so read without a
     // lock.
