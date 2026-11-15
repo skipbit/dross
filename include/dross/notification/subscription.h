@@ -12,11 +12,16 @@ namespace dross {
  * says. Destroying it or calling reset() ends that.
  *
  * Ending:
- * - Once reset() or the destructor has returned, no new call to the
- *   function starts, including one already queued on a run loop or an
- *   operation_queue
- * - A call already running is not waited for and runs to its end, so either
- *   can be called from inside the function itself
+ * - Once reset() or the destructor has returned, a notification still
+ *   queued on a run loop or an operation_queue no longer calls the function,
+ *   and on the thread that ended it, nothing does
+ * - Neither waits for a call on another thread. That call runs to its end,
+ *   and one that was about to start there can still enter the function just
+ *   after either returns. What the function uses is therefore held by the
+ *   function, captured by value or through a std::shared_ptr, rather than
+ *   referred to from outside it
+ * - Not waiting is also what lets either be called from inside the function
+ *   itself
  *
  * Handle semantics:
  * - A subscription has one holder. It moves and does not copy, as

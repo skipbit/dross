@@ -15,8 +15,9 @@
  * function runs on.
  *
  * Subscribing gives back a dross::subscription. Holding it keeps the
- * function being called; destroying it or calling reset() stops new calls
- * from starting, without waiting for one already running.
+ * function being called; destroying it or calling reset() stops the
+ * notifications still queued from calling it, without waiting for a call on
+ * another thread.
  *
  * Errors:
  * - A subscription whose run loop's thread has ended, or whose queue has

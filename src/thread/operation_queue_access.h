@@ -17,8 +17,9 @@ public:
     // waits read the time and wait through source.
     static operation_queue make(std::size_t thread_count, std::shared_ptr<const time_source> source);
 
-    // A reference to a queue that does not keep it alive: once the last
-    // handle goes, the queue stops as if this reference did not exist.
+    // A reference to a queue that does not keep it alive. lock() makes a
+    // handle for as long as it is held, so a queue whose last other handle
+    // goes meanwhile stops when that one does, on the thread that held it.
     using weak_queue = std::weak_ptr<operation_queue::storage>;
 
     static weak_queue weaken(const operation_queue& queue);

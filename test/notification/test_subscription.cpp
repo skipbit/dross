@@ -462,6 +462,32 @@ TEST(subscription_test, one_on_a_queue_that_has_shut_down_is_not_active)
     EXPECT_FALSE(token.active());
 }
 
+TEST(subscription_test, notifications_queued_before_a_queue_stops_still_run)
+{
+    record calls;
+    dross::operation_queue workers{ 1 };
+    auto release = std::make_shared<event>();
+    auto blocking = std::make_shared<event>();
+    workers.submit([release, blocking]() {
+        blocking->set();
+        release->wait();
+    });
+    ASSERT_TRUE(blocking->wait());
+
+    auto [sender_side, token] = subscribe(dross::delivery::on(workers), [&calls](int value) {
+        calls.add(value);
+    });
+    send(*sender_side, 1);
+    send(*sender_side, 2);
+    EXPECT_FALSE(workers.shutdown(std::chrono::milliseconds::zero()));
+    send(*sender_side, 3);
+    release->set();
+    ASSERT_TRUE(workers.shutdown(std::chrono::duration_cast<std::chrono::milliseconds>(kTimeout)));
+
+    EXPECT_EQ(calls.values(), (std::vector<int>{ 1, 2 }));
+    EXPECT_FALSE(token.active());
+}
+
 TEST(subscription_test, it_does_not_keep_its_queue_going)
 {
     std::optional<dross::operation_queue> workers{ std::in_place, 1 };
