@@ -16,12 +16,15 @@ namespace dross {
  *   notification, even when that call is made on the loop's own thread.
  *   Without a loop, the loop is the subscribing thread's
  * - direct() runs it on the thread that sends the notification, inside that
- *   call
+ *   call, or on that thread's run loop once the call has returned when the
+ *   sender defers it; see dross::notify_options
  * - on() runs it on one of an operation_queue's workers
  *
  * Order, for notifications sent from one thread to one subscriber:
  * - With queued() and direct(), the function runs for them one at a time,
- *   in the order they were sent
+ *   in the order they were sent. For direct(), that holds among those sent
+ *   with the same dross::notify_timing: a deferred one runs after any sent
+ *   without deferring before its loop runs it
  * - With on(), they are taken from the queue in the order they were sent.
  *   On a queue with more than one worker, which of them the function starts
  *   on first is not fixed, and two of them can run at the same time, as two
@@ -77,7 +80,8 @@ public:
     static delivery queued(runloop loop);
 
     /**
-     * @brief Run on the sending thread, inside the call that sends.
+     * @brief Run on the sending thread, inside the call that sends unless the
+     * sender defers it.
      * @return The delivery
      */
     static delivery direct();

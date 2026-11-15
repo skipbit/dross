@@ -38,14 +38,19 @@
  * - dross::broadcaster sends, and does nothing else
  * - dross::listener subscribes to one broadcaster's notifications, and does
  *   not send
- * - dross::notification is what one call to notify() sent
+ * - dross::notification is what one call to notify() sent, and cancels the
+ *   deliveries of it that have not started
+ * - dross::notify_options says how notify() sends; notify_timing::deferred
+ *   holds back the subscribers that run on the sending thread until notify()
+ *   has returned
  *
  * A subscriber names, for every subscription, where its function runs:
  *
  * - dross::delivery::queued() on a run loop, the subscribing thread's by
  *   default
  * - dross::delivery::direct() on the sending thread, inside the call that
- *   sends
+ *   sends, or on that thread's run loop once it has returned when the sender
+ *   defers it
  * - dross::delivery::on() on one of an operation_queue's workers
  *
  * There is no default, so reading a subscription tells which thread its
@@ -86,6 +91,7 @@
  * @brief Notification namespace members live directly in dross.
  *
  * The notification module adds topic, broadcaster, listener, notification,
- * delivery and subscription to the dross namespace, alongside the thread
- * module it runs on, rather than a namespace of its own.
+ * notify_options, delivery and subscription to the dross namespace,
+ * alongside the thread module it runs on, rather than a namespace of its
+ * own.
  */

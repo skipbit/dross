@@ -12,6 +12,11 @@ Unreleased
 Added
 ~~~~~
 
+- ``notification::cancel()``, which stops every delivery of one
+  notification that has not started, and ``notify_options``, whose
+  ``notify_timing::deferred`` has subscribers that chose ``direct()`` run
+  on the sending thread's run loop once ``notify()`` has returned
+
 - ``topic``, ``broadcaster``, ``listener`` and ``notification`` in the
   notification module. A ``broadcaster`` sends typed notifications within
   the process, and a ``listener`` made from it subscribes to them, each

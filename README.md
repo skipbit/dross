@@ -176,7 +176,8 @@ int main()
 - **`listener`** - Subscribes to one broadcaster's notifications, and does not send
 - **`delivery`** - Where a subscriber's function runs: on a run loop, on the sending thread, or on an operation queue's worker
 - **`subscription`** - The right to go on receiving, which ends when it is reset or destroyed
-- **`notification`** - What one call to `notify()` sent
+- **`notification`** - What one call to `notify()` sent, through which its deliveries not yet started can be cancelled
+- **`notify_options`** - How `notify()` sends, such as deferring the subscribers that run on the sending thread until it returns
 
 ## 📖 Documentation
 
