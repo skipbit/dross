@@ -6,6 +6,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <optional>
 
 // The receiving end behind a subscription: the subscriber's function, where
 // it runs, and whether the subscription has ended. What sends a notification
@@ -17,16 +18,33 @@ public:
     // The subscriber's function, given a pointer to the notification's value.
     using function_type = std::function<void(const void*)>;
 
-    storage(delivery_target target, function_type function);
+    // Where a subscription made through a listener came from: the listener,
+    // which it keeps going, and the broadcaster the listener hears, which it
+    // does not.
+    struct origin final {
+        std::shared_ptr<const void> listener;
+        std::weak_ptr<const void> broadcaster;
+        // Takes the subscription out of the broadcaster's list, when the
+        // broadcaster still exists.
+        std::function<void()> detach;
+    };
+
+    storage(delivery_target target, function_type function, std::optional<origin> from = std::nullopt);
 
     // Runs the function for value the way target says: here and now for
     // direct_target, and otherwise as a task that holds value until it runs.
     // Every subscriber can be handed the same value. Does nothing once ended.
     void deliver(const std::shared_ptr<const void>& value);
 
-    // Ends the subscription. A call already running is not waited for.
+    // Ends the subscription and detaches it from its broadcaster. A call
+    // already running is not waited for.
     void end() noexcept;
 
+    bool ended() const noexcept;
+
+    // False once the function can never be called again: the subscription
+    // has ended, its target no longer takes work, or the broadcaster it came
+    // from has gone.
     bool active() const;
 
 private:
@@ -41,6 +59,7 @@ private:
     // lock.
     const delivery_target _target;
     const function_type _function;
+    const std::optional<origin> _from;
 
     std::atomic<bool> _ended{ false };
 };

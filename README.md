@@ -7,7 +7,7 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)
 
-**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, and per-thread run loops with the threads, timers and operation queue built on them.
+**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose.
 
 ## ✨ Key Features
 
@@ -170,6 +170,14 @@ int main()
 - **`operation_queue`** - A fixed set of worker threads, each running its own loop, taking submitted tasks from one shared queue by priority, and in the order they were submitted within one priority, each only once the tasks it runs after have returned
 - **`operation_result`** - What a task given to `operation_queue::enqueue()` returned, to wait on and read as its own type
 
+### Notification Layer
+- **`topic`** - The name a notification is sent under and the type of value it carries
+- **`broadcaster`** - Sends notifications within the process, and does nothing else
+- **`listener`** - Subscribes to one broadcaster's notifications, and does not send
+- **`delivery`** - Where a subscriber's function runs: on a run loop, on the sending thread, or on an operation queue's worker
+- **`subscription`** - The right to go on receiving, which ends when it is reset or destroyed
+- **`notification`** - What one call to `notify()` sent
+
 ## 📖 Documentation
 
 **[📘 API Reference & User Guide](https://skipbit.github.io/dross/)**
@@ -209,7 +217,7 @@ ctest --preset release -V
 ### Planned Features
 - **Format** - JSON, XML, YAML
 - **Concurrency** - Coroutines
-- **Notifications** - Typed notifications from a broadcaster to listeners, each delivered on the thread or queue the listener chose, within a process and between processes, and values that notify their observers when they change
+- **Notifications** - Sending between processes, and values that notify their observers when they change
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
 

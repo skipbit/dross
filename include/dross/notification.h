@@ -1,7 +1,44 @@
 /**
  * @file notification.h
- * @brief Notification module: choosing where a subscriber is called, and
- * holding the right to be called.
+ * @brief Notification module: sending typed notifications from a
+ * broadcaster to whoever subscribes through a listener, each on the thread
+ * the subscriber chose.
+ *
+ * Usage:
+ * @code
+ * #include <dross/notification.h>
+ *
+ * struct progress {
+ *     int done;
+ *     int total;
+ * };
+ *
+ * inline constexpr dross::topic<progress> kProgress{ "com.example.player.progress" };
+ *
+ * void show(const progress& now);
+ *
+ * int main()
+ * {
+ *     auto news = dross::broadcaster::create();
+ *     auto ears = dross::listener::create(news);
+ *
+ *     auto subscribed = ears.subscribe(kProgress, show, dross::delivery::queued());
+ *     if (! subscribed) {
+ *         return 1;
+ *     }
+ *     dross::subscription keep = std::move(*subscribed);
+ *
+ *     news.notify(kProgress, progress{ 3, 10 });
+ *     dross::current_runloop().run_pending();  // show() runs here
+ * }
+ * @endcode
+ *
+ * The pieces:
+ * - dross::topic names what is sent and the type of value it carries
+ * - dross::broadcaster sends, and does nothing else
+ * - dross::listener subscribes to one broadcaster's notifications, and does
+ *   not send
+ * - dross::notification is what one call to notify() sent
  *
  * A subscriber names, for every subscription, where its function runs:
  *
@@ -19,25 +56,36 @@
  * notifications still queued from calling it, without waiting for a call on
  * another thread.
  *
+ * There is no broadcaster shared by the whole process: each one is made by
+ * create() and handed to whoever sends or listens.
+ *
  * Errors:
- * - A subscription whose run loop's thread has ended, or whose queue has
- *   stopped, is no longer active rather than failing; active() reports it
+ * - listener::subscribe() returns an error of notification_errc, rather than
+ *   a subscription, for an empty function
+ * - A subscription whose run loop's thread has ended, whose queue has
+ *   stopped, or whose broadcaster has gone is no longer active rather than
+ *   failing; active() reports it
  * - An exception thrown by a subscriber's function propagates out of the
  *   call that ran it. It is not caught, stored or translated
  *
  * Platform support:
- * - Wherever the thread module runs
+ * - Wherever the thread module runs, with run-time type information on
  */
 
 #pragma once
 
+#include <dross/notification/broadcaster.h>
 #include <dross/notification/delivery.h>
+#include <dross/notification/error.h>
+#include <dross/notification/listener.h>
+#include <dross/notification/notification.h>
 #include <dross/notification/subscription.h>
+#include <dross/notification/topic.h>
 
 /**
  * @brief Notification namespace members live directly in dross.
  *
- * The notification module adds delivery and subscription to the dross
- * namespace, alongside the thread module it runs on, rather than a namespace
- * of its own.
+ * The notification module adds topic, broadcaster, listener, notification,
+ * delivery and subscription to the dross namespace, alongside the thread
+ * module it runs on, rather than a namespace of its own.
  */

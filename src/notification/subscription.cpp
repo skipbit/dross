@@ -6,14 +6,16 @@
 #include "thread/runloop_access.h"
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include <variant>
 
 namespace dross {
 
-subscription::storage::storage(delivery_target target, function_type function)
+subscription::storage::storage(delivery_target target, function_type function, std::optional<origin> from)
     : _target{ std::move(target) }
     , _function{ std::move(function) }
+    , _from{ std::move(from) }
 {
 }
 
@@ -39,12 +41,27 @@ void subscription::storage::deliver(const std::shared_ptr<const void>& value)
 
 void subscription::storage::end() noexcept
 {
-    _ended.store(true);
+    if (_ended.exchange(true)) {
+        return;
+    }
+    if (_from && _from->detach) {
+        // Detaching allocates a new list; running out of memory here ends the
+        // program, as noexcept does.
+        _from->detach();
+    }
+}
+
+bool subscription::storage::ended() const noexcept
+{
+    return _ended.load();
 }
 
 bool subscription::storage::active() const
 {
     if (_ended.load()) {
+        return false;
+    }
+    if (_from && _from->broadcaster.expired()) {
         return false;
     }
     const auto on_direct = [](const direct_target&) {

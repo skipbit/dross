@@ -72,9 +72,14 @@ public:
     void reset() noexcept;
 
     /**
-     * @brief Test whether the function can still be called.
-     * @return false once this is empty, and once the run loop's thread has
-     * ended or the operation_queue has stopped that the delivery names
+     * @brief Test whether notifications are still handed to the function.
+     * @return false once this is empty, once the run loop's thread has ended
+     * or the operation_queue has stopped that the delivery names, and once
+     * the broadcaster subscribed to has gone
+     *
+     * Once false, it stays false, and no notification sent from then on is
+     * handed to the function. One already queued can still call it, as the
+     * delivery's doc comment says; reset() keeps those from calling it too.
      */
     bool active() const;
 
