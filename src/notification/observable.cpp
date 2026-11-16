@@ -81,27 +81,66 @@ public:
         return (current_runloop() == _owner);
     }
 
-    const runloop& owner() const noexcept
-    {
-        return _owner;
-    }
-
     // Owner's thread only.
     const void* value() const noexcept
     {
         return _value.get();
     }
 
+    // Applies value on the owner's thread: at once when called there,
+    // otherwise from a task posted to the owner's loop. A task that runs
+    // after the observable has gone does nothing. Returns false when the
+    // loop does not accept the task.
+    bool set(value_pointer value)
+    {
+        if (owned_here()) {
+            apply(std::move(value));
+            return true;
+        }
+        runloop owner = _owner;
+        return owner.perform([self = weak_from_this(), value = std::move(value)]() mutable {
+            if (const auto alive = self.lock()) {
+                alive->apply(std::move(value));
+            }
+        });
+    }
+
+    void add(watcher which)
+    {
+        std::shared_ptr<const watchers> replaced;
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            replaced = rebuild(std::move(which));
+        }
+    }
+
+    void prune()
+    {
+        std::shared_ptr<const watchers> replaced;
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            replaced = rebuild(std::nullopt);
+        }
+    }
+
+private:
+    // A change with the watchers as they were when it took effect.
+    struct pending final {
+        change what;
+        std::shared_ptr<const watchers> to;
+    };
+
     // Owner's thread only. A change made from inside a watcher's function
     // takes effect at once, and is handed on once the change being handed on
     // has reached every watcher, so each watcher sees the changes in order.
+    // A change goes only to the watchers there were when it took effect.
     void apply(value_pointer next)
     {
         if (_equal(_value.get(), next.get())) {
             return;
         }
         value_pointer previous = std::exchange(_value, std::move(next));
-        _changes.push_back(change{ std::move(previous), _value });
+        _changes.push_back(pending{ change{ std::move(previous), _value }, snapshot() });
         if (_handing_on) {
             return;
         }
@@ -119,31 +158,16 @@ public:
         } const guard{ *this };
 
         while (! _changes.empty()) {
-            const change current = std::move(_changes.front());
+            const pending current = std::move(_changes.front());
             _changes.pop_front();
-            for (const auto& each : *snapshot()) {
-                if (each.waiting->offer(current)) {
+            for (const auto& each : *current.to) {
+                if (each.waiting->offer(current.what)) {
                     each.subscriber->deliver(nullptr, _sent, false);
                 }
             }
         }
     }
 
-    void add(watcher which)
-    {
-        std::shared_ptr<const watchers> replaced;
-        const std::lock_guard<std::mutex> guard{ _mutex };
-        replaced = rebuild(std::move(which));
-    }
-
-    void prune()
-    {
-        std::shared_ptr<const watchers> replaced;
-        const std::lock_guard<std::mutex> guard{ _mutex };
-        replaced = rebuild(std::nullopt);
-    }
-
-private:
     std::shared_ptr<const watchers> snapshot() const
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
@@ -178,7 +202,7 @@ private:
 
     // Changes waiting to be handed on, and whether they are being handed on
     // now.
-    std::deque<change> _changes;
+    std::deque<pending> _changes;
     bool _handing_on{ false };
 
     // What deliver() checks for cancelling; an observable's change is never
@@ -220,16 +244,7 @@ bool observable_core::set(const std::weak_ptr<storage>& which, std::shared_ptr<c
     if (! target) {
         return false;
     }
-    if (target->owned_here()) {
-        target->apply(std::move(value));
-        return true;
-    }
-    runloop owner = target->owner();
-    return owner.perform([which, value = std::move(value)]() mutable {
-        if (const auto alive = which.lock()) {
-            alive->apply(std::move(value));
-        }
-    });
+    return target->set(std::move(value));
 }
 
 subscription observable_core::when_changed(function_type function, const delivery& how) const

@@ -361,6 +361,54 @@ TEST(observable_test, subscribing_and_resetting_inside_a_function_is_allowed)
     EXPECT_EQ(calls.values(), (std::vector<int>{ 3 }));
 }
 
+TEST(observable_test, subscribing_and_resetting_inside_a_function_does_not_stop_the_change_reaching_the_functions_after_it)
+{
+    const dross::observable<int> volume{ 1 };
+    record calls;
+    dross::subscription added;
+    dross::subscription bystander;
+    bool first_call = true;
+    auto first = volume.when_changed([&](const int&) {
+        if (first_call) {
+            first_call = false;
+            added = volume.when_changed([](const int&) {
+            }, dross::delivery::direct());
+            bystander.reset();
+        }
+    }, dross::delivery::direct());
+    auto second = volume.when_changed([&calls](const int& now) {
+        calls.add(now);
+    }, dross::delivery::direct());
+    bystander = volume.when_changed([](const int&) {
+    }, dross::delivery::direct());
+
+    volume.set(2);
+
+    EXPECT_EQ(calls.values(), (std::vector<int>{ 2 }));
+}
+
+TEST(observable_test, a_function_subscribed_inside_another_is_not_given_a_change_made_before_it_subscribed)
+{
+    const dross::observable<int> volume{ 1 };
+    record calls;
+    dross::subscription later;
+    auto first = volume.when_changed([&](const int& now) {
+        if (now == 2) {
+            volume.set(3);
+            later = volume.when_changed([&calls](const int& before, const int& after) {
+                calls.add(before, after);
+            }, dross::delivery::direct());
+        }
+    }, dross::delivery::direct());
+
+    volume.set(2);
+    EXPECT_TRUE(calls.changes().empty());
+    EXPECT_EQ(volume.get(), 3);
+    volume.set(4);
+
+    EXPECT_EQ(calls.changes(), (std::vector<change>{ { 3, 4 } }));
+}
+
 TEST(observable_test, a_set_from_another_thread_takes_effect_when_the_owners_loop_runs_it)
 {
     dross_test::reset_main_runloop();

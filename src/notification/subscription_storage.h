@@ -43,7 +43,7 @@ public:
     // same sent. Does nothing once ended.
     void deliver(const std::shared_ptr<const void>& value, const std::shared_ptr<const sending>& sent, bool deferred);
 
-    // Ends the subscription and detaches it from its broadcaster. A call
+    // Ends the subscription and detaches it from its source. A call
     // already running is not waited for.
     void end() noexcept;
 
