@@ -101,7 +101,7 @@ private:
  *     }
  *
  * private:
- *     void show(int volume);
+ *     void show(int volume) { std::cout << "Volume: " << volume << std::endl; }
  *
  *     dross::subscription _watch;
  * };
