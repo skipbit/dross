@@ -74,8 +74,8 @@
  * - A subscription whose run loop's thread has ended, whose queue has
  *   stopped, or whose broadcaster or observable has gone is no longer active
  *   rather than failing; active() reports it
- * - observable::get() from a thread that does not own the observable is a
- *   misuse, and stops the program
+ * - observable::get() from a thread that does not own the observable, or on
+ *   a moved-from one, is a misuse, and stops the program
  * - An exception thrown by a subscriber's function propagates out of the
  *   call that ran it. It is not caught, stored or translated
  *

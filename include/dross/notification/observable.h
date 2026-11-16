@@ -140,27 +140,35 @@ private:
  * - An empty function, a null function pointer or an empty std::function,
  *   gives a subscription that is never called and is not active
  * - A change made from inside a function takes effect at once, and is handed
- *   on once the change being handed on has reached every function, so each
- *   function is given the changes in the order they took effect
+ *   on once the change being handed on has reached every function, so the
+ *   changes are handed to each function in the order they took effect
+ * - With dross::delivery::on() and a queue with more than one worker, two
+ *   calls of one function can run at the same time and finish in either
+ *   order, as dross::delivery says
  *
  * Exceptions:
  * - An exception thrown by a function is not caught. It propagates out of
- *   the call that ran the function: the set() that made the change for
- *   dross::delivery::direct(), and the running call of the run loop or the
- *   worker otherwise
- * - When it leaves a set(), the functions after it are not given that
- *   change, nor any change made inside it that had yet to be handed on. The
- *   value keeps the latest change
+ *   the call that ran the function. For dross::delivery::direct(), that is
+ *   the call that applied the change: the set() made on the owner's thread,
+ *   or the owner's run loop for a value posted to it. Otherwise it is the
+ *   running call of the run loop or the worker
+ * - When it leaves the call that applied a change, the functions after it
+ *   are not given that change, nor any change made inside it that had yet to
+ *   be handed on. The value keeps the latest change
  *
  * Misuse:
  * - get() from a thread that does not own the observable writes a line to
  *   standard error and calls std::abort(). The value is not guarded by a
  *   lock, so reading it there would be a data race
+ * - get() on a moved-from observable does the same, since there is no value
+ *   to read
  *
  * Lifetime:
  * - The observable is not copied. Moving it keeps its owner and the
- *   subscriptions made on it. A moved-from observable may only be assigned
- *   to or destroyed
+ *   subscriptions made on it. A moved-from observable holds no value: its
+ *   set() returns false, make_proxy() gives a proxy whose set() returns
+ *   false, and when_changed() gives a subscription that is never called and
+ *   is not active. It can be assigned to again
  * - Once the observable is destroyed, a value posted to it is dropped, its
  *   subscriptions are no longer active, and a proxy's set() returns false
  *
@@ -237,7 +245,8 @@ public:
      * @brief Read the value, on the owner's thread.
      * @return The value, valid until the next change takes effect
      *
-     * Called from any other thread, it stops the program; see Misuse.
+     * Called from any other thread, or on a moved-from observable, it stops
+     * the program; see Misuse.
      */
     const T& get() const
     {

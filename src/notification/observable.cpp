@@ -226,6 +226,10 @@ observable_core::~observable_core() = default;
 
 const void* observable_core::get() const
 {
+    if (! _store) {
+        std::fputs("dross: observable::get: called on an observable that has been moved from\n", stderr);
+        std::abort();
+    }
     if (! _store->owned_here()) {
         std::fputs("dross: observable::get: called from a thread that does not own the observable\n", stderr);
         std::abort();
@@ -238,6 +242,8 @@ bool observable_core::set(std::shared_ptr<const void> value) const
     return set(weaken(), std::move(value));
 }
 
+// The storage is locked for the call, so a function that destroys the
+// observable while a change is handed on does not free it underneath.
 bool observable_core::set(const std::weak_ptr<storage>& which, std::shared_ptr<const void> value)
 {
     const auto target = which.lock();
@@ -249,6 +255,10 @@ bool observable_core::set(const std::weak_ptr<storage>& which, std::shared_ptr<c
 
 subscription observable_core::when_changed(function_type function, const delivery& how) const
 {
+    if (! _store) {
+        return subscription{};
+    }
+
     using receiver = storage::receiver;
 
     auto waiting = std::make_shared<waiting_change>();

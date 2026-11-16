@@ -572,6 +572,35 @@ TEST(observable_test, moving_keeps_the_owner_and_the_subscriptions)
     EXPECT_EQ(calls.values(), (std::vector<int>{ 2, 3 }));
 }
 
+TEST(observable_test, a_moved_from_observable_sets_nothing_and_gives_subscriptions_that_are_not_active)
+{
+    dross::observable<int> first{ 1 };
+    dross::observable<int> second{ std::move(first) };
+    record calls;
+
+    auto token = first.when_changed([&calls](const int& now) {
+        calls.add(now);
+    }, dross::delivery::direct());
+
+    EXPECT_FALSE(token.active());
+    EXPECT_FALSE(first.set(2));
+    EXPECT_FALSE(first.make_proxy().set(3));
+    EXPECT_EQ(second.get(), 1);
+    EXPECT_TRUE(calls.values().empty());
+}
+
+TEST(observable_test, a_moved_from_observable_can_be_assigned_to_again)
+{
+    dross::observable<int> first{ 1 };
+    dross::observable<int> second{ std::move(first) };
+
+    first = dross::observable<int>{ 5 };
+
+    EXPECT_EQ(first.get(), 5);
+    EXPECT_TRUE(first.set(6));
+    EXPECT_EQ(first.get(), 6);
+}
+
 TEST(observable_test, an_exception_from_a_direct_function_propagates_out_of_set_and_later_changes_still_arrive)
 {
     const dross::observable<int> volume{ 1 };
@@ -615,4 +644,13 @@ TEST(observable_death_test, get_once_the_owners_thread_has_ended_stops_the_progr
     }
 
     EXPECT_DEATH((void)volume->get(), "does not own the observable");
+}
+
+TEST(observable_death_test, get_on_a_moved_from_observable_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    dross::observable<int> first{ 1 };
+    const dross::observable<int> second{ std::move(first) };
+
+    EXPECT_DEATH((void)first.get(), "dross: observable::get: called on an observable that has been moved from");
 }
