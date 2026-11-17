@@ -396,6 +396,8 @@ TEST(cbor_deserialize_test, forms_dross_does_not_write_are_refused)
     EXPECT_EQ(refusal("1c"), "byte 0: the additional information is reserved");
     EXPECT_EQ(refusal("c001"), "byte 1: a date and time is not a text string");
     EXPECT_EQ(refusal("c201"), "byte 1: a bignum is not a byte string");
+    EXPECT_EQ(refusal("c160"), "byte 1: an epoch time is not a number");
+    EXPECT_EQ(refusal("c1f6"), "byte 1: an epoch time is not a number");
     EXPECT_EQ(refusal("c4810001"), "byte 1: a decimal fraction is not an array of two items");
     EXPECT_EQ(refusal("c482c2410101"), "byte 2: an integer is expected");
 }

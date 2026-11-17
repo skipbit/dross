@@ -73,4 +73,6 @@ DROSS_CBOR_HIDDEN data serialize(const value& input);
  */
 DROSS_CBOR_HIDDEN std::expected<value, error> deserialize(const data& input);
 
+#undef DROSS_CBOR_HIDDEN
+
 }  // namespace dross::cbor

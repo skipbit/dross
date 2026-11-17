@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <expected>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -353,11 +354,34 @@ private:
         return start;
     }
 
+    // The text string of a head, whose length the input must hold.
+    std::expected<std::string, error> take_text(const item_head& head)
+    {
+        const auto start = take(head.argument);
+        if (! start) {
+            return std::unexpected(start.error());
+        }
+        return std::string(reinterpret_cast<const char*>(*start), static_cast<std::size_t>(head.argument));
+    }
+
+    static std::string too_deep_message()
+    {
+        return "arrays and maps are nested deeper than " + std::to_string(kMaximumDepth);
+    }
+
+    static std::string too_many_digits_message(const std::string_view what)
+    {
+        return std::string(what) + " has more than " + std::to_string(kMaximumDigits) + " digits";
+    }
+
     std::expected<value, error> read(const int depth)
     {
         const auto head = read_head();
         if (! head) {
             return std::unexpected(head.error());
+        }
+        if (((head->type == major_type::array) || (head->type == major_type::map)) && (depth > kMaximumDepth)) {
+            return fail(too_deep_message());
         }
         switch (head->type) {
         case major_type::unsigned_integer:
@@ -371,11 +395,11 @@ private:
             return data{ *start, static_cast<std::size_t>(head->argument) };
         }
         case major_type::text_string: {
-            const auto start = take(head->argument);
-            if (! start) {
-                return std::unexpected(start.error());
+            auto text = take_text(*head);
+            if (! text) {
+                return std::unexpected(text.error());
             }
-            return string{ std::string(reinterpret_cast<const char*>(*start), static_cast<std::size_t>(head->argument)) };
+            return string{ std::move(*text) };
         }
         case major_type::array:
             return read_array(head->argument, depth);
@@ -391,9 +415,6 @@ private:
 
     std::expected<value, error> read_array(const std::uint64_t count, const int depth)
     {
-        if (depth > kMaximumDepth) {
-            return fail("arrays and maps are nested deeper than 128");
-        }
         // Each item takes a byte at least, so a count beyond the bytes left
         // is refused before anything is made for it.
         if (count > remaining()) {
@@ -412,9 +433,6 @@ private:
 
     std::expected<value, error> read_map(const std::uint64_t count, const int depth)
     {
-        if (depth > kMaximumDepth) {
-            return fail("arrays and maps are nested deeper than 128");
-        }
         if (count > (remaining() / 2)) {
             return fail("a map has more entries than bytes left");
         }
@@ -427,11 +445,11 @@ private:
             if (key_head->type != major_type::text_string) {
                 return fail("a map key is not a text string");
             }
-            const auto start = take(key_head->argument);
-            if (! start) {
-                return std::unexpected(start.error());
+            auto taken = take_text(*key_head);
+            if (! taken) {
+                return std::unexpected(taken.error());
             }
-            const std::string key(reinterpret_cast<const char*>(*start), static_cast<std::size_t>(key_head->argument));
+            const std::string key = std::move(*taken);
             if (entries.contains(key)) {
                 return fail("a map key appears twice");
             }
@@ -462,16 +480,26 @@ private:
         }
     }
 
+    static bool is_float(const item_head& head)
+    {
+        return (head.type == major_type::simple) && (head.additional >= 25) && (head.additional <= 27);
+    }
+
+    // The value of a half, single or double precision float head.
+    static double float_value(const item_head& head)
+    {
+        if (head.additional == 25) {
+            return half_to_double(static_cast<std::uint16_t>(head.argument));
+        }
+        if (head.additional == 26) {
+            return std::bit_cast<float>(static_cast<std::uint32_t>(head.argument));
+        }
+        return std::bit_cast<double>(head.argument);
+    }
+
     std::expected<value, error> read_float(const item_head& head)
     {
-        double amount = 0.0;
-        if (head.additional == 25) {
-            amount = half_to_double(static_cast<std::uint16_t>(head.argument));
-        } else if (head.additional == 26) {
-            amount = std::bit_cast<float>(static_cast<std::uint32_t>(head.argument));
-        } else {
-            amount = std::bit_cast<double>(head.argument);
-        }
+        const double amount = float_value(head);
         if (std::isinf(amount)) {
             return fail("an infinity cannot be held");
         }
@@ -543,64 +571,56 @@ private:
         if (head->type != major_type::text_string) {
             return fail("a date and time is not a text string");
         }
-        const auto start = take(head->argument);
-        if (! start) {
-            return std::unexpected(start.error());
+        const auto text = take_text(*head);
+        if (! text) {
+            return std::unexpected(text.error());
         }
-        const auto moment = timestamp::from_string(std::string(reinterpret_cast<const char*>(*start), static_cast<std::size_t>(head->argument)));
+        const auto moment = timestamp::from_string(*text);
         if (! moment) {
             return fail("a date and time string is not one a timestamp holds");
         }
         return *moment;
     }
 
-    std::expected<value, error> read_epoch_time()
+    // The seconds and nanoseconds from the epoch of an integer or float head,
+    // or nothing outside the years 0 to 9999.
+    static std::optional<std::pair<std::int64_t, std::int64_t>> epoch_instant(const item_head& head)
     {
-        const auto head = read_head();
-        if (! head) {
-            return std::unexpected(head.error());
+        if (head.type == major_type::unsigned_integer) {
+            if (head.argument >= static_cast<std::uint64_t>(kEndSecond)) {
+                return std::nullopt;
+            }
+            return std::pair{ static_cast<std::int64_t>(head.argument), std::int64_t{ 0 } };
         }
-        std::int64_t seconds = 0;
-        std::int64_t nanoseconds = 0;
-        if (head->type == major_type::unsigned_integer) {
-            if (head->argument >= static_cast<std::uint64_t>(kEndSecond)) {
-                return fail("an epoch time is outside the years 0 to 9999");
+        if (head.type == major_type::negative_integer) {
+            if (head.argument >= static_cast<std::uint64_t>(-kFirstSecond)) {
+                return std::nullopt;
             }
-            seconds = static_cast<std::int64_t>(head->argument);
-        } else if (head->type == major_type::negative_integer) {
-            if (head->argument >= static_cast<std::uint64_t>(-kFirstSecond)) {
-                return fail("an epoch time is outside the years 0 to 9999");
-            }
-            seconds = -1 - static_cast<std::int64_t>(head->argument);
-        } else if ((head->type == major_type::simple) && (head->additional >= 25) && (head->additional <= 27)) {
-            double amount = 0.0;
-            if (head->additional == 25) {
-                amount = half_to_double(static_cast<std::uint16_t>(head->argument));
-            } else if (head->additional == 26) {
-                amount = std::bit_cast<float>(static_cast<std::uint32_t>(head->argument));
-            } else {
-                amount = std::bit_cast<double>(head->argument);
-            }
-            // Also false for NaN.
-            if (! ((amount >= static_cast<double>(kFirstSecond)) && (amount < static_cast<double>(kEndSecond)))) {
-                return fail("an epoch time is outside the years 0 to 9999");
-            }
-            const double whole = std::floor(amount);
-            seconds = static_cast<std::int64_t>(whole);
-            nanoseconds = std::llround((amount - whole) * 1e9);
-            if (nanoseconds == 1000000000) {
-                ++seconds;
-                nanoseconds = 0;
-            }
-            if (seconds >= kEndSecond) {
-                return fail("an epoch time is outside the years 0 to 9999");
-            }
-        } else {
-            return fail("an epoch time is not a number");
+            return std::pair{ -1 - static_cast<std::int64_t>(head.argument), std::int64_t{ 0 } };
         }
+        const double amount = float_value(head);
+        // Also false for NaN.
+        if (! ((amount >= static_cast<double>(kFirstSecond)) && (amount < static_cast<double>(kEndSecond)))) {
+            return std::nullopt;
+        }
+        const double whole = std::floor(amount);
+        std::int64_t seconds = static_cast<std::int64_t>(whole);
+        std::int64_t nanoseconds = std::llround((amount - whole) * 1e9);
+        if (nanoseconds == 1000000000) {
+            ++seconds;
+            nanoseconds = 0;
+        }
+        if (seconds >= kEndSecond) {
+            return std::nullopt;
+        }
+        return std::pair{ seconds, nanoseconds };
+    }
+
+    static std::optional<timestamp> timestamp_at(const std::int64_t seconds, const std::int64_t nanoseconds)
+    {
         const auto moment = timestamp::from_components(1970, 1, 1)->add(std::chrono::seconds{ seconds });
         if (! moment) {
-            return fail("an epoch time is outside the years 0 to 9999");
+            return std::nullopt;
         }
         if (nanoseconds == 0) {
             return *moment;
@@ -612,9 +632,27 @@ private:
         text.insert(text.size() - 1, "." + fraction);
         const auto precise = timestamp::from_string(text);
         if (! precise) {
-            return fail("an epoch time is outside the years 0 to 9999");
+            return std::nullopt;
         }
         return *precise;
+    }
+
+    std::expected<value, error> read_epoch_time()
+    {
+        const auto head = read_head();
+        if (! head) {
+            return std::unexpected(head.error());
+        }
+        const bool integer = (head->type == major_type::unsigned_integer) || (head->type == major_type::negative_integer);
+        if (! integer && ! is_float(*head)) {
+            return fail("an epoch time is not a number");
+        }
+        const auto instant = epoch_instant(*head);
+        const auto moment = instant ? timestamp_at(instant->first, instant->second) : std::nullopt;
+        if (! moment) {
+            return fail("an epoch time is outside the years 0 to 9999");
+        }
+        return *moment;
     }
 
     // The digits of a bignum, with a minus sign when negative.
@@ -628,7 +666,7 @@ private:
             return fail("a bignum is not a byte string");
         }
         if (head->argument > kMaximumBignumBytes) {
-            return fail("a bignum has more than 4096 digits");
+            return fail(too_many_digits_message("a bignum"));
         }
         const auto start = take(head->argument);
         if (! start) {
@@ -640,7 +678,7 @@ private:
             digits = increment(std::move(digits));
         }
         if (digits.size() > kMaximumDigits) {
-            return fail("a bignum has more than 4096 digits");
+            return fail(too_many_digits_message("a bignum"));
         }
         return negative ? "-" + digits : digits;
     }
@@ -666,7 +704,7 @@ private:
         const auto [end, code] = std::from_chars(exponent_text->data(), exponent_text->data() + exponent_text->size(), exponent);
         const auto limit = static_cast<std::int64_t>(kMaximumDigits);
         if ((code != std::errc{}) || (end != exponent_text->data() + exponent_text->size()) || (exponent > limit) || (exponent < -limit)) {
-            return fail("a decimal fraction has more than 4096 digits");
+            return fail(too_many_digits_message("a decimal fraction"));
         }
         const bool negative = mantissa->starts_with('-');
         std::string digits = negative ? mantissa->substr(1) : *mantissa;
@@ -675,7 +713,7 @@ private:
         std::string text;
         if (exponent >= 0) {
             if ((digits.size() + static_cast<std::size_t>(exponent)) > kMaximumDigits) {
-                return fail("a decimal fraction has more than 4096 digits");
+                return fail(too_many_digits_message("a decimal fraction"));
             }
             text = digits + std::string(static_cast<std::size_t>(exponent), '0') + ".0";
         } else {
