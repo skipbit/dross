@@ -153,6 +153,7 @@ int main()
 - **`dictionary`** - Key-value containers
 - **`data`** - Byte buffer, converted to and from strings byte for byte
 - **`value`** - Polymorphic type holding any supported type
+- **`value_traits`** - How a type becomes a `value` and comes back from one, given for dross's own types, numbers, `std::string` and standard containers
 - **`error`** - A `std::error_code` with its category, returned through `std::expected`
 
 ### Format Layer
