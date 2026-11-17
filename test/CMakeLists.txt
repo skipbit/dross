@@ -52,6 +52,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_value.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_value_traits.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_type.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/format/test_cbor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/file_local_peer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_broadcaster.cpp
@@ -66,6 +67,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_timer_schedule.cpp
     # Hidden in the shared library, and used by the internal headers the
     # tests include.
+    ${PROJECT_SOURCE_DIR}/src/format/cbor.cpp
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
 )
 

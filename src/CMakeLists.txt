@@ -31,6 +31,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timezone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value_traits.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/format/cbor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
