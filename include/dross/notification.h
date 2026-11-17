@@ -43,6 +43,9 @@
  * - dross::notify_options says how notify() sends; notify_timing::deferred
  *   holds back the subscribers that run on the sending thread until notify()
  *   has returned
+ * - dross::observable holds a value that its owner thread changes, and
+ *   calls the functions given to when_changed() on each change, where each
+ *   one's delivery says
  *
  * A subscriber names, for every subscription, where its function runs:
  *
@@ -66,10 +69,13 @@
  *
  * Errors:
  * - listener::subscribe() returns an error of notification_errc, rather than
- *   a subscription, for an empty function
+ *   a subscription, for an empty function. observable::when_changed()
+ *   returns a subscription that is not active for one
  * - A subscription whose run loop's thread has ended, whose queue has
- *   stopped, or whose broadcaster has gone is no longer active rather than
- *   failing; active() reports it
+ *   stopped, or whose broadcaster or observable has gone is no longer active
+ *   rather than failing; active() reports it
+ * - observable::get() from a thread that does not own the observable, or on
+ *   a moved-from one, is a misuse, and stops the program
  * - An exception thrown by a subscriber's function propagates out of the
  *   call that ran it. It is not caught, stored or translated
  *
@@ -84,6 +90,7 @@
 #include <dross/notification/error.h>
 #include <dross/notification/listener.h>
 #include <dross/notification/notification.h>
+#include <dross/notification/observable.h>
 #include <dross/notification/subscription.h>
 #include <dross/notification/topic.h>
 
@@ -91,7 +98,7 @@
  * @brief Notification namespace members live directly in dross.
  *
  * The notification module adds topic, broadcaster, listener, notification,
- * notify_options, delivery and subscription to the dross namespace,
- * alongside the thread module it runs on, rather than a namespace of its
- * own.
+ * notify_options, observable, delivery and subscription to the dross
+ * namespace, alongside the thread module it runs on, rather than a
+ * namespace of its own.
  */

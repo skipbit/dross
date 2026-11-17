@@ -178,6 +178,7 @@ int main()
 - **`subscription`** - The right to go on receiving, which ends when it is reset or destroyed
 - **`notification`** - What one call to `notify()` sent, through which its deliveries not yet started can be cancelled
 - **`notify_options`** - How `notify()` sends, such as deferring the subscribers that run on the sending thread until it returns
+- **`observable`** - A value its owner thread changes, whose changes reach the functions given to `when_changed()`, and which other threads set through a `proxy`
 
 ## 📖 Documentation
 
@@ -218,7 +219,7 @@ ctest --preset release -V
 ### Planned Features
 - **Format** - JSON, XML, YAML
 - **Concurrency** - Coroutines
-- **Notifications** - Sending between processes, and values that notify their observers when they change
+- **Notifications** - Sending between processes
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
 

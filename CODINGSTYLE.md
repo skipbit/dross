@@ -92,6 +92,8 @@ The library works toward these goals. They guide design decisions, but they are 
     *   Do not use exceptions.
     *   For operations that may fail, return `std::optional` or `std::expected`.
     *   Represent error information using the `dross::error` class.
+    *   **Misuse:** A call that breaks what the documentation requires of its caller, such as reading an `observable` from a thread that does not own it, is a bug in the caller, not a failure to report. The library writes one line to standard error naming the function and the rule that was broken, then calls `std::abort()`. This happens in every build, so a bug found in testing is not left to undefined behaviour in a release.
+    *   **Failure:** What the caller cannot rule out in advance, such as bad input, a missing file or a stopped queue, is returned as `std::optional` or `std::expected`, as above.
 *   **`const` Usage:**
     *   Apply `const` to variables and parameters that are not modified.
     *   Apply `const` to methods that do not modify member variables.

@@ -12,6 +12,13 @@ Unreleased
 Added
 ~~~~~
 
+- ``observable``, a value its owner thread changes and others are told
+  of. ``when_changed()`` calls a function on each change where its
+  ``delivery`` says, with the value after the change, or with the values
+  before and after it. A ``set()`` from another thread, directly or through
+  the ``proxy`` that ``make_proxy()`` gives, takes effect on the owner's run
+  loop. ``get()`` from a thread that does not own it stops the program
+
 - ``notification::cancel()``, which stops every delivery of one
   notification that has not started, and ``notify_options``, whose
   ``notify_timing::deferred`` has subscribers that chose ``direct()`` run

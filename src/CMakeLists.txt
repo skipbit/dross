@@ -36,6 +36,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/error.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/listener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/notification.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/topic_address.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp

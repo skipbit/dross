@@ -55,6 +55,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/file_local_peer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_notification.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation_queue.cpp
