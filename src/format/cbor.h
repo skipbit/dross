@@ -29,7 +29,8 @@ namespace dross::cbor {
  * - null, boolean: the simple values null, true and false
  * - number: an integer as an integer, or as a bignum (tags 2 and 3) beyond
  *   64 bits; a floating-point number as a decimal fraction (tag 4), so no
- *   digit is lost; NaN as the half-precision NaN
+ *   digit is lost, with a whole number's trailing zeros in the exponent; NaN
+ *   as the half-precision NaN
  * - string: a text string of the bytes it holds, which are not checked to
  *   be UTF-8
  * - data: a byte string
@@ -38,8 +39,9 @@ namespace dross::cbor {
  * - timestamp: an RFC 3339 date and time string (tag 0), with its offset
  *   and fractional seconds
  *
- * A number whose integer or fractional part has more than 4096 digits, as
- * arithmetic can make, is written, but deserialize() refuses it.
+ * A number of more than 4096 digits from its first nonzero digit to its
+ * last, or with more than 4096 digits after the decimal point, as arithmetic
+ * can make, is written, but deserialize() refuses it.
  */
 DROSS_CBOR_HIDDEN data serialize(const value& input);
 
@@ -52,7 +54,10 @@ DROSS_CBOR_HIDDEN data serialize(const value& input);
  *
  * It reads what serialize() writes, and also:
  * - an integer, bignum or decimal fraction not in the fewest bytes
- * - a half, single or double precision float, as a floating-point number
+ * - a half, single or double precision float, as a floating-point number:
+ *   single and double as the shortest text that converts back to float and
+ *   double, as number does, and half, which has no such type, as its exact
+ *   value
  * - an epoch date and time (tag 1), as a UTC timestamp; a float is rounded
  *   to the nanosecond
  *
@@ -62,14 +67,19 @@ DROSS_CBOR_HIDDEN data serialize(const value& input);
  *   made for it
  * - arrays and maps nested deeper than 128
  * - a map key that is not a text string, or appears twice
- * - an infinity; a bignum, or a decimal fraction's integer or fractional
- *   part, of more than 4096 digits; a date and time outside the years 0 to
- *   9999
+ * - an infinity; a number of more than 4096 digits from its first nonzero
+ *   digit to its last, or with more than 4096 digits after the decimal
+ *   point; a date and time outside the years 0 to 9999
  * - an indefinite length, a tag other than 0 to 4, and a simple value other
  *   than false, true and null
  *
  * A text string is not checked to be UTF-8, as dross::string does not
  * check it.
+ *
+ * Each number is bounded, but the input as a whole is not: a decimal
+ * fraction of six bytes makes a number of 4096 digits, and the time a bignum
+ * takes grows with the square of its length. Whoever receives the input
+ * bounds its size.
  */
 DROSS_CBOR_HIDDEN std::expected<value, error> deserialize(const data& input);
 

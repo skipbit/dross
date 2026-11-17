@@ -55,6 +55,10 @@ constexpr std::size_t kMaximumDigits = 4096;
 // 256^1701 is below 10^4097, so no more bytes are needed for 4096 digits.
 constexpr std::uint64_t kMaximumBignumBytes = 1701;
 
+// Big integers are converted between bytes and decimal nine digits at a time.
+constexpr std::uint64_t kLimbBase = 1000000000;
+constexpr std::size_t kLimbDigits = 9;
+
 // The first second of the year 0 and of the year 10000, from the epoch.
 constexpr std::int64_t kFirstSecond = -62167219200;
 constexpr std::int64_t kEndSecond = 253402300800;
@@ -77,22 +81,30 @@ std::string decrement(std::string digits)
 
 // The big-endian bytes of a non-negative decimal integer, with no leading
 // zero byte.
-std::vector<std::uint8_t> decimal_to_bytes(std::string digits)
+std::vector<std::uint8_t> decimal_to_bytes(const std::string& digits)
 {
+    // Nine decimal digits at a time, most significant first.
+    std::vector<std::uint32_t> limbs;
+    const std::size_t head_length = ((digits.size() - 1) % kLimbDigits) + 1;
+    for (std::size_t start = 0; start < digits.size(); start += (start == 0) ? head_length : kLimbDigits) {
+        const std::size_t length = (start == 0) ? head_length : kLimbDigits;
+        std::uint32_t limb = 0;
+        std::from_chars(digits.data() + start, digits.data() + start + length, limb);
+        limbs.push_back(limb);
+    }
     std::vector<std::uint8_t> result;
-    while (digits != "0") {
-        std::string quotient;
-        unsigned remainder = 0;
-        for (const char digit : digits) {
-            const unsigned current = (remainder * 10) + static_cast<unsigned>(digit - '0');
-            const unsigned place = current / 256;
+    std::size_t first = 0;
+    while (first < limbs.size()) {
+        std::uint64_t remainder = 0;
+        for (std::size_t i = first; i < limbs.size(); ++i) {
+            const std::uint64_t current = (remainder * kLimbBase) + limbs[i];
+            limbs[i] = static_cast<std::uint32_t>(current / 256);
             remainder = current % 256;
-            if (! quotient.empty() || (place != 0)) {
-                quotient.push_back(static_cast<char>('0' + place));
-            }
         }
         result.push_back(static_cast<std::uint8_t>(remainder));
-        digits = quotient.empty() ? std::string{ "0" } : quotient;
+        while ((first < limbs.size()) && (limbs[first] == 0)) {
+            ++first;
+        }
     }
     std::ranges::reverse(result);
     return result;
@@ -214,9 +226,16 @@ private:
         }
         const auto first = text.find_first_not_of('0');
         text = (first == std::string::npos) ? std::string{ "0" } : text.substr(first);
+        // A whole number keeps its trailing zeros in the exponent: 1000 is
+        // [3, 1]. A fraction has none, as number writes none.
+        std::size_t trailing_zeros = 0;
+        if ((fraction_digits == 0) && (text != "0")) {
+            trailing_zeros = text.size() - text.find_last_not_of('0') - 1;
+            text.erase(text.size() - trailing_zeros);
+        }
         head(major_type::tag, kDecimalFractionTag);
         head(major_type::array, 2);
-        write_integer(fraction_digits != 0, std::to_string(fraction_digits));
+        write_integer(fraction_digits != 0, std::to_string((fraction_digits != 0) ? fraction_digits : trailing_zeros));
         write_integer(negative && (text != "0"), std::move(text));
     }
 
@@ -243,25 +262,29 @@ std::string increment(std::string digits)
 // The decimal digits of a big-endian unsigned integer.
 std::string bytes_to_decimal(const std::uint8_t* bytes, const std::size_t size)
 {
-    // Decimal digits, least significant first.
-    std::vector<std::uint8_t> digits;
+    // Nine decimal digits at a time, least significant first.
+    std::vector<std::uint32_t> limbs;
     for (std::size_t i = 0; i < size; ++i) {
-        unsigned carry = bytes[i];
-        for (auto& digit : digits) {
-            const unsigned current = (static_cast<unsigned>(digit) * 256) + carry;
-            digit = static_cast<std::uint8_t>(current % 10);
-            carry = current / 10;
+        std::uint64_t carry = bytes[i];
+        for (auto& limb : limbs) {
+            const std::uint64_t current = (static_cast<std::uint64_t>(limb) * 256) + carry;
+            limb = static_cast<std::uint32_t>(current % kLimbBase);
+            carry = current / kLimbBase;
         }
-        while (carry != 0) {
-            digits.push_back(static_cast<std::uint8_t>(carry % 10));
-            carry /= 10;
+        if (carry != 0) {
+            limbs.push_back(static_cast<std::uint32_t>(carry));
         }
     }
-    std::string result;
-    for (auto digit = digits.rbegin(); digit != digits.rend(); ++digit) {
-        result.push_back(static_cast<char>('0' + *digit));
+    if (limbs.empty()) {
+        return "0";
     }
-    return result.empty() ? std::string{ "0" } : result;
+    std::string result = std::to_string(limbs.back());
+    for (auto limb = std::next(limbs.rbegin()); limb != limbs.rend(); ++limb) {
+        const std::string part = std::to_string(*limb);
+        result.append(kLimbDigits - part.size(), '0');
+        result += part;
+    }
+    return result;
 }
 
 // The value of a half-precision float, given as its 16 bits.
@@ -708,6 +731,9 @@ private:
         }
         const bool negative = mantissa->starts_with('-');
         std::string digits = negative ? mantissa->substr(1) : *mantissa;
+        if (digits == "0") {
+            return number{ "0.0" };
+        }
         // The text of mantissa * 10^exponent, with a decimal point so that the
         // number is floating point.
         std::string text;

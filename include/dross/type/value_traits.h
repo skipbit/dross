@@ -250,7 +250,8 @@ struct value_traits<T> {
             return std::numeric_limits<T>::quiet_NaN();
         }
         static const number overflow = rounds_to_infinity();
-        if ((*found >= overflow) || (*found <= (number{} - overflow))) {
+        static const number negative_overflow = number{} - overflow;
+        if ((*found >= overflow) || (*found <= negative_overflow)) {
             return std::unexpected(value_errc::out_of_range);
         }
         const T result = static_cast<T>(static_cast<double>(*found));

@@ -76,6 +76,13 @@ TEST(cbor_serialize_test, a_floating_point_number_is_a_decimal_fraction)
     EXPECT_EQ(written(dross::number{ "0.0015" }), "c482230f");
 }
 
+TEST(cbor_serialize_test, a_whole_floating_point_number_keeps_its_trailing_zeros_in_the_exponent)
+{
+    EXPECT_EQ(written(dross::number{ "1000.0" }), "c4820301");
+    EXPECT_EQ(written(dross::number{ "-1e300" }), "c48219012c20");
+    EXPECT_EQ(written(dross::number{ "120.0" }), "c482010c");
+}
+
 TEST(cbor_serialize_test, a_decimal_fraction_carries_a_bignum_mantissa)
 {
     // 18446744073709551616 * 10^-1
@@ -213,6 +220,8 @@ TEST(cbor_deserialize_test, what_is_written_comes_back_equal)
         dross::number{ "18446744073709551616" },
         dross::number{ "-18446744073709551617" },
         dross::number{ "123456789012345678901234567890123456789" },
+        dross::number{ "1000000000000000000000000000" },
+        dross::number{ "-1000000000000000001000000000" },
         "",
         "IETF",
         "\xff\xfe",
@@ -232,7 +241,7 @@ TEST(cbor_deserialize_test, what_is_written_comes_back_equal)
 
 TEST(cbor_deserialize_test, a_number_comes_back_with_its_form)
 {
-    for (const char* text : { "273.15", "-0.5", "2.0", "0.0", "0.0015", "1844674407370955161.6", "-12345678901234567890.123456789", "1e3" }) {
+    for (const char* text : { "273.15", "-0.5", "2.0", "0.0", "0.0015", "1844674407370955161.6", "-12345678901234567890.123456789", "1e3", "1e300", "-120.0" }) {
         const dross::number input{ text };
         const auto back = dross::cbor::deserialize(dross::cbor::serialize(input));
         ASSERT_TRUE(back.has_value()) << text;
@@ -289,6 +298,9 @@ TEST(cbor_deserialize_test, floats_are_read_as_floating_point_numbers)
     EXPECT_TRUE(read_ok("f97e00").as<dross::number>().is_nan());
     EXPECT_TRUE(read_ok("fa7fc00000").as<dross::number>().is_nan());
     EXPECT_TRUE(read_ok("fb7ff8000000000000").as<dross::number>().is_nan());
+    // A half has no C++ type to be shortest for, so it reads as its value.
+    EXPECT_EQ(static_cast<std::string>(read_ok("f92e66").as<dross::number>()), "0.0999755859375");
+    EXPECT_EQ(static_cast<std::string>(read_ok("fa3dcccccd").as<dross::number>()), "0.1");
 }
 
 TEST(cbor_deserialize_test, an_epoch_time_is_read_as_utc)
@@ -371,8 +383,22 @@ TEST(cbor_deserialize_test, a_bignum_of_more_than_4096_digits_is_refused)
     expect_round_trip(largest);
 }
 
+TEST(cbor_deserialize_test, a_zero_mantissa_is_zero_whatever_the_exponent)
+{
+    const auto zero = read_ok("c48219100000").as<dross::number>();
+    EXPECT_EQ(zero, dross::number{ 0 });
+    EXPECT_TRUE(zero.is_floating_point());
+}
+
 TEST(cbor_deserialize_test, a_number_made_beyond_4096_digits_is_written_but_refused)
 {
+    // 4090 digits before the decimal point and 10 after: 4100 in all.
+    const dross::number long_fraction{ std::string(4090, '7') + "." + std::string(10, '3') };
+    ASSERT_FALSE(long_fraction.is_nan());
+    const auto refused = dross::cbor::deserialize(dross::cbor::serialize(long_fraction));
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error().detail(), "byte 4: a bignum has more than 4096 digits");
+
     const dross::number wide{ std::string(3000, '9') };
     const dross::number product = wide * wide;
     ASSERT_FALSE(product.is_nan());
