@@ -11,7 +11,9 @@
 #include "dross/type/value.h"
 
 #include <charconv>
+#include <cmath>
 #include <concepts>
+#include <cstdint>
 #include <expected>
 #include <limits>
 #include <map>
@@ -229,7 +231,7 @@ struct value_traits<T> {
  * number to the nearest value of double, and then of T; a long double gets
  * no more precision than double. It fails with value_errc::kind_mismatch
  * when the value is not a number, and with value_errc::out_of_range when the
- * number is beyond the largest finite value of T.
+ * number is too large in magnitude to round to a finite value of T.
  */
 template <std::floating_point T>
 struct value_traits<T> {
@@ -247,14 +249,35 @@ struct value_traits<T> {
         if (found->is_nan()) {
             return std::numeric_limits<T>::quiet_NaN();
         }
-        // The number goes through double, so a wider T is bounded as double is.
-        using bound_type = std::conditional_t<(sizeof(T) > sizeof(double)), double, T>;
-        const number largest{ std::numeric_limits<bound_type>::max() };
-        const number lowest{ std::numeric_limits<bound_type>::lowest() };
-        if ((*found > largest) || (*found < lowest)) {
+        static const number overflow = rounds_to_infinity();
+        if ((*found >= overflow) || (*found <= (number{} - overflow))) {
             return std::unexpected(value_errc::out_of_range);
         }
-        return static_cast<T>(static_cast<double>(*found));
+        const T result = static_cast<T>(static_cast<double>(*found));
+        // Rounding to double and then to T can still reach infinity just below
+        // the bound.
+        if (std::isinf(result)) {
+            return std::unexpected(value_errc::out_of_range);
+        }
+        return result;
+    }
+
+private:
+    // The number goes through double, so a wider T is bounded as double is.
+    using bound_type = std::conditional_t<(sizeof(T) > sizeof(double)), double, T>;
+
+    // The least magnitude that rounds to infinity in bound_type, every digit
+    // of it: halfway between the largest finite value and the next power of
+    // two, (2^(digits + 1) - 1) * 2^(max_exponent - digits - 1).
+    static number rounds_to_infinity()
+    {
+        using limits = std::numeric_limits<bound_type>;
+        number result{ (std::uint64_t{ 1 } << (limits::digits + 1)) - 1 };
+        const number two{ 2 };
+        for (int i = 0; i < limits::max_exponent - limits::digits - 1; ++i) {
+            result = result * two;
+        }
+        return result;
     }
 };
 

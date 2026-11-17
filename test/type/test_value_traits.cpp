@@ -196,6 +196,65 @@ TEST(value_traits_test, floating_point_rejects_what_is_beyond_its_largest_value)
     expect_failure<double>(dross::value{ true }, dross::value_errc::kind_mismatch);
 }
 
+namespace {
+
+// (2^digits - 1) * 2^(max_exponent - digits) of T, every digit: its largest
+// finite value.
+template <typename T>
+dross::number largest_finite()
+{
+    using limits = std::numeric_limits<T>;
+    dross::number result{ (std::uint64_t{ 1 } << limits::digits) - 1 };
+    for (int i = 0; i < limits::max_exponent - limits::digits; ++i) {
+        result = result * dross::number{ 2 };
+    }
+    return result;
+}
+
+// Halfway between the largest finite value of T and the next power of two:
+// the least magnitude that rounds to infinity.
+template <typename T>
+dross::number halfway_to_infinity()
+{
+    using limits = std::numeric_limits<T>;
+    dross::number half_ulp{ 1 };
+    for (int i = 0; i < limits::max_exponent - limits::digits - 1; ++i) {
+        half_ulp = half_ulp * dross::number{ 2 };
+    }
+    return largest_finite<T>() + half_ulp;
+}
+
+}  // namespace
+
+TEST(value_traits_test, floating_point_takes_its_largest_value_written_in_full)
+{
+    const dross::number largest = largest_finite<double>();
+    ASSERT_EQ(static_cast<std::string>(largest).size(), 309U);
+    const auto positive = dross::value_traits<double>::from_value(largest);
+    ASSERT_TRUE(positive.has_value());
+    EXPECT_EQ(*positive, std::numeric_limits<double>::max());
+    const auto negative = dross::value_traits<double>::from_value(dross::number{} - largest);
+    ASSERT_TRUE(negative.has_value());
+    EXPECT_EQ(*negative, std::numeric_limits<double>::lowest());
+
+    const auto single = dross::value_traits<float>::from_value(largest_finite<float>());
+    ASSERT_TRUE(single.has_value());
+    EXPECT_EQ(*single, std::numeric_limits<float>::max());
+}
+
+TEST(value_traits_test, floating_point_rejects_what_rounds_to_infinity)
+{
+    expect_failure<double>(halfway_to_infinity<double>(), dross::value_errc::out_of_range);
+    expect_failure<double>(dross::number{} - halfway_to_infinity<double>(), dross::value_errc::out_of_range);
+    const auto below = dross::value_traits<double>::from_value(halfway_to_infinity<double>() - dross::number{ 1 });
+    ASSERT_TRUE(below.has_value());
+    EXPECT_EQ(*below, std::numeric_limits<double>::max());
+
+    expect_failure<float>(halfway_to_infinity<float>(), dross::value_errc::out_of_range);
+    // Just below the bound, rounding to double first lands on the bound.
+    expect_failure<float>(halfway_to_infinity<float>() - dross::number{ 1 }, dross::value_errc::out_of_range);
+}
+
 TEST(value_traits_test, std_string_comes_back_byte_for_byte)
 {
     expect_round_trip(std::string{ "text" });
