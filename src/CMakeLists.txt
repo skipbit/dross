@@ -30,6 +30,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timestamp.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/timezone.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/type/value.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/type/value_traits.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
@@ -82,6 +83,7 @@ set(DROSS_HEADERS
     ${PROJECT_SOURCE_DIR}/include/dross/type/timestamp.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/timezone.h
     ${PROJECT_SOURCE_DIR}/include/dross/type/value.h
+    ${PROJECT_SOURCE_DIR}/include/dross/type/value_traits.h
     ${PROJECT_SOURCE_DIR}/include/dross/format.h
     ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
     ${PROJECT_SOURCE_DIR}/include/dross/notification.h

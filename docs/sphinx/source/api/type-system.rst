@@ -440,6 +440,9 @@ The type system uses C++20 concepts to constrain template parameters:
 .. doxygenconcept:: dross::container_type
    :project: dross
 
+.. doxygenconcept:: dross::value_convertible_type
+   :project: dross
+
 Type Conversion
 ---------------
 
@@ -508,6 +511,62 @@ Example:
         auto ts = ts_value.as<dross::timestamp>();
         std::cout << "Current time: " << ts.format("%Y-%m-%d %H:%M:%S") << std::endl;
     }
+
+Converting Types to and from value
+----------------------------------
+
+``value_traits<T>`` says how a ``T`` becomes a ``value`` and comes back from
+one. A type is given a conversion by specializing it in namespace ``dross``
+with two static functions. ``to_value()`` always succeeds; ``from_value()``
+returns a ``std::expected``, since a value received from elsewhere can have
+any shape:
+
+.. code-block:: cpp
+    :class: example-namespace-scope
+
+    struct point {
+        int x;
+        int y;
+    };
+
+    template <>
+    struct dross::value_traits<point> {
+        static dross::value to_value(const point& p)
+        {
+            dross::dictionary d;
+            d["x"] = p.x;
+            d["y"] = p.y;
+            return d;
+        }
+
+        static std::expected<point, dross::error> from_value(const dross::value& v)
+        {
+            const auto* d = v.get_if<dross::dictionary>();
+            if (d == nullptr || ! d->contains("x") || ! d->contains("y")) {
+                return std::unexpected(dross::value_errc::kind_mismatch);
+            }
+            auto x = dross::value_traits<int>::from_value((*d)["x"]);
+            auto y = dross::value_traits<int>::from_value((*d)["y"]);
+            if (! x || ! y) {
+                return std::unexpected(! x ? x.error() : y.error());
+            }
+            return point{ *x, *y };
+        }
+    };
+
+dross gives a conversion to ``value`` itself and the kinds it holds, to
+``bool``, integer and floating-point types, to ``std::string``, and to
+``std::vector``, ``std::optional``, and ``std::map`` and
+``std::unordered_map`` keyed by ``std::string``, of any type that has one.
+Character types have none. The conversions dross gives report a failure as
+a ``value_errc``, in the category named ``dross.value``:
+
+- ``kind_mismatch`` - The value holds another kind, or is null
+- ``out_of_range`` - The number does not fit the type, or has a fraction or
+  is NaN where an integer is wanted
+
+``value_convertible_type<T>`` tells at compile time whether ``T`` has a
+conversion.
 
 Comparison Operations
 ---------------------

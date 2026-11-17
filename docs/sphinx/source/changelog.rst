@@ -12,6 +12,14 @@ Unreleased
 Added
 ~~~~~
 
+- ``value_traits``, specialized for a type to say how it becomes a
+  ``value`` and comes back from one, with ``value_convertible_type`` to ask
+  whether a type has a conversion and ``value_errc`` for why one failed.
+  Conversions are given for ``value`` and the kinds it holds, ``bool``,
+  integer and floating-point types, ``std::string``, and ``std::vector``,
+  ``std::optional``, and ``std::map`` and ``std::unordered_map`` keyed by
+  ``std::string``
+
 - ``observable``, a value its owner thread changes and others are told
   of. ``when_changed()`` calls a function on each change where its
   ``delivery`` says, with the value after the change, or with the values

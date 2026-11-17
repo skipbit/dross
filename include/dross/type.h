@@ -73,6 +73,7 @@
 #include <dross/type/timestamp.h>
 #include <dross/type/timezone.h>
 #include <dross/type/value.h>
+#include <dross/type/value_traits.h>
 
 #include <string>
 #include <vector>
