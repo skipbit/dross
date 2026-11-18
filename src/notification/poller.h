@@ -22,7 +22,9 @@ namespace dross {
 
 // Waits on file descriptors until one can be read or written, on one
 // thread, and can be woken from any other. Each platform has its own file:
-// poller_epoll.cpp on Linux and poller_kqueue.cpp on macOS.
+// poller_epoll.cpp on Linux and poller_kqueue.cpp on macOS. A descriptor is
+// added once, and only an added one is changed or removed; the platforms
+// differ on what happens otherwise.
 class DROSS_POLLER_HIDDEN poller final {
 public:
     // What to wait for on a file descriptor.

@@ -24,6 +24,10 @@ namespace dross {
 // that waits on the sockets and calls the events. A peer that runs as
 // another user is refused with peer_not_same_user.
 //
+// The thread starts before listen() or connect() returns, so an event can
+// come before the caller holds the transport. A failure to accept a
+// connection, or of the waiting itself, is not reported yet.
+//
 // Destroyed from another thread, it stops its thread and waits for it.
 // Destroyed from inside one of its own events, it lets its thread go: the
 // thread calls nothing more once that event returns, and closes the
