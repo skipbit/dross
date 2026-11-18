@@ -21,8 +21,8 @@ namespace dross {
 #endif
 
 // A transport over Unix domain stream sockets, with a thread of its own
-// that waits on the sockets and calls the events. A peer that runs as
-// another user is refused with peer_not_same_user.
+// that waits on the sockets and calls the events. A peer whose effective
+// user differs from this process's is refused with peer_not_same_user.
 //
 // The thread starts before listen() or connect() returns, so an event can
 // come before the caller holds the transport. A failure to accept a

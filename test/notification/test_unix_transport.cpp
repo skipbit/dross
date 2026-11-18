@@ -309,7 +309,7 @@ TEST_F(unix_transport_test, a_length_over_the_limit_closes_the_connection_with_m
 TEST_F(unix_transport_test, a_peer_of_another_user_is_closed_without_being_connected)
 {
     recorder events;
-    auto server = dross::unix_transport::listen(dross::path{ at("s") }, events, ::getuid() + 1);
+    auto server = dross::unix_transport::listen(dross::path{ at("s") }, events, ::geteuid() + 1);
     ASSERT_TRUE(server.has_value());
     const auto peer = dross::unix_connect(dross::path{ at("s") });
     ASSERT_TRUE(peer.has_value());
@@ -328,7 +328,7 @@ TEST_F(unix_transport_test, connecting_to_a_peer_of_another_user_fails)
     ASSERT_TRUE(server.has_value());
 
     recorder client_events;
-    const auto client = dross::unix_transport::connect(dross::path{ at("s") }, client_events, ::getuid() + 1);
+    const auto client = dross::unix_transport::connect(dross::path{ at("s") }, client_events, ::geteuid() + 1);
     ASSERT_FALSE(client.has_value());
     EXPECT_EQ(client.error(), dross::notification_errc::peer_not_same_user);
 }

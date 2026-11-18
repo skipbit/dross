@@ -306,7 +306,7 @@ private:
 
 std::expected<std::unique_ptr<unix_transport>, error> unix_transport::listen(const path& location, transport_events& events)
 {
-    return listen(location, events, ::getuid());
+    return listen(location, events, ::geteuid());
 }
 
 std::expected<std::unique_ptr<unix_transport>, error> unix_transport::listen(const path& location, transport_events& events, const uid_t allowed)
@@ -328,7 +328,7 @@ std::expected<std::unique_ptr<unix_transport>, error> unix_transport::listen(con
 
 std::expected<std::unique_ptr<unix_transport>, error> unix_transport::connect(const path& location, transport_events& events)
 {
-    return connect(location, events, ::getuid());
+    return connect(location, events, ::geteuid());
 }
 
 std::expected<std::unique_ptr<unix_transport>, error> unix_transport::connect(const path& location, transport_events& events, const uid_t allowed)

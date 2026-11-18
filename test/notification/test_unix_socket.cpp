@@ -108,8 +108,8 @@ TEST_F(unix_socket_test, both_ends_see_the_same_user_at_the_other_end)
     const auto at_connector = dross::peer_uid(pair.connected.get());
     ASSERT_TRUE(at_listener.has_value());
     ASSERT_TRUE(at_connector.has_value());
-    EXPECT_EQ(*at_listener, ::getuid());
-    EXPECT_EQ(*at_connector, ::getuid());
+    EXPECT_EQ(*at_listener, ::geteuid());
+    EXPECT_EQ(*at_connector, ::geteuid());
 }
 
 TEST_F(unix_socket_test, a_path_someone_listens_on_is_not_taken)
