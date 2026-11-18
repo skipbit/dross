@@ -307,7 +307,20 @@ TEST_F(unix_transport_test, a_length_over_the_limit_closes_the_connection_with_m
 
 TEST_F(unix_transport_test, a_peer_that_does_not_read_overflows_the_queue_and_is_closed)
 {
+    // Holds the transport's thread in connected(), so nothing reaches the
+    // socket while the queue fills.
+    std::mutex gate_lock;
+    std::condition_variable gate_changed;
+    bool open = false;
     recorder events;
+    events.on_entry([&](const entry& made) {
+        if (made.what == entry::kind::connected) {
+            std::unique_lock guard{ gate_lock };
+            gate_changed.wait_for(guard, 5s, [&] {
+                return open;
+            });
+        }
+    });
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
     ASSERT_TRUE(server.has_value());
     const auto peer = raw_peer(events, at("s"));
@@ -321,10 +334,15 @@ TEST_F(unix_transport_test, a_peer_that_does_not_read_overflows_the_queue_and_is
             failure = result.error();
         }
     }
+    {
+        const std::lock_guard guard{ gate_lock };
+        open = true;
+    }
+    gate_changed.notify_all();
     ASSERT_TRUE(failure.has_value());
     EXPECT_EQ(*failure, dross::notification_errc::queue_overflow);
-    // 1 MiB waits in the transport, and what the socket buffers is on top.
-    EXPECT_GT(sent, 16);
+    // 15 framed messages fit in 1 MiB, so the 16th is the first to fail.
+    EXPECT_EQ(sent, 16);
 
     const auto reason = reason_closed(events);
     ASSERT_TRUE(reason.has_value());
