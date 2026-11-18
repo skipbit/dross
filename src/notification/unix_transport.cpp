@@ -19,21 +19,25 @@ namespace dross {
 
 namespace {
 
-// One connection. The reader and what the poller watches belong to the
-// thread of the transport; the outbox and ending are shared under the lock.
+// One connection. The members of shared are touched only under the lock,
+// the others only on the thread of the transport.
 struct connection final {
     explicit connection(socket_handle accepted)
         : socket{ std::move(accepted) }
     {
     }
 
+    struct shared_state final {
+        outbox waiting;
+        // Set when the connection is to be closed, with the reason.
+        std::optional<error> ending;
+    };
+
     socket_handle socket;
     frame_reader reader;
-    outbox waiting;
     poller::interest watched{ poller::interest::read };
     bool announced{ false };
-    // Set when the connection is to be closed, with the reason.
-    std::optional<error> ending;
+    shared_state shared;
 };
 
 // Whether the peer runs as the same user as this process.
@@ -66,10 +70,10 @@ public:
     {
         const int fd = socket.get();
         connection made{ std::move(socket) };
-        made.ending = refusal_of(fd);
-        if (! made.ending) {
+        made.shared.ending = refusal_of(fd);
+        if (! made.shared.ending) {
             if (auto added = _poller.add(fd, poller::interest::read); ! added) {
-                made.ending = std::move(added).error();
+                made.shared.ending = std::move(added).error();
             }
         }
         const connection_id id = _next_id++;
@@ -87,11 +91,11 @@ public:
         {
             const std::lock_guard guard{ _lock };
             const auto found = _connections.find(id);
-            if ((found == _connections.end()) || found->second.ending) {
+            if ((found == _connections.end()) || found->second.shared.ending) {
                 return std::unexpected(error{ std::errc::not_connected });
             }
-            if (auto pushed = found->second.waiting.push(std::move(*framed)); ! pushed) {
-                found->second.ending = pushed.error();
+            if (auto pushed = found->second.shared.waiting.push(std::move(*framed)); ! pushed) {
+                found->second.shared.ending = pushed.error();
                 _poller.wake();
                 return pushed;
             }
@@ -105,10 +109,10 @@ public:
         {
             const std::lock_guard guard{ _lock };
             const auto found = _connections.find(id);
-            if ((found == _connections.end()) || found->second.ending) {
+            if ((found == _connections.end()) || found->second.shared.ending) {
                 return;
             }
-            found->second.ending = error{};
+            found->second.shared.ending = error{};
         }
         _poller.wake();
     }
@@ -153,10 +157,10 @@ private:
             for (auto it = _connections.begin(); it != _connections.end();) {
                 connection& each = it->second;
                 const int fd = each.socket.get();
-                if (each.ending) {
+                if (each.shared.ending) {
                     _poller.remove(fd);
                     _ids_by_fd.erase(fd);
-                    ended.emplace_back(it->first, std::move(*each.ending));
+                    ended.emplace_back(it->first, std::move(*each.shared.ending));
                     it = _connections.erase(it);
                     continue;
                 }
@@ -164,10 +168,10 @@ private:
                     each.announced = true;
                     fresh.push_back(it->first);
                 }
-                const auto wanted = each.waiting.empty() ? poller::interest::read : poller::interest::read_write;
+                const auto wanted = each.shared.waiting.empty() ? poller::interest::read : poller::interest::read_write;
                 if (wanted != each.watched) {
                     if (auto changed = _poller.change(fd, wanted); ! changed) {
-                        each.ending = std::move(changed).error();
+                        each.shared.ending = std::move(changed).error();
                         _poller.wake();
                     } else {
                         each.watched = wanted;
@@ -218,9 +222,9 @@ private:
         }
         if (ready.writable) {
             const std::lock_guard guard{ _lock };
-            if (! served->ending) {
-                if (auto flushed = served->waiting.flush(served->socket.get()); ! flushed) {
-                    served->ending = std::move(flushed).error();
+            if (! served->shared.ending) {
+                if (auto flushed = served->shared.waiting.flush(served->socket.get()); ! flushed) {
+                    served->shared.ending = std::move(flushed).error();
                 }
             }
         }
@@ -232,7 +236,7 @@ private:
     {
         const std::lock_guard guard{ _lock };
         const auto found = _connections.find(id);
-        if ((found == _connections.end()) || found->second.ending) {
+        if ((found == _connections.end()) || found->second.shared.ending) {
             return nullptr;
         }
         return &found->second;
@@ -269,8 +273,8 @@ private:
     void end(connection& which, error reason)
     {
         const std::lock_guard guard{ _lock };
-        if (! which.ending) {
-            which.ending = std::move(reason);
+        if (! which.shared.ending) {
+            which.shared.ending = std::move(reason);
         }
     }
 
@@ -278,8 +282,8 @@ private:
     {
         const std::lock_guard guard{ _lock };
         for (auto& [id, each] : _connections) {
-            if (! each.ending) {
-                each.ending = reason;
+            if (! each.shared.ending) {
+                each.shared.ending = reason;
             }
         }
     }
