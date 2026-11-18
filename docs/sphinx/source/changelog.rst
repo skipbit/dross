@@ -12,6 +12,13 @@ Unreleased
 Added
 ~~~~~
 
+- ``notification_errc`` values for messages between processes:
+  ``message_too_large`` for a message over 64 KiB, ``queue_overflow`` for
+  more than 1 MiB waiting to be sent on a connection,
+  ``peer_not_same_user`` for a peer running as another user, and
+  ``message_cut_short`` for a connection that ends in the middle of a
+  message. No function returns them yet
+
 - ``value_traits``, specialized for a type to say how it becomes a
   ``value`` and comes back from one, with ``value_convertible_type`` to ask
   whether a type has a conversion and ``value_errc`` for why one failed.

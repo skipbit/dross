@@ -59,9 +59,11 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_outbox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_poller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_socket.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_transport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation_queue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_runloop.cpp
@@ -72,7 +74,9 @@ target_sources(${TEST_NAME} PRIVATE
     # tests include.
     ${PROJECT_SOURCE_DIR}/src/format/cbor.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/frame.cpp
+    ${PROJECT_SOURCE_DIR}/src/notification/outbox.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/unix_socket.cpp
+    ${PROJECT_SOURCE_DIR}/src/notification/unix_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
     ${DROSS_PLATFORM_SOURCES}
 )
