@@ -35,6 +35,8 @@ struct connection final {
 
     socket_handle socket;
     frame_reader reader;
+    // Whether the socket was added to the poller.
+    bool added{ false };
     poller::interest watched{ poller::interest::read };
     bool announced{ false };
     shared_state shared;
@@ -76,6 +78,8 @@ public:
         if (! made.shared.ending) {
             if (auto added = _poller.add(fd, poller::interest::read); ! added) {
                 made.shared.ending = std::move(added).error();
+            } else {
+                made.added = true;
             }
         }
         std::optional<error> ending = made.shared.ending;
@@ -162,7 +166,9 @@ private:
                 connection& each = it->second;
                 const int fd = each.socket.get();
                 if (each.shared.ending) {
-                    _poller.remove(fd);
+                    if (each.added) {
+                        _poller.remove(fd);
+                    }
                     _ids_by_fd.erase(fd);
                     ended.emplace_back(it->first, std::move(*each.shared.ending));
                     it = _connections.erase(it);
