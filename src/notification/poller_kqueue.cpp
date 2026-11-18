@@ -1,3 +1,4 @@
+#include "notification/last_error.h"
 #include "notification/poller.h"
 
 #include <array>
@@ -9,7 +10,6 @@
 #include <string>
 #include <sys/event.h>
 #include <sys/types.h>
-#include <system_error>
 #include <unistd.h>
 #include <utility>
 
@@ -20,11 +20,6 @@ namespace {
 // The identifier of the user event wake() triggers. User events have their
 // own identifiers, apart from file descriptors.
 constexpr std::uintptr_t kWakeIdent = 0;
-
-error last_error(const char* call)
-{
-    return error{ static_cast<std::errc>(errno), call };
-}
 
 bool wants(const poller::interest wanted, const poller::interest one)
 {

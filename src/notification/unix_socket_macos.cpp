@@ -1,20 +1,15 @@
+#include "notification/last_error.h"
 #include "notification/unix_socket.h"
 
 #include <cerrno>
 #include <fcntl.h>
 #include <sys/socket.h>
-#include <system_error>
 #include <unistd.h>
 #include <utility>
 
 namespace dross {
 
 namespace {
-
-error last_error(const char* call)
-{
-    return error{ static_cast<std::errc>(errno), call };
-}
 
 // macOS has neither the socket() flags nor accept4(), so each socket is set
 // up after it is made. SO_NOSIGPIPE keeps a peer that has gone from raising

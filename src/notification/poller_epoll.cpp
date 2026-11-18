@@ -1,3 +1,4 @@
+#include "notification/last_error.h"
 #include "notification/poller.h"
 
 #include <array>
@@ -6,18 +7,12 @@
 #include <string>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <system_error>
 #include <unistd.h>
 #include <utility>
 
 namespace dross {
 
 namespace {
-
-error last_error(const char* call)
-{
-    return error{ static_cast<std::errc>(errno), call };
-}
 
 std::uint32_t events_of(const poller::interest wanted)
 {

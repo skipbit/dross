@@ -1,19 +1,10 @@
+#include "notification/last_error.h"
 #include "notification/unix_socket.h"
 
 #include <cerrno>
 #include <sys/socket.h>
-#include <system_error>
 
 namespace dross {
-
-namespace {
-
-error last_error(const char* call)
-{
-    return error{ static_cast<std::errc>(errno), call };
-}
-
-}  // namespace
 
 std::expected<socket_handle, error> open_unix_socket()
 {

@@ -1,5 +1,7 @@
 #include "notification/unix_socket.h"
 
+#include "notification/last_error.h"
+
 #include <cerrno>
 #include <cstring>
 #include <sys/socket.h>
@@ -12,11 +14,6 @@
 namespace dross {
 
 namespace {
-
-error last_error(const char* call)
-{
-    return error{ static_cast<std::errc>(errno), call };
-}
 
 std::expected<sockaddr_un, error> address_of(const std::string& name)
 {
