@@ -66,8 +66,9 @@ public:
     {
     }
 
-    // Before the thread starts, or on it.
-    void adopt(socket_handle socket)
+    // Before the thread starts, or on it. Returns why the connection ends
+    // at once, when it does.
+    std::optional<error> adopt(socket_handle socket)
     {
         const int fd = socket.get();
         connection made{ std::move(socket) };
@@ -77,10 +78,12 @@ public:
                 made.shared.ending = std::move(added).error();
             }
         }
+        std::optional<error> ending = made.shared.ending;
         const connection_id id = _next_id++;
         _ids_by_fd[fd] = id;
         const std::lock_guard guard{ _lock };
         _connections.emplace(id, std::move(made));
+        return ending;
     }
 
     std::expected<void, error> send(const connection_id id, const std::span<const std::byte> message)
@@ -334,15 +337,14 @@ std::expected<std::unique_ptr<unix_transport>, error> unix_transport::connect(co
     if (! socket) {
         return std::unexpected(std::move(socket).error());
     }
-    if (auto refused = refusal_of(socket->get(), allowed)) {
-        return std::unexpected(std::move(*refused));
-    }
     auto watcher = poller::create();
     if (! watcher) {
         return std::unexpected(std::move(watcher).error());
     }
     auto shared = std::make_shared<state>(events, std::move(*watcher), std::nullopt, allowed);
-    shared->adopt(std::move(*socket));
+    if (auto ended = shared->adopt(std::move(*socket))) {
+        return std::unexpected(std::move(*ended));
+    }
     return std::unique_ptr<unix_transport>{ new unix_transport{ std::move(shared) } };
 }
 
