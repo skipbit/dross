@@ -2,8 +2,10 @@
 
 #include "notification/last_error.h"
 
+#include <atomic>
 #include <cerrno>
 #include <cstring>
+#include <string>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -64,10 +66,45 @@ std::expected<void, error> remove_stale(const std::string& name, const sockaddr_
     if (probe.error() != error(std::errc::connection_refused)) {
         return std::unexpected(std::move(probe).error());
     }
+    // Another process may have replaced the file since it was probed.
+    struct stat probed { };
+    if ((::lstat(name.c_str(), &probed) != 0) || (probed.st_dev != found.st_dev) || (probed.st_ino != found.st_ino)) {
+        return {};
+    }
     if ((::unlink(name.c_str()) != 0) && (errno != ENOENT)) {
         return std::unexpected(last_error("unlink"));
     }
     return {};
+}
+
+// A name next to name that no other listener of this or another process
+// uses at the same time.
+std::string temporary_name_for(const std::string& name)
+{
+    static std::atomic<unsigned long> made{ 0 };
+    return name + "." + std::to_string(::getpid()) + "." + std::to_string(made++);
+}
+
+// Puts the socket file at from also at name. link() fails rather than
+// replace a file at name, so a file someone listens on is never replaced.
+std::expected<void, error> place(const std::string& from, const std::string& name, const sockaddr_un& address)
+{
+    if (::link(from.c_str(), name.c_str()) == 0) {
+        return {};
+    }
+    if (errno != EEXIST) {
+        return std::unexpected(last_error("link"));
+    }
+    if (auto removed = remove_stale(name, address); ! removed) {
+        return removed;
+    }
+    if (::link(from.c_str(), name.c_str()) == 0) {
+        return {};
+    }
+    if (errno == EEXIST) {
+        return std::unexpected(error{ std::errc::address_in_use, name });
+    }
+    return std::unexpected(last_error("link"));
 }
 
 }  // namespace
@@ -112,32 +149,47 @@ std::expected<unix_listener, error> unix_listener::listen(const path& location)
     if (! address) {
         return std::unexpected(address.error());
     }
+    // The socket listens under a name of its own before it appears at name,
+    // so no one finds it there refusing connections and takes it for stale.
+    std::string temporary = temporary_name_for(name);
+    const auto temporary_address = address_of(temporary);
+    if (! temporary_address) {
+        return std::unexpected(error{ std::errc::filename_too_long, name });
+    }
     auto socket = open_unix_socket();
     if (! socket) {
         return std::unexpected(std::move(socket).error());
     }
-    if (::bind(socket->get(), as_socket_address(*address), sizeof(*address)) != 0) {
+    if (::bind(socket->get(), as_socket_address(*temporary_address), sizeof(*temporary_address)) != 0) {
+        // Left by a process that had the same id and did not finish.
         if (errno != EADDRINUSE) {
             return std::unexpected(last_error("bind"));
         }
-        if (auto removed = remove_stale(name, *address); ! removed) {
+        if (auto removed = remove_stale(temporary, *temporary_address); ! removed) {
             return std::unexpected(std::move(removed).error());
         }
-        if (::bind(socket->get(), as_socket_address(*address), sizeof(*address)) != 0) {
+        if (::bind(socket->get(), as_socket_address(*temporary_address), sizeof(*temporary_address)) != 0) {
             return std::unexpected(last_error("bind"));
         }
     }
     struct stat bound { };
-    if (::lstat(name.c_str(), &bound) != 0) {
+    if (::lstat(temporary.c_str(), &bound) != 0) {
         return std::unexpected(last_error("lstat"));
     }
-    // From here the destructor removes the socket file on failure.
-    unix_listener made{ std::move(*socket), std::move(name), bound.st_dev, bound.st_ino };
-    if (::chmod(made._name.c_str(), S_IRUSR | S_IWUSR) != 0) {
+    // From here the destructor removes the file at _name on failure.
+    unix_listener made{ std::move(*socket), temporary, bound.st_dev, bound.st_ino };
+    if (::chmod(temporary.c_str(), S_IRUSR | S_IWUSR) != 0) {
         return std::unexpected(last_error("chmod"));
     }
     if (::listen(made._socket.get(), SOMAXCONN) != 0) {
         return std::unexpected(last_error("listen"));
+    }
+    if (auto placed = place(temporary, name, *address); ! placed) {
+        return std::unexpected(std::move(placed).error());
+    }
+    made._name = std::move(name);
+    if (::unlink(temporary.c_str()) != 0) {
+        return std::unexpected(last_error("unlink"));
     }
     return made;
 }

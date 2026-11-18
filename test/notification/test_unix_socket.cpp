@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <vector>
 
 namespace {
 
@@ -187,6 +188,33 @@ TEST_F(unix_socket_test, a_moved_listener_keeps_the_socket_file)
         EXPECT_TRUE(std::filesystem::exists(std::filesystem::symlink_status(name)));
         EXPECT_TRUE(dross::unix_connect(path_of(name)).has_value());
     }
+    EXPECT_FALSE(std::filesystem::exists(std::filesystem::symlink_status(name)));
+}
+
+TEST_F(unix_socket_test, listening_leaves_no_other_file_behind)
+{
+    const auto name = at("s");
+    auto listener = dross::unix_listener::listen(path_of(name));
+    ASSERT_TRUE(listener.has_value());
+    const auto directory = std::filesystem::path{ name }.parent_path();
+    std::vector<std::string> found;
+    for (const auto& each : std::filesystem::directory_iterator{ directory }) {
+        found.push_back(each.path().filename().string());
+    }
+    EXPECT_EQ(found, std::vector<std::string>{ "s" });
+}
+
+TEST_F(unix_socket_test, a_path_with_no_room_for_the_name_listened_under_first_fails)
+{
+    const std::size_t limit = sizeof(sockaddr_un{}.sun_path);
+    const auto directory = at("");
+    ASSERT_LT(directory.size() + 2, limit);
+    const auto name = directory + std::string(limit - 2 - directory.size(), 'x');
+    ASSERT_EQ(name.size(), limit - 2);
+
+    const auto listener = dross::unix_listener::listen(path_of(name));
+    ASSERT_FALSE(listener.has_value());
+    EXPECT_EQ(listener.error(), dross::error(std::errc::filename_too_long));
     EXPECT_FALSE(std::filesystem::exists(std::filesystem::symlink_status(name)));
 }
 

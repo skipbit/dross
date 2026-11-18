@@ -43,12 +43,18 @@ private:
 // A Unix domain stream socket listening at a path in the file system. The
 // socket file is made readable and writable by its owner alone.
 //
+// The socket is made and listens under a name of its own next to the path,
+// the path with a dot and two numbers after it, and then appears at the
+// path; a path that leaves no room for that name fails with
+// filename_too_long. A file at the path that is not a socket, or a socket
+// that a process is listening on, makes listen() fail with address_in_use,
+// so of two processes that start at the same moment one takes the path.
+//
 // A socket file left by a process that has gone refuses connections, and
-// is replaced. A file at the path that is not a socket, or a socket that
-// another process is listening on, makes listen() fail with
-// address_in_use. Two processes that start at the same moment can both
-// find the old file refused and both replace it; the one that binds last
-// keeps the path.
+// is replaced. Finding that out connects to the file once, so a listener
+// there sees a connection that closes at once. Two processes that find
+// the same old file at the same moment can both succeed; the path then
+// leads to the one that replaced it last.
 //
 // On destruction the socket file is removed, unless another process has
 // put its own file at the path in the meantime.
