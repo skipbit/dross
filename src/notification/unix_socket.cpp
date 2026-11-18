@@ -4,6 +4,8 @@
 
 #include <atomic>
 #include <cerrno>
+#include <chrono>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <sys/socket.h>
@@ -77,13 +79,24 @@ std::expected<void, error> remove_stale(const std::string& name, const sockaddr_
     return {};
 }
 
-// A name next to name that no other listener of this or another process
-// uses at the same time.
+// A name next to name, of the same length on every call. The number after
+// the process id differs between the calls of one process, and depends on
+// the time, so other processes with the same id rarely make it too.
 std::string temporary_name_for(const std::string& name)
 {
-    static std::atomic<unsigned long> made{ 0 };
-    return name + "." + std::to_string(::getpid()) + "." + std::to_string(made++);
+    static std::atomic<std::uint32_t> made{ 0 };
+    const auto now = static_cast<std::uint32_t>(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::uint32_t number = now ^ (made++ * 0x9e3779b9U);
+    std::string digits(8, '0');
+    for (auto each = digits.rbegin(); each != digits.rend(); ++each) {
+        *each = "0123456789abcdef"[number % 16];
+        number /= 16;
+    }
+    return name + "." + std::to_string(::getpid()) + "." + digits;
 }
+
+// How many names listen() tries before it gives up.
+constexpr int temporary_name_tries = 4;
 
 // Puts the socket file at from also at name. link() fails rather than
 // replace a file at name, so a file someone listens on is never replaced.
@@ -151,24 +164,23 @@ std::expected<unix_listener, error> unix_listener::listen(const path& location)
     }
     // The socket listens under a name of its own before it appears at name,
     // so no one finds it there refusing connections and takes it for stale.
-    std::string temporary = temporary_name_for(name);
-    const auto temporary_address = address_of(temporary);
-    if (! temporary_address) {
-        return std::unexpected(error{ std::errc::filename_too_long, name });
-    }
     auto socket = open_unix_socket();
     if (! socket) {
         return std::unexpected(std::move(socket).error());
     }
-    if (::bind(socket->get(), as_socket_address(*temporary_address), sizeof(*temporary_address)) != 0) {
-        // Left by a process that had the same id and did not finish.
-        if (errno != EADDRINUSE) {
-            return std::unexpected(last_error("bind"));
+    std::string temporary;
+    for (int tried = 1;; ++tried) {
+        temporary = temporary_name_for(name);
+        const auto temporary_address = address_of(temporary);
+        if (! temporary_address) {
+            return std::unexpected(error{ std::errc::filename_too_long, name });
         }
-        if (auto removed = remove_stale(temporary, *temporary_address); ! removed) {
-            return std::unexpected(std::move(removed).error());
+        if (::bind(socket->get(), as_socket_address(*temporary_address), sizeof(*temporary_address)) == 0) {
+            break;
         }
-        if (::bind(socket->get(), as_socket_address(*temporary_address), sizeof(*temporary_address)) != 0) {
+        // A file there may be another process's, so another name is tried
+        // rather than the file removed.
+        if ((errno != EADDRINUSE) || (tried == temporary_name_tries)) {
             return std::unexpected(last_error("bind"));
         }
     }

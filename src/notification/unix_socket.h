@@ -44,11 +44,14 @@ private:
 // socket file is made readable and writable by its owner alone.
 //
 // The socket is made and listens under a name of its own next to the path,
-// the path with a dot and two numbers after it, and then appears at the
-// path; a path that leaves no room for that name fails with
-// filename_too_long. A file at the path that is not a socket, or a socket
-// that a process is listening on, makes listen() fail with address_in_use,
-// so of two processes that start at the same moment one takes the path.
+// the path with a dot, the process id, a dot and eight hexadecimal digits
+// after it, and then appears at the path; a path that leaves no room for
+// that name fails with filename_too_long. A process that ends while it
+// listens under that name leaves the file behind; no listener removes it.
+//
+// A file at the path that is not a socket, or a socket that a process is
+// listening on, makes listen() fail with address_in_use, so of two
+// processes that start at the same moment one takes the path.
 //
 // A socket file left by a process that has gone refuses connections, and
 // is replaced. Finding that out connects to the file once, so a listener
