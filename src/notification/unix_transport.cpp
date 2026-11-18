@@ -40,14 +40,14 @@ struct connection final {
     shared_state shared;
 };
 
-// Whether the peer runs as the same user as this process.
-std::optional<error> refusal_of(const int fd)
+// Whether the peer runs as the allowed user.
+std::optional<error> refusal_of(const int fd, const uid_t allowed)
 {
     const auto user = peer_uid(fd);
     if (! user) {
         return user.error();
     }
-    if (*user != ::getuid()) {
+    if (*user != allowed) {
         return error{ notification_errc::peer_not_same_user };
     }
     return std::nullopt;
@@ -57,8 +57,9 @@ std::optional<error> refusal_of(const int fd)
 
 class unix_transport::state final {
 public:
-    state(transport_events& events, poller watcher, std::optional<unix_listener> listening)
-        : _events{ events }
+    state(transport_events& events, poller watcher, std::optional<unix_listener> listening, const uid_t allowed)
+        : _allowed{ allowed }
+        , _events{ events }
         , _poller{ std::move(watcher) }
         , _listening{ std::move(listening) }
         , _buffer(max_message_size)
@@ -70,7 +71,7 @@ public:
     {
         const int fd = socket.get();
         connection made{ std::move(socket) };
-        made.shared.ending = refusal_of(fd);
+        made.shared.ending = refusal_of(fd, _allowed);
         if (! made.shared.ending) {
             if (auto added = _poller.add(fd, poller::interest::read); ! added) {
                 made.shared.ending = std::move(added).error();
@@ -288,6 +289,7 @@ private:
         }
     }
 
+    const uid_t _allowed;
     transport_events& _events;
     poller _poller;
     std::optional<unix_listener> _listening;
@@ -301,6 +303,11 @@ private:
 
 std::expected<std::unique_ptr<unix_transport>, error> unix_transport::listen(const path& location, transport_events& events)
 {
+    return listen(location, events, ::getuid());
+}
+
+std::expected<std::unique_ptr<unix_transport>, error> unix_transport::listen(const path& location, transport_events& events, const uid_t allowed)
+{
     auto listening = unix_listener::listen(location);
     if (! listening) {
         return std::unexpected(std::move(listening).error());
@@ -312,24 +319,29 @@ std::expected<std::unique_ptr<unix_transport>, error> unix_transport::listen(con
     if (auto added = watcher->add(listening->fd(), poller::interest::read); ! added) {
         return std::unexpected(std::move(added).error());
     }
-    auto shared = std::make_shared<state>(events, std::move(*watcher), std::move(*listening));
+    auto shared = std::make_shared<state>(events, std::move(*watcher), std::move(*listening), allowed);
     return std::unique_ptr<unix_transport>{ new unix_transport{ std::move(shared) } };
 }
 
 std::expected<std::unique_ptr<unix_transport>, error> unix_transport::connect(const path& location, transport_events& events)
 {
+    return connect(location, events, ::getuid());
+}
+
+std::expected<std::unique_ptr<unix_transport>, error> unix_transport::connect(const path& location, transport_events& events, const uid_t allowed)
+{
     auto socket = unix_connect(location);
     if (! socket) {
         return std::unexpected(std::move(socket).error());
     }
-    if (auto refused = refusal_of(socket->get())) {
+    if (auto refused = refusal_of(socket->get(), allowed)) {
         return std::unexpected(std::move(*refused));
     }
     auto watcher = poller::create();
     if (! watcher) {
         return std::unexpected(std::move(watcher).error());
     }
-    auto shared = std::make_shared<state>(events, std::move(*watcher), std::nullopt);
+    auto shared = std::make_shared<state>(events, std::move(*watcher), std::nullopt, allowed);
     shared->adopt(std::move(*socket));
     return std::unique_ptr<unix_transport>{ new unix_transport{ std::move(shared) } };
 }

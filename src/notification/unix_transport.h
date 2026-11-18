@@ -7,6 +7,7 @@
 #include <expected>
 #include <memory>
 #include <span>
+#include <sys/types.h>
 #include <thread>
 
 namespace dross {
@@ -29,13 +30,19 @@ namespace dross {
 // sockets on its way out.
 class DROSS_UNIX_TRANSPORT_HIDDEN unix_transport final : public transport {
 public:
-    // Listens at location and takes every peer that connects. See
-    // unix_listener for a file already at the path.
+    // Listens at location and takes every peer of the same user that
+    // connects. See unix_listener for a file already at the path.
     static std::expected<std::unique_ptr<unix_transport>, error> listen(const path& location, transport_events& events);
 
-    // Makes one connection to a transport listening at location; its
-    // connected() is the first event.
+    // Makes one connection to a transport of the same user listening at
+    // location; its connected() is the first event.
     static std::expected<std::unique_ptr<unix_transport>, error> connect(const path& location, transport_events& events);
+
+    // Like the above, but accepts only peers running as allowed.
+    static std::expected<std::unique_ptr<unix_transport>, error> listen(const path& location, transport_events& events, uid_t allowed);
+
+    // Like the above, but connects only to a peer running as allowed.
+    static std::expected<std::unique_ptr<unix_transport>, error> connect(const path& location, transport_events& events, uid_t allowed);
 
     ~unix_transport() override;
 

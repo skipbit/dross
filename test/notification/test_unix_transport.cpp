@@ -16,6 +16,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -303,6 +304,33 @@ TEST_F(unix_transport_test, a_length_over_the_limit_closes_the_connection_with_m
     const auto reason = reason_closed(events);
     ASSERT_TRUE(reason.has_value());
     EXPECT_EQ(*reason, dross::notification_errc::message_too_large);
+}
+
+TEST_F(unix_transport_test, a_peer_of_another_user_is_closed_without_being_connected)
+{
+    recorder events;
+    auto server = dross::unix_transport::listen(dross::path{ at("s") }, events, ::getuid() + 1);
+    ASSERT_TRUE(server.has_value());
+    const auto peer = dross::unix_connect(dross::path{ at("s") });
+    ASSERT_TRUE(peer.has_value());
+
+    const auto reason = reason_closed(events);
+    ASSERT_TRUE(reason.has_value());
+    EXPECT_EQ(*reason, dross::notification_errc::peer_not_same_user);
+    EXPECT_EQ(count_of(events.entries(), entry::kind::closed), 1U);
+    EXPECT_FALSE(has(events.entries(), entry::kind::connected));
+}
+
+TEST_F(unix_transport_test, connecting_to_a_peer_of_another_user_fails)
+{
+    recorder server_events;
+    auto server = dross::unix_transport::listen(dross::path{ at("s") }, server_events);
+    ASSERT_TRUE(server.has_value());
+
+    recorder client_events;
+    const auto client = dross::unix_transport::connect(dross::path{ at("s") }, client_events, ::getuid() + 1);
+    ASSERT_FALSE(client.has_value());
+    EXPECT_EQ(client.error(), dross::notification_errc::peer_not_same_user);
 }
 
 TEST_F(unix_transport_test, a_peer_that_does_not_read_overflows_the_queue_and_is_closed)
