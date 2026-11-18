@@ -14,10 +14,12 @@ find_package(Threads REQUIRED)
 if (APPLE)
     set(DROSS_PLATFORM_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/notification/poller_kqueue.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket_macos.cpp
     )
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(DROSS_PLATFORM_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/notification/poller_epoll.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket_linux.cpp
     )
 else()
     message(FATAL_ERROR "dross builds for Linux and macOS")
@@ -57,6 +59,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/topic_address.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation.cpp
