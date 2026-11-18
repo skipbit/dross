@@ -6,10 +6,11 @@
 namespace dross {
 
 /**
- * @brief Why listener::subscribe() made no subscription.
+ * @brief Why an operation of the notification module failed.
  */
 enum class notification_errc {
-    empty_function = 1,  ///< The function given was empty, so there is nothing to call
+    empty_function = 1,     ///< The function given was empty, so there is nothing to call
+    message_too_large = 2,  ///< A message between processes was larger than 64 KiB
 };
 
 /**

@@ -19,6 +19,8 @@ public:
         switch (static_cast<notification_errc>(value)) {
         case notification_errc::empty_function:
             return "subscriber function is empty";
+        case notification_errc::message_too_large:
+            return "message is larger than 64 KiB";
         }
         return "unknown notification error";
     }

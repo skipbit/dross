@@ -56,6 +56,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/file_local_peer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_broadcaster.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_poller.cpp
@@ -70,6 +71,7 @@ target_sources(${TEST_NAME} PRIVATE
     # Hidden in the shared library, and used by the internal headers the
     # tests include.
     ${PROJECT_SOURCE_DIR}/src/format/cbor.cpp
+    ${PROJECT_SOURCE_DIR}/src/notification/frame.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/unix_socket.cpp
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
     ${DROSS_PLATFORM_SOURCES}

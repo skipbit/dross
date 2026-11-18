@@ -54,6 +54,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/error.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/listener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/observable.cpp
