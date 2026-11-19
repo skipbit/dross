@@ -16,8 +16,8 @@ namespace dross::native {
 #endif
 
 // The four places this library asks the operating system about a thread.
-// Every platform difference in the thread module lives in native.cpp; nothing
-// else branches on the platform.
+// Every platform difference in the thread module lives in native_linux.cpp
+// and native_macos.cpp, which the build picks for the platform.
 
 // The kernel's own identifier for the calling thread, which is what a
 // debugger, a profiler and the system tools show. std::thread::id is a
