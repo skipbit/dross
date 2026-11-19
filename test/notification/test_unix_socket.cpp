@@ -51,6 +51,33 @@ void leave_stale_socket(const std::string& name)
     ::close(fd);
 }
 
+// A listener at name that never accepts, with its queue of one filled by
+// connections that wait.
+struct full_listener final {
+    dross::socket_handle listening;
+    std::vector<dross::socket_handle> waiting;
+};
+
+full_listener fill_listener(const std::string& name)
+{
+    full_listener made{ dross::socket_handle{ ::socket(AF_UNIX, SOCK_STREAM, 0) }, {} };
+    sockaddr_un address{};
+    address.sun_family = AF_UNIX;
+    name.copy(address.sun_path, sizeof(address.sun_path) - 1);
+    EXPECT_EQ(::bind(made.listening.get(), reinterpret_cast<const sockaddr*>(&address), sizeof(address)), 0);
+    EXPECT_EQ(::listen(made.listening.get(), 1), 0);
+    while (made.waiting.size() < 16) {
+        auto connected = dross::unix_connect(path_of(name));
+        if (! connected) {
+            EXPECT_EQ(connected.error(), dross::error(std::errc::resource_unavailable_try_again));
+            break;
+        }
+        made.waiting.push_back(std::move(*connected));
+    }
+    EXPECT_LT(made.waiting.size(), 16U);
+    return made;
+}
+
 ino_t inode_of(const std::string& name)
 {
     struct stat found { };
@@ -124,6 +151,21 @@ TEST_F(unix_socket_test, a_path_someone_listens_on_is_not_taken)
     EXPECT_EQ(second.error(), dross::error(std::errc::address_in_use));
     EXPECT_EQ(inode_of(name), before);
     EXPECT_TRUE(dross::unix_connect(path_of(name)).has_value());
+}
+
+TEST_F(unix_socket_test, a_path_whose_listener_has_no_room_left_is_not_taken)
+{
+#if defined(__APPLE__)
+    GTEST_SKIP() << "macOS refuses a connection to a full listener as to a stale file";
+#endif
+    const auto name = at("s");
+    const auto full = fill_listener(name);
+    const ino_t before = inode_of(name);
+
+    const auto second = dross::unix_listener::listen(path_of(name));
+    ASSERT_FALSE(second.has_value());
+    EXPECT_EQ(second.error(), dross::error(std::errc::address_in_use));
+    EXPECT_EQ(inode_of(name), before);
 }
 
 TEST_F(unix_socket_test, a_socket_file_left_behind_is_replaced)

@@ -57,7 +57,8 @@ private:
 // is replaced. Finding that out connects to the file once, so a listener
 // there sees a connection that closes at once. Two processes that find
 // the same old file at the same moment can both succeed; the path then
-// leads to the one that replaced it last.
+// leads to the one that replaced it last. On macOS a listener with no room
+// left for another connection refuses it too, and its file is replaced.
 //
 // On destruction the socket file is removed, unless another process has
 // put its own file at the path in the meantime.
@@ -91,7 +92,8 @@ private:
 DROSS_UNIX_SOCKET_HIDDEN std::expected<std::optional<std::size_t>, error> receive_some(int fd, std::span<std::byte> into);
 
 // Connects to a socket listening at location. The connection does not wait:
-// a listener with no room left fails it with resource_unavailable_try_again.
+// a listener with no room left fails it, with resource_unavailable_try_again
+// on Linux and with connection_refused on macOS.
 DROSS_UNIX_SOCKET_HIDDEN std::expected<socket_handle, error> unix_connect(const path& location);
 
 // What differs between platforms; each has its own file,

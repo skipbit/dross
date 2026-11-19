@@ -62,7 +62,8 @@ std::expected<void, error> remove_stale(const std::string& name, const sockaddr_
         return std::unexpected(error{ std::errc::address_in_use, name });
     }
     auto probe = connect_to(address);
-    if (probe) {
+    // A listener with no room left for the probe is still there.
+    if (probe || (probe.error() == error(std::errc::resource_unavailable_try_again))) {
         return std::unexpected(error{ std::errc::address_in_use, name });
     }
     if (probe.error() != error(std::errc::connection_refused)) {
