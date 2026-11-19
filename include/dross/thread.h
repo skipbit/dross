@@ -68,7 +68,7 @@
  *   translated
  *
  * Platform support:
- * - Linux and macOS; the build stops for anything else
+ * - Linux and macOS only
  */
 
 #pragma once
