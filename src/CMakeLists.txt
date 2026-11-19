@@ -8,6 +8,24 @@ include(GNUInstallDirs)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+# What differs between platforms lives in files named for the platform, and
+# the build picks them here; the sources themselves do not test the platform.
+# The tests compile the hidden ones too, so the list reaches the parent scope.
+if (APPLE)
+    set(DROSS_PLATFORM_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/poller_kqueue.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket_macos.cpp
+    )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(DROSS_PLATFORM_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/poller_epoll.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket_linux.cpp
+    )
+else()
+    message(FATAL_ERROR "dross builds for Linux and macOS")
+endif()
+set(DROSS_PLATFORM_SOURCES ${DROSS_PLATFORM_SOURCES} PARENT_SCOPE)
+
 option(BUILD_SHARED_LIBS "build dross as a shared library" ON)
 if (BUILD_SHARED_LIBS)
     add_library(${PROJECT_NAME} SHARED)
@@ -36,11 +54,15 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/error.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/listener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/observable.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/outbox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/topic_address.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_transport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation.cpp
@@ -49,6 +71,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/time_source.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/timer.cpp
+    ${DROSS_PLATFORM_SOURCES}
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads)
