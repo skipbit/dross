@@ -1,0 +1,145 @@
+#include "notification/publisher.h"
+
+#include "notification/unix_transport.h"
+#include "notification/wire.h"
+
+#include <utility>
+#include <variant>
+#include <vector>
+
+namespace dross {
+
+std::expected<std::unique_ptr<publisher>, error> publisher::listen(const path& where)
+{
+    std::unique_ptr<publisher> made{ new publisher{ where } };
+    auto transport = unix_transport::listen(where, *made);
+    if (! transport) {
+        return std::unexpected(std::move(transport).error());
+    }
+    made->_transport = std::move(*transport);
+    made->_transport->start();
+    return made;
+}
+
+publisher::publisher(path where)
+    : _where{ std::move(where) }
+{
+}
+
+publisher::~publisher()
+{
+    // Stops the thread before the state its events touch goes.
+    std::shared_ptr<unix_transport> ending;
+    {
+        const std::lock_guard guard{ _lock };
+        ending = std::move(_transport);
+    }
+}
+
+bool publisher::wanted(const std::string_view name) const
+{
+    const std::lock_guard guard{ _lock };
+    return _subscribers.contains(name);
+}
+
+void publisher::send(const std::string_view name, const value& content)
+{
+    std::vector<connection_id> receivers;
+    std::shared_ptr<unix_transport> through;
+    {
+        const std::lock_guard guard{ _lock };
+        for (const auto& [id, names] : _names_by_connection) {
+            if (names.contains(name)) {
+                receivers.push_back(id);
+            }
+        }
+        through = _transport;
+    }
+    if (receivers.empty() || ! through) {
+        return;
+    }
+    const auto bytes = wire::encode(wire::notice{ std::string{ name }, content });
+    // A connection that cannot take the message is closed by the
+    // transport, and its listener connects again.
+    for (const connection_id id : receivers) {
+        (void)through->send(id, bytes);
+    }
+}
+
+void publisher::connected(const connection_id id)
+{
+    const std::lock_guard guard{ _lock };
+    _names_by_connection.try_emplace(id);
+}
+
+void publisher::received(const connection_id id, std::vector<std::byte> message)
+{
+    auto read = wire::decode(message);
+    if (read && ! std::holds_alternative<wire::notice>(*read)) {
+        const std::lock_guard guard{ _lock };
+        const auto found = _names_by_connection.find(id);
+        if (found == _names_by_connection.end()) {
+            return;
+        }
+        if (const auto* asked = std::get_if<wire::subscribe>(&*read)) {
+            if (found->second.insert(asked->name).second) {
+                ++_subscribers[asked->name];
+            }
+        } else {
+            const auto& dropped = std::get<wire::unsubscribe>(*read);
+            if (found->second.erase(dropped.name) != 0) {
+                const auto count = _subscribers.find(dropped.name);
+                if (--count->second == 0) {
+                    _subscribers.erase(count);
+                }
+            }
+        }
+        return;
+    }
+    // A listener sends nothing else, so the peer is not one.
+    if (const auto through = transport()) {
+        through->close(id);
+    }
+}
+
+void publisher::closed(const connection_id id, error)
+{
+    const std::lock_guard guard{ _lock };
+    const auto found = _names_by_connection.find(id);
+    if (found == _names_by_connection.end()) {
+        return;
+    }
+    for (const auto& name : found->second) {
+        const auto count = _subscribers.find(name);
+        if (--count->second == 0) {
+            _subscribers.erase(count);
+        }
+    }
+    _names_by_connection.erase(found);
+}
+
+void publisher::stopped(error)
+{
+    // Called on the stopped transport's own thread, which lets it go once
+    // this returns.
+    auto again = unix_transport::listen(_where, *this);
+    std::shared_ptr<unix_transport> replaced;
+    {
+        const std::lock_guard guard{ _lock };
+        replaced = std::move(_transport);
+        if (again) {
+            _transport = std::move(*again);
+        }
+    }
+    if (again) {
+        transport()->start();
+    }
+}
+
+std::shared_ptr<unix_transport> publisher::transport() const
+{
+    const std::lock_guard guard{ _lock };
+    return _transport;
+}
+
+}  // namespace dross

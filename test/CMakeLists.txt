@@ -63,6 +63,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_outbox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_poller.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_published_broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_transport.cpp

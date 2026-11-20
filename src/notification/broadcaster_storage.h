@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dross/notification/broadcaster.h"
+#include "notification/publisher.h"
 #include "notification/subscription_access.h"
 #include "notification/topic_address.h"
 
@@ -12,14 +13,32 @@
 #include <unordered_map>
 #include <vector>
 
-// The state behind a broadcaster handle: who is subscribed to each topic. A
+// The state behind a broadcaster handle: who is subscribed to each topic in
+// this process, and for a published broadcaster, the listeners in others. A
 // listener adds to it, and notify() reads it.
 namespace dross {
 
-class broadcaster::storage final {
+// Hidden from the library's exported symbol table, as the publisher it holds
+// is.
+#if defined(__GNUC__) || defined(__clang__)
+#define DROSS_BROADCASTER_STORAGE_HIDDEN __attribute__((visibility("hidden")))
+#else
+#define DROSS_BROADCASTER_STORAGE_HIDDEN
+#endif
+
+class DROSS_BROADCASTER_STORAGE_HIDDEN broadcaster::storage final {
 public:
     using receiver = subscription_access::receiver;
     using receivers = std::vector<std::shared_ptr<receiver>>;
+
+    storage() = default;
+
+    // A broadcaster published through outside.
+    explicit storage(std::unique_ptr<publisher> outside) noexcept;
+
+    // What faces other processes; null for a broadcaster that is not
+    // published.
+    publisher* outside() const noexcept;
 
     // Adds which to the subscribers of the topic at where, and drops those of
     // that topic that have ended.
@@ -69,6 +88,9 @@ private:
 
     mutable std::mutex _mutex;
     topic_map _topics;
+    const std::unique_ptr<publisher> _outside;
 };
+
+#undef DROSS_BROADCASTER_STORAGE_HIDDEN
 
 }  // namespace dross

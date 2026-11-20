@@ -14,9 +14,17 @@
 
 namespace dross {
 
+// Hidden from the library's exported symbol table, as the broadcaster's
+// state it holds is.
+#if defined(__GNUC__) || defined(__clang__)
+#define DROSS_LISTENER_STORAGE_HIDDEN __attribute__((visibility("hidden")))
+#else
+#define DROSS_LISTENER_STORAGE_HIDDEN
+#endif
+
 // The state behind a listener handle: the broadcaster it hears, held without
 // keeping it going.
-class listener::storage final {
+class DROSS_LISTENER_STORAGE_HIDDEN listener::storage final {
 public:
     explicit storage(std::weak_ptr<broadcaster_access::storage_type> source)
         : source{ std::move(source) }
@@ -25,6 +33,8 @@ public:
 
     const std::weak_ptr<broadcaster_access::storage_type> source;
 };
+
+#undef DROSS_LISTENER_STORAGE_HIDDEN
 
 listener::listener(std::shared_ptr<storage> store) noexcept
     : _store{ std::move(store) }
