@@ -2,7 +2,7 @@
  * @file notification.h
  * @brief Notification module: sending typed notifications from a
  * broadcaster to whoever subscribes through a listener, each on the thread
- * the subscriber chose.
+ * the subscriber chose, within a process or from one process to another.
  *
  * Usage:
  * @code
@@ -46,6 +46,8 @@
  * - dross::observable holds a value that its owner thread changes, and
  *   calls the functions given to when_changed() on each change, where each
  *   one's delivery says
+ * - dross::link_event is what dross::listener::link reports about a
+ *   listener's connection to another process
  *
  * A subscriber names, for every subscription, where its function runs:
  *
@@ -67,10 +69,29 @@
  * There is no broadcaster shared by the whole process: each one is made by
  * create() and handed to whoever sends or listens.
  *
+ * Between processes:
+ * - broadcaster::create() given a dross::ipc::unix_socket publishes the
+ *   broadcaster there, and listener::create() given the same place hears it
+ *   from another process. The listener can be made first, and connects
+ *   again whenever the connection ends
+ * - A value crosses as a dross::value, so a topic sent or subscribed to
+ *   between processes carries a type with dross::value_traits. Between
+ *   processes a topic is told apart by its name alone
+ * - A notification reaches a listener in another process only once its
+ *   subscription has reached the broadcaster
+ * - What happens to the connection is reported on dross::listener::link
+ *
+ * See dross::broadcaster and dross::listener for the details.
+ *
  * Errors:
  * - listener::subscribe() returns an error of notification_errc, rather than
- *   a subscription, for an empty function. observable::when_changed()
- *   returns a subscription that is not active for one
+ *   a subscription, for an empty function, and on a listener made with a
+ *   place, for a type without dross::value_traits. observable::when_changed()
+ *   returns a subscription that is not active for an empty function
+ * - broadcaster::create() with a place returns the error that kept it from
+ *   listening there
+ * - notify() on a published broadcaster with a type without
+ *   dross::value_traits is a misuse, and stops the program
  * - A subscription whose run loop's thread has ended, whose queue has
  *   stopped, or whose broadcaster or observable has gone is no longer active
  *   rather than failing; active() reports it
@@ -81,6 +102,8 @@
  *
  * Platform support:
  * - Wherever the thread module runs, with run-time type information on
+ * - Between processes: Linux and macOS, between processes of the same
+ *   effective user
  */
 
 #pragma once

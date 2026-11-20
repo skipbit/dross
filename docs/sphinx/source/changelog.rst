@@ -12,12 +12,30 @@ Unreleased
 Added
 ~~~~~
 
+- Notifications between processes. ``broadcaster::create()`` given an
+  ``ipc::unix_socket`` publishes the broadcaster at that path, and
+  ``listener::create()`` given the same place hears it from another
+  process of the same user. The listener can be made before the
+  broadcaster, connects again whenever the connection ends, and tells the
+  broadcaster the topic names it subscribes to; a notification sent before
+  a subscription reaches the broadcaster does not reach it. Values cross as
+  a ``value`` through ``value_traits``: ``notify()`` on a published
+  broadcaster with a type without them stops the program, and
+  ``subscribe()`` on such a listener returns
+  ``notification_errc::type_not_convertible``. What happens to the
+  connection is reported on ``listener::link`` as a ``link_event``
+
+- ``ipc::unix_socket``, in a new IPC module (``<dross/ipc.h>``), naming a
+  place where processes meet: a Unix domain socket at a path
+
 - ``notification_errc`` values for messages between processes:
   ``message_too_large`` for a message over 64 KiB, ``queue_overflow`` for
   more than 1 MiB waiting to be sent on a connection,
   ``peer_not_same_user`` for a peer running as another user, and
   ``message_cut_short`` for a connection that ends in the middle of a
-  message. No function returns them yet
+  message. All but ``peer_not_same_user`` can reach a listener in another
+  process as the reason its ``link_event`` gives for a disconnection; a
+  peer running as another user is never connected to
 
 - ``value_traits``, specialized for a type to say how it becomes a
   ``value`` and comes back from one, with ``value_convertible_type`` to ask
