@@ -3,16 +3,13 @@
 #include "dross/platform/path.h"
 #include "dross/type/error.h"
 #include "dross/type/value.h"
+#include "notification/subscriber_table.h"
 #include "notification/transport.h"
 
 #include <cstddef>
 #include <expected>
-#include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
-#include <set>
-#include <string>
 #include <string_view>
 
 namespace dross {
@@ -33,7 +30,7 @@ class unix_transport;
 //
 // A failure of the transport's waiting is met by listening at the path
 // again, once; when that fails too, nothing more is sent.
-class DROSS_PUBLISHER_HIDDEN publisher final : public transport_events {
+class DROSS_PUBLISHER_HIDDEN publisher final : private transport_events {
 public:
     static std::expected<std::unique_ptr<publisher>, error> listen(const path& where);
 
@@ -50,13 +47,13 @@ public:
     // Sends content on name to each listener subscribed to it.
     void send(std::string_view name, const value& content);
 
+private:
+    explicit publisher(path where);
+
     void connected(connection_id id) override;
     void received(connection_id id, std::vector<std::byte> message) override;
     void closed(connection_id id, error reason) override;
     void stopped(error reason) override;
-
-private:
-    explicit publisher(path where);
 
     // The transport, which stopped() may replace while send() runs.
     std::shared_ptr<unix_transport> transport() const;
@@ -64,9 +61,7 @@ private:
     const path _where;
     mutable std::mutex _lock;
     std::shared_ptr<unix_transport> _transport;
-    std::map<connection_id, std::set<std::string, std::less<>>> _names_by_connection;
-    // How many connections subscribed to each name.
-    std::map<std::string, std::size_t, std::less<>> _subscribers;
+    subscriber_table _subscribers;
 };
 
 #undef DROSS_PUBLISHER_HIDDEN

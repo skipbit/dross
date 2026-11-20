@@ -39,7 +39,7 @@ publisher::~publisher()
 bool publisher::wanted(const std::string_view name) const
 {
     const std::lock_guard guard{ _lock };
-    return _subscribers.contains(name);
+    return _subscribers.wanted(name);
 }
 
 void publisher::send(const std::string_view name, const value& content)
@@ -48,11 +48,7 @@ void publisher::send(const std::string_view name, const value& content)
     std::shared_ptr<unix_transport> through;
     {
         const std::lock_guard guard{ _lock };
-        for (const auto& [id, names] : _names_by_connection) {
-            if (names.contains(name)) {
-                receivers.push_back(id);
-            }
-        }
+        receivers = _subscribers.receivers(name);
         through = _transport;
     }
     if (receivers.empty() || ! through) {
@@ -69,7 +65,7 @@ void publisher::send(const std::string_view name, const value& content)
 void publisher::connected(const connection_id id)
 {
     const std::lock_guard guard{ _lock };
-    _names_by_connection.try_emplace(id);
+    _subscribers.join(id);
 }
 
 void publisher::received(const connection_id id, std::vector<std::byte> message)
@@ -77,22 +73,10 @@ void publisher::received(const connection_id id, std::vector<std::byte> message)
     auto read = wire::decode(message);
     if (read && ! std::holds_alternative<wire::notice>(*read)) {
         const std::lock_guard guard{ _lock };
-        const auto found = _names_by_connection.find(id);
-        if (found == _names_by_connection.end()) {
-            return;
-        }
         if (const auto* asked = std::get_if<wire::subscribe>(&*read)) {
-            if (found->second.insert(asked->name).second) {
-                ++_subscribers[asked->name];
-            }
+            _subscribers.add(id, asked->name);
         } else {
-            const auto& dropped = std::get<wire::unsubscribe>(*read);
-            if (found->second.erase(dropped.name) != 0) {
-                const auto count = _subscribers.find(dropped.name);
-                if (--count->second == 0) {
-                    _subscribers.erase(count);
-                }
-            }
+            _subscribers.remove(id, std::get<wire::unsubscribe>(*read).name);
         }
         return;
     }
@@ -105,17 +89,7 @@ void publisher::received(const connection_id id, std::vector<std::byte> message)
 void publisher::closed(const connection_id id, error)
 {
     const std::lock_guard guard{ _lock };
-    const auto found = _names_by_connection.find(id);
-    if (found == _names_by_connection.end()) {
-        return;
-    }
-    for (const auto& name : found->second) {
-        const auto count = _subscribers.find(name);
-        if (--count->second == 0) {
-            _subscribers.erase(count);
-        }
-    }
-    _names_by_connection.erase(found);
+    _subscribers.leave(id);
 }
 
 void publisher::stopped(error)

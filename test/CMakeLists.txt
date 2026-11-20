@@ -66,6 +66,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_poller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_published_broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_remote_listener.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscriber_table.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_transport.cpp
@@ -82,6 +83,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/notification/connector.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/frame.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/outbox.cpp
+    ${PROJECT_SOURCE_DIR}/src/notification/subscriber_table.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/unix_socket.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/unix_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/wire.cpp
