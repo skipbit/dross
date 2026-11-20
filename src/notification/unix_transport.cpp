@@ -1,13 +1,12 @@
 #include "notification/unix_transport.h"
 
 #include "dross/notification/error.h"
-#include "notification/backoff.h"
+#include "notification/accept_pause.h"
 #include "notification/frame.h"
 #include "notification/outbox.h"
 #include "notification/poller.h"
 #include "notification/unix_socket.h"
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <map>
@@ -224,7 +223,7 @@ private:
             if (! *accepted) {
                 return;
             }
-            _accept_waits.reset();
+            _accept_pause.accepted();
             adopt(std::move(**accepted));
         }
     }
@@ -234,30 +233,27 @@ private:
     void pause_accepting()
     {
         _poller.remove(_listening->fd());
-        _accepting_again = std::chrono::steady_clock::now() + _accept_waits.next();
+        _accept_pause.pause(std::chrono::steady_clock::now());
     }
 
     // How long the wait may last before accepting resumes; none while
     // accepting.
     std::optional<std::chrono::milliseconds> until_accepting() const
     {
-        if (! _accepting_again) {
-            return std::nullopt;
-        }
-        const auto left = std::chrono::ceil<std::chrono::milliseconds>(*_accepting_again - std::chrono::steady_clock::now());
-        return std::max(left, std::chrono::milliseconds::zero());
+        return _accept_pause.remaining(std::chrono::steady_clock::now());
     }
 
     void resume_accepting()
     {
-        if (! _accepting_again || (std::chrono::steady_clock::now() < *_accepting_again)) {
+        const auto now = std::chrono::steady_clock::now();
+        if (! _accept_pause.due(now)) {
             return;
         }
         if (auto added = _poller.add(_listening->fd(), poller::interest::read); ! added) {
-            _accepting_again = std::chrono::steady_clock::now() + _accept_waits.next();
+            _accept_pause.pause(now);
             return;
         }
-        _accepting_again.reset();
+        _accept_pause.clear();
     }
 
     void serve(const poller::event& ready)
@@ -346,9 +342,7 @@ private:
     transport_events& _events;
     poller _poller;
     std::optional<unix_listener> _listening;
-    backoff _accept_waits;
-    // When accepting resumes, while it is paused.
-    std::optional<std::chrono::steady_clock::time_point> _accepting_again;
+    accept_pause _accept_pause;
     std::vector<std::byte> _buffer;
     std::unordered_map<int, connection_id> _ids_by_fd;
     connection_id _next_id{ 1 };
