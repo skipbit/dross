@@ -7,7 +7,7 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)
 
-**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose.
+**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose, within a process or from one process to another over a Unix domain socket.
 
 ## ✨ Key Features
 
@@ -164,6 +164,9 @@ int main()
 - **`path`** - Filesystem operations with error handling
 - **`xdg`** - XDG Base Directory specification support
 
+### IPC Layer
+- **`ipc::unix_socket`** - A place where processes meet: a Unix domain socket at a path
+
 ### Thread Layer
 - **`runloop`** - Per-thread task queue, so work can be handed to a specific thread
 - **`thread`** - A handle to an OS thread, running a loop the library drives, a one-shot body, or one its owner drives
@@ -173,8 +176,9 @@ int main()
 
 ### Notification Layer
 - **`topic`** - The name a notification is sent under and the type of value it carries
-- **`broadcaster`** - Sends notifications within the process, and does nothing else
-- **`listener`** - Subscribes to one broadcaster's notifications, and does not send
+- **`broadcaster`** - Sends notifications within the process, and, when published at a place, to listeners in other processes too; it does nothing else
+- **`listener`** - Subscribes to one broadcaster's notifications, in this process or in another, and does not send
+- **`link_event`** - What happened to a listener's connection to another process: connected, disconnected, or a value its type could not be made from
 - **`delivery`** - Where a subscriber's function runs: on a run loop, on the sending thread, or on an operation queue's worker
 - **`subscription`** - The right to go on receiving, which ends when it is reset or destroyed
 - **`notification`** - What one call to `notify()` sent, through which its deliveries not yet started can be cancelled
@@ -220,7 +224,6 @@ ctest --preset release -V
 ### Planned Features
 - **Format** - JSON, XML, YAML
 - **Concurrency** - Coroutines
-- **Notifications** - Sending between processes
 - **Multimedia** - Image processing, color management, transformations
 - **Application Support** - CLI parsing, logging, preferences
 

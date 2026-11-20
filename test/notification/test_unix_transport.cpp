@@ -15,6 +15,9 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <sys/resource.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <thread>
 #include <unistd.h>
 #include <vector>
@@ -30,7 +33,8 @@ struct entry final {
     enum class kind {
         connected,
         received,
-        closed
+        closed,
+        stopped
     };
 
     kind what;
@@ -54,6 +58,11 @@ public:
     void closed(const dross::connection_id id, dross::error reason) override
     {
         record(entry{ entry::kind::closed, id, {}, std::move(reason) });
+    }
+
+    void stopped(dross::error reason) override
+    {
+        record(entry{ entry::kind::stopped, 0, {}, std::move(reason) });
     }
 
     // Runs on the transport's thread after each entry is recorded.
@@ -147,9 +156,11 @@ void link(linked& both, const std::string& name)
     auto server = dross::unix_transport::listen(dross::path{ name }, both.server_events);
     ASSERT_TRUE(server.has_value());
     both.server = std::move(*server);
+    both.server->start();
     auto client = dross::unix_transport::connect(dross::path{ name }, both.client_events);
     ASSERT_TRUE(client.has_value());
     both.client = std::move(*client);
+    both.client->start();
 
     const auto connected = [](const std::vector<entry>& entries) {
         return has(entries, entry::kind::connected);
@@ -283,6 +294,7 @@ TEST_F(unix_transport_test, a_peer_that_goes_in_the_middle_of_a_message_is_close
     recorder events;
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
     ASSERT_TRUE(server.has_value());
+    (*server)->start();
     {
         const auto peer = raw_peer(events, at("s"));
         ASSERT_TRUE(dross::send_some(peer.get(), bytes_of({ 0, 0, 0, 10, 1, 2, 3 })).has_value());
@@ -298,6 +310,7 @@ TEST_F(unix_transport_test, a_length_over_the_limit_closes_the_connection_with_m
     recorder events;
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
     ASSERT_TRUE(server.has_value());
+    (*server)->start();
     const auto peer = raw_peer(events, at("s"));
     ASSERT_TRUE(dross::send_some(peer.get(), bytes_of({ 0, 1, 0, 1 })).has_value());
 
@@ -311,6 +324,7 @@ TEST_F(unix_transport_test, a_peer_of_another_user_is_closed_without_being_conne
     recorder events;
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, events, ::geteuid() + 1);
     ASSERT_TRUE(server.has_value());
+    (*server)->start();
     const auto peer = dross::unix_connect(dross::path{ at("s") });
     ASSERT_TRUE(peer.has_value());
 
@@ -326,6 +340,7 @@ TEST_F(unix_transport_test, connecting_to_a_peer_of_another_user_fails)
     recorder server_events;
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, server_events);
     ASSERT_TRUE(server.has_value());
+    (*server)->start();
 
     recorder client_events;
     const auto client = dross::unix_transport::connect(dross::path{ at("s") }, client_events, ::geteuid() + 1);
@@ -351,6 +366,7 @@ TEST_F(unix_transport_test, a_peer_that_does_not_read_overflows_the_queue_and_is
     });
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
     ASSERT_TRUE(server.has_value());
+    (*server)->start();
     const auto peer = raw_peer(events, at("s"));
     const dross::connection_id id = first_of(events.entries(), entry::kind::connected)->id;
 
@@ -400,12 +416,14 @@ TEST_F(unix_transport_test, each_connection_is_connected_and_then_closed_once)
     recorder events;
     auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
     ASSERT_TRUE(server.has_value());
+    (*server)->start();
     std::vector<recorder> client_events(3);
     std::vector<std::unique_ptr<dross::unix_transport>> clients;
     for (auto& each : client_events) {
         auto client = dross::unix_transport::connect(dross::path{ at("s") }, each);
         ASSERT_TRUE(client.has_value());
         clients.push_back(std::move(*client));
+        clients.back()->start();
     }
     ASSERT_TRUE(events.wait_for([](const std::vector<entry>& entries) {
         return has(entries, entry::kind::connected, 3);
@@ -481,6 +499,7 @@ TEST_F(unix_transport_test, destroyed_from_its_own_event_it_calls_nothing_more_a
         ASSERT_TRUE(made.has_value());
         const std::lock_guard guard{ owner_lock };
         server = std::move(*made);
+        server->start();
     }
     const auto peer = raw_peer(server_events, at("s"));
 
@@ -509,6 +528,106 @@ TEST_F(unix_transport_test, destroyed_from_its_own_event_it_calls_nothing_more_a
         std::this_thread::sleep_for(10ms);
     }
     EXPECT_TRUE(removed);
+}
+
+TEST_F(unix_transport_test, no_event_comes_before_start)
+{
+    recorder events;
+    auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
+    ASSERT_TRUE(server.has_value());
+    const auto peer = dross::unix_connect(dross::path{ at("s") });
+    ASSERT_TRUE(peer.has_value());
+    std::this_thread::sleep_for(100ms);
+    EXPECT_TRUE(events.entries().empty());
+
+    (*server)->start();
+    EXPECT_TRUE(events.wait_for([](const auto& entries) {
+        return has(entries, entry::kind::connected);
+    }));
+}
+
+namespace {
+
+// Process time spent on every thread so far.
+std::chrono::microseconds process_time()
+{
+    rusage used{};
+    ::getrusage(RUSAGE_SELF, &used);
+    const auto of = [](const timeval& t) {
+        return std::chrono::seconds{ t.tv_sec } + std::chrono::microseconds{ t.tv_usec };
+    };
+    return of(used.ru_utime) + of(used.ru_stime);
+}
+
+// Starts connecting socket to path without making a descriptor, which the
+// process may have none left for.
+bool connect_to(const int socket, const std::string& path)
+{
+    sockaddr_un address{};
+    address.sun_family = AF_UNIX;
+    path.copy(address.sun_path, sizeof(address.sun_path) - 1);
+    return ::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
+}
+
+// GCC's UndefinedBehaviorSanitizer opens a pipe to check an object's
+// vptr, and reports a valid object as invalid when no descriptor is left.
+#if defined(__SANITIZE_ADDRESS__) && ! defined(__clang__)
+constexpr bool sanitizer_needs_descriptors = true;
+#else
+constexpr bool sanitizer_needs_descriptors = false;
+#endif
+
+}  // namespace
+
+TEST_F(unix_transport_test, a_connection_that_cannot_be_accepted_does_not_spin_the_thread)
+{
+    if (sanitizer_needs_descriptors) {
+        GTEST_SKIP() << "GCC's sanitizers report false errors once no file descriptor is left";
+    }
+    recorder events;
+    auto server = dross::unix_transport::listen(dross::path{ at("s") }, events);
+    ASSERT_TRUE(server.has_value());
+    (*server)->start();
+
+    // Made while descriptors are left, and connected once none are.
+    std::vector<int> peers;
+    for (int i = 0; i < 3; ++i) {
+        peers.push_back(::socket(AF_UNIX, SOCK_STREAM, 0));
+        ASSERT_GE(peers.back(), 0);
+    }
+    rlimit before{};
+    ASSERT_EQ(::getrlimit(RLIMIT_NOFILE, &before), 0);
+    rlimit lowered = before;
+    lowered.rlim_cur = 256;
+    ASSERT_EQ(::setrlimit(RLIMIT_NOFILE, &lowered), 0);
+    std::vector<int> filling;
+    for (int fd = ::dup(peers.front()); fd >= 0; fd = ::dup(peers.front())) {
+        filling.push_back(fd);
+    }
+    for (const int each : peers) {
+        EXPECT_TRUE(connect_to(each, at("s")));
+    }
+
+    const auto started = process_time();
+    std::this_thread::sleep_for(500ms);
+    const auto spent = process_time() - started;
+
+    for (const int each : filling) {
+        ::close(each);
+    }
+    ASSERT_EQ(::setrlimit(RLIMIT_NOFILE, &before), 0);
+    EXPECT_LT(spent, 100ms);
+    EXPECT_FALSE(has(events.entries(), entry::kind::connected));
+
+    // Accepting resumes once descriptors are free again.
+    const auto later = dross::unix_connect(dross::path{ at("s") });
+    ASSERT_TRUE(later.has_value());
+    EXPECT_TRUE(events.wait_for([](const auto& entries) {
+        return has(entries, entry::kind::connected);
+    }));
+    for (const int each : peers) {
+        ::close(each);
+    }
 }
 
 TEST_F(unix_transport_test, connecting_where_no_one_listens_fails)

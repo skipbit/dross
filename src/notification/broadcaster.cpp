@@ -3,8 +3,11 @@
 #include "notification/broadcaster_access.h"
 #include "notification/broadcaster_storage.h"
 #include "notification/notification_storage.h"
+#include "notification/publisher.h"
 #include "notification/topic_address.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -35,6 +38,20 @@ std::size_t broadcaster::storage::address_hash::operator()(const topic_address& 
 bool broadcaster::storage::address_equal::operator()(const topic_address& lhs, const topic_address& rhs) const noexcept
 {
     return (lhs.name == rhs.name) && (lhs.type == rhs.type) && (lhs.identity == rhs.identity);
+}
+
+broadcaster::storage::storage() = default;
+
+broadcaster::storage::storage(std::unique_ptr<publisher> outside) noexcept
+    : _outside{ std::move(outside) }
+{
+}
+
+broadcaster::storage::~storage() = default;
+
+publisher* broadcaster::storage::outside() const noexcept
+{
+    return _outside.get();
 }
 
 void broadcaster::storage::add(const topic_address& where, std::shared_ptr<receiver> which)
@@ -112,6 +129,15 @@ broadcaster broadcaster::create()
     return broadcaster{ std::make_shared<storage>() };
 }
 
+std::expected<broadcaster, error> broadcaster::create(const ipc::unix_socket& place)
+{
+    auto outside = publisher::listen(place.location());
+    if (! outside) {
+        return std::unexpected(std::move(outside).error());
+    }
+    return broadcaster{ std::make_shared<storage>(std::move(*outside)) };
+}
+
 bool broadcaster::operator==(const broadcaster& other) const noexcept
 {
     return _store == other._store;
@@ -120,17 +146,31 @@ bool broadcaster::operator==(const broadcaster& other) const noexcept
 notification broadcaster::notify_any(std::string_view name,
                                      const std::type_info& type,
                                      const std::function<std::shared_ptr<const void>()>& make,
-                                     const notify_options& how)
+                                     const notify_options& how,
+                                     const value_writer write)
 {
+    publisher* const outside = _store->outside();
+    if ((outside != nullptr) && (write == nullptr)) {
+        std::fputs("dross: broadcaster::notify: a published broadcaster sends a type without dross::value_traits\n", stderr);
+        std::abort();
+    }
     const auto where = topic_address::of(name, type);
     const auto subscribers = _store->subscribers(where);
+    const bool sent_out = (outside != nullptr) && outside->wanted(name);
+    if (! subscribers && ! sent_out) {
+        return notification{ nullptr };
+    }
+
+    const auto value = make();
+    if (sent_out) {
+        outside->send(name, write(value.get()));
+    }
     if (! subscribers) {
         return notification{ nullptr };
     }
 
     // A subscription removes itself from the list when it ends, so one that
     // ends after this copy was taken is skipped by deliver() itself.
-    const auto value = make();
     auto sent = std::make_shared<notification::storage>();
     const bool deferred = (how.timing == notify_timing::deferred);
     for (const auto& each : *subscribers) {

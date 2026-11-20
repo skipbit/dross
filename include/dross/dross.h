@@ -20,6 +20,7 @@
  * - Type System: boolean, number, string, timestamp, timezone, array, dictionary, data, value, error
  * - Platform Layer: environment, path, xdg utilities
  * - Format Layer: TOML parsing with type-safe dictionary API (dross::toml)
+ * - IPC Layer: places where processes meet, such as a Unix domain socket (dross::ipc)
  * - Thread Layer: per-thread run loops that other threads can hand work to, and thread, a handle to an OS thread
  * - Notification Layer: typed notifications from a broadcaster to subscribers through a listener, each called where its delivery says
  *
@@ -31,6 +32,7 @@
 #pragma once
 
 #include <dross/format.h>
+#include <dross/ipc.h>
 #include <dross/notification.h>
 #include <dross/platform.h>
 #include <dross/thread.h>

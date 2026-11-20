@@ -54,6 +54,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/cbor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/connector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/error.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/frame.cpp
@@ -61,10 +62,14 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/outbox.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/publisher.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/remote_broadcaster.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/subscriber_table.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/subscription.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/topic_address.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_transport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/wire.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation.cpp

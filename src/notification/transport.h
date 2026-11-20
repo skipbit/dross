@@ -39,6 +39,11 @@ public:
 
     // reason is an empty error when the connection ended in order.
     virtual void closed(connection_id id, error reason) = 0;
+
+    // The transport's thread ended on a failure of its own, after closing
+    // every connection with that reason and what it listened on. Nothing is
+    // called after it. Not called when the transport is destroyed.
+    virtual void stopped(error reason) = 0;
 };
 
 // Carries messages between processes. Safe to call from any thread.
