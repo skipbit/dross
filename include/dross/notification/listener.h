@@ -79,9 +79,9 @@ concept subscriber_type = std::copy_constructible<std::decay_t<F>> && std::invoc
  * - A listener made by create() with a place hears the broadcaster
  *   published there by another process. It can be made before that
  *   broadcaster is, and keeps connecting until it reaches it, and again
- *   whenever the connection ends: at once the first time, and then after a
- *   wait that doubles from 100 milliseconds up to 5 seconds while the tries
- *   fail, starting over once one succeeds
+ *   whenever the connection ends, after a wait that doubles from 100
+ *   milliseconds up to 5 seconds while the tries fail, starting over once
+ *   one succeeds
  * - It tells the broadcaster each topic name it subscribes to, and each it
  *   stops subscribing to. A notification sent before a subscription has
  *   reached the broadcaster does not reach it, and is not kept; nor is one
