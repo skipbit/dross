@@ -62,6 +62,9 @@ private:
     mutable std::mutex _lock;
     std::shared_ptr<unix_transport> _transport;
     subscriber_table _subscribers;
+    // Set by the destructor, so that stopped() does not start a transport
+    // that nothing would stop.
+    bool _stopping{ false };
 };
 
 #undef DROSS_PUBLISHER_HIDDEN

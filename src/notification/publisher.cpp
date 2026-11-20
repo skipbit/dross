@@ -32,6 +32,7 @@ publisher::~publisher()
     std::shared_ptr<unix_transport> ending;
     {
         const std::lock_guard guard{ _lock };
+        _stopping = true;
         ending = std::move(_transport);
     }
 }
@@ -98,16 +99,16 @@ void publisher::stopped(error)
     // this returns.
     auto again = unix_transport::listen(_where, *this);
     std::shared_ptr<unix_transport> replaced;
-    {
-        const std::lock_guard guard{ _lock };
-        replaced = std::move(_transport);
-        if (again) {
-            _transport = std::move(*again);
-        }
+    const std::lock_guard guard{ _lock };
+    replaced = std::move(_transport);
+    if (! again || _stopping) {
+        return;
     }
-    if (again) {
-        transport()->start();
-    }
+    _transport = std::move(*again);
+    // Inside the lock: once the destructor has taken _transport, it no
+    // longer waits for this thread, so nothing of this is touched after the
+    // lock is let go.
+    _transport->start();
 }
 
 std::shared_ptr<unix_transport> publisher::transport() const
