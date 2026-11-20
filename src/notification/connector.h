@@ -47,8 +47,9 @@ public:
 // peer refused before it connected.
 //
 // It holds the layer above without keeping it going, and keeps it going for
-// the length of each event, so the layer above may let the connector go from
-// inside one.
+// the length of each event, so the layer above may let itself go from inside
+// any of them. It may let the connector go from inside connected() or
+// received(), but not disconnected(), after which the connector still runs.
 class DROSS_CONNECTOR_HIDDEN connector final : private transport_events {
 public:
     connector(path where, std::weak_ptr<connector_events> above);

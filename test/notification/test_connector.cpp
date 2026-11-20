@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -290,6 +291,73 @@ TEST_F(connector_test, reports_the_reason_given_to_close_and_connects_again)
     EXPECT_EQ(events->reasons_held().front(), dross::error{ std::errc::invalid_argument });
     EXPECT_TRUE(events->wait_for([&] {
         return events->connections_held() == 2;
+    }));
+}
+
+// Takes longer to hear that a connection ended than the first wait before
+// connecting again, and notes whether a connection was made meanwhile.
+class slow_to_hear_the_end final : public dross::connector_events, public waitable {
+public:
+    void connected() override
+    {
+        change([this] {
+            ++_connections;
+        });
+    }
+
+    void received(std::vector<std::byte>) override
+    {
+    }
+
+    void disconnected(dross::error) override
+    {
+        int before = 0;
+        change([this, &before] {
+            before = _connections;
+        });
+        std::this_thread::sleep_for(300ms);
+        change([this, before] {
+            _overlapped = _overlapped || (_connections != before);
+            ++_ends;
+        });
+    }
+
+    // Read inside a condition given to wait_for(), which holds the lock.
+    int connections_held() const
+    {
+        return _connections;
+    }
+
+    int ends_held() const
+    {
+        return _ends;
+    }
+
+    bool overlapped_held() const
+    {
+        return _overlapped;
+    }
+
+private:
+    int _connections{ 0 };
+    int _ends{ 0 };
+    bool _overlapped{ false };
+};
+
+TEST_F(connector_test, connects_again_only_once_the_end_has_been_reported)
+{
+    peer there{ at("s") };
+    auto events = std::make_shared<slow_to_hear_the_end>();
+    dross::connector link{ dross::path{ at("s") }, events };
+    link.start();
+    ASSERT_TRUE(events->wait_for([&] {
+        return events->connections_held() == 1;
+    }));
+
+    there.close();
+
+    EXPECT_TRUE(events->wait_for([&] {
+        return (events->connections_held() == 2) && (events->ends_held() == 1) && ! events->overlapped_held();
     }));
 }
 

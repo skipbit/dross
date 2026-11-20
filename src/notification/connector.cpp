@@ -82,24 +82,30 @@ void connector::closed(connection_id, error reason)
 {
     // Taken first, so it is let go last: letting it go may destroy this.
     const auto above = _above.lock();
-    std::unique_ptr<unix_transport> ending;
     bool was_connected = false;
     {
         const std::lock_guard guard{ _lock };
-        ending = std::move(_transport);
         was_connected = _connection.has_value();
         _connection.reset();
         if (_closing) {
             reason = std::move(*_closing);
             _closing.reset();
         }
+    }
+    // Reported before run() is woken, so the next connection's events follow
+    // it. The transport stays in _transport meanwhile, so the destructor
+    // waits for this thread.
+    if (above && was_connected) {
+        above->disconnected(std::move(reason));
+    }
+    std::unique_ptr<unix_transport> ending;
+    {
+        const std::lock_guard guard{ _lock };
+        ending = std::move(_transport);
         // Inside the lock: once the transport is out of _transport, the
         // destructor no longer waits for this thread, so nothing of this is
         // touched after the lock is let go.
         _wake.notify_all();
-    }
-    if (above && was_connected) {
-        above->disconnected(std::move(reason));
     }
     // ending goes here, inside its own event, so its thread is let go.
 }
