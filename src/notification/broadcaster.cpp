@@ -40,10 +40,14 @@ bool broadcaster::storage::address_equal::operator()(const topic_address& lhs, c
     return (lhs.name == rhs.name) && (lhs.type == rhs.type) && (lhs.identity == rhs.identity);
 }
 
+broadcaster::storage::storage() = default;
+
 broadcaster::storage::storage(std::unique_ptr<publisher> outside) noexcept
     : _outside{ std::move(outside) }
 {
 }
+
+broadcaster::storage::~storage() = default;
 
 publisher* broadcaster::storage::outside() const noexcept
 {

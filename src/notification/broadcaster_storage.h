@@ -1,7 +1,6 @@
 #pragma once
 
 #include "dross/notification/broadcaster.h"
-#include "notification/publisher.h"
 #include "notification/subscription_access.h"
 #include "notification/topic_address.h"
 
@@ -18,6 +17,8 @@
 // listener adds to it, and notify() reads it.
 namespace dross {
 
+class publisher;
+
 // Hidden from the library's exported symbol table, as the publisher it holds
 // is.
 #if defined(__GNUC__) || defined(__clang__)
@@ -31,10 +32,12 @@ public:
     using receiver = subscription_access::receiver;
     using receivers = std::vector<std::shared_ptr<receiver>>;
 
-    storage() = default;
+    storage();
 
     // A broadcaster published through outside.
     explicit storage(std::unique_ptr<publisher> outside) noexcept;
+
+    ~storage();
 
     // What faces other processes; null for a broadcaster that is not
     // published.
