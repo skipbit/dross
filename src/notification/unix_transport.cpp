@@ -1,12 +1,15 @@
 #include "notification/unix_transport.h"
 
 #include "dross/notification/error.h"
+#include "notification/backoff.h"
 #include "notification/frame.h"
 #include "notification/outbox.h"
 #include "notification/poller.h"
 #include "notification/unix_socket.h"
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -134,12 +137,17 @@ public:
     void run()
     {
         while (settle()) {
-            const auto ready = _poller.wait();
+            const auto ready = _poller.wait(until_accepting());
             if (! ready) {
                 end_all(ready.error());
-                settle();
+                if (settle()) {
+                    // Closed first, so the path is free to listen on again.
+                    _listening.reset();
+                    _events.stopped(ready.error());
+                }
                 return;
             }
+            resume_accepting();
             for (const auto& each : *ready) {
                 if (_stopping) {
                     return;
@@ -209,11 +217,47 @@ private:
     {
         while (true) {
             auto accepted = _listening->accept();
-            if (! accepted || ! *accepted) {
+            if (! accepted) {
+                pause_accepting();
                 return;
             }
+            if (! *accepted) {
+                return;
+            }
+            _accept_waits.reset();
             adopt(std::move(**accepted));
         }
+    }
+
+    // Stops watching the listener for a while, since it stays ready while
+    // the connection it failed to accept waits.
+    void pause_accepting()
+    {
+        _poller.remove(_listening->fd());
+        _accepting_again = std::chrono::steady_clock::now() + _accept_waits.next();
+    }
+
+    // How long the wait may last before accepting resumes; none while
+    // accepting.
+    std::optional<std::chrono::milliseconds> until_accepting() const
+    {
+        if (! _accepting_again) {
+            return std::nullopt;
+        }
+        const auto left = std::chrono::ceil<std::chrono::milliseconds>(*_accepting_again - std::chrono::steady_clock::now());
+        return std::max(left, std::chrono::milliseconds::zero());
+    }
+
+    void resume_accepting()
+    {
+        if (! _accepting_again || (std::chrono::steady_clock::now() < *_accepting_again)) {
+            return;
+        }
+        if (auto added = _poller.add(_listening->fd(), poller::interest::read); ! added) {
+            _accepting_again = std::chrono::steady_clock::now() + _accept_waits.next();
+            return;
+        }
+        _accepting_again.reset();
     }
 
     void serve(const poller::event& ready)
@@ -302,6 +346,9 @@ private:
     transport_events& _events;
     poller _poller;
     std::optional<unix_listener> _listening;
+    backoff _accept_waits;
+    // When accepting resumes, while it is paused.
+    std::optional<std::chrono::steady_clock::time_point> _accepting_again;
     std::vector<std::byte> _buffer;
     std::unordered_map<int, connection_id> _ids_by_fd;
     connection_id _next_id{ 1 };
@@ -356,15 +403,22 @@ std::expected<std::unique_ptr<unix_transport>, error> unix_transport::connect(co
 
 unix_transport::unix_transport(std::shared_ptr<state> shared)
     : _state{ std::move(shared) }
-    , _thread{ [shared = _state] {
-        shared->run();
-    } }
 {
+}
+
+void unix_transport::start()
+{
+    _thread = std::thread{ [shared = _state] {
+        shared->run();
+    } };
 }
 
 unix_transport::~unix_transport()
 {
     _state->stop();
+    if (! _thread.joinable()) {
+        return;
+    }
     if (_thread.get_id() == std::this_thread::get_id()) {
         _thread.detach();
     } else {
