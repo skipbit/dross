@@ -81,33 +81,24 @@ std::expected<subscription, error> listener::subscribe_any(std::string_view name
     using receiver = subscription_access::receiver;
 
     const auto where = topic_address::of(name, type);
-    // link is reported here, not asked of the broadcaster.
-    const auto link_address = topic_address::of(link.name(), typeid(link_event));
-    const bool on_link = (where.name == link_address.name) && (where.type == link_address.type);
-    std::weak_ptr<remote_broadcaster> remote;
-    if (_store->remote && ! on_link) {
-        if (read == nullptr) {
-            return std::unexpected(error{ notification_errc::type_not_convertible });
-        }
-        remote = _store->remote;
+    if (_store->remote && ! remote_broadcaster::is_link(where) && (read == nullptr)) {
+        return std::unexpected(error{ notification_errc::type_not_convertible });
     }
 
     receiver::origin from{ _store, _store->source, nullptr };
-    from.detach = [source = _store->source, remote, name = std::string{ name }, type = &type]() {
-        if (auto alive = source.lock()) {
-            alive->prune(topic_address::of(name, *type));
-        }
+    from.detach = [source = _store->source, remote = std::weak_ptr<remote_broadcaster>{ _store->remote }, name = std::string{ name }, type = &type]() {
         if (auto alive = remote.lock()) {
-            alive->unwant(name, *type);
+            alive->remove(name, *type);
+        } else if (auto registry = source.lock()) {
+            registry->prune(topic_address::of(name, *type));
         }
     };
 
     auto which = std::make_shared<receiver>(delivery_access::resolve(how), std::move(function), std::move(from));
-    if (auto source = _store->source.lock()) {
+    if (_store->remote) {
+        _store->remote->add(name, type, which, read);
+    } else if (auto source = _store->source.lock()) {
         source->add(where, which);
-    }
-    if (auto alive = remote.lock()) {
-        alive->want(name, type, read);
     }
     return subscription_access::make(std::move(which));
 }

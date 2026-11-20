@@ -36,6 +36,7 @@ namespace dross {
 class DROSS_REMOTE_BROADCASTER_HIDDEN remote_broadcaster final : public connector_events {
 public:
     using registry = broadcaster_access::storage_type;
+    using receiver = registry::receiver;
 
     // Makes the value a dross::value holds, or says why it could not.
     using value_reader = std::expected<std::shared_ptr<const void>, error> (*)(const value& held);
@@ -50,12 +51,18 @@ public:
     remote_broadcaster(remote_broadcaster&& other) = delete;
     remote_broadcaster& operator=(remote_broadcaster&& other) = delete;
 
-    // The subscribers here, which a listener adds to and prunes.
+    // Where listener::link is reported, which is not asked of the
+    // broadcaster.
+    static topic_address link_address() noexcept;
+    static bool is_link(const topic_address& where) noexcept;
+
+    // The subscribers here, which a listener prunes from once this is gone.
     std::weak_ptr<registry> subscribers() const noexcept;
 
-    // A subscriber of name came, of the type read makes; or one went.
-    void want(std::string_view name, const std::type_info& type, value_reader read);
-    void unwant(std::string_view name, const std::type_info& type);
+    // Adds which as a subscriber of name, of the type read makes, and asks
+    // the broadcaster for name; or removes one that went.
+    void add(std::string_view name, const std::type_info& type, std::shared_ptr<receiver> which, value_reader read);
+    void remove(std::string_view name, const std::type_info& type);
 
     void connected() override;
     void received(std::vector<std::byte> message) override;
@@ -72,6 +79,9 @@ private:
         value_reader read;
         std::size_t count;
     };
+
+    void want(std::string_view name, const std::type_info& type, value_reader read);
+    void unwant(std::string_view name, const std::type_info& type);
 
     // Hands value to the subscribers at where, on this thread.
     void hand(const topic_address& where, const std::shared_ptr<const void>& value) const;

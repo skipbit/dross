@@ -26,9 +26,37 @@ remote_broadcaster::remote_broadcaster()
 
 remote_broadcaster::~remote_broadcaster() = default;
 
+topic_address remote_broadcaster::link_address() noexcept
+{
+    return topic_address::of(listener::link.name(), typeid(link_event));
+}
+
+bool remote_broadcaster::is_link(const topic_address& where) noexcept
+{
+    const auto link = link_address();
+    return (where.name == link.name) && (where.type == link.type);
+}
+
 std::weak_ptr<remote_broadcaster::registry> remote_broadcaster::subscribers() const noexcept
 {
     return _subscribers;
+}
+
+void remote_broadcaster::add(const std::string_view name, const std::type_info& type, std::shared_ptr<receiver> which, const value_reader read)
+{
+    _subscribers->add(topic_address::of(name, type), std::move(which));
+    if (! is_link(topic_address::of(name, type))) {
+        want(name, type, read);
+    }
+}
+
+void remote_broadcaster::remove(const std::string_view name, const std::type_info& type)
+{
+    const auto where = topic_address::of(name, type);
+    _subscribers->prune(where);
+    if (! is_link(where)) {
+        unwant(name, type);
+    }
 }
 
 void remote_broadcaster::want(const std::string_view name, const std::type_info& type, const value_reader read)
@@ -151,7 +179,7 @@ void remote_broadcaster::hand(const topic_address& where, const std::shared_ptr<
 
 void remote_broadcaster::tell(link_event what) const
 {
-    const auto where = topic_address::of(listener::link.name(), typeid(link_event));
+    const auto where = link_address();
     if (! _subscribers->subscribers(where)) {
         return;
     }
