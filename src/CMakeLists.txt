@@ -15,11 +15,13 @@ if (APPLE)
     set(DROSS_PLATFORM_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/notification/poller_kqueue.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket_macos.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/thread/native_macos.cpp
     )
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(DROSS_PLATFORM_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/notification/poller_epoll.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket_linux.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/thread/native_linux.cpp
     )
 else()
     message(FATAL_ERROR "dross builds for Linux and macOS")

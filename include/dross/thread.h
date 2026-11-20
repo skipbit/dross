@@ -68,7 +68,7 @@
  *   translated
  *
  * Platform support:
- * - Linux and macOS; native.cpp does not compile for anything else
+ * - Linux and macOS only
  */
 
 #pragma once
