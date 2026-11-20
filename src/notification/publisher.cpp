@@ -98,6 +98,12 @@ void publisher::stopped(error)
 {
     // Called on the stopped transport's own thread, which lets it go once
     // this returns.
+    {
+        const std::lock_guard guard{ _lock };
+        if (_stopping) {
+            return;
+        }
+    }
     auto again = unix_transport::listen(_where, *this);
     std::shared_ptr<unix_transport> replaced;
     const std::lock_guard guard{ _lock };
