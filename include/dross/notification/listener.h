@@ -1,11 +1,15 @@
 #pragma once
 
+#include "dross/ipc/unix_socket.h"
 #include "dross/notification/broadcaster.h"
 #include "dross/notification/delivery.h"
 #include "dross/notification/error.h"
+#include "dross/notification/link_event.h"
 #include "dross/notification/subscription.h"
 #include "dross/notification/topic.h"
 #include "dross/type/error.h"
+#include "dross/type/value.h"
+#include "dross/type/value_traits.h"
 
 #include <concepts>
 #include <expected>
@@ -70,6 +74,52 @@ concept subscriber_type = std::copy_constructible<std::decay_t<F>> && std::invoc
  * Thread safety:
  * - Every operation is free of data races when called from any thread,
  *   including from inside a subscriber's function
+ *
+ * Listening to another process:
+ * - A listener made by create() with a place hears the broadcaster
+ *   published there by another process. It can be made before that
+ *   broadcaster is, and keeps connecting until it reaches it, and again
+ *   whenever the connection ends: at once the first time, and then after a
+ *   wait that doubles from 100 milliseconds up to 5 seconds while the tries
+ *   fail, starting over once one succeeds
+ * - It tells the broadcaster each topic name it subscribes to, and each it
+ *   stops subscribing to. A notification sent before a subscription has
+ *   reached the broadcaster does not reach it, and is not kept; nor is one
+ *   sent while the listener is not connected
+ * - Each value comes as a dross::value and is turned back into the topic's
+ *   type with dross::value_traits, so subscribe() takes only a type that has
+ *   them. A topic is told apart by its name alone, so a value that the type
+ *   cannot be made from is dropped and reported on link
+ * - link carries what happens to the connection: connected, disconnected,
+ *   and type_mismatch. Nothing is reported when no one subscribes to it, and
+ *   a try to connect that fails is never reported
+ * - The listener has a thread of its own that connects, and the connection
+ *   has another that receives. A subscriber that chose
+ *   dross::delivery::direct() runs on the receiving thread, so an exception
+ *   it throws leaves that thread and ends the program, as one leaving a
+ *   worker of an operation_queue does
+ * - A listener made from a broadcaster in this process never reports on
+ *   link
+ *
+ * @code
+ * inline constexpr dross::topic<int> kTrack{ "com.example.player.track" };
+ *
+ * void show(const int& track);
+ * void report(const dross::link_event& what);
+ *
+ * int main()
+ * {
+ *     const dross::ipc::unix_socket place{ dross::path{ std::string{ "/run/user/1000/player.sock" } } };
+ *     auto ears = dross::listener::create(place);
+ *
+ *     auto watched = ears.subscribe(dross::listener::link, report, dross::delivery::queued());
+ *     auto subscribed = ears.subscribe(kTrack, show, dross::delivery::queued());
+ *     if (! watched || ! subscribed) {
+ *         return 1;
+ *     }
+ *     dross::current_runloop().run();
+ * }
+ * @endcode
  */
 class listener final {
 public:
@@ -80,6 +130,20 @@ public:
      * @return A handle to the new listener
      */
     [[nodiscard]] static listener create(const broadcaster& source);
+
+    /**
+     * @brief Make a listener that hears the broadcaster another process
+     * published at place.
+     * @param place Where that broadcaster listens, now or later
+     * @return A handle to the new listener, which starts connecting at once
+     */
+    [[nodiscard]] static listener create(const ipc::unix_socket& place);
+
+    /**
+     * @brief The topic on which a listener made with a place reports what
+     * happens to its connection.
+     */
+    static constexpr topic<link_event> link{ "dross.listener.link" };
 
     /**
      * @brief Copy constructor, giving another handle to the same listener.
@@ -107,7 +171,9 @@ public:
      * @param how Where the function runs; there is no default
      * @return The subscription, which receives for as long as it is held, or
      * notification_errc::empty_function for a null function pointer or an
-     * empty std::function
+     * empty std::function, or notification_errc::type_not_convertible on a
+     * listener made with a place, for a type without dross::value_traits
+     * on any topic but link
      *
      * Dropping what this returns ends the subscription at once, so the result
      * is not to be discarded. When the broadcaster has already gone, the
@@ -148,11 +214,16 @@ private:
         }
     }
 
+    // Makes the value a dross::value holds, or says why it could not; null
+    // for a type without dross::value_traits.
+    using value_reader = std::expected<std::shared_ptr<const void>, error> (*)(const value& held);
+
     // subscribe() without its type: function is given a pointer to the value.
-    subscription subscribe_any(std::string_view name,
-                               const std::type_info& type,
-                               std::function<void(const void*)> function,
-                               const delivery& how);
+    std::expected<subscription, error> subscribe_any(std::string_view name,
+                                                     const std::type_info& type,
+                                                     std::function<void(const void*)> function,
+                                                     const delivery& how,
+                                                     value_reader read);
 
     std::shared_ptr<storage> _store;
 };
@@ -165,9 +236,19 @@ std::expected<subscription, error> listener::subscribe(const topic<T>& which, F&
     }
     // Wrapped here, not in the library, so the value is taken out on the same
     // side of a shared library boundary as notify() puts it in.
+    value_reader read = nullptr;
+    if constexpr (value_convertible_type<T>) {
+        read = [](const value& held) -> std::expected<std::shared_ptr<const void>, error> {
+            auto made = value_traits<T>::from_value(held);
+            if (! made) {
+                return std::unexpected(std::move(made).error());
+            }
+            return std::shared_ptr<const void>{ std::make_shared<const T>(std::move(*made)) };
+        };
+    }
     return subscribe_any(which.name(), topic<T>::type(), [function = std::forward<F>(function)](const void* value) mutable {
         std::invoke(function, *static_cast<const T*>(value));
-    }, how);
+    }, how, read);
 }
 
 }  // namespace dross

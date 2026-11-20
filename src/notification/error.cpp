@@ -27,6 +27,8 @@ public:
             return "peer runs as another user";
         case notification_errc::message_cut_short:
             return "connection ended in the middle of a message";
+        case notification_errc::type_not_convertible:
+            return "type has no dross::value_traits to cross between processes";
         }
         return "unknown notification error";
     }
