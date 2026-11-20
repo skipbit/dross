@@ -141,7 +141,8 @@ public:
 
     /**
      * @brief The topic on which a listener made with a place reports what
-     * happens to its connection.
+     * happens to its connection. A subscriber hears only what happens after
+     * it subscribes, so a connection made before is not reported to it.
      */
     static constexpr topic<link_event> link{ "dross.listener.link" };
 

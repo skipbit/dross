@@ -14,6 +14,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -270,9 +271,9 @@ TEST_F(remote_listener_test, a_listener_made_before_the_broadcaster_hears_it_onc
 TEST_F(remote_listener_test, connecting_is_reported_with_no_topic_and_no_reason)
 {
     const dross::ipc::unix_socket place{ dross::path{ at("s") } };
+    listening one{ place };
     auto news = dross::broadcaster::create(place);
     ASSERT_TRUE(news.has_value());
-    listening one{ place };
 
     ASSERT_TRUE(one.got->wait_for([&] {
         return ! one.got->links_held().empty();
@@ -452,12 +453,11 @@ TEST_F(remote_listener_test, nothing_is_reported_when_no_one_subscribes_to_link)
 TEST_F(remote_listener_test, the_listener_may_be_let_go_from_inside_a_direct_subscriber)
 {
     const dross::ipc::unix_socket place{ dross::path{ at("s") } };
-    auto news = dross::broadcaster::create(place);
-    ASSERT_TRUE(news.has_value());
 
     std::mutex lock;
     std::condition_variable changed;
     std::optional<dross::subscription> held;
+    std::expected<dross::broadcaster, dross::error> news = std::unexpected(dross::error{});
     bool gone = false;
     {
         auto ears = dross::listener::create(place);
@@ -477,9 +477,14 @@ TEST_F(remote_listener_test, the_listener_may_be_let_go_from_inside_a_direct_sub
             changed.notify_all();
         }, dross::delivery::direct());
         ASSERT_TRUE(subscribed.has_value());
-        const std::lock_guard guard{ lock };
-        held = std::move(*subscribed);
-        changed.notify_all();
+        {
+            const std::lock_guard guard{ lock };
+            held = std::move(*subscribed);
+            changed.notify_all();
+        }
+        // Made after the subscription, which hears only what follows it.
+        news = dross::broadcaster::create(place);
+        ASSERT_TRUE(news.has_value());
     }
 
     std::unique_lock guard{ lock };
