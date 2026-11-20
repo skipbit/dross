@@ -65,6 +65,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/topic_address.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/unix_transport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/wire.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/deadline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/native.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation.cpp
