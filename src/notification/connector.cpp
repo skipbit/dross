@@ -43,8 +43,8 @@ void connector::send(const std::span<const std::byte> message)
     if (! _connection) {
         return;
     }
-    // A message that does not fit closes the connection, which is then made
-    // again.
+    // A message over 64 KiB is not sent and the connection stays; one that
+    // overflows the queue closes it, and it is then made again.
     (void)_transport->send(*_connection, message);
 }
 

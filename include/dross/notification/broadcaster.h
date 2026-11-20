@@ -138,7 +138,9 @@ struct notify_options final {
  *   dross::listener::link
  * - A notification is at most 64 KiB once turned into bytes, and at most
  *   1 MiB waits to be sent to one listener. A listener that falls further
- *   behind is disconnected, and connects again
+ *   behind is disconnected, and connects again. A larger notification is
+ *   not sent to other processes, while listeners in this process still get
+ *   it
  * - Only processes of the same effective user can connect. The socket file
  *   is made for its owner alone, and removed when the last handle goes
  * - When a connection cannot be accepted, as when the process has no file

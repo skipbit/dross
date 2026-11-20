@@ -56,8 +56,9 @@ void publisher::send(const std::string_view name, const value& content)
         return;
     }
     const auto bytes = wire::encode(wire::notice{ std::string{ name }, content });
-    // A connection that cannot take the message is closed by the
-    // transport, and its listener connects again.
+    // A message over 64 KiB is not sent and the connection stays; a
+    // connection whose queue overflows is closed by the transport, and its
+    // listener connects again.
     for (const connection_id id : receivers) {
         (void)through->send(id, bytes);
     }
