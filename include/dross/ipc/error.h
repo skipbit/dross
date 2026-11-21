@@ -9,6 +9,9 @@ namespace dross {
  * @brief Why carrying a message between processes failed.
  *
  * A connection that is not open fails with std::errc::not_connected.
+ *
+ * Like the error codes of the other modules, it is in namespace dross, and
+ * its name says its module.
  */
 enum class ipc_errc {
     message_too_large = 1,   ///< A message was larger than the connection carries
