@@ -7,6 +7,8 @@
 
 #include <condition_variable>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -120,6 +122,10 @@ private:
             return;
         }
         auto events = above->accepted(std::make_shared<unix_channel>(self, id));
+        if (! events) {
+            std::fputs("dross: message_acceptor_events::accepted: returned null\n", stderr);
+            std::abort();
+        }
         // An acceptor destroyed inside accepted() keeps nothing more, so the
         // events are let go here, after the lock.
         const std::lock_guard guard{ _lock };

@@ -322,6 +322,32 @@ TEST_F(unix_place_test, the_events_of_a_connection_accepted_while_the_acceptor_g
     EXPECT_EQ(events.use_count(), 1);
 }
 
+// Gives nothing to tell about each connection it accepts.
+class giving_null final : public dross::ipc::message_acceptor_events {
+public:
+    std::shared_ptr<dross::ipc::message_channel_events> accepted(std::shared_ptr<dross::ipc::message_channel>) override
+    {
+        return nullptr;
+    }
+
+    void stopped(dross::error) override
+    {
+    }
+};
+
+TEST_F(unix_place_test, accepted_that_returns_null_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_DEATH(
+        {
+            auto acceptor = place().listen(std::make_shared<giving_null>());
+            auto mine = std::make_shared<recorder>();
+            auto channel = place().connector()->connect(mine);
+            std::this_thread::sleep_for(kPatience);
+        },
+        "message_acceptor_events::accepted: returned null");
+}
+
 TEST_F(unix_place_test, a_message_over_the_largest_fails)
 {
     auto above = std::make_shared<acceptance>();

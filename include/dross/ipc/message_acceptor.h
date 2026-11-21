@@ -29,7 +29,9 @@ public:
      * @brief A peer connected.
      * @param channel The new connection
      * @return What to tell about the connection, which the part holds as
-     *         message_channel_events says
+     *         message_channel_events says. It is never null: a part given
+     *         null ends the process as a misuse, as one that breaks the
+     *         order of the calls does
      */
     virtual std::shared_ptr<message_channel_events> accepted(std::shared_ptr<message_channel> channel) = 0;
 
