@@ -208,4 +208,15 @@ TEST(publisher_test, the_channels_are_let_go_with_the_publisher)
     EXPECT_TRUE(watched.expired());
 }
 
+TEST(publisher_test, a_channel_told_after_it_closed_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    fake_place place;
+    auto made = dross::publisher::listen(place.listen());
+    ASSERT_TRUE(made.has_value());
+    auto events = place.events->accepted(std::make_shared<kept_channel>());
+    events->closed({});
+    EXPECT_DEATH(events->received(subscribe("a")), "received: called after closed");
+}
+
 }  // namespace

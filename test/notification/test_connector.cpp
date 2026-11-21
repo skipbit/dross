@@ -619,6 +619,29 @@ TEST(connector_part_test, nothing_is_told_once_the_connector_is_gone)
     EXPECT_EQ(above->log(), std::vector<std::string>{ "connected" });
 }
 
+// Runs a connector over a part that tells received() after closed(), and
+// waits for it to stop the program.
+void tell_after_the_end()
+{
+    auto part = std::make_shared<scripted_part>([](int, const auto& events) -> std::expected<std::shared_ptr<dross::ipc::message_channel>, dross::error> {
+        events->closed({});
+        events->received(one_byte(1));
+        return std::make_shared<counted_channel>();
+    });
+    auto above = std::make_shared<told>();
+    dross::connector link{ part, above };
+    link.start();
+    (void)above->wait_for([] {
+        return false;
+    });
+}
+
+TEST(connector_part_test, a_part_that_tells_after_the_end_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_DEATH(tell_after_the_end(), "received: called after closed");
+}
+
 // Owns its connector, as a remote broadcaster does, and holds received()
 // until the test lets it go on.
 class owning_above final : public dross::connector_events, public waitable {

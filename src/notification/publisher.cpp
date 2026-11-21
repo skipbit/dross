@@ -1,6 +1,7 @@
 #include "notification/publisher.h"
 
 #include "dross/ipc/message_channel.h"
+#include "notification/channel_calls.h"
 #include "notification/subscriber_table.h"
 #include "notification/wire.h"
 
@@ -137,6 +138,7 @@ private:
 
         void received(std::vector<std::byte> message) override
         {
+            const auto call = _calls.received();
             const auto above = _above.lock();
             const auto channel = _channel.lock();
             if (above && channel) {
@@ -146,6 +148,7 @@ private:
 
         void closed(error) override
         {
+            const auto call = _calls.closed();
             const auto above = _above.lock();
             const auto channel = _channel.lock();
             if (above && channel) {
@@ -156,6 +159,7 @@ private:
     private:
         const std::weak_ptr<core> _above;
         const std::weak_ptr<ipc::message_channel> _channel;
+        channel_calls _calls;
     };
 
     const listen_function _listen;

@@ -61,6 +61,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/unix_transport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/channel_calls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/connector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/error.cpp

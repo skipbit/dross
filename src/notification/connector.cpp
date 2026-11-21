@@ -2,6 +2,7 @@
 
 #include "dross/ipc/message_channel.h"
 #include "ipc/backoff.h"
+#include "notification/channel_calls.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -36,6 +37,7 @@ public:
 
     void received(std::vector<std::byte> message) override
     {
+        const auto call = _calls.received();
         const std::lock_guard guard{ _telling };
         if (! _opened) {
             _early.push_back(std::move(message));
@@ -46,6 +48,7 @@ public:
 
     void closed(error reason) override
     {
+        const auto call = _calls.closed();
         const std::lock_guard guard{ _telling };
         if (! _opened) {
             _early_end = std::move(reason);
@@ -135,6 +138,7 @@ private:
 
     const std::weak_ptr<state> _state;
     const std::weak_ptr<connector_events> _above;
+    channel_calls _calls;
     std::mutex _telling;
     std::atomic<std::thread::id> _telling_thread;
     std::atomic<bool> _silenced{ false };
