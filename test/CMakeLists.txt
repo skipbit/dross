@@ -55,6 +55,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_cbor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_error.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_message_place.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/file_local_peer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_accept_pause.cpp

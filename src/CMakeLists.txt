@@ -54,6 +54,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/format/cbor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/toml.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/error.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/message_channel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/connector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/delivery.cpp
