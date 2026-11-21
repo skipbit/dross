@@ -11,6 +11,7 @@
 #include <span>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -206,6 +207,54 @@ TEST(publisher_test, the_channels_are_let_go_with_the_publisher)
     EXPECT_FALSE(watched.expired());
     made->reset();
     EXPECT_TRUE(watched.expired());
+}
+
+TEST(publisher_test, channels_told_from_many_threads_at_once_are_each_kept)
+{
+    fake_place place;
+    auto made = dross::publisher::listen(place.listen());
+    ASSERT_TRUE(made.has_value());
+    auto& out = **made;
+
+    constexpr int kChannels = 8;
+    std::vector<std::shared_ptr<kept_channel>> channels;
+    std::vector<std::shared_ptr<dross::ipc::message_channel_events>> events;
+    for (int i = 0; i < kChannels; ++i) {
+        channels.push_back(std::make_shared<kept_channel>());
+        events.push_back(place.events->accepted(channels.back()));
+    }
+    std::vector<std::thread> parts;
+    for (int i = 0; i < kChannels; ++i) {
+        parts.emplace_back([&events, i] {
+            for (int round = 0; round < 100; ++round) {
+                events[i]->received(subscribe("b"));
+                events[i]->received(unsubscribe("b"));
+            }
+            events[i]->received(subscribe("a"));
+        });
+    }
+    for (int round = 0; round < 100; ++round) {
+        (void)out.wanted("b");
+    }
+    for (auto& part : parts) {
+        part.join();
+    }
+    EXPECT_FALSE(out.wanted("b"));
+    out.send("a", dross::value{ 1 });
+    for (const auto& channel : channels) {
+        EXPECT_EQ(channel->sent, std::vector<bytes>{ dross::wire::encode(dross::wire::notice{ "a", dross::value{ 1 } }) });
+    }
+
+    parts.clear();
+    for (int i = 0; i < kChannels; ++i) {
+        parts.emplace_back([&events, i] {
+            events[i]->closed({});
+        });
+    }
+    for (auto& part : parts) {
+        part.join();
+    }
+    EXPECT_FALSE(out.wanted("a"));
 }
 
 TEST(publisher_test, a_channel_told_after_it_closed_stops_the_program)

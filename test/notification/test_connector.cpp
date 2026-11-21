@@ -619,6 +619,36 @@ TEST(connector_part_test, nothing_is_told_once_the_connector_is_gone)
     EXPECT_EQ(above->log(), std::vector<std::string>{ "connected" });
 }
 
+TEST(connector_part_test, what_a_part_tells_from_its_own_thread_while_connect_returns_comes_in_order)
+{
+    std::thread telling;
+    auto part = std::make_shared<scripted_part>([&telling](int now, const auto& events) -> std::expected<std::shared_ptr<dross::ipc::message_channel>, dross::error> {
+        if (now == 1) {
+            telling = std::thread{ [events] {
+                for (int i = 1; i <= 100; ++i) {
+                    events->received(one_byte(i));
+                }
+                events->closed({});
+            } };
+        }
+        return std::make_shared<counted_channel>();
+    });
+    auto above = std::make_shared<told>();
+    dross::connector link{ part, above };
+    link.start();
+    ASSERT_TRUE(above->wait_for([&] {
+        return above->log_held().size() >= 103;
+    }));
+    telling.join();
+    std::vector<std::string> expected{ "connected" };
+    for (int i = 1; i <= 100; ++i) {
+        expected.push_back("received " + std::to_string(i));
+    }
+    expected.emplace_back("disconnected");
+    expected.emplace_back("connected");
+    EXPECT_EQ(above->log(), expected);
+}
+
 // Runs a connector over a part that tells received() after closed(), and
 // waits for it to stop the program.
 void tell_after_the_end()
