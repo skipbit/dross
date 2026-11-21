@@ -57,6 +57,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/message_channel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/outbox.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/unix_place.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/unix_transport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/broadcaster.cpp

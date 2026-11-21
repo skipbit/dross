@@ -61,6 +61,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_message_place.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_outbox.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_poller.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_place.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_socket.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_socket_calls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_transport.cpp
