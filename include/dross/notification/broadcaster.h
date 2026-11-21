@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dross/ipc/message_acceptor.h"
+#include "dross/ipc/message_place.h"
 #include "dross/ipc/unix_socket.h"
 #include "dross/notification/notification.h"
 #include "dross/notification/topic.h"
@@ -173,14 +175,17 @@ public:
     /**
      * @brief Make a broadcaster published at place, which listeners in other
      * processes can hear.
-     * @param place Where to listen. A socket file left there by a process
-     * that has gone is replaced; one that a live process listens on is not
+     * @param place Where to listen, copied to listen there again when what
+     * listens stops on a failure of its own. At a dross::ipc::unix_socket, a
+     * socket file left by a process that has gone is replaced; one that a
+     * live process listens on is not
      * @return A handle to the new broadcaster, or the error that kept it
      * from listening at place, such as std::errc::address_in_use when
-     * another process listens there, or std::errc::filename_too_long for a
-     * path longer than the system takes
+     * another process listens at a dross::ipc::unix_socket, or
+     * std::errc::filename_too_long for a path longer than the system takes
      */
-    [[nodiscard]] static std::expected<broadcaster, error> create(const ipc::unix_socket& place);
+    template <ipc::message_listenable_place_type P>
+    [[nodiscard]] static std::expected<broadcaster, error> create(const P& place);
 
     /**
      * @brief Copy constructor, giving another handle to the same
@@ -233,6 +238,12 @@ private:
 
     explicit broadcaster(std::shared_ptr<storage> store) noexcept;
 
+    // Starts listening at a place with the events given.
+    using listen_function = std::function<std::expected<std::unique_ptr<ipc::message_acceptor>, error>(std::shared_ptr<ipc::message_acceptor_events>)>;
+
+    // create() with a place, past the type of the place.
+    static std::expected<broadcaster, error> publish(listen_function listen);
+
     // Turns the value notify() made into a dross::value; null for a type
     // without dross::value_traits.
     using value_writer = dross::value (*)(const void* made);
@@ -249,6 +260,14 @@ private:
 
     friend class broadcaster_access;
 };
+
+template <ipc::message_listenable_place_type P>
+std::expected<broadcaster, error> broadcaster::create(const P& place)
+{
+    return publish([place](std::shared_ptr<ipc::message_acceptor_events> events) {
+        return place.listen(std::move(events));
+    });
+}
 
 template <std::move_constructible T>
 notification broadcaster::notify(const topic<T>& which, std::type_identity_t<T> value, const notify_options& how)

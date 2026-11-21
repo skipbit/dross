@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dross/ipc/message_connector.h"
+#include "dross/ipc/message_place.h"
 #include "dross/ipc/unix_socket.h"
 #include "dross/notification/broadcaster.h"
 #include "dross/notification/delivery.h"
@@ -134,10 +136,12 @@ public:
     /**
      * @brief Make a listener that hears the broadcaster another process
      * published at place.
-     * @param place Where that broadcaster listens, now or later
+     * @param place Where that broadcaster listens, now or later. The listener
+     * keeps what its connector() gives, not place itself
      * @return A handle to the new listener, which starts connecting at once
      */
-    [[nodiscard]] static listener create(const ipc::unix_socket& place);
+    template <ipc::message_connectable_place_type P>
+    [[nodiscard]] static listener create(const P& place);
 
     /**
      * @brief The topic on which a listener made with a place reports what
@@ -195,6 +199,9 @@ private:
 
     explicit listener(std::shared_ptr<storage> store) noexcept;
 
+    // create() with a place, past the type of the place.
+    static listener connect(std::shared_ptr<ipc::message_connector> part);
+
     // A std::function of any signature. A class derived from one is not,
     // since std::function never takes such a class as empty either.
     template <typename F>
@@ -228,6 +235,12 @@ private:
 
     std::shared_ptr<storage> _store;
 };
+
+template <ipc::message_connectable_place_type P>
+listener listener::create(const P& place)
+{
+    return connect(place.connector());
+}
 
 template <typename T, subscriber_type<T> F>
 std::expected<subscription, error> listener::subscribe(const topic<T>& which, F&& function, const delivery& how)
