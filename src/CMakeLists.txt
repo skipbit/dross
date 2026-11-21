@@ -101,42 +101,6 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-set(DROSS_HEADERS
-    ${PROJECT_SOURCE_DIR}/include/dross/dross.h
-    ${PROJECT_SOURCE_DIR}/include/dross/platform.h
-    ${PROJECT_SOURCE_DIR}/include/dross/platform/environment.h
-    ${PROJECT_SOURCE_DIR}/include/dross/platform/path.h
-    ${PROJECT_SOURCE_DIR}/include/dross/platform/xdg.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/array.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/boolean.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/data.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/dictionary.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/error.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/number.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/string.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/timestamp.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/timezone.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/value.h
-    ${PROJECT_SOURCE_DIR}/include/dross/type/value_traits.h
-    ${PROJECT_SOURCE_DIR}/include/dross/format.h
-    ${PROJECT_SOURCE_DIR}/include/dross/format/toml.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/broadcaster.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/delivery.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/error.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/listener.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/notification.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/subscription.h
-    ${PROJECT_SOURCE_DIR}/include/dross/notification/topic.h
-    ${PROJECT_SOURCE_DIR}/include/dross/thread.h
-    ${PROJECT_SOURCE_DIR}/include/dross/thread/operation.h
-    ${PROJECT_SOURCE_DIR}/include/dross/thread/operation_queue.h
-    ${PROJECT_SOURCE_DIR}/include/dross/thread/runloop.h
-    ${PROJECT_SOURCE_DIR}/include/dross/thread/thread.h
-    ${PROJECT_SOURCE_DIR}/include/dross/thread/timer.h
-)
-
 # While the major version is 0, a minor bump can change the ABI, so the soname
 # carries the minor as well. Once 1.0 is out, the major alone names the ABI.
 if (PROJECT_VERSION_MAJOR EQUAL 0)
