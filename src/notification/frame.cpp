@@ -1,6 +1,6 @@
 #include "notification/frame.h"
 
-#include "dross/notification/error.h"
+#include "dross/ipc/error.h"
 
 #include <cstdint>
 #include <iterator>
@@ -23,7 +23,7 @@ std::size_t length_at(const std::byte* head)
 std::expected<std::vector<std::byte>, error> frame_message(const std::span<const std::byte> message)
 {
     if (message.size() > max_message_size) {
-        return std::unexpected(error{ notification_errc::message_too_large });
+        return std::unexpected(error{ ipc_errc::message_too_large });
     }
     const auto length = static_cast<std::uint32_t>(message.size());
     std::vector<std::byte> framed;
@@ -38,7 +38,7 @@ std::expected<std::vector<std::byte>, error> frame_message(const std::span<const
 std::expected<std::vector<std::vector<std::byte>>, error> frame_reader::take(const std::span<const std::byte> bytes)
 {
     if (_failed) {
-        return std::unexpected(error{ notification_errc::message_too_large });
+        return std::unexpected(error{ ipc_errc::message_too_large });
     }
     _pending.insert(_pending.end(), bytes.begin(), bytes.end());
     std::vector<std::vector<std::byte>> messages;
@@ -48,7 +48,7 @@ std::expected<std::vector<std::vector<std::byte>>, error> frame_reader::take(con
         if (length > max_message_size) {
             _failed = true;
             _pending.clear();
-            return std::unexpected(error{ notification_errc::message_too_large });
+            return std::unexpected(error{ ipc_errc::message_too_large });
         }
         if ((_pending.size() - used - frame_header_size) < length) {
             break;

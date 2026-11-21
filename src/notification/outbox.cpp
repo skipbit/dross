@@ -1,6 +1,6 @@
 #include "notification/outbox.h"
 
-#include "dross/notification/error.h"
+#include "dross/ipc/error.h"
 #include "notification/unix_socket.h"
 
 #include <span>
@@ -11,7 +11,7 @@ namespace dross {
 std::expected<void, error> outbox::push(std::vector<std::byte> bytes)
 {
     if (bytes.size() > (max_queued_bytes - _size)) {
-        return std::unexpected(error{ notification_errc::queue_overflow });
+        return std::unexpected(error{ ipc_errc::queue_overflow });
     }
     if (bytes.empty()) {
         return {};

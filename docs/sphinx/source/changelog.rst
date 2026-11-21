@@ -28,11 +28,11 @@ Added
 - ``ipc::unix_socket``, in a new IPC module (``<dross/ipc.h>``), naming a
   place where processes meet: a Unix domain socket at a path
 
-- ``notification_errc`` values for messages between processes:
-  ``message_too_large`` for a message over 64 KiB, ``queue_overflow`` for
-  more than 1 MiB waiting to be sent on a connection,
-  ``peer_not_same_user`` for a peer running as another user, and
-  ``message_cut_short`` for a connection that ends in the middle of a
+- ``ipc_errc`` in the IPC module, for why carrying a message between
+  processes failed: ``message_too_large`` for a message over 64 KiB,
+  ``queue_overflow`` for more than 1 MiB waiting to be sent on a
+  connection, ``peer_not_same_user`` for a peer running as another user,
+  and ``message_cut_short`` for a connection that ends in the middle of a
   message. All but ``peer_not_same_user`` can reach a listener in another
   process as the reason its ``link_event`` gives for a disconnection; a
   peer running as another user is never connected to

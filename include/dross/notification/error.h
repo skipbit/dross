@@ -10,11 +10,7 @@ namespace dross {
  */
 enum class notification_errc {
     empty_function = 1,        ///< The function given was empty, so there is nothing to call
-    message_too_large = 2,     ///< A message between processes was larger than 64 KiB
-    queue_overflow = 3,        ///< More than 1 MiB waited to be sent on a connection
-    peer_not_same_user = 4,    ///< The process at the other end ran as another user
-    message_cut_short = 5,     ///< The connection ended in the middle of a message
-    type_not_convertible = 6,  ///< The type has no dross::value_traits, so it cannot cross between processes
+    type_not_convertible = 2,  ///< The type has no dross::value_traits, so it cannot cross between processes
 };
 
 /**

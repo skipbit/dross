@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include <dross/ipc/error.h>
 #include <dross/ipc/unix_socket.h>
 
 /**

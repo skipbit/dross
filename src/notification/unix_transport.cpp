@@ -1,6 +1,6 @@
 #include "notification/unix_transport.h"
 
-#include "dross/notification/error.h"
+#include "dross/ipc/error.h"
 #include "notification/accept_pause.h"
 #include "notification/frame.h"
 #include "notification/outbox.h"
@@ -52,7 +52,7 @@ std::optional<error> refusal_of(const int fd, const uid_t allowed)
         return user.error();
     }
     if (*user != allowed) {
-        return error{ notification_errc::peer_not_same_user };
+        return error{ ipc_errc::peer_not_same_user };
     }
     return std::nullopt;
 }
@@ -303,7 +303,7 @@ private:
             return;
         }
         if (**got == 0) {
-            end(from, from.reader.holds_partial() ? error{ notification_errc::message_cut_short } : error{});
+            end(from, from.reader.holds_partial() ? error{ ipc_errc::message_cut_short } : error{});
             return;
         }
         auto messages = from.reader.take(std::span{ _buffer }.first(**got));
