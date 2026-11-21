@@ -34,8 +34,11 @@ public:
     virtual std::shared_ptr<message_channel_events> accepted(std::shared_ptr<message_channel> channel) = 0;
 
     /**
-     * @brief The part stopped listening on a failure of its own. Nothing
-     *        more is called. Not called when the acceptor is destroyed.
+     * @brief The part stopped listening on a failure of its own.
+     *
+     * Every channel it accepted has had closed() first, and nothing more is
+     * called after it. Not called when the acceptor is destroyed.
+     *
      * @param reason Why it stopped
      */
     virtual void stopped(error reason) = 0;

@@ -131,7 +131,9 @@ broadcaster broadcaster::create()
 
 std::expected<broadcaster, error> broadcaster::create(const ipc::unix_socket& place)
 {
-    auto outside = publisher::listen(place.location());
+    auto outside = publisher::listen([place](std::shared_ptr<ipc::message_acceptor_events> events) {
+        return place.listen(std::move(events));
+    });
     if (! outside) {
         return std::unexpected(std::move(outside).error());
     }

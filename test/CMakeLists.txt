@@ -71,6 +71,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_published_broadcaster.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_publisher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_remote_listener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscriber_table.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscription.cpp
@@ -89,6 +90,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/ipc/unix_socket.cpp
     ${PROJECT_SOURCE_DIR}/src/ipc/unix_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/connector.cpp
+    ${PROJECT_SOURCE_DIR}/src/notification/publisher.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/subscriber_table.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/wire.cpp
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
