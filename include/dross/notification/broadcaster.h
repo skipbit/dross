@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dross/ipc/message_acceptor.h"
+#include "dross/ipc/message_place.h"
 #include "dross/ipc/unix_socket.h"
 #include "dross/notification/notification.h"
 #include "dross/notification/topic.h"
@@ -136,18 +138,23 @@ struct notify_options final {
  * - Between processes a topic is told apart by its name alone. A listener
  *   that cannot turn the value back into its own type says so on
  *   dross::listener::link
+ * - A notification larger than the place carries is not sent to other
+ *   processes, while listeners in this process still get it. A listener
+ *   that falls further behind than the place lets wait is disconnected, and
+ *   connects again
+ * - When what listens stops on a failure of its own, the place is listened
+ *   at once more
+ * - Nothing tells the sender that a listener connected, went or fell
+ *   behind
+ *
+ * Published at a dross::ipc::unix_socket:
  * - A notification is at most 64 KiB once turned into bytes, and at most
- *   1 MiB waits to be sent to one listener. A listener that falls further
- *   behind is disconnected, and connects again. A larger notification is
- *   not sent to other processes, while listeners in this process still get
- *   it
+ *   1 MiB waits to be sent to one listener
  * - Only processes of the same effective user can connect. The socket file
  *   is made for its owner alone, and removed when the last handle goes
  * - When a connection cannot be accepted, as when the process has no file
  *   descriptor left, accepting pauses for a while. macOS drops the
  *   connection it could not accept, so that listener connects again
- * - Nothing tells the sender that a listener connected, went or fell
- *   behind
  *
  * Exceptions:
  * - An exception thrown by a subscriber's function called with
@@ -173,14 +180,17 @@ public:
     /**
      * @brief Make a broadcaster published at place, which listeners in other
      * processes can hear.
-     * @param place Where to listen. A socket file left there by a process
-     * that has gone is replaced; one that a live process listens on is not
+     * @param place Where to listen, copied to listen there again when what
+     * listens stops on a failure of its own. At a dross::ipc::unix_socket, a
+     * socket file left by a process that has gone is replaced; one that a
+     * live process listens on is not
      * @return A handle to the new broadcaster, or the error that kept it
      * from listening at place, such as std::errc::address_in_use when
-     * another process listens there, or std::errc::filename_too_long for a
-     * path longer than the system takes
+     * another process listens at a dross::ipc::unix_socket, or
+     * std::errc::filename_too_long for a path longer than the system takes
      */
-    [[nodiscard]] static std::expected<broadcaster, error> create(const ipc::unix_socket& place);
+    template <ipc::message_listenable_place_type P>
+    [[nodiscard]] static std::expected<broadcaster, error> create(const P& place);
 
     /**
      * @brief Copy constructor, giving another handle to the same
@@ -233,6 +243,12 @@ private:
 
     explicit broadcaster(std::shared_ptr<storage> store) noexcept;
 
+    // Starts listening at a place with the events given.
+    using listen_function = std::function<std::expected<std::unique_ptr<ipc::message_acceptor>, error>(std::shared_ptr<ipc::message_acceptor_events>)>;
+
+    // create() with a place, past the type of the place.
+    static std::expected<broadcaster, error> publish(listen_function listen);
+
     // Turns the value notify() made into a dross::value; null for a type
     // without dross::value_traits.
     using value_writer = dross::value (*)(const void* made);
@@ -249,6 +265,14 @@ private:
 
     friend class broadcaster_access;
 };
+
+template <ipc::message_listenable_place_type P>
+std::expected<broadcaster, error> broadcaster::create(const P& place)
+{
+    return publish([place](std::shared_ptr<ipc::message_acceptor_events> events) {
+        return place.listen(std::move(events));
+    });
+}
 
 template <std::move_constructible T>
 notification broadcaster::notify(const topic<T>& which, std::type_identity_t<T> value, const notify_options& how)

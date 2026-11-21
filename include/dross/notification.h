@@ -70,10 +70,10 @@
  * create() and handed to whoever sends or listens.
  *
  * Between processes:
- * - broadcaster::create() given a dross::ipc::unix_socket publishes the
- *   broadcaster there, and listener::create() given the same place hears it
- *   from another process. The listener can be made first, and connects
- *   again whenever the connection ends
+ * - broadcaster::create() given a place, such as a dross::ipc::unix_socket,
+ *   publishes the broadcaster there, and listener::create() given the same
+ *   place hears it from another process. The listener can be made first,
+ *   and connects again whenever the connection ends
  * - A value crosses as a dross::value, so a topic sent or subscribed to
  *   between processes carries a type with dross::value_traits. Between
  *   processes a topic is told apart by its name alone
@@ -102,8 +102,8 @@
  *
  * Platform support:
  * - Wherever the thread module runs, with run-time type information on
- * - Between processes: Linux and macOS, between processes of the same
- *   effective user
+ * - Between processes over a dross::ipc::unix_socket: Linux and macOS,
+ *   between processes of the same effective user
  */
 
 #pragma once

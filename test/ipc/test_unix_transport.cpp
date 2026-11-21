@@ -1,8 +1,8 @@
-#include "dross/notification/error.h"
-#include "notification/frame.h"
-#include "notification/unix_socket.h"
-#include "notification/unix_transport.h"
-#include "socket_directory.h"
+#include "dross/ipc/error.h"
+#include "ipc/frame.h"
+#include "ipc/socket_directory.h"
+#include "ipc/unix_socket.h"
+#include "ipc/unix_transport.h"
 
 #include <gtest/gtest.h>
 
@@ -259,7 +259,7 @@ TEST_F(unix_transport_test, a_message_too_large_is_refused_and_the_connection_st
     const std::vector<std::byte> over(dross::max_message_size + 1);
     const auto refused = both.client->send(both.client_side, over);
     ASSERT_FALSE(refused.has_value());
-    EXPECT_EQ(refused.error(), dross::notification_errc::message_too_large);
+    EXPECT_EQ(refused.error(), dross::ipc_errc::message_too_large);
 
     ASSERT_TRUE(both.client->send(both.client_side, bytes_of({ 9 })).has_value());
     ASSERT_TRUE(both.server_events.wait_for([](const std::vector<entry>& entries) {
@@ -301,7 +301,7 @@ TEST_F(unix_transport_test, a_peer_that_goes_in_the_middle_of_a_message_is_close
     }
     const auto reason = reason_closed(events);
     ASSERT_TRUE(reason.has_value());
-    EXPECT_EQ(*reason, dross::notification_errc::message_cut_short);
+    EXPECT_EQ(*reason, dross::ipc_errc::message_cut_short);
     EXPECT_FALSE(has(events.entries(), entry::kind::received));
 }
 
@@ -316,7 +316,7 @@ TEST_F(unix_transport_test, a_length_over_the_limit_closes_the_connection_with_m
 
     const auto reason = reason_closed(events);
     ASSERT_TRUE(reason.has_value());
-    EXPECT_EQ(*reason, dross::notification_errc::message_too_large);
+    EXPECT_EQ(*reason, dross::ipc_errc::message_too_large);
 }
 
 TEST_F(unix_transport_test, a_peer_of_another_user_is_closed_without_being_connected)
@@ -330,7 +330,7 @@ TEST_F(unix_transport_test, a_peer_of_another_user_is_closed_without_being_conne
 
     const auto reason = reason_closed(events);
     ASSERT_TRUE(reason.has_value());
-    EXPECT_EQ(*reason, dross::notification_errc::peer_not_same_user);
+    EXPECT_EQ(*reason, dross::ipc_errc::peer_not_same_user);
     EXPECT_EQ(count_of(events.entries(), entry::kind::closed), 1U);
     EXPECT_FALSE(has(events.entries(), entry::kind::connected));
 }
@@ -345,7 +345,7 @@ TEST_F(unix_transport_test, connecting_to_a_peer_of_another_user_fails)
     recorder client_events;
     const auto client = dross::unix_transport::connect(dross::path{ at("s") }, client_events, ::geteuid() + 1);
     ASSERT_FALSE(client.has_value());
-    EXPECT_EQ(client.error(), dross::notification_errc::peer_not_same_user);
+    EXPECT_EQ(client.error(), dross::ipc_errc::peer_not_same_user);
 }
 
 TEST_F(unix_transport_test, a_peer_that_does_not_read_overflows_the_queue_and_is_closed)
@@ -384,13 +384,13 @@ TEST_F(unix_transport_test, a_peer_that_does_not_read_overflows_the_queue_and_is
     }
     gate_changed.notify_all();
     ASSERT_TRUE(failure.has_value());
-    EXPECT_EQ(*failure, dross::notification_errc::queue_overflow);
+    EXPECT_EQ(*failure, dross::ipc_errc::queue_overflow);
     // 15 framed messages fit in 1 MiB, so the 16th is the first to fail.
     EXPECT_EQ(sent, 16);
 
     const auto reason = reason_closed(events);
     ASSERT_TRUE(reason.has_value());
-    EXPECT_EQ(*reason, dross::notification_errc::queue_overflow);
+    EXPECT_EQ(*reason, dross::ipc_errc::queue_overflow);
 }
 
 TEST_F(unix_transport_test, close_ends_the_connection_on_both_sides)

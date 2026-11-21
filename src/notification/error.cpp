@@ -19,14 +19,6 @@ public:
         switch (static_cast<notification_errc>(value)) {
         case notification_errc::empty_function:
             return "subscriber function is empty";
-        case notification_errc::message_too_large:
-            return "message is larger than 64 KiB";
-        case notification_errc::queue_overflow:
-            return "more than 1 MiB is waiting to be sent";
-        case notification_errc::peer_not_same_user:
-            return "peer runs as another user";
-        case notification_errc::message_cut_short:
-            return "connection ended in the middle of a message";
         case notification_errc::type_not_convertible:
             return "type has no dross::value_traits to cross between processes";
         }

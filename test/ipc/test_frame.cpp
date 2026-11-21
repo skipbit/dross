@@ -1,5 +1,5 @@
-#include "dross/notification/error.h"
-#include "notification/frame.h"
+#include "dross/ipc/error.h"
+#include "ipc/frame.h"
 
 #include <gtest/gtest.h>
 
@@ -52,7 +52,7 @@ TEST(frame_test, a_message_of_the_largest_size_is_framed_and_one_byte_more_is_no
     const std::vector<std::byte> over(dross::max_message_size + 1, std::byte{ 1 });
     const auto refused = dross::frame_message(over);
     ASSERT_FALSE(refused.has_value());
-    EXPECT_EQ(refused.error(), dross::notification_errc::message_too_large);
+    EXPECT_EQ(refused.error(), dross::ipc_errc::message_too_large);
 }
 
 TEST(frame_test, a_whole_frame_gives_its_message)
@@ -131,7 +131,7 @@ TEST(frame_test, a_length_over_the_largest_fails_before_its_bytes_arrive)
     dross::frame_reader reader;
     const auto taken = reader.take(bytes_of({ 0, 1, 0, 1 }));
     ASSERT_FALSE(taken.has_value());
-    EXPECT_EQ(taken.error(), dross::notification_errc::message_too_large);
+    EXPECT_EQ(taken.error(), dross::ipc_errc::message_too_large);
 }
 
 TEST(frame_test, a_length_with_the_top_bit_set_fails)
@@ -139,7 +139,7 @@ TEST(frame_test, a_length_with_the_top_bit_set_fails)
     dross::frame_reader reader;
     const auto taken = reader.take(bytes_of({ 0x80, 0, 0, 0 }));
     ASSERT_FALSE(taken.has_value());
-    EXPECT_EQ(taken.error(), dross::notification_errc::message_too_large);
+    EXPECT_EQ(taken.error(), dross::ipc_errc::message_too_large);
 }
 
 TEST(frame_test, a_reader_that_failed_keeps_failing)
@@ -148,13 +148,5 @@ TEST(frame_test, a_reader_that_failed_keeps_failing)
     ASSERT_FALSE(reader.take(bytes_of({ 0xff, 0xff, 0xff, 0xff })).has_value());
     const auto after = reader.take(framed(bytes_of({ 1 })));
     ASSERT_FALSE(after.has_value());
-    EXPECT_EQ(after.error(), dross::notification_errc::message_too_large);
-}
-
-TEST(frame_test, a_message_too_large_has_its_own_description)
-{
-    const std::error_code too_large = dross::notification_errc::message_too_large;
-    const std::error_code empty = dross::notification_errc::empty_function;
-    EXPECT_FALSE(too_large.message().empty());
-    EXPECT_NE(too_large.message(), empty.message());
+    EXPECT_EQ(after.error(), dross::ipc_errc::message_too_large);
 }

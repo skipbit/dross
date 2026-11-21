@@ -1,6 +1,6 @@
-#include "notification/unix_socket.h"
+#include "ipc/unix_socket.h"
 
-#include "notification/last_error.h"
+#include "ipc/last_error.h"
 
 #include <atomic>
 #include <cerrno>

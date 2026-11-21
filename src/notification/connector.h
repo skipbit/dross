@@ -1,15 +1,10 @@
 #pragma once
 
-#include "dross/platform/path.h"
+#include "dross/ipc/message_connector.h"
 #include "dross/type/error.h"
-#include "notification/backoff.h"
-#include "notification/transport.h"
 
-#include <condition_variable>
 #include <cstddef>
 #include <memory>
-#include <mutex>
-#include <optional>
 #include <span>
 #include <thread>
 #include <vector>
@@ -24,10 +19,8 @@ namespace dross {
 #define DROSS_CONNECTOR_HIDDEN
 #endif
 
-class unix_transport;
-
-// What a connector tells the layer above it. Every call comes on the
-// transport's thread, one at a time.
+// What a connector tells the layer above it, one call at a time: from the
+// connector's thread or from the part's.
 class DROSS_CONNECTOR_HIDDEN connector_events {
 public:
     virtual ~connector_events() = default;
@@ -40,21 +33,24 @@ public:
     virtual void disconnected(error reason) = 0;
 };
 
-// Keeps one connection to a transport listening at a path. A thread of its
-// own connects, and once a try fails or the connection ends, tries again
+// Keeps one connection to a place through a part's connector. A thread of
+// its own connects, and once a try fails or the connection ends, tries again
 // after a wait that doubles from 100 milliseconds up to 5 seconds and starts
-// over once a connection is made. A try that fails is not reported, nor is a
-// peer refused before it connected.
+// over once a connection is made. A try that fails is not reported.
+//
+// What the part tells before its connect() has returned is held, and told
+// after connected(). disconnected() is told before the next try starts.
 //
 // It holds the layer above without keeping it going, and keeps it going for
 // the length of each event, so the layer above may let itself go from inside
 // any of them. It may let the connector go from inside connected() or
 // received(), but not disconnected(), after which the connector still runs.
-class DROSS_CONNECTOR_HIDDEN connector final : private transport_events {
+// Once the connector is gone, nothing more is told.
+class DROSS_CONNECTOR_HIDDEN connector final {
 public:
-    connector(path where, std::weak_ptr<connector_events> above);
+    connector(std::shared_ptr<ipc::message_connector> part, std::weak_ptr<connector_events> above);
 
-    ~connector() override;
+    ~connector();
 
     connector(const connector& other) = delete;
     connector& operator=(const connector& other) = delete;
@@ -71,24 +67,14 @@ public:
     void close(error reason);
 
 private:
-    void connected(connection_id id) override;
-    void received(connection_id id, std::vector<std::byte> message) override;
-    void closed(connection_id id, error reason) override;
-    void stopped(error reason) override;
+    class state;
+    class attempt;
 
-    void run();
+    static void run(const std::shared_ptr<state>& shared, const std::shared_ptr<ipc::message_connector>& part, const std::weak_ptr<connector_events>& above);
 
-    const path _where;
+    const std::shared_ptr<ipc::message_connector> _part;
     const std::weak_ptr<connector_events> _above;
-
-    std::mutex _lock;
-    std::condition_variable _wake;
-    std::unique_ptr<unix_transport> _transport;
-    std::optional<connection_id> _connection;
-    std::optional<error> _closing;
-    backoff _waits;
-    bool _stopping{ false };
-
+    const std::shared_ptr<state> _state;
     std::thread _thread;
 };
 

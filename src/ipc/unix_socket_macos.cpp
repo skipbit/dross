@@ -1,5 +1,5 @@
-#include "notification/last_error.h"
-#include "notification/unix_socket.h"
+#include "ipc/last_error.h"
+#include "ipc/unix_socket.h"
 
 #include <cerrno>
 #include <fcntl.h>

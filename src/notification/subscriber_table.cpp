@@ -4,14 +4,14 @@
 
 namespace dross {
 
-void subscriber_table::join(const connection_id id)
+void subscriber_table::join(const channel& connection)
 {
-    _names_by_connection.try_emplace(id);
+    _names_by_connection.try_emplace(connection);
 }
 
-void subscriber_table::add(const connection_id id, std::string name)
+void subscriber_table::add(const channel& connection, std::string name)
 {
-    const auto found = _names_by_connection.find(id);
+    const auto found = _names_by_connection.find(connection);
     if (found == _names_by_connection.end()) {
         return;
     }
@@ -21,9 +21,9 @@ void subscriber_table::add(const connection_id id, std::string name)
     }
 }
 
-void subscriber_table::remove(const connection_id id, const std::string_view name)
+void subscriber_table::remove(const channel& connection, const std::string_view name)
 {
-    const auto found = _names_by_connection.find(id);
+    const auto found = _names_by_connection.find(connection);
     if (found == _names_by_connection.end()) {
         return;
     }
@@ -35,9 +35,9 @@ void subscriber_table::remove(const connection_id id, const std::string_view nam
     found->second.erase(kept);
 }
 
-void subscriber_table::leave(const connection_id id)
+void subscriber_table::leave(const channel& connection)
 {
-    const auto found = _names_by_connection.find(id);
+    const auto found = _names_by_connection.find(connection);
     if (found == _names_by_connection.end()) {
         return;
     }
@@ -47,17 +47,23 @@ void subscriber_table::leave(const connection_id id)
     _names_by_connection.erase(found);
 }
 
+void subscriber_table::clear()
+{
+    _names_by_connection.clear();
+    _counts.clear();
+}
+
 bool subscriber_table::wanted(const std::string_view name) const
 {
     return _counts.contains(name);
 }
 
-std::vector<connection_id> subscriber_table::receivers(const std::string_view name) const
+std::vector<subscriber_table::channel> subscriber_table::receivers(const std::string_view name) const
 {
-    std::vector<connection_id> found;
-    for (const auto& [id, names] : _names_by_connection) {
+    std::vector<channel> found;
+    for (const auto& [connection, names] : _names_by_connection) {
         if (names.contains(name)) {
-            found.push_back(id);
+            found.push_back(connection);
         }
     }
     return found;

@@ -1,7 +1,7 @@
-#include "dross/notification/error.h"
-#include "notification/outbox.h"
-#include "notification/unix_socket.h"
-#include "socket_directory.h"
+#include "dross/ipc/error.h"
+#include "ipc/outbox.h"
+#include "ipc/socket_directory.h"
+#include "ipc/unix_socket.h"
 
 #include <gtest/gtest.h>
 
@@ -76,7 +76,7 @@ TEST(outbox_limit_test, bytes_up_to_the_limit_are_queued_and_one_more_is_not)
 
     const auto refused = waiting.push(std::vector<std::byte>(1));
     ASSERT_FALSE(refused.has_value());
-    EXPECT_EQ(refused.error(), dross::notification_errc::queue_overflow);
+    EXPECT_EQ(refused.error(), dross::ipc_errc::queue_overflow);
     EXPECT_EQ(waiting.size(), dross::max_queued_bytes);
 }
 

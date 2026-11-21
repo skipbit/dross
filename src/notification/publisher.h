@@ -1,15 +1,12 @@
 #pragma once
 
-#include "dross/platform/path.h"
+#include "dross/ipc/message_acceptor.h"
 #include "dross/type/error.h"
 #include "dross/type/value.h"
-#include "notification/subscriber_table.h"
-#include "notification/transport.h"
 
-#include <cstddef>
 #include <expected>
+#include <functional>
 #include <memory>
-#include <mutex>
 #include <string_view>
 
 namespace dross {
@@ -22,19 +19,21 @@ namespace dross {
 #define DROSS_PUBLISHER_HIDDEN
 #endif
 
-class unix_transport;
-
 // The part of a published broadcaster that faces other processes: it
-// listens at a path, keeps the names each listener there subscribed to,
+// listens at a place, keeps the names each listener there subscribed to,
 // and sends a notification to those that want it.
 //
-// A failure of the transport's waiting is met by listening at the path
-// again, once; when that fails too, nothing more is sent.
-class DROSS_PUBLISHER_HIDDEN publisher final : private transport_events {
+// When what listens stops on a failure of its own, the place is listened
+// at again, once; when that fails too, nothing more is sent.
+class DROSS_PUBLISHER_HIDDEN publisher final {
 public:
-    static std::expected<std::unique_ptr<publisher>, error> listen(const path& where);
+    // Starts listening at a place with the events given.
+    using listen_function = std::function<std::expected<std::unique_ptr<ipc::message_acceptor>, error>(std::shared_ptr<ipc::message_acceptor_events>)>;
 
-    ~publisher() override;
+    static std::expected<std::unique_ptr<publisher>, error> listen(listen_function listen);
+
+    // Stops listening, and returns once nothing more is called from it.
+    ~publisher();
 
     publisher(const publisher& other) = delete;
     publisher& operator=(const publisher& other) = delete;
@@ -48,23 +47,11 @@ public:
     void send(std::string_view name, const value& content);
 
 private:
-    explicit publisher(path where);
+    class core;
 
-    void connected(connection_id id) override;
-    void received(connection_id id, std::vector<std::byte> message) override;
-    void closed(connection_id id, error reason) override;
-    void stopped(error reason) override;
+    explicit publisher(std::shared_ptr<core> shared);
 
-    // The transport, which stopped() may replace while send() runs.
-    std::shared_ptr<unix_transport> transport() const;
-
-    const path _where;
-    mutable std::mutex _lock;
-    std::shared_ptr<unix_transport> _transport;
-    subscriber_table _subscribers;
-    // Set by the destructor, so that stopped() does not start a transport
-    // that nothing would stop.
-    bool _stopping{ false };
+    const std::shared_ptr<core> _core;
 };
 
 #undef DROSS_PUBLISHER_HIDDEN

@@ -7,7 +7,7 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)
 
-**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose, within a process or from one process to another over a Unix domain socket.
+**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose, within a process or from one process to another through a place such as a Unix domain socket.
 
 ## ✨ Key Features
 
@@ -166,6 +166,10 @@ int main()
 
 ### IPC Layer
 - **`ipc::unix_socket`** - A place where processes meet: a Unix domain socket at a path
+- **`ipc::message_channel`** - One connection between two processes, carrying whole messages, and what it tells through `message_channel_events`
+- **`ipc::message_acceptor`** - What listens at a place, telling of each connection it takes through `message_acceptor_events`
+- **`ipc::message_connector`** - What connects to a place, one try at a time
+- **`ipc::message_listenable_place_type`** / **`ipc::message_connectable_place_type`** - Concepts for a place that can be listened at or connected to, so that a broadcaster can be published at, or a listener can hear through, a place of any type that satisfies them
 
 ### Thread Layer
 - **`runloop`** - Per-thread task queue, so work can be handed to a specific thread
@@ -198,7 +202,7 @@ The documentation includes:
 
 dross follows modern C++ best practices:
 
-- **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg`, `timestamp`, `timezone` and the `data` iterators, which hold theirs directly; the ABI can change in any 0.x release
+- **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg`, `ipc::unix_socket`, `timestamp`, `timezone` and the `data` iterators, which hold theirs directly, and the `ipc::message_*` interfaces, which a part implements; the ABI can change in any 0.x release
 - **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
 - **Error Handling** - Failures are returned through `std::expected` and `std::optional`. Where a call throws, lets an exception through, or reports its outcome another way, its comment in the public headers says so
 - **Type Safety** - Concepts for compile-time constraints

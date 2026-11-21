@@ -129,9 +129,9 @@ broadcaster broadcaster::create()
     return broadcaster{ std::make_shared<storage>() };
 }
 
-std::expected<broadcaster, error> broadcaster::create(const ipc::unix_socket& place)
+std::expected<broadcaster, error> broadcaster::publish(listen_function listen)
 {
-    auto outside = publisher::listen(place.location());
+    auto outside = publisher::listen(std::move(listen));
     if (! outside) {
         return std::unexpected(std::move(outside).error());
     }

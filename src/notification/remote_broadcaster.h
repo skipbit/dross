@@ -1,7 +1,6 @@
 #pragma once
 
 #include "dross/notification/link_event.h"
-#include "dross/platform/path.h"
 #include "dross/type/error.h"
 #include "dross/type/value.h"
 #include "notification/broadcaster_access.h"
@@ -41,8 +40,8 @@ public:
     // Makes the value a dross::value holds, or says why it could not.
     using value_reader = std::expected<std::shared_ptr<const void>, error> (*)(const value& held);
 
-    // Starts connecting to the broadcaster at where.
-    static std::shared_ptr<remote_broadcaster> connect(const path& where);
+    // Starts connecting to the broadcaster through part.
+    static std::shared_ptr<remote_broadcaster> connect(std::shared_ptr<ipc::message_connector> part);
 
     ~remote_broadcaster() override;
 
