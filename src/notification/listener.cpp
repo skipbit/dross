@@ -6,6 +6,8 @@
 #include "notification/subscription_access.h"
 #include "notification/topic_address.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <expected>
 #include <functional>
 #include <memory>
@@ -64,6 +66,10 @@ listener listener::create(const broadcaster& source)
 
 listener listener::connect(std::shared_ptr<ipc::message_connector> part)
 {
+    if (! part) {
+        std::fputs("dross: listener::create: the place gave no connector\n", stderr);
+        std::abort();
+    }
     return listener{ std::make_shared<storage>(remote_broadcaster::connect(std::move(part))) };
 }
 

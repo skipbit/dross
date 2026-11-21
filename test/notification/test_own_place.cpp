@@ -196,6 +196,21 @@ static_assert(listenable_at<own_connectable_place>);
 static_assert(! listenable_at<own_listenable_place>);
 static_assert(! listenable_at<int>);
 
+// A place that gives no connector.
+class connectorless_place {
+public:
+    std::shared_ptr<dross::ipc::message_connector> connector() const
+    {
+        return nullptr;
+    }
+};
+
+TEST(own_place_test, a_place_that_gives_no_connector_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_DEATH((void)dross::listener::create(connectorless_place{}), "listener::create: the place gave no connector");
+}
+
 TEST(own_place_test, a_broadcaster_published_at_a_place_of_its_own_sends_there)
 {
     const auto state = std::make_shared<listened>();

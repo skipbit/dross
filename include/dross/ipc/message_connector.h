@@ -33,7 +33,8 @@ public:
      *
      * @param events What to tell about the connection, which the part holds
      *        as message_channel_events says
-     * @return The connection, or why the try failed
+     * @return The connection, never null, or why the try failed. A part
+     *         that gives a null connection ends the process as a misuse
      */
     virtual std::expected<std::shared_ptr<message_channel>, error> connect(std::shared_ptr<message_channel_events> events) = 0;
 

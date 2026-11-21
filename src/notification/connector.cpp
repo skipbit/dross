@@ -6,6 +6,8 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -230,6 +232,10 @@ void connector::run(const std::shared_ptr<state>& shared, const std::shared_ptr<
         guard.unlock();
         auto events = std::make_shared<attempt>(shared, above);
         auto made = part->connect(events);
+        if (made && ! *made) {
+            std::fputs("dross: message_connector::connect: returned a null channel\n", stderr);
+            std::abort();
+        }
         guard.lock();
         if (shared->stopping) {
             if (made) {

@@ -674,6 +674,27 @@ void tell_after_the_end()
     });
 }
 
+// Runs a connector over a part whose connect() succeeds with no channel,
+// and waits for it to stop the program.
+void connect_to_nothing()
+{
+    auto part = std::make_shared<scripted_part>([](int, const auto&) -> std::expected<std::shared_ptr<dross::ipc::message_channel>, dross::error> {
+        return std::shared_ptr<dross::ipc::message_channel>{};
+    });
+    auto above = std::make_shared<told>();
+    dross::connector link{ part, above };
+    link.start();
+    (void)above->wait_for([] {
+        return false;
+    });
+}
+
+TEST(connector_part_test, a_part_that_connects_with_no_channel_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    EXPECT_DEATH(connect_to_nothing(), "message_connector::connect: returned a null channel");
+}
+
 TEST(connector_part_test, a_part_that_tells_after_the_end_stops_the_program)
 {
     GTEST_FLAG_SET(death_test_style, "threadsafe");

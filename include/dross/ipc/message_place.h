@@ -27,8 +27,9 @@ concept message_listenable_place_type = std::copy_constructible<T> && requires(c
  * @brief A place something can connect to, such as where a listener hears a
  *        broadcaster.
  *
- * Its connector() gives what connects to the place. What connects there,
- * such as a listener, keeps it for as long as it connects again.
+ * Its connector() gives what connects to the place, never null: a listener
+ * given null ends the process as a misuse. What connects there, such as a
+ * listener, keeps it for as long as it connects again.
  */
 template <typename T>
 concept message_connectable_place_type = requires(const T& place) {
