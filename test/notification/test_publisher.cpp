@@ -257,6 +257,65 @@ TEST(publisher_test, channels_told_from_many_threads_at_once_are_each_kept)
     EXPECT_FALSE(out.wanted("a"));
 }
 
+// A channel whose close() lets the events of its connection go, as a part
+// may inside a call.
+class letting_go_channel final : public dross::ipc::message_channel {
+public:
+    std::expected<void, dross::error> send(std::span<const std::byte>) override
+    {
+        return {};
+    }
+
+    void close() override
+    {
+        events.reset();
+    }
+
+    std::shared_ptr<dross::ipc::message_channel_events> events;
+};
+
+TEST(publisher_test, a_part_may_let_the_events_go_inside_their_own_call)
+{
+    fake_place place;
+    auto made = dross::publisher::listen(place.listen());
+    ASSERT_TRUE(made.has_value());
+    auto channel = std::make_shared<letting_go_channel>();
+    channel->events = place.events->accepted(channel);
+
+    // Nothing else holds the events, so a sanitizer sees a use once they
+    // have gone.
+    channel->events->received(bytes{ std::byte{ 0xff } });
+    EXPECT_EQ(channel->events, nullptr);
+}
+
+TEST(publisher_test, the_next_listen_may_accept_while_the_last_one_tells_it_stopped)
+{
+    fake_place place;
+    auto made = dross::publisher::listen(place.listen());
+    ASSERT_TRUE(made.has_value());
+
+    auto early = std::make_shared<kept_channel>();
+    std::shared_ptr<dross::ipc::message_channel_events> early_events;
+    place.on_listen = [&](dross::ipc::message_acceptor_events& events) {
+        early_events = events.accepted(early);
+        early_events->received(subscribe("a"));
+    };
+    place.events->stopped(dross::error{ std::errc::io_error });
+    EXPECT_EQ(place.listens, 2);
+    EXPECT_TRUE((*made)->wanted("a"));
+}
+
+TEST(publisher_test, an_acceptor_told_after_it_stopped_stops_the_program)
+{
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+    fake_place place;
+    auto made = dross::publisher::listen(place.listen());
+    ASSERT_TRUE(made.has_value());
+    const auto first = place.events;
+    first->stopped(dross::error{ std::errc::io_error });
+    EXPECT_DEATH((void)first->accepted(std::make_shared<kept_channel>()), "message_acceptor_events::accepted: called after stopped");
+}
+
 TEST(publisher_test, a_channel_told_after_it_closed_stops_the_program)
 {
     GTEST_FLAG_SET(death_test_style, "threadsafe");

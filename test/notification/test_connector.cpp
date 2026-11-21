@@ -475,6 +475,14 @@ public:
         return found;
     }
 
+    // Lets the events of the last try go, as a part may while it tells them.
+    void forget()
+    {
+        change([this] {
+            _events.reset();
+        });
+    }
+
 private:
     const script _script;
     int _tries{ 0 };
@@ -767,6 +775,53 @@ TEST(connector_part_test, the_layer_above_may_go_for_good_while_the_part_tells_i
     }
     telling.join();
     EXPECT_TRUE(watched.expired());
+}
+
+TEST(connector_part_test, the_connector_may_go_while_a_part_that_holds_nothing_more_tells_it)
+{
+    auto part = std::make_shared<scripted_part>([](int, const auto&) -> std::expected<std::shared_ptr<dross::ipc::message_channel>, dross::error> {
+        return std::make_shared<counted_channel>();
+    });
+    auto above = std::make_shared<owning_above>();
+    above->link = std::make_unique<dross::connector>(part, above);
+    above->link->start();
+    ASSERT_TRUE(above->wait_for([&] {
+        return above->connected_held();
+    }));
+    // Nothing but the connector holds the events, so a sanitizer sees a use
+    // once they have gone.
+    dross::ipc::message_channel_events* const events = part->last_events().get();
+    part->forget();
+
+    std::mutex lock;
+    std::condition_variable changed;
+    bool told = false;
+    std::thread telling{ [&] {
+        events->received(one_byte(1));
+        const std::lock_guard guard{ lock };
+        told = true;
+        changed.notify_all();
+    } };
+    ASSERT_TRUE(above->wait_for([&] {
+        return above->inside_held();
+    }));
+    // The hold taken for the call is the last on the layer above, which
+    // destroys the connector as it goes.
+    const auto keep = above.get();
+    above.reset();
+    keep->go_on();
+
+    std::unique_lock guard{ lock };
+    const bool ended = changed.wait_for(guard, 5s, [&] {
+        return told;
+    });
+    guard.unlock();
+    EXPECT_TRUE(ended);
+    if (! ended) {
+        telling.detach();
+        return;
+    }
+    telling.join();
 }
 
 }  // namespace

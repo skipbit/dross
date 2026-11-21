@@ -1,11 +1,12 @@
 #include "notification/publisher.h"
 
 #include "dross/ipc/message_channel.h"
-#include "notification/channel_calls.h"
+#include "notification/part_calls.h"
 #include "notification/subscriber_table.h"
 #include "notification/wire.h"
 
 #include <cstddef>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -14,9 +15,9 @@
 
 namespace dross {
 
-// What the part calls. It is shared with the part, which holds it until
-// it is destroyed.
-class publisher::core final : public ipc::message_acceptor_events, public std::enable_shared_from_this<core> {
+// The state behind a publisher. The events of each listen() hold it, and
+// the part holds them until it is destroyed.
+class publisher::core final : public std::enable_shared_from_this<core> {
 public:
     explicit core(listen_function listen)
         : _listen{ std::move(listen) }
@@ -25,7 +26,7 @@ public:
 
     std::expected<void, error> start()
     {
-        auto made = _listen(shared_from_this());
+        auto made = _listen(std::make_shared<listening>(shared_from_this()));
         if (! made) {
             return std::unexpected(std::move(made).error());
         }
@@ -74,7 +75,7 @@ public:
         }
     }
 
-    std::shared_ptr<ipc::message_channel_events> accepted(std::shared_ptr<ipc::message_channel> channel) override
+    std::shared_ptr<ipc::message_channel_events> accepted(std::shared_ptr<ipc::message_channel> channel)
     {
         {
             const std::lock_guard guard{ _lock };
@@ -83,7 +84,7 @@ public:
         return std::make_shared<subscriber_events>(weak_from_this(), channel);
     }
 
-    void stopped(error) override
+    void stopped()
     {
         // Called from the stopped acceptor, which lets its calls go once
         // this returns.
@@ -93,7 +94,7 @@ public:
                 return;
             }
         }
-        auto again = _listen(shared_from_this());
+        auto again = _listen(std::make_shared<listening>(shared_from_this()));
         std::unique_ptr<ipc::message_acceptor> replaced;
         const std::lock_guard guard{ _lock };
         replaced = std::move(_acceptor);
@@ -126,9 +127,39 @@ public:
     }
 
 private:
+    // The events of one listen(). Each listen() has its own, so the calls
+    // of a part that stopped are told apart from those of the next. Each
+    // call keeps them going, as the part may let them go inside it.
+    class listening final : public ipc::message_acceptor_events, public std::enable_shared_from_this<listening> {
+    public:
+        explicit listening(std::shared_ptr<core> above)
+            : _above{ std::move(above) }
+        {
+        }
+
+        std::shared_ptr<ipc::message_channel_events> accepted(std::shared_ptr<ipc::message_channel> channel) override
+        {
+            const auto self = shared_from_this();
+            const auto call = _calls.any("accepted");
+            return _above->accepted(std::move(channel));
+        }
+
+        void stopped(error) override
+        {
+            const auto self = shared_from_this();
+            const auto call = _calls.last("stopped");
+            _above->stopped();
+        }
+
+    private:
+        const std::shared_ptr<core> _above;
+        part_calls _calls{ "message_acceptor_events" };
+    };
+
     // What one accepted channel tells. It holds the core and the channel
-    // without keeping them going.
-    class subscriber_events final : public ipc::message_channel_events {
+    // without keeping them going, and each call keeps it going, as the part
+    // may let it go inside the call.
+    class subscriber_events final : public ipc::message_channel_events, public std::enable_shared_from_this<subscriber_events> {
     public:
         subscriber_events(std::weak_ptr<core> above, std::weak_ptr<ipc::message_channel> channel)
             : _above{ std::move(above) }
@@ -138,7 +169,8 @@ private:
 
         void received(std::vector<std::byte> message) override
         {
-            const auto call = _calls.received();
+            const auto self = shared_from_this();
+            const auto call = _calls.any("received");
             const auto above = _above.lock();
             const auto channel = _channel.lock();
             if (above && channel) {
@@ -148,7 +180,8 @@ private:
 
         void closed(error) override
         {
-            const auto call = _calls.closed();
+            const auto self = shared_from_this();
+            const auto call = _calls.last("closed");
             const auto above = _above.lock();
             const auto channel = _channel.lock();
             if (above && channel) {
@@ -159,7 +192,7 @@ private:
     private:
         const std::weak_ptr<core> _above;
         const std::weak_ptr<ipc::message_channel> _channel;
-        channel_calls _calls;
+        part_calls _calls{ "message_channel_events" };
     };
 
     const listen_function _listen;
