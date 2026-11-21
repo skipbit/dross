@@ -1,6 +1,6 @@
 #pragma once
 
-#include "notification/transport.h"
+#include "ipc/transport.h"
 
 #include <cstddef>
 #include <map>

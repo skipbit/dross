@@ -1,7 +1,7 @@
 #include "dross/ipc/error.h"
-#include "notification/outbox.h"
-#include "notification/unix_socket.h"
-#include "socket_directory.h"
+#include "ipc/outbox.h"
+#include "ipc/socket_directory.h"
+#include "ipc/unix_socket.h"
 
 #include <gtest/gtest.h>
 

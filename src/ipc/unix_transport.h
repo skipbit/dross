@@ -2,7 +2,7 @@
 
 #include "dross/platform/path.h"
 #include "dross/type/error.h"
-#include "notification/transport.h"
+#include "ipc/transport.h"
 
 #include <expected>
 #include <memory>

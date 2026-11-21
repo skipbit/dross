@@ -2,8 +2,8 @@
 
 #include "dross/platform/path.h"
 #include "dross/type/error.h"
-#include "notification/backoff.h"
-#include "notification/transport.h"
+#include "ipc/backoff.h"
+#include "ipc/transport.h"
 
 #include <condition_variable>
 #include <cstddef>

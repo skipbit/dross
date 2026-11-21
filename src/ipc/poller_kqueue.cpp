@@ -1,5 +1,5 @@
-#include "notification/last_error.h"
-#include "notification/poller.h"
+#include "ipc/last_error.h"
+#include "ipc/poller.h"
 
 #include <array>
 #include <cerrno>

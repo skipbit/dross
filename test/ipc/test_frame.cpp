@@ -1,5 +1,5 @@
 #include "dross/ipc/error.h"
-#include "notification/frame.h"
+#include "ipc/frame.h"
 
 #include <gtest/gtest.h>
 

@@ -54,25 +54,25 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/type/test_type.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_cbor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/format/test_toml.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_accept_pause.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_backoff.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_error.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_message_place.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_outbox.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_poller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_socket.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_socket_calls.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_transport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/file_local_peer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_accept_pause.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_backoff.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_connector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_broadcaster.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_outbox.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_poller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_published_broadcaster.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_remote_listener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscriber_table.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_subscription.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_socket.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_unix_transport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_wire.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation_queue.cpp
@@ -83,19 +83,19 @@ target_sources(${TEST_NAME} PRIVATE
     # Hidden in the shared library, and used by the internal headers the
     # tests include.
     ${PROJECT_SOURCE_DIR}/src/format/cbor.cpp
+    ${PROJECT_SOURCE_DIR}/src/ipc/frame.cpp
+    ${PROJECT_SOURCE_DIR}/src/ipc/outbox.cpp
+    ${PROJECT_SOURCE_DIR}/src/ipc/unix_socket.cpp
+    ${PROJECT_SOURCE_DIR}/src/ipc/unix_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/connector.cpp
-    ${PROJECT_SOURCE_DIR}/src/notification/frame.cpp
-    ${PROJECT_SOURCE_DIR}/src/notification/outbox.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/subscriber_table.cpp
-    ${PROJECT_SOURCE_DIR}/src/notification/unix_socket.cpp
-    ${PROJECT_SOURCE_DIR}/src/notification/unix_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/wire.cpp
     ${PROJECT_SOURCE_DIR}/src/thread/deadline.cpp
     ${DROSS_PLATFORM_SOURCES}
 )
 
 target_include_directories(${TEST_NAME}
-    PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src
+    PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Replaces operator new to count allocations, which would reach every test in

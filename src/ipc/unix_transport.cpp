@@ -1,11 +1,11 @@
-#include "notification/unix_transport.h"
+#include "ipc/unix_transport.h"
 
 #include "dross/ipc/error.h"
-#include "notification/accept_pause.h"
-#include "notification/frame.h"
-#include "notification/outbox.h"
-#include "notification/poller.h"
-#include "notification/unix_socket.h"
+#include "ipc/accept_pause.h"
+#include "ipc/frame.h"
+#include "ipc/outbox.h"
+#include "ipc/poller.h"
+#include "ipc/unix_socket.h"
 
 #include <atomic>
 #include <chrono>

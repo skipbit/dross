@@ -1,6 +1,6 @@
+#include "ipc/socket_directory.h"
+#include "ipc/unix_transport.h"
 #include "notification/connector.h"
-#include "notification/unix_transport.h"
-#include "socket_directory.h"
 
 #include <gtest/gtest.h>
 

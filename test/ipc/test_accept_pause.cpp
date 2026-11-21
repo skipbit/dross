@@ -1,4 +1,4 @@
-#include "notification/accept_pause.h"
+#include "ipc/accept_pause.h"
 
 #include <gtest/gtest.h>
 

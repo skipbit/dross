@@ -4,9 +4,9 @@
 #include "dross/notification/listener.h"
 #include "dross/notification/topic.h"
 #include "dross/type/value_traits.h"
-#include "notification/unix_transport.h"
+#include "ipc/socket_directory.h"
+#include "ipc/unix_transport.h"
 #include "notification/wire.h"
-#include "socket_directory.h"
 
 #include <gtest/gtest.h>
 

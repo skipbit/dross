@@ -1,7 +1,7 @@
-#include "notification/outbox.h"
+#include "ipc/outbox.h"
 
 #include "dross/ipc/error.h"
-#include "notification/unix_socket.h"
+#include "ipc/unix_socket.h"
 
 #include <span>
 #include <utility>

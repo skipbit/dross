@@ -3,8 +3,8 @@
 #include "dross/platform/path.h"
 #include "dross/type/error.h"
 #include "dross/type/value.h"
+#include "ipc/transport.h"
 #include "notification/subscriber_table.h"
-#include "notification/transport.h"
 
 #include <cstddef>
 #include <expected>

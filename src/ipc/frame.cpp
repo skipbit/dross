@@ -1,4 +1,4 @@
-#include "notification/frame.h"
+#include "ipc/frame.h"
 
 #include "dross/ipc/error.h"
 

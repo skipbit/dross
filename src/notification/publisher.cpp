@@ -1,6 +1,6 @@
 #include "notification/publisher.h"
 
-#include "notification/unix_transport.h"
+#include "ipc/unix_transport.h"
 #include "notification/wire.h"
 
 #include <utility>

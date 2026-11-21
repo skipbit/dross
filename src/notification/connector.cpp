@@ -1,6 +1,6 @@
 #include "notification/connector.h"
 
-#include "notification/unix_transport.h"
+#include "ipc/unix_transport.h"
 
 #include <utility>
 
