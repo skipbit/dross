@@ -37,7 +37,10 @@ public:
     int closes{ 0 };
 };
 
+// An acceptor whose life the test can watch through its token.
 class idle_acceptor final : public dross::ipc::message_acceptor {
+public:
+    const std::shared_ptr<int> token = std::make_shared<int>(0);
 };
 
 // Stands in for a part: keeps the events of each listen() and lets the
@@ -47,7 +50,7 @@ public:
     dross::publisher::listen_function listen()
     {
         return [this](std::shared_ptr<dross::ipc::message_acceptor_events> events) -> std::expected<std::unique_ptr<dross::ipc::message_acceptor>, dross::error> {
-            ++listens;
+            const auto ordinal = static_cast<std::size_t>(++listens);
             this->events = events;
             if (on_listen) {
                 on_listen(*events);
@@ -55,7 +58,12 @@ public:
             if (refuse) {
                 return std::unexpected(dross::error{ std::errc::address_in_use });
             }
-            return std::make_unique<idle_acceptor>();
+            auto made = std::make_unique<idle_acceptor>();
+            if (acceptors.size() < ordinal) {
+                acceptors.resize(ordinal);
+            }
+            acceptors[ordinal - 1] = made->token;
+            return made;
         };
     }
 
@@ -63,6 +71,9 @@ public:
     std::function<void(dross::ipc::message_acceptor_events&)> on_listen;
     int listens{ 0 };
     bool refuse{ false };
+    // The acceptor each listen() made, in the order of the calls, expired
+    // once it is destroyed.
+    std::vector<std::weak_ptr<int>> acceptors;
 };
 
 bytes subscribe(const std::string& name)
@@ -158,6 +169,24 @@ TEST(publisher_test, stopping_on_a_failure_listens_again_once)
     auto events = place.events->accepted(channel);
     events->received(subscribe("a"));
     EXPECT_TRUE((*made)->wanted("a"));
+}
+
+TEST(publisher_test, an_acceptor_that_stops_before_listen_returns_gives_way_to_the_next)
+{
+    fake_place place;
+    bool first = true;
+    place.on_listen = [&first](dross::ipc::message_acceptor_events& events) {
+        if (first) {
+            first = false;
+            events.stopped(dross::error{ std::errc::io_error });
+        }
+    };
+    auto made = dross::publisher::listen(place.listen());
+    ASSERT_TRUE(made.has_value());
+    ASSERT_EQ(place.listens, 2);
+    ASSERT_EQ(place.acceptors.size(), 2u);
+    EXPECT_TRUE(place.acceptors[0].expired());
+    EXPECT_FALSE(place.acceptors[1].expired());
 }
 
 TEST(publisher_test, when_listening_again_fails_nothing_more_is_tried)

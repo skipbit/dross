@@ -30,8 +30,12 @@ public:
         if (! made) {
             return std::unexpected(std::move(made).error());
         }
+        // A part may stop before listen() returns, and stopped() has then
+        // listened again; what this listen() made is let go after the lock.
         const std::lock_guard guard{ _lock };
-        _acceptor = std::move(*made);
+        if (! _listened_again) {
+            _acceptor = std::move(*made);
+        }
         return {};
     }
 
@@ -100,6 +104,7 @@ public:
         auto again = _listen(std::make_shared<listening>(shared_from_this()));
         std::unique_ptr<ipc::message_acceptor> replaced;
         const std::lock_guard guard{ _lock };
+        _listened_again = true;
         replaced = std::move(_acceptor);
         if (! again || _stopping) {
             return;
@@ -205,6 +210,8 @@ private:
     // Set by stop(), so that stopped() does not listen again for nothing to
     // stop.
     bool _stopping{ false };
+    // Set by stopped(), so that start() keeps what it listened again with.
+    bool _listened_again{ false };
 };
 
 std::expected<std::unique_ptr<publisher>, error> publisher::listen(listen_function listen)
