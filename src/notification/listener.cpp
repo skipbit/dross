@@ -64,7 +64,7 @@ listener listener::create(const broadcaster& source)
 
 listener listener::create(const ipc::unix_socket& place)
 {
-    return listener{ std::make_shared<storage>(remote_broadcaster::connect(place.location())) };
+    return listener{ std::make_shared<storage>(remote_broadcaster::connect(place.connector())) };
 }
 
 bool listener::operator==(const listener& other) const noexcept
