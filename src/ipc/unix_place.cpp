@@ -78,7 +78,7 @@ public:
         return {};
     }
 
-    // Destroys the transport, then lets the events go.
+    // Destroys the transport, then lets the events go after the lock.
     void stop()
     {
         std::unique_ptr<unix_transport> ending;
@@ -87,9 +87,11 @@ public:
             ending = std::move(_transport);
         }
         ending.reset();
+        std::map<connection_id, std::shared_ptr<message_channel_events>> channels;
+        std::shared_ptr<message_acceptor_events> above;
         const std::lock_guard guard{ _lock };
-        _channels.clear();
-        _above.reset();
+        channels = std::exchange(_channels, {});
+        above = std::move(_above);
     }
 
     std::expected<void, error> send(const connection_id id, const std::span<const std::byte> message) override

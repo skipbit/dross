@@ -348,6 +348,90 @@ TEST_F(unix_place_test, accepted_that_returns_null_stops_the_program)
         "message_acceptor_events::accepted: returned null");
 }
 
+// Counts what the events it gives receive.
+class counter {
+public:
+    void add()
+    {
+        const std::lock_guard guard{ _lock };
+        ++_count;
+        _changed.notify_all();
+    }
+
+    bool wait_for(int count)
+    {
+        std::unique_lock guard{ _lock };
+        return _changed.wait_for(guard, kPatience, [&] {
+            return _count >= count;
+        });
+    }
+
+private:
+    std::mutex _lock;
+    std::condition_variable _changed;
+    int _count{ 0 };
+};
+
+// The events of a connection, which close it as they go.
+class closing_as_it_goes final : public dross::ipc::message_channel_events {
+public:
+    closing_as_it_goes(std::shared_ptr<dross::ipc::message_channel> channel, std::shared_ptr<counter> received)
+        : _channel{ std::move(channel) }
+        , _received{ std::move(received) }
+    {
+    }
+
+    ~closing_as_it_goes() override
+    {
+        _channel->close();
+    }
+
+    void received(bytes) override
+    {
+        _received->add();
+    }
+
+    void closed(dross::error) override
+    {
+    }
+
+private:
+    const std::shared_ptr<dross::ipc::message_channel> _channel;
+    const std::shared_ptr<counter> _received;
+};
+
+// Gives each connection events that close it as they go, and keeps none.
+class handing_closers final : public dross::ipc::message_acceptor_events {
+public:
+    std::shared_ptr<dross::ipc::message_channel_events> accepted(std::shared_ptr<dross::ipc::message_channel> channel) override
+    {
+        return std::make_shared<closing_as_it_goes>(std::move(channel), received);
+    }
+
+    void stopped(dross::error) override
+    {
+    }
+
+    const std::shared_ptr<counter> received = std::make_shared<counter>();
+};
+
+TEST_F(unix_place_test, the_acceptor_may_go_while_what_it_holds_closes_its_channel)
+{
+    auto above = std::make_shared<handing_closers>();
+    auto acceptor = place().listen(above);
+    ASSERT_TRUE(acceptor.has_value());
+    auto mine = std::make_shared<recorder>();
+    auto channel = place().connector()->connect(mine);
+    ASSERT_TRUE(channel.has_value());
+
+    // A message reaching the events shows the acceptor holds them.
+    ASSERT_TRUE((*channel)->send(bytes_of({ 1 })).has_value());
+    ASSERT_TRUE(above->received->wait_for(1));
+
+    acceptor->reset();
+    EXPECT_TRUE(mine->wait_for_close());
+}
+
 TEST_F(unix_place_test, a_message_over_the_largest_fails)
 {
     auto above = std::make_shared<acceptance>();
