@@ -138,18 +138,23 @@ struct notify_options final {
  * - Between processes a topic is told apart by its name alone. A listener
  *   that cannot turn the value back into its own type says so on
  *   dross::listener::link
+ * - A notification larger than the place carries is not sent to other
+ *   processes, while listeners in this process still get it. A listener
+ *   that falls further behind than the place lets wait is disconnected, and
+ *   connects again
+ * - When what listens stops on a failure of its own, the place is listened
+ *   at once more
+ * - Nothing tells the sender that a listener connected, went or fell
+ *   behind
+ *
+ * Published at a dross::ipc::unix_socket:
  * - A notification is at most 64 KiB once turned into bytes, and at most
- *   1 MiB waits to be sent to one listener. A listener that falls further
- *   behind is disconnected, and connects again. A larger notification is
- *   not sent to other processes, while listeners in this process still get
- *   it
+ *   1 MiB waits to be sent to one listener
  * - Only processes of the same effective user can connect. The socket file
  *   is made for its owner alone, and removed when the last handle goes
  * - When a connection cannot be accepted, as when the process has no file
  *   descriptor left, accepting pauses for a while. macOS drops the
  *   connection it could not accept, so that listener connects again
- * - Nothing tells the sender that a listener connected, went or fell
- *   behind
  *
  * Exceptions:
  * - An exception thrown by a subscriber's function called with

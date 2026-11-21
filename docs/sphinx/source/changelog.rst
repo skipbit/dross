@@ -12,21 +12,33 @@ Unreleased
 Added
 ~~~~~
 
-- Notifications between processes. ``broadcaster::create()`` given an
-  ``ipc::unix_socket`` publishes the broadcaster at that path, and
-  ``listener::create()`` given the same place hears it from another
-  process of the same user. The listener can be made before the
-  broadcaster, connects again whenever the connection ends, and tells the
-  broadcaster the topic names it subscribes to; a notification sent before
-  a subscription reaches the broadcaster does not reach it. Values cross as
-  a ``value`` through ``value_traits``: ``notify()`` on a published
-  broadcaster with a type without them stops the program, and
-  ``subscribe()`` on such a listener returns
+- Notifications between processes. ``broadcaster::create()`` given a
+  place, such as an ``ipc::unix_socket``, publishes the broadcaster there,
+  and ``listener::create()`` given the same place hears it from another
+  process; over an ``ipc::unix_socket``, one of the same user. The
+  listener can be made before the broadcaster, connects again whenever the
+  connection ends, and tells the broadcaster the topic names it subscribes
+  to; a notification sent before a subscription reaches the broadcaster
+  does not reach it. Values cross as a ``value`` through ``value_traits``:
+  ``notify()`` on a published broadcaster with a type without them stops
+  the program, and ``subscribe()`` on such a listener returns
   ``notification_errc::type_not_convertible``. What happens to the
   connection is reported on ``listener::link`` as a ``link_event``
 
 - ``ipc::unix_socket``, in a new IPC module (``<dross/ipc.h>``), naming a
   place where processes meet: a Unix domain socket at a path
+
+- The shape of a part that carries messages between processes, in the IPC
+  module: ``ipc::message_channel``, ``ipc::message_acceptor`` and
+  ``ipc::message_connector``, which a part implements, with
+  ``ipc::message_channel_events`` and ``ipc::message_acceptor_events``,
+  which the library gives it to call. A place satisfies
+  ``ipc::message_listenable_place_type`` when it can be listened at, and
+  ``ipc::message_connectable_place_type`` when it can be connected to;
+  ``broadcaster::create()`` and ``listener::create()`` take a place of any
+  type that does, and ``ipc::unix_socket`` is one. A part that calls one
+  of those events while another call on it is under way, or after its last
+  call, stops the program
 
 - ``ipc_errc`` in the IPC module, for why carrying a message between
   processes failed: ``message_too_large`` for a message over 64 KiB,

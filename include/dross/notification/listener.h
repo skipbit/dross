@@ -95,8 +95,9 @@ concept subscriber_type = std::copy_constructible<std::decay_t<F>> && std::invoc
  * - link carries what happens to the connection: connected, disconnected,
  *   and type_mismatch. Nothing is reported when no one subscribes to it, and
  *   a try to connect that fails is never reported
- * - The listener has a thread of its own that connects, and the connection
- *   has another that receives. A subscriber that chose
+ * - The listener has a thread of its own that connects, and what the place
+ *   carries comes on threads of its own; at a dross::ipc::unix_socket, the
+ *   connection has one that receives. A subscriber that chose
  *   dross::delivery::direct() runs on the receiving thread, so an exception
  *   it throws leaves that thread and ends the program, as one leaving a
  *   worker of an operation_queue does

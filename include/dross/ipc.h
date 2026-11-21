@@ -23,7 +23,8 @@
  *   library implements the events they call
  * - The part's place has a listen() that message_listenable_place_type
  *   describes, a connector() that message_connectable_place_type describes,
- *   or both
+ *   or both. dross::broadcaster::create() publishes at a place of the first
+ *   kind, and dross::listener::create() hears through one of the second
  *
  * Platform support:
  * - Linux and macOS only
