@@ -1,4 +1,4 @@
-#include "notification/part_calls.h"
+#include "ipc/part_calls.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -18,6 +18,16 @@ part_calls::call::~call()
 part_calls::part_calls(const char* events) noexcept
     : _events{ events }
 {
+}
+
+part_calls part_calls::for_channel_events() noexcept
+{
+    return part_calls{ "message_channel_events" };
+}
+
+part_calls part_calls::for_acceptor_events() noexcept
+{
+    return part_calls{ "message_acceptor_events" };
 }
 
 part_calls::call part_calls::any(const char* name)

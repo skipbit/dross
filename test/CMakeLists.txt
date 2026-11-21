@@ -60,6 +60,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_message_place.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_outbox.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_part_calls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_poller.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_place.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ipc/test_unix_socket.cpp
@@ -68,7 +69,6 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/file_local_peer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_connector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_broadcaster.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_part_calls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_notification.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_observable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_own_place.cpp
@@ -89,9 +89,9 @@ target_sources(${TEST_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/format/cbor.cpp
     ${PROJECT_SOURCE_DIR}/src/ipc/frame.cpp
     ${PROJECT_SOURCE_DIR}/src/ipc/outbox.cpp
+    ${PROJECT_SOURCE_DIR}/src/ipc/part_calls.cpp
     ${PROJECT_SOURCE_DIR}/src/ipc/unix_socket.cpp
     ${PROJECT_SOURCE_DIR}/src/ipc/unix_transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/notification/part_calls.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/connector.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/publisher.cpp
     ${PROJECT_SOURCE_DIR}/src/notification/subscriber_table.cpp

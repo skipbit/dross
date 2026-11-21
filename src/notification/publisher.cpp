@@ -1,7 +1,7 @@
 #include "notification/publisher.h"
 
 #include "dross/ipc/message_channel.h"
-#include "notification/part_calls.h"
+#include "ipc/part_calls.h"
 #include "notification/subscriber_table.h"
 #include "notification/wire.h"
 
@@ -46,8 +46,11 @@ public:
             ending = std::move(_acceptor);
         }
         ending.reset();
-        const std::lock_guard guard{ _lock };
-        _subscribers.clear();
+        subscriber_table dropped;
+        {
+            const std::lock_guard guard{ _lock };
+            dropped = std::exchange(_subscribers, subscriber_table{});
+        }
     }
 
     bool wanted(const std::string_view name) const
@@ -153,7 +156,7 @@ private:
 
     private:
         const std::shared_ptr<core> _above;
-        part_calls _calls{ "message_acceptor_events" };
+        part_calls _calls{ part_calls::for_acceptor_events() };
     };
 
     // What one accepted channel tells. It holds the core and the channel
@@ -192,7 +195,7 @@ private:
     private:
         const std::weak_ptr<core> _above;
         const std::weak_ptr<ipc::message_channel> _channel;
-        part_calls _calls{ "message_channel_events" };
+        part_calls _calls{ part_calls::for_channel_events() };
     };
 
     const listen_function _listen;

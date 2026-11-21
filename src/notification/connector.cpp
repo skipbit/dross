@@ -2,7 +2,7 @@
 
 #include "dross/ipc/message_channel.h"
 #include "ipc/backoff.h"
-#include "notification/part_calls.h"
+#include "ipc/part_calls.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -142,7 +142,7 @@ private:
 
     const std::weak_ptr<state> _state;
     const std::weak_ptr<connector_events> _above;
-    part_calls _calls{ "message_channel_events" };
+    part_calls _calls{ part_calls::for_channel_events() };
     std::mutex _telling;
     std::atomic<std::thread::id> _telling_thread;
     std::atomic<bool> _silenced{ false };
@@ -251,8 +251,14 @@ void connector::run(const std::shared_ptr<state>& shared, const std::shared_ptr<
             if (shared->stopping) {
                 return;
             }
-            shared->channel.reset();
-            shared->current.reset();
+            {
+                auto ended_channel = std::move(shared->channel);
+                auto ended_attempt = std::move(shared->current);
+                guard.unlock();
+                ended_channel.reset();
+                ended_attempt.reset();
+                guard.lock();
+            }
         }
         if (shared->wake.wait_for(guard, shared->waits.next(), [&shared] {
             return shared->stopping;

@@ -30,8 +30,11 @@ public:
         std::atomic<bool>& _calling;
     };
 
-    // events names the class the part calls, for the message.
-    explicit part_calls(const char* events) noexcept;
+    // For the calls of a message_channel_events.
+    [[nodiscard]] static part_calls for_channel_events() noexcept;
+
+    // For the calls of a message_acceptor_events.
+    [[nodiscard]] static part_calls for_acceptor_events() noexcept;
 
     // A call to name, after which more may come.
     [[nodiscard]] call any(const char* name);
@@ -40,6 +43,9 @@ public:
     [[nodiscard]] call last(const char* name);
 
 private:
+    // events names the class the part calls, for the message.
+    explicit part_calls(const char* events) noexcept;
+
     call enter(const char* name, bool last);
 
     const char* const _events;
