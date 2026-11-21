@@ -295,6 +295,33 @@ TEST_F(unix_place_test, the_acceptor_can_be_destroyed_from_inside_accepted)
     EXPECT_EQ(held, nullptr);
 }
 
+TEST_F(unix_place_test, the_events_of_a_connection_accepted_while_the_acceptor_goes_are_let_go)
+{
+    auto above = std::make_shared<acceptance>();
+    auto acceptor = place().listen(above);
+    ASSERT_TRUE(acceptor.has_value());
+    std::mutex lock;
+    std::unique_ptr<dross::ipc::message_acceptor> held = std::move(*acceptor);
+    above->on_accept = [&] {
+        const std::lock_guard guard{ lock };
+        held.reset();
+    };
+
+    auto mine = std::make_shared<recorder>();
+    auto channel = place().connector()->connect(mine);
+    ASSERT_TRUE(channel.has_value());
+    ASSERT_TRUE(above->wait_for_accepted(1));
+
+    // Only the test's own record of what was accepted holds them once the
+    // part has let them go.
+    const std::weak_ptr<recorder> events = above->events(0);
+    const auto until = std::chrono::steady_clock::now() + kPatience;
+    while (events.use_count() > 1 && std::chrono::steady_clock::now() < until) {
+        std::this_thread::sleep_for(1ms);
+    }
+    EXPECT_EQ(events.use_count(), 1);
+}
+
 TEST_F(unix_place_test, a_message_over_the_largest_fails)
 {
     auto above = std::make_shared<acceptance>();

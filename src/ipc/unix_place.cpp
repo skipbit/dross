@@ -120,8 +120,12 @@ private:
             return;
         }
         auto events = above->accepted(std::make_shared<unix_channel>(self, id));
+        // An acceptor destroyed inside accepted() keeps nothing more, so the
+        // events are let go here, after the lock.
         const std::lock_guard guard{ _lock };
-        _channels[id] = std::move(events);
+        if (_transport) {
+            _channels[id] = std::move(events);
+        }
     }
 
     void received(const connection_id id, std::vector<std::byte> message) override
