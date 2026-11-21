@@ -133,3 +133,7 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/dross
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.h"
 )
+
+if (DROSS_WITH_GRPC)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ipc/grpc)
+endif()

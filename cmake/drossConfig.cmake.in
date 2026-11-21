@@ -12,5 +12,28 @@ find_dependency(Threads)
 # Include the exported targets
 include("${CMAKE_CURRENT_LIST_DIR}/drossTargets.cmake")
 
+# The gRPC part is installed only from a build with DROSS_WITH_GRPC on, and
+# gRPC is looked for only when the part is asked for. A required part that
+# is not available says why.
+foreach(component IN LISTS dross_FIND_COMPONENTS)
+    set(dross_${component}_FOUND FALSE)
+    if(NOT component STREQUAL "grpc")
+        set(dross_${component}_REASON "dross has no part named ${component}.")
+    elseif(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/drossGrpcTargets.cmake")
+        set(dross_grpc_REASON "this dross was built without DROSS_WITH_GRPC.")
+    else()
+        find_package(gRPC @DROSS_GRPC_MINIMUM_VERSION@ CONFIG QUIET)
+        if(gRPC_FOUND)
+            include("${CMAKE_CURRENT_LIST_DIR}/drossGrpcTargets.cmake")
+            set(dross_grpc_FOUND TRUE)
+        else()
+            set(dross_grpc_REASON "gRPC @DROSS_GRPC_MINIMUM_VERSION@ or later was not found.")
+        endif()
+    endif()
+    if(dross_FIND_REQUIRED_${component} AND NOT dross_${component}_FOUND)
+        set(dross_NOT_FOUND_MESSAGE "The ${component} part of dross is not available: ${dross_${component}_REASON}")
+    endif()
+endforeach()
+
 # Check that the targets exist
 check_required_components(dross)
