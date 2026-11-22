@@ -165,11 +165,14 @@ private:
         // ended its side and the stream was not cancelled.
         const auto reason = _state->finished().value_or(_context.IsCancelled() ? error{ std::errc::connection_reset } : error{});
         auto events = std::move(_events);
-        if (events && ! _core.stopping()) {
+        {
+            // Letting the events go may destroy the acceptor.
             const reaction_scope scope;
-            events->closed(reason);
+            if (events && ! _core.stopping()) {
+                events->closed(reason);
+            }
+            events.reset();
         }
-        events.reset();
         delete this;
     }
 

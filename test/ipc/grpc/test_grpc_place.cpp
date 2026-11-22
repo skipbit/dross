@@ -48,10 +48,11 @@ public:
 // Holds back what it is given until let go.
 class gate {
 public:
-    void wait()
+    // Returns whether it was let go in time.
+    bool wait()
     {
         std::unique_lock guard{ _lock };
-        _changed.wait_for(guard, kPatience, [&] {
+        return _changed.wait_for(guard, kPatience, [&] {
             return _open;
         });
     }
@@ -67,6 +68,70 @@ private:
     std::mutex _lock;
     std::condition_variable _changed;
     bool _open{ false };
+};
+
+// Owns an acceptor, and opens a gate once it has destroyed it.
+class acceptor_owner {
+public:
+    acceptor_owner(std::unique_ptr<dross::ipc::message_acceptor> acceptor, std::shared_ptr<gate> destroyed)
+        : _acceptor{ std::move(acceptor) }
+        , _destroyed{ std::move(destroyed) }
+    {
+    }
+
+    ~acceptor_owner()
+    {
+        _acceptor.reset();
+        _destroyed->open();
+    }
+
+private:
+    std::unique_ptr<dross::ipc::message_acceptor> _acceptor;
+    const std::shared_ptr<gate> _destroyed;
+};
+
+// The events of a connection, which own what they are given.
+class owning_events final : public dross::ipc::message_channel_events {
+public:
+    explicit owning_events(std::shared_ptr<acceptor_owner> owned)
+        : _owned{ std::move(owned) }
+    {
+    }
+
+    void received(std::vector<std::byte>) override
+    {
+    }
+
+    void closed(dross::error) override
+    {
+    }
+
+private:
+    const std::shared_ptr<acceptor_owner> _owned;
+};
+
+// Accepts one connection, whose events take what is handed to it.
+class handing_acceptance final : public dross::ipc::message_acceptor_events {
+public:
+    void hand(std::shared_ptr<acceptor_owner> owned)
+    {
+        const std::lock_guard guard{ _lock };
+        _owned = std::move(owned);
+    }
+
+    std::shared_ptr<dross::ipc::message_channel_events> accepted(std::shared_ptr<dross::ipc::message_channel>) override
+    {
+        const std::lock_guard guard{ _lock };
+        return std::make_shared<owning_events>(std::move(_owned));
+    }
+
+    void stopped(dross::error) override
+    {
+    }
+
+private:
+    std::mutex _lock;
+    std::shared_ptr<acceptor_owner> _owned;
 };
 
 class grpc_place_test : public dross_test::socket_directory_test {
@@ -399,6 +464,38 @@ TEST_F(grpc_place_test, the_acceptor_can_be_destroyed_from_inside_received)
     EXPECT_EQ(mine->messages().size(), 0u);
     EXPECT_EQ(above->events(0)->messages(), std::vector<bytes>{ bytes_of({ 1 }) });
     EXPECT_EQ(above->events(0)->closes(), 0);
+}
+
+TEST_F(grpc_place_test, the_acceptor_can_be_destroyed_by_letting_the_events_of_a_connection_it_accepted_go)
+{
+    auto above = std::make_shared<handing_acceptance>();
+    auto acceptor = listen(above);
+    ASSERT_TRUE(acceptor.has_value());
+    auto destroyed = std::make_shared<gate>();
+    above->hand(std::make_shared<acceptor_owner>(std::move(*acceptor), destroyed));
+
+    auto mine = std::make_shared<recorder>();
+    auto channel = connector()->connect(mine);
+    ASSERT_TRUE(channel.has_value());
+    ASSERT_TRUE((*channel)->send(bytes_of({ 1 })).has_value());
+    (*channel)->close();
+    ASSERT_TRUE(mine->wait_for_close());
+    EXPECT_TRUE(destroyed->wait());
+}
+
+TEST_F(grpc_place_test, the_acceptor_can_be_destroyed_by_letting_the_events_of_a_connection_to_it_go)
+{
+    auto above = std::make_shared<acceptance>();
+    auto acceptor = listen(above);
+    ASSERT_TRUE(acceptor.has_value());
+    auto destroyed = std::make_shared<gate>();
+    auto channel = connector()->connect(std::make_shared<owning_events>(std::make_shared<acceptor_owner>(std::move(*acceptor), destroyed)));
+    ASSERT_TRUE(channel.has_value());
+    ASSERT_TRUE((*channel)->send(bytes_of({ 1 })).has_value());
+    ASSERT_TRUE(above->wait_for_accepted(1));
+
+    (*channel)->close();
+    EXPECT_TRUE(destroyed->wait());
 }
 
 TEST_F(grpc_place_test, the_events_are_let_go_once_the_acceptor_is_gone)
