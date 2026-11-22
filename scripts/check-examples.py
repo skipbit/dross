@@ -4,9 +4,10 @@
 # comments, so an example that stops compiling fails a check instead of a
 # reader who copies it.
 #
-#   scripts/check-examples.py [compiler]   default: $CXX, then c++
+#   scripts/check-examples.py [--require-grpc] [compiler]
 #
-# $CXXFLAGS is added to the flags, such as -stdlib=libc++.
+# The compiler defaults to $CXX, then c++. $CXXFLAGS is added to the flags,
+# such as -stdlib=libc++.
 #
 # Each example is compiled on its own with -fsyntax-only, after
 # #include <dross/dross.h>. One that defines main is compiled as it is; any
@@ -16,6 +17,12 @@
 # sources, a code-block marked ":class: example-namespace-scope" is compiled
 # as it is without main, and one marked ":class: example-fragment" is not
 # compiled.
+#
+# An example that includes a header of the gRPC part, under
+# <dross/ipc/grpc/>, also needs gRPC, which pkg-config finds as grpc++. Its
+# headers are searched as system headers, as CMake does for an imported
+# target, so their own warnings do not fail the example. Without gRPC such
+# an example is skipped and counted, unless --require-grpc is given.
 
 import concurrent.futures
 import os
@@ -33,6 +40,31 @@ FLAGS = [
     '-std=c++23', '-fsyntax-only', '-Wall', '-Wextra', '-Werror',
     '-Wno-unused-variable', '-Wno-unused-but-set-variable',
 ]
+
+
+GRPC_HEADER = re.compile(r'^\s*#\s*include\s*<dross/ipc/grpc/', re.M)
+
+
+def needs_grpc(body):
+    return GRPC_HEADER.search('\n'.join(body)) is not None
+
+
+# The flags pkg-config gives for grpc++, with each include directory made a
+# system one, or None when pkg-config does not find it.
+def grpc_flags():
+    try:
+        result = subprocess.run(['pkg-config', '--cflags', 'grpc++'], capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    flags = []
+    for flag in shlex.split(result.stdout):
+        if flag.startswith('-I'):
+            flags += ['-isystem', flag[2:]]
+        else:
+            flags.append(flag)
+    return flags
 
 
 def tracked_files():
@@ -194,17 +226,19 @@ def compile_flags():
     return FLAGS + shlex.split(os.environ.get('CXXFLAGS', ''))
 
 
-def compile_one(compiler, directory, index, body, kind):
+def compile_one(compiler, directory, index, body, kind, extra):
     path = os.path.join(directory, 'example_%03d.cpp' % index)
     with open(path, 'w', encoding='utf-8') as f:
         f.write(source_of(body, kind))
-    result = subprocess.run([compiler, *compile_flags(), '-I', os.path.join(ROOT, 'include'), path],
+    result = subprocess.run([compiler, *compile_flags(), *extra, '-I', os.path.join(ROOT, 'include'), path],
                             capture_output=True, text=True)
     return result.returncode, result.stderr
 
 
-def main():
-    compiler = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('CXX', 'c++')
+def main(arguments):
+    require_grpc = '--require-grpc' in arguments
+    arguments = [a for a in arguments if a != '--require-grpc']
+    compiler = arguments[0] if arguments else os.environ.get('CXX', 'c++')
     try:
         found, problems = examples()
     except subprocess.CalledProcessError:
@@ -217,11 +251,18 @@ def main():
 
     for problem in problems:
         print(problem)
-    compiled = [(i, e) for i, e in enumerate(found) if e[3] != 'example-fragment']
     failed = len(problems)
+    with_grpc = grpc_flags()
+    if with_grpc is None and require_grpc:
+        print('--require-grpc: pkg-config does not find grpc++', file=sys.stderr)
+        failed += 1
+    compiled = [(i, e) for i, e in enumerate(found)
+                if e[3] != 'example-fragment' and (with_grpc is not None or not needs_grpc(e[2]))]
+    fragments = sum(1 for e in found if e[3] == 'example-fragment')
     with tempfile.TemporaryDirectory() as directory:
         with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
-            jobs = [(e, pool.submit(compile_one, compiler, directory, i, e[2], e[3]))
+            jobs = [(e, pool.submit(compile_one, compiler, directory, i, e[2], e[3],
+                                    with_grpc if needs_grpc(e[2]) else []))
                     for i, e in compiled]
             for (name, line, _, _), job in jobs:
                 rc, stderr = job.result()
@@ -230,10 +271,10 @@ def main():
                     print('%s:%d: does not compile' % (name, line))
                     print(stderr)
 
-    print('%d examples, %d compiled, %d skipped as fragments, %d failed'
-          % (len(found), len(compiled), len(found) - len(compiled), failed))
+    print('%d examples, %d compiled, %d skipped as fragments, %d skipped without gRPC, %d failed'
+          % (len(found), len(compiled), fragments, len(found) - len(compiled) - fragments, failed))
     return 1 if failed else 0
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

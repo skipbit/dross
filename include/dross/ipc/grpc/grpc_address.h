@@ -18,6 +18,8 @@ namespace dross::ipc {
  * a listener hears it through a dross::ipc::grpc_target naming the same
  * address:
  * @code
+ * #include <dross/ipc/grpc/grpc_address.h>
+ *
  * int main()
  * {
  *     const dross::ipc::grpc_address place{ "127.0.0.1:50051", grpc::InsecureServerCredentials() };

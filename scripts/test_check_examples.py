@@ -197,12 +197,85 @@ class environment_test(unittest.TestCase):
         check_examples.ROOT = self.directory.name
 
         with contextlib.redirect_stderr(io.StringIO()) as stderr:
-            self.assertEqual(check_examples.main(), 1)
+            self.assertEqual(check_examples.main([]), 1)
         self.assertIn('git work tree', stderr.getvalue())
 
     def test_cxxflags_are_split_as_a_shell_would(self):
         with unittest.mock.patch.dict(os.environ, {'CXXFLAGS': '-stdlib=libc++ -DGREETING="hello world"'}):
             self.assertEqual(check_examples.compile_flags()[-2:], ['-stdlib=libc++', '-DGREETING=hello world'])
+
+
+class grpc_examples_test(unittest.TestCase):
+    def test_an_example_including_a_header_of_the_grpc_part_needs_grpc(self):
+        self.assertTrue(check_examples.needs_grpc(['#include <dross/ipc/grpc/grpc_address.h>', 'int x = 1;']))
+        self.assertTrue(check_examples.needs_grpc(['#  include  <dross/ipc/grpc/grpc_target.h>']))
+
+    def test_other_examples_do_not(self):
+        for body in [['#include <dross/dross.h>'], ['// see <dross/ipc/grpc/grpc_address.h>'],
+                     ['#include <dross/ipc/unix_socket.h>']]:
+            self.assertFalse(check_examples.needs_grpc(body), body)
+
+    def test_the_include_directories_of_grpc_become_system_ones(self):
+        found = subprocess.CompletedProcess([], 0, stdout='-I/opt/grpc/include -DNOMINMAX -I/opt/absl\n')
+        with unittest.mock.patch.object(check_examples.subprocess, 'run', return_value=found):
+            self.assertEqual(check_examples.grpc_flags(),
+                             ['-isystem', '/opt/grpc/include', '-DNOMINMAX', '-isystem', '/opt/absl'])
+
+    def test_no_flags_when_pkg_config_does_not_find_grpc(self):
+        missing = subprocess.CompletedProcess([], 1, stdout='', stderr='not found')
+        with unittest.mock.patch.object(check_examples.subprocess, 'run', return_value=missing):
+            self.assertIsNone(check_examples.grpc_flags())
+        with unittest.mock.patch.object(check_examples.subprocess, 'run', side_effect=FileNotFoundError):
+            self.assertIsNone(check_examples.grpc_flags())
+
+
+class grpc_main_test(unittest.TestCase):
+    def setUp(self):
+        self.root = check_examples.ROOT
+        self.directory = tempfile.TemporaryDirectory()
+        os.mkdir(os.path.join(self.directory.name, 'include'))
+        with open(os.path.join(self.directory.name, 'include', 'a.h'), 'w') as f:
+            f.write(' * @code\n * int plain = 1;\n * @endcode\n'
+                    ' * @code\n * #include <dross/ipc/grpc/grpc_address.h>\n * int over_grpc = 1;\n * @endcode\n')
+        subprocess.run(['git', 'init', '-q'], cwd=self.directory.name, check=True)
+        subprocess.run(['git', 'add', '.'], cwd=self.directory.name, check=True)
+        check_examples.ROOT = self.directory.name
+        self.compiled = []
+
+    def tearDown(self):
+        check_examples.ROOT = self.root
+        self.directory.cleanup()
+
+    def run_main(self, arguments, flags):
+        def compile_one(compiler, directory, index, body, kind, extra):
+            self.compiled.append((body[-1], extra))
+            return 0, ''
+        with unittest.mock.patch.object(check_examples, 'grpc_flags', return_value=flags), \
+                unittest.mock.patch.object(check_examples, 'compile_one', side_effect=compile_one), \
+                contextlib.redirect_stdout(io.StringIO()) as stdout, \
+                contextlib.redirect_stderr(io.StringIO()) as stderr:
+            rc = check_examples.main(arguments)
+        return rc, stdout.getvalue(), stderr.getvalue()
+
+    def test_without_grpc_its_examples_are_skipped_and_counted(self):
+        rc, stdout, _ = self.run_main([], None)
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.compiled, [('int plain = 1;', [])])
+        self.assertIn('2 examples, 1 compiled, 0 skipped as fragments, 1 skipped without gRPC, 0 failed', stdout)
+
+    def test_with_grpc_its_examples_get_its_flags_alone(self):
+        rc, stdout, _ = self.run_main([], ['-isystem', '/opt/grpc'])
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(sorted(self.compiled), [('int over_grpc = 1;', ['-isystem', '/opt/grpc']), ('int plain = 1;', [])])
+        self.assertIn('0 skipped without gRPC', stdout)
+
+    def test_requiring_grpc_fails_without_it(self):
+        rc, _, stderr = self.run_main(['--require-grpc'], None)
+
+        self.assertEqual(rc, 1)
+        self.assertIn('pkg-config does not find grpc++', stderr)
 
 
 if __name__ == '__main__':

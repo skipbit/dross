@@ -15,6 +15,8 @@ namespace dross::ipc {
  * A listener hears there with dross::listener::create() the broadcaster
  * published at a dross::ipc::grpc_address:
  * @code
+ * #include <dross/ipc/grpc/grpc_target.h>
+ *
  * int main()
  * {
  *     const dross::ipc::grpc_target place{ "localhost:50051", grpc::InsecureChannelCredentials() };
