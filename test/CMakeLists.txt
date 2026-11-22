@@ -104,6 +104,28 @@ target_include_directories(${TEST_NAME}
     PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# The gRPC part, built only when DROSS_WITH_GRPC is on.
+if(DROSS_WITH_GRPC)
+    dross_add_test_executable(${PROJECT_NAME}_grpc_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/ipc/grpc/test_grpc_address.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ipc/grpc/test_grpc_place.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ipc/grpc/test_stream_state.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_grpc_notification.cpp
+        # Hidden in the shared libraries, and used by the internal headers
+        # the tests include.
+        ${PROJECT_SOURCE_DIR}/src/ipc/part_calls.cpp
+        ${PROJECT_SOURCE_DIR}/src/ipc/grpc/grpc_acceptor.cpp
+        ${PROJECT_SOURCE_DIR}/src/ipc/grpc/grpc_connector.cpp
+        ${PROJECT_SOURCE_DIR}/src/ipc/grpc/reaction_scope.cpp
+        ${PROJECT_SOURCE_DIR}/src/ipc/grpc/stream_state.cpp
+    )
+    target_link_libraries(${PROJECT_NAME}_grpc_test dross_grpc)
+    target_include_directories(${PROJECT_NAME}_grpc_test
+        PRIVATE ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}
+        $<TARGET_PROPERTY:dross_grpc,BINARY_DIR>
+    )
+endif()
+
 # Replaces operator new to count allocations, which would reach every test in
 # the executable above. A runtime that defines operator new and delete itself,
 # such as ThreadSanitizer's with Clang, keeps the replacement from linking, so

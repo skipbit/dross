@@ -1,6 +1,7 @@
 #include "dross/ipc/error.h"
 #include "dross/ipc/message_place.h"
 #include "dross/ipc/unix_socket.h"
+#include "ipc/part_recorder.h"
 #include "ipc/socket_directory.h"
 
 #include <gtest/gtest.h>
@@ -22,127 +23,12 @@
 namespace {
 
 using namespace std::chrono_literals;
-using bytes = std::vector<std::byte>;
+using bytes = dross_test::bytes;
 
-constexpr auto kPatience = 5s;
-
-bytes bytes_of(std::initializer_list<int> values)
-{
-    bytes out;
-    for (const int v : values) {
-        out.push_back(static_cast<std::byte>(v));
-    }
-    return out;
-}
-
-// Records what happens on one connection.
-class recorder final : public dross::ipc::message_channel_events {
-public:
-    void received(bytes message) override
-    {
-        const std::lock_guard guard{ _lock };
-        _messages.push_back(std::move(message));
-        _changed.notify_all();
-    }
-
-    void closed(dross::error reason) override
-    {
-        const std::lock_guard guard{ _lock };
-        ++_closes;
-        _reason = std::move(reason);
-        _changed.notify_all();
-    }
-
-    bool wait_for_messages(std::size_t count)
-    {
-        std::unique_lock guard{ _lock };
-        return _changed.wait_for(guard, kPatience, [&] {
-            return _messages.size() >= count;
-        });
-    }
-
-    bool wait_for_close()
-    {
-        std::unique_lock guard{ _lock };
-        return _changed.wait_for(guard, kPatience, [&] {
-            return _closes > 0;
-        });
-    }
-
-    std::vector<bytes> messages()
-    {
-        const std::lock_guard guard{ _lock };
-        return _messages;
-    }
-
-    int closes()
-    {
-        const std::lock_guard guard{ _lock };
-        return _closes;
-    }
-
-    std::optional<dross::error> reason()
-    {
-        const std::lock_guard guard{ _lock };
-        return _reason;
-    }
-
-private:
-    std::mutex _lock;
-    std::condition_variable _changed;
-    std::vector<bytes> _messages;
-    int _closes{ 0 };
-    std::optional<dross::error> _reason;
-};
-
-// Records what is accepted, giving each connection a recorder.
-class acceptance final : public dross::ipc::message_acceptor_events {
-public:
-    std::shared_ptr<dross::ipc::message_channel_events> accepted(std::shared_ptr<dross::ipc::message_channel> channel) override
-    {
-        auto events = std::make_shared<recorder>();
-        if (on_accept) {
-            on_accept();
-        }
-        const std::lock_guard guard{ _lock };
-        _channels.push_back(std::move(channel));
-        _events.push_back(events);
-        _changed.notify_all();
-        return events;
-    }
-
-    void stopped(dross::error) override
-    {
-    }
-
-    bool wait_for_accepted(std::size_t count)
-    {
-        std::unique_lock guard{ _lock };
-        return _changed.wait_for(guard, kPatience, [&] {
-            return _channels.size() >= count;
-        });
-    }
-
-    std::shared_ptr<dross::ipc::message_channel> channel(std::size_t at)
-    {
-        const std::lock_guard guard{ _lock };
-        return _channels.at(at);
-    }
-
-    std::shared_ptr<recorder> events(std::size_t at)
-    {
-        const std::lock_guard guard{ _lock };
-        return _events.at(at);
-    }
-
-    std::function<void()> on_accept;
-
-private:
-    std::mutex _lock;
-    std::condition_variable _changed;
-    std::vector<std::shared_ptr<dross::ipc::message_channel>> _channels;
-    std::vector<std::shared_ptr<recorder>> _events;
-};
+using dross_test::acceptance;
+using dross_test::bytes_of;
+using dross_test::kPatience;
+using dross_test::recorder;
 
 class unix_place_test : public dross_test::socket_directory_test {
 protected:

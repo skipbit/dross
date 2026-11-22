@@ -1,9 +1,9 @@
 # Checks a commit against the Requirements in the README: every supported
 # compiler and standard library pairing, in both build types, the two ways the
 # library is packaged, what the sanitizers find, that the documentation still
-# builds and is well formed, and that the sources match the formatting
-# configuration. `required` waits for all of them, so one name stands for the
-# whole list.
+# builds and is well formed, that the sources match the formatting
+# configuration, and the gRPC part against the gRPC releases it takes.
+# `required` waits for all of them, so one name stands for the whole list.
 #
 # Toolchains come only from the pinned runner images and the distribution's own
 # repositories, so an upstream change cannot break a check here. Newer
@@ -644,10 +644,135 @@ jobs:
       - name: Check formatting
         run: scripts/tools.sh format-check
 
+  # The gRPC part, built against the gRPC each platform's packages install:
+  # the distribution's on Linux, the oldest release the part takes, and
+  # Homebrew's on macOS, the newest. It is built, tested and installed, an
+  # installed copy is used through find_package, and the examples that need
+  # gRPC are compiled, which the examples jobs skip.
+  grpc:
+    name: grpc (${{ matrix.platform.name }})
+    runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { name: linux, os: ubuntu-24.04, cxx: g++-13 }
+          - { name: macos, os: macos-15 }
+    env:
+      CXX: ${{ matrix.platform.cxx }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          # As above: without the tags the build calls itself 0.0.0.
+          fetch-tags: true
+
+      - name: Install gRPC
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            brew install grpc pkgconf
+          else
+            sudo apt-get update
+            sudo apt-get install -y libgrpc++-dev libprotobuf-dev protobuf-compiler protobuf-compiler-grpc
+          fi
+
+      - name: Report toolchain versions
+        run: |
+          "${CXX:-c++}" --version
+          if [ "$RUNNER_OS" = macOS ]; then xcrun --show-sdk-version; fi
+          cmake --version
+          echo "grpc++ $(pkg-config --modversion grpc++)"
+
+      - name: Build and test
+        run: |
+          cmake --preset release -D DROSS_WITH_GRPC=ON
+          cmake --build --preset release --parallel "$(getconf _NPROCESSORS_ONLN)"
+          ctest --preset release --parallel "$(getconf _NPROCESSORS_ONLN)"
+
+      # The tests pass just the same when the part is not built, so its own
+      # are counted.
+      - name: Check the gRPC part was tested
+        run: |
+          count=$(ctest --preset release -N | grep -c 'grpc_' || true)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::no test of the gRPC part ran"
+            exit 1
+          fi
+          echo "$count tests of the gRPC part"
+
+      - name: Install
+        run: cmake --install build/release --prefix "$RUNNER_TEMP/install"
+
+      # A broadcaster published at a gRPC address, heard by a listener in the
+      # same process through the loopback address.
+      - name: Build and run a consumer through find_package
+        run: |
+          mkdir consumer && cd consumer
+          cat > CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(consumer CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(dross REQUIRED COMPONENTS grpc)
+          add_executable(consumer main.cpp)
+          target_link_libraries(consumer PRIVATE dross::grpc)
+          EOF
+
+          cat > main.cpp << 'EOF'
+          #include <dross/dross.h>
+          #include <dross/ipc/grpc/grpc_address.h>
+          #include <dross/ipc/grpc/grpc_target.h>
+
+          #include <atomic>
+          #include <chrono>
+          #include <cstdint>
+          #include <cstdio>
+          #include <thread>
+
+          inline constexpr dross::topic<std::int64_t> kCount{ "com.example.consumer.count" };
+
+          int main()
+          {
+              auto news = dross::broadcaster::create(dross::ipc::grpc_address{ "127.0.0.1:50051", grpc::InsecureServerCredentials() });
+              if (! news) {
+                  std::printf("publishing failed: %s\n", news.error().message().c_str());
+                  return 1;
+              }
+              auto ears = dross::listener::create(dross::ipc::grpc_target{ "127.0.0.1:50051", grpc::InsecureChannelCredentials() });
+              std::atomic<std::int64_t> heard{ 0 };
+              auto subscribed = ears.subscribe(kCount, [&heard](const std::int64_t n) { heard = n; }, dross::delivery::direct());
+              if (! subscribed) {
+                  return 1;
+              }
+              for (int i = 0; i < 1000 && heard != 42; ++i) {
+                  news->notify(kCount, 42);
+                  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+              }
+              std::printf("heard %lld\n", static_cast<long long>(heard.load()));
+              return 0;
+          }
+          EOF
+
+          cmake -S . -B build -D "CMAKE_PREFIX_PATH=$RUNNER_TEMP/install"
+          cmake --build build
+          printed=$(./build/consumer)
+          if [ "$printed" != "heard 42" ]; then
+            echo "::error::the consumer printed '$printed'"
+            exit 1
+          fi
+          echo "the consumer printed $printed"
+
+      # CXX is empty on macOS, where the runner's own compiler is meant.
+      - name: Compile the examples that need gRPC
+        run: python3 scripts/check-examples.py --require-grpc "${CXX:-c++}"
+
   required:
     name: required
     if: always()
-    needs: [build-and-test, packaging, sanitize, docs, docs-lint, examples, format-check]
+    needs: [build-and-test, packaging, sanitize, docs, docs-lint, examples, format-check, grpc]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
 

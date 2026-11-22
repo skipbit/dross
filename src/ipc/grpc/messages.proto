@@ -1,0 +1,14 @@
+// The stream a gRPC part carries messages on. Internal: both ends are dross,
+// and nothing outside it is promised this shape.
+syntax = "proto3";
+
+package dross.ipc.grpc_stream;
+
+service Messages {
+  // Each side sends its messages on the one stream for as long as it lasts.
+  rpc Exchange(stream Message) returns (stream Message);
+}
+
+message Message {
+  bytes data = 1;
+}

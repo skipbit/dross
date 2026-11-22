@@ -14,6 +14,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Modern CMake package support
 include(CMakePackageConfigHelpers)
 
+# The gRPC part needs gRPC installed where CMake finds it, so it is built only
+# when asked for. See src/ipc/grpc/CMakeLists.txt.
+option(DROSS_WITH_GRPC "build dross::grpc, the gRPC part" OFF)
+set(DROSS_GRPC_MINIMUM_VERSION 1.51)
+set(DROSS_PROTOBUF_MINIMUM_VERSION 3.21)
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
 # enable_testing() registers the test tree with ctest only when it runs at the

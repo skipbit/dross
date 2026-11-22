@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dross/type/error.h"
+#include "ipc/limits.h"
 
 #include <cstddef>
 #include <deque>
@@ -16,8 +17,6 @@ namespace dross {
 #else
 #define DROSS_OUTBOX_HIDDEN
 #endif
-
-inline constexpr std::size_t max_queued_bytes = 1024 * 1024;
 
 // The bytes waiting to be sent on one connection, in the order they were
 // queued.
