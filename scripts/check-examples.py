@@ -67,6 +67,22 @@ def grpc_flags():
     return flags
 
 
+# Sorts the examples, each with its index in found, into fragments, those
+# skipped for want of gRPC, and those to compile with their extra flags.
+def classify(found, with_grpc):
+    fragments, without_grpc, to_compile = [], [], []
+    for i, e in enumerate(found):
+        if e[3] == 'example-fragment':
+            fragments.append((i, e))
+        elif not needs_grpc(e[2]):
+            to_compile.append((i, e, []))
+        elif with_grpc is None:
+            without_grpc.append((i, e))
+        else:
+            to_compile.append((i, e, with_grpc))
+    return fragments, without_grpc, to_compile
+
+
 def tracked_files():
     out = subprocess.run(['git', 'ls-files', '-z', 'README.md', 'docs', 'include'],
                          cwd=ROOT, capture_output=True, text=True, check=True).stdout
@@ -256,14 +272,11 @@ def main(arguments):
     if with_grpc is None and require_grpc:
         print('--require-grpc: pkg-config does not find grpc++', file=sys.stderr)
         failed += 1
-    compiled = [(i, e) for i, e in enumerate(found)
-                if e[3] != 'example-fragment' and (with_grpc is not None or not needs_grpc(e[2]))]
-    fragments = sum(1 for e in found if e[3] == 'example-fragment')
+    fragments, without_grpc, to_compile = classify(found, with_grpc)
     with tempfile.TemporaryDirectory() as directory:
         with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
-            jobs = [(e, pool.submit(compile_one, compiler, directory, i, e[2], e[3],
-                                    with_grpc if needs_grpc(e[2]) else []))
-                    for i, e in compiled]
+            jobs = [(e, pool.submit(compile_one, compiler, directory, i, e[2], e[3], extra))
+                    for i, e, extra in to_compile]
             for (name, line, _, _), job in jobs:
                 rc, stderr = job.result()
                 if rc != 0:
@@ -272,7 +285,7 @@ def main(arguments):
                     print(stderr)
 
     print('%d examples, %d compiled, %d skipped as fragments, %d skipped without gRPC, %d failed'
-          % (len(found), len(compiled), fragments, len(found) - len(compiled) - fragments, failed))
+          % (len(found), len(to_compile), len(fragments), len(without_grpc), failed))
     return 1 if failed else 0
 
 

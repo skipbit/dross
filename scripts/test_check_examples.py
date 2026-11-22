@@ -228,6 +228,16 @@ class grpc_examples_test(unittest.TestCase):
         with unittest.mock.patch.object(check_examples.subprocess, 'run', side_effect=FileNotFoundError):
             self.assertIsNone(check_examples.grpc_flags())
 
+    def test_a_fragment_that_needs_grpc_counts_as_a_fragment(self):
+        plain = ('a.md', 1, ['int x;'], 'example')
+        grpc = ('b.md', 2, ['#include <dross/ipc/grpc/grpc_address.h>'], 'example')
+        fragment = ('c.md', 3, ['#include <dross/ipc/grpc/grpc_address.h>'], 'example-fragment')
+        found = [plain, grpc, fragment]
+        self.assertEqual(check_examples.classify(found, None),
+                         ([(2, fragment)], [(1, grpc)], [(0, plain, [])]))
+        self.assertEqual(check_examples.classify(found, ['-DX']),
+                         ([(2, fragment)], [], [(0, plain, []), (1, grpc, ['-DX'])]))
+
 
 class grpc_main_test(unittest.TestCase):
     def setUp(self):
