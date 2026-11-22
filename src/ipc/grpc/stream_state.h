@@ -64,9 +64,8 @@ public:
     // The write started last finished; ok is false when it failed.
     void written(bool ok);
 
-    // The peer ended the stream. reason, when given, is what closed() is
-    // to tell, unless this side ended it first.
-    void peer_ended(std::optional<error> reason);
+    // The peer ended the stream.
+    void peer_ended();
 
     // The stream is over and its reactor is going: no operation is started
     // after this. Returns the reason the stream ended with, if one is known.
@@ -74,6 +73,7 @@ public:
 
 private:
     void end_locked(std::optional<error> reason);
+    void end_if_idle();
 
     std::mutex _lock;
     stream_operations* _operations;
@@ -82,7 +82,6 @@ private:
     std::size_t _waiting_bytes{ 0 };
     bool _open{ true };
     bool _writing{ false };
-    bool _ended{ false };
     std::optional<error> _reason;
 };
 

@@ -53,10 +53,7 @@ void stream_state::written(const bool ok)
     }
     if (! _open) {
         _writing = false;
-        if (! _ended && _operations) {
-            _ended = true;
-            _operations->end();
-        }
+        end_if_idle();
         return;
     }
     if (_waiting.empty()) {
@@ -66,10 +63,10 @@ void stream_state::written(const bool ok)
     _operations->write(_waiting.front());
 }
 
-void stream_state::peer_ended(std::optional<error> reason)
+void stream_state::peer_ended()
 {
     const std::lock_guard guard{ _lock };
-    end_locked(std::move(reason));
+    end_locked(std::nullopt);
 }
 
 std::optional<error> stream_state::finished()
@@ -92,8 +89,12 @@ void stream_state::end_locked(std::optional<error> reason)
         _waiting_bytes -= _waiting.back().data().size();
         _waiting.pop_back();
     }
+    end_if_idle();
+}
+
+void stream_state::end_if_idle()
+{
     if (! _writing && _operations) {
-        _ended = true;
         _operations->end();
     }
 }

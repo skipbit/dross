@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <grpcpp/grpcpp.h>
 #include <mutex>
-#include <optional>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -140,7 +139,7 @@ private:
     void OnReadDone(const bool ok) override
     {
         if (! ok) {
-            _state->peer_ended(std::nullopt);
+            _state->peer_ended();
             return;
         }
         if (! _core.stopping()) {
@@ -157,7 +156,7 @@ private:
 
     void OnCancel() override
     {
-        _state->peer_ended(std::nullopt);
+        _state->peer_ended();
     }
 
     void OnDone() override
