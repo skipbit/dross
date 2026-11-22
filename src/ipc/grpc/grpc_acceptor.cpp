@@ -40,6 +40,9 @@ public:
         ::grpc::ServerBuilder builder;
         builder.AddListeningPort(address, std::move(credentials));
         builder.SetMaxReceiveMessageSize(max_received_size);
+        // Another server taking the same port would split the peers between
+        // the two without a word, so the port is not shared.
+        builder.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
         builder.RegisterService(this);
         _server = builder.BuildAndStart();
         if (! _server) {

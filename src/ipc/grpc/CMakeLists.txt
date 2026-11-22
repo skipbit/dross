@@ -24,7 +24,9 @@ add_library(dross_grpc)
 
 target_sources(dross_grpc PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/grpc_acceptor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/grpc_address.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/grpc_connector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/grpc_target.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/messages.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/reaction_scope.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/stream_state.cpp
@@ -67,6 +69,11 @@ install(TARGETS dross_grpc
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/dross/ipc/grpc
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dross/ipc
+    FILES_MATCHING PATTERN "*.h"
 )
 
 install(EXPORT drossGrpcTargets

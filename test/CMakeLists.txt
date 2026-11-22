@@ -107,7 +107,9 @@ target_include_directories(${TEST_NAME}
 # The gRPC part, built only when DROSS_WITH_GRPC is on.
 if(DROSS_WITH_GRPC)
     dross_add_test_executable(${PROJECT_NAME}_grpc_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/ipc/grpc/test_grpc_address.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ipc/grpc/test_grpc_place.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/notification/test_grpc_notification.cpp
         # Hidden in the shared libraries, and used by the internal headers
         # the tests include.
         ${PROJECT_SOURCE_DIR}/src/ipc/part_calls.cpp

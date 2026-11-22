@@ -128,10 +128,11 @@ install(TARGETS ${PROJECT_NAME}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dross
 )
 
-# Install all headers
+# Install all headers but those of the gRPC part, which comes with it.
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/dross
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.h"
+    REGEX "/ipc/grpc$" EXCLUDE
 )
 
 if (DROSS_WITH_GRPC)
