@@ -67,6 +67,10 @@ public:
     // The peer ended the stream.
     void peer_ended();
 
+    // Whether neither side has ended the stream. A message read once one
+    // has is dropped, as unix_socket does.
+    bool is_open();
+
     // The stream is over and its reactor is going: no operation is started
     // after this. Returns the reason the stream ended with, if one is known.
     std::optional<error> finished();

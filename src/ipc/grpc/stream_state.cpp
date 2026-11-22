@@ -69,6 +69,12 @@ void stream_state::peer_ended()
     end_locked(std::nullopt);
 }
 
+bool stream_state::is_open()
+{
+    const std::lock_guard guard{ _lock };
+    return _open;
+}
+
 std::optional<error> stream_state::finished()
 {
     const std::lock_guard guard{ _lock };

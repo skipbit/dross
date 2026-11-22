@@ -212,6 +212,49 @@ TEST_F(grpc_place_test, closing_from_the_accepting_side_ends_both_in_order)
     EXPECT_EQ(refused.error(), dross::error(std::errc::not_connected));
 }
 
+TEST_F(grpc_place_test, the_accepting_side_receives_nothing_once_it_closed)
+{
+    auto above = std::make_shared<acceptance>();
+    above->on_receive = [&above] {
+        above->channel(0)->close();
+    };
+    auto acceptor = listen(above);
+    ASSERT_TRUE(acceptor.has_value());
+    auto mine = std::make_shared<recorder>();
+    auto channel = connector()->connect(mine);
+    ASSERT_TRUE(channel.has_value());
+    // Sends after the close may be refused.
+    for (int i = 0; i < 20; ++i) {
+        (void)(*channel)->send(bytes_of({ 1 }));
+    }
+
+    ASSERT_TRUE(above->wait_for_accepted(1));
+    ASSERT_TRUE(above->events(0)->wait_for_close());
+    EXPECT_EQ(above->events(0)->messages().size(), 1u);
+}
+
+TEST_F(grpc_place_test, the_connecting_side_receives_nothing_once_it_closed)
+{
+    auto above = std::make_shared<acceptance>();
+    auto acceptor = listen(above);
+    ASSERT_TRUE(acceptor.has_value());
+    auto mine = std::make_shared<recorder>();
+    auto channel = connector()->connect(mine);
+    ASSERT_TRUE(channel.has_value());
+    mine->on_receive = [&channel] {
+        (*channel)->close();
+    };
+    ASSERT_TRUE((*channel)->send(bytes_of({ 1 })).has_value());
+    ASSERT_TRUE(above->wait_for_accepted(1));
+    // Sends after the close may be refused.
+    for (int i = 0; i < 20; ++i) {
+        (void)above->channel(0)->send(bytes_of({ 2 }));
+    }
+
+    ASSERT_TRUE(mine->wait_for_close());
+    EXPECT_EQ(mine->messages().size(), 1u);
+}
+
 TEST_F(grpc_place_test, letting_the_connecting_channel_go_keeps_the_connection)
 {
     auto above = std::make_shared<acceptance>();

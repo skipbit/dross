@@ -138,6 +138,18 @@ TEST_F(stream_state_test, more_waiting_than_the_limit_ends_the_stream_after_the_
     EXPECT_EQ(*reason, dross::ipc_errc::queue_overflow);
 }
 
+TEST_F(stream_state_test, a_stream_is_open_until_either_side_ends_it)
+{
+    EXPECT_TRUE(state.is_open());
+    state.close();
+    EXPECT_FALSE(state.is_open());
+
+    recording_operations others;
+    stream_state ended_by_the_peer{ others, nullptr };
+    ended_by_the_peer.peer_ended();
+    EXPECT_FALSE(ended_by_the_peer.is_open());
+}
+
 TEST_F(stream_state_test, finished_tells_that_this_side_closed)
 {
     state.close();

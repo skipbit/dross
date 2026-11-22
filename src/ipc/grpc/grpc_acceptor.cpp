@@ -142,7 +142,7 @@ private:
             _state->peer_ended();
             return;
         }
-        if (! _core.stopping()) {
+        if (! _core.stopping() && _state->is_open()) {
             const reaction_scope scope;
             _events->received(bytes_of(_in));
         }
