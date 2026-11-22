@@ -52,7 +52,6 @@ public:
     void stop()
     {
         const std::lock_guard guard{ _lock };
-        _stopping = true;
         _gone->store(true);
     }
 
@@ -76,7 +75,7 @@ public:
         std::shared_ptr<message_acceptor_events> above;
         {
             const std::lock_guard guard{ _lock };
-            if (_stopping) {
+            if (_gone->load()) {
                 return nullptr;
             }
             above = _above;
@@ -92,8 +91,7 @@ public:
 
     bool stopping() const
     {
-        const std::lock_guard guard{ _lock };
-        return _stopping;
+        return _gone->load();
     }
 
     std::shared_ptr<const std::atomic<bool>> gone() const
@@ -107,7 +105,6 @@ private:
     mutable std::mutex _lock;
     std::mutex _accepting;
     std::shared_ptr<message_acceptor_events> _above;
-    bool _stopping{ false };
     const std::shared_ptr<std::atomic<bool>> _gone{ std::make_shared<std::atomic<bool>>(false) };
     std::unique_ptr<::grpc::Server> _server;
 };
