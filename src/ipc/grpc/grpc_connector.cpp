@@ -1,4 +1,3 @@
-#include "ipc/frame.h"
 #include "ipc/grpc/grpc_place.h"
 #include "ipc/grpc/reaction_scope.h"
 #include "ipc/grpc/stream_state.h"
@@ -15,10 +14,6 @@ namespace dross::ipc {
 namespace {
 
 using reactor = ::grpc::ClientBidiReactor<grpc_stream::Message, grpc_stream::Message>;
-
-// A message as large as a channel carries, with room for the field's tag
-// and length.
-constexpr int max_received_size = static_cast<int>(max_message_size) + 16;
 
 // One stream to a server, which deletes itself once gRPC is done with it.
 // Its channel starts writes from outside its reactions, so it holds the

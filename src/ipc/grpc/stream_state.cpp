@@ -1,8 +1,7 @@
 #include "ipc/grpc/stream_state.h"
 
 #include "dross/ipc/error.h"
-#include "ipc/frame.h"
-#include "ipc/outbox.h"
+#include "ipc/limits.h"
 
 #include <system_error>
 #include <utility>

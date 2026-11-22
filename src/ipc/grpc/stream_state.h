@@ -2,6 +2,7 @@
 
 #include "dross/ipc/message_channel.h"
 #include "dross/type/error.h"
+#include "ipc/limits.h"
 #include "messages.pb.h"
 
 #include <atomic>
@@ -23,6 +24,10 @@ namespace dross::ipc {
 #else
 #define DROSS_STREAM_STATE_HIDDEN
 #endif
+
+// A message as large as a channel carries, with room for the field's tag
+// and length.
+inline constexpr int max_received_size = static_cast<int>(max_message_size) + 16;
 
 // The operations a stream_state starts on its gRPC stream, which the
 // reactor of the stream implements. They are started under the state's

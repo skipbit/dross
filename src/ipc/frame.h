@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dross/type/error.h"
+#include "ipc/limits.h"
 
 #include <cstddef>
 #include <expected>
@@ -20,7 +21,6 @@ namespace dross {
 // Messages between processes travel on a stream, each one after a 4-byte
 // big-endian length.
 inline constexpr std::size_t frame_header_size = 4;
-inline constexpr std::size_t max_message_size = 64 * 1024;
 
 // The message with its length in front. A message larger than
 // max_message_size fails with message_too_large.
