@@ -28,6 +28,16 @@ Added
 - ``ipc::unix_socket``, in a new IPC module (``<dross/ipc.h>``), naming a
   place where processes meet: a Unix domain socket at a path
 
+- A gRPC part, ``dross::grpc``, built when dross is configured with
+  ``DROSS_WITH_GRPC`` on, against gRPC 1.51 or later and protobuf 3.21 or
+  later installed where CMake finds them. ``ipc::grpc_address`` is a place
+  to listen at over gRPC and ``ipc::grpc_target`` one to connect to, each
+  with the credentials the user gives, so a broadcaster is published and
+  heard across machines. A port a ``grpc_address`` listens at is not
+  shared with another server, and a try to connect waits up to 5 seconds.
+  Only dross talks to dross there. ``find_package(dross COMPONENTS grpc)``
+  gives the part and looks for gRPC only then
+
 - The shape of a part that carries messages between processes, in the IPC
   module: ``ipc::message_channel``, ``ipc::message_acceptor`` and
   ``ipc::message_connector``, which a part implements, with

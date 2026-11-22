@@ -16,6 +16,11 @@
  *
  * Places:
  * - unix_socket: a Unix domain socket at a path
+ * - grpc_address and grpc_target: an address to listen at and a target to
+ *   connect to over gRPC, in the gRPC part, dross::grpc, built when dross is
+ *   configured with DROSS_WITH_GRPC on. This header does not include them:
+ *   they are in <dross/ipc/grpc/grpc_address.h> and
+ *   <dross/ipc/grpc/grpc_target.h>
  *
  * Carrying messages:
  * - A part that carries messages between processes implements

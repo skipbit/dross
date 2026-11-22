@@ -7,7 +7,7 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/build-CMake-brightgreen.svg)](CMakeLists.txt)
 
-**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose, within a process or from one process to another through a place such as a Unix domain socket.
+**dross** is a general-purpose C++23 library of building blocks for applications: value types held together by a dynamic `value`, including arbitrary precision numbers, TOML reading and writing, platform utilities for the environment, paths and XDG directories, per-thread run loops with the threads, timers and operation queue built on them, and typed notifications delivered on the thread each subscriber chose, within a process or from one process to another through a place such as a Unix domain socket, or, with the optional gRPC part, across machines over gRPC.
 
 ## ✨ Key Features
 
@@ -26,6 +26,9 @@
   [Getting Started](https://skipbit.github.io/dross/getting-started.html)
   lists the supported pairings and what CI builds.
 - **CMake 3.20+**, or 3.25+ to build with the presets
+- **gRPC 1.51+ and protobuf 3.21+**, for the optional gRPC part only, installed
+  where CMake finds them; dross does not fetch or build them. CI builds the
+  part against Ubuntu 24.04's gRPC 1.51 and against Homebrew's current release
 
 ### Installation
 
@@ -52,6 +55,14 @@ by default; the `static` preset, or `-DBUILD_SHARED_LIBS=OFF`, builds a static
 one. CMake 3.20 to 3.24 has no presets: configure with
 `cmake -S . -B build/release -DCMAKE_BUILD_TYPE=Release`, then run
 `cmake --build build/release`.
+
+The gRPC part, `dross::grpc`, is built only when asked for, and configuring
+stops with the reason when gRPC is missing or too old:
+
+```bash
+cmake --preset release -DDROSS_WITH_GRPC=ON
+cmake --build --preset release
+```
 
 ### Using in Your Project
 
@@ -80,6 +91,14 @@ Replace `<version>` with a tag from
 [Releases](https://github.com/skipbit/dross/releases). `main` is the
 development tip, and the ABI can change between 0.x releases.
 
+The gRPC part, from a dross built with it, is asked for as a component, and
+gRPC is looked for only then:
+
+```cmake
+find_package(dross REQUIRED COMPONENTS grpc)
+target_link_libraries(your_target PRIVATE dross::grpc)
+```
+
 #### pkg-config Integration
 
 ```bash
@@ -100,6 +119,9 @@ take the prefix from where it finds `dross.pc` in `<prefix>/lib/pkgconfig`:
 ```bash
 PKG_CONFIG_PATH=<prefix>/lib/pkgconfig pkg-config --define-prefix --cflags --libs dross
 ```
+
+`dross.pc` describes the library without the gRPC part, which is used
+through `find_package`.
 
 #### Manual Compilation
 
@@ -166,6 +188,7 @@ int main()
 
 ### IPC Layer
 - **`ipc::unix_socket`** - A place where processes meet: a Unix domain socket at a path
+- **`ipc::grpc_address`** / **`ipc::grpc_target`** - In the optional gRPC part, a place to listen at and one to connect to over gRPC, each with the credentials the user gives; only dross talks to dross there
 - **`ipc::message_channel`** - One connection between two processes, carrying whole messages, and what it tells through `message_channel_events`
 - **`ipc::message_acceptor`** - What listens at a place, telling of each connection it takes through `message_acceptor_events`
 - **`ipc::message_connector`** - What connects to a place, one try at a time
@@ -202,7 +225,7 @@ The documentation includes:
 
 dross follows modern C++ best practices:
 
-- **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg`, `ipc::unix_socket`, `timestamp`, `timezone` and the `data` iterators, which hold theirs directly, and the `ipc::message_*` interfaces, which a part implements; the ABI can change in any 0.x release
+- **Pimpl Idiom** - Types keep their representation behind an opaque pointer, apart from `error`, `path`, `xdg`, `ipc::unix_socket`, `ipc::grpc_address`, `ipc::grpc_target`, `timestamp`, `timezone` and the `data` iterators, which hold theirs directly, and the `ipc::message_*` interfaces, which a part implements; the ABI can change in any 0.x release
 - **Value Semantics** - The value types are copyable and assignable; `environment` exposes only static members
 - **Error Handling** - Failures are returned through `std::expected` and `std::optional`. Where a call throws, lets an exception through, or reports its outcome another way, its comment in the public headers says so
 - **Type Safety** - Concepts for compile-time constraints

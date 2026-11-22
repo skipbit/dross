@@ -57,6 +57,10 @@ To build and use dross, you need:
 
 - **Build System**: CMake 3.20 or later, or 3.25 or later to build with the
   presets
+- **gRPC**, for the optional gRPC part only: gRPC 1.51 or later and
+  protobuf 3.21 or later, installed where CMake finds them. dross does not
+  fetch or build them. CI builds the part against the gRPC 1.51 of
+  Ubuntu 24.04 and against the current release in Homebrew
 - **Operating System**: Linux or macOS
 
 Installation
@@ -102,6 +106,13 @@ be added when configuring with one:
     cmake --preset release -DCMAKE_INSTALL_PREFIX=/usr/local
     cmake --build --preset release
 
+    # Build the gRPC part as well
+    cmake --preset release -DDROSS_WITH_GRPC=ON
+    cmake --build --preset release
+
+With ``DROSS_WITH_GRPC`` on and gRPC missing or too old, configuring stops
+and says why.
+
 Using dross in Your Project
 ---------------------------
 
@@ -135,6 +146,16 @@ Or using FetchContent:
 Replace ``<version>`` with a tag from
 `Releases <https://github.com/skipbit/dross/releases>`_. ``main`` is the
 development tip, and the ABI can change between 0.x releases.
+
+The gRPC part, from a dross built with it, is asked for as a component, and
+gRPC is looked for only then:
+
+.. code-block:: cmake
+
+    find_package(dross REQUIRED COMPONENTS grpc)
+
+    add_executable(myapp main.cpp)
+    target_link_libraries(myapp PRIVATE dross::grpc)
 
 Manual Integration
 ~~~~~~~~~~~~~~~~~~
