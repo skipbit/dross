@@ -5,7 +5,7 @@
 #include "observed_time_source.h"
 #include "test_support.h"
 #include "thread/operation_queue_access.h"
-#include "thread/start_thread.h"
+#include "thread/start_thread_access.h"
 
 #include <gtest/gtest.h>
 

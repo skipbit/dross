@@ -13,14 +13,4 @@ namespace dross {
 // library that starts a thread reports it.
 std::expected<std::thread, error> start_thread(std::function<void()> body);
 
-// A way to make start_thread() fail that the system does not offer. Used by
-// the library's own tests.
-class start_thread_access final {
-public:
-    // Has count calls to start_thread(), from any thread, fail as when the
-    // system will not start a thread, once the next after calls have
-    // started theirs.
-    static void fail_next(int count, int after = 0);
-};
-
 }  // namespace dross

@@ -1,5 +1,6 @@
 #include "dross/type/error.h"
 #include "thread/start_thread.h"
+#include "thread/start_thread_access.h"
 
 #include <gtest/gtest.h>
 

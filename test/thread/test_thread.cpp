@@ -2,7 +2,7 @@
 #include "dross/thread/thread.h"
 #include "observed_time_source.h"
 #include "test_support.h"
-#include "thread/start_thread.h"
+#include "thread/start_thread_access.h"
 #include "thread/thread_access.h"
 
 #include <gtest/gtest.h>
