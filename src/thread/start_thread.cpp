@@ -45,7 +45,9 @@ std::expected<std::thread, error> start_thread(std::function<void()> body)
     if (take_failure()) {
         return std::unexpected(error{ std::errc::resource_unavailable_try_again });
     }
-    // std::thread reports the failure only by throwing.
+    // std::thread reports the failure only by throwing. It starts the thread
+    // with the default attributes, for which the system fails only for want
+    // of resources.
     try {
         return std::thread{ std::move(body) };
     } catch (const std::system_error&) {
