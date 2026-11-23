@@ -81,6 +81,7 @@ target_sources(${TEST_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_operation_queue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_runloop.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_start_thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_timer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/test_timer_schedule.cpp
