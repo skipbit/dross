@@ -11,11 +11,13 @@
 
 namespace dross {
 
-std::shared_ptr<remote_broadcaster> remote_broadcaster::connect(std::shared_ptr<ipc::message_connector> part)
+std::expected<std::shared_ptr<remote_broadcaster>, error> remote_broadcaster::connect(std::shared_ptr<ipc::message_connector> part)
 {
     std::shared_ptr<remote_broadcaster> made{ new remote_broadcaster{} };
     made->_connector = std::make_unique<connector>(std::move(part), made);
-    made->_connector->start();
+    if (auto started = made->_connector->start(); ! started) {
+        return std::unexpected(std::move(started).error());
+    }
     return made;
 }
 

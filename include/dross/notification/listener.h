@@ -114,9 +114,12 @@ concept subscriber_type = std::copy_constructible<std::decay_t<F>> && std::invoc
  * {
  *     const dross::ipc::unix_socket place{ dross::path{ std::string{ "/run/user/1000/player.sock" } } };
  *     auto ears = dross::listener::create(place);
+ *     if (! ears) {
+ *         return 1;
+ *     }
  *
- *     auto watched = ears.subscribe(dross::listener::link, report, dross::delivery::queued());
- *     auto subscribed = ears.subscribe(kTrack, show, dross::delivery::queued());
+ *     auto watched = ears->subscribe(dross::listener::link, report, dross::delivery::queued());
+ *     auto subscribed = ears->subscribe(kTrack, show, dross::delivery::queued());
  *     if (! watched || ! subscribed) {
  *         return 1;
  *     }
@@ -139,10 +142,13 @@ public:
      * published at place.
      * @param place Where that broadcaster listens, now or later. The listener
      * keeps what its connector() gives, not place itself
-     * @return A handle to the new listener, which starts connecting at once
+     * @return A handle to the new listener, which starts connecting at once,
+     * or std::errc::resource_unavailable_try_again when the system will not
+     * start its thread, or std::errc::not_enough_memory when there is no
+     * memory to start it
      */
     template <ipc::message_connectable_place_type P>
-    [[nodiscard]] static listener create(const P& place);
+    [[nodiscard]] static std::expected<listener, error> create(const P& place);
 
     /**
      * @brief The topic on which a listener made with a place reports what
@@ -201,7 +207,7 @@ private:
     explicit listener(std::shared_ptr<storage> store) noexcept;
 
     // create() with a place, past the type of the place.
-    static listener connect(std::shared_ptr<ipc::message_connector> part);
+    static std::expected<listener, error> connect(std::shared_ptr<ipc::message_connector> part);
 
     // A std::function of any signature. A class derived from one is not,
     // since std::function never takes such a class as empty either.
@@ -238,7 +244,7 @@ private:
 };
 
 template <ipc::message_connectable_place_type P>
-listener listener::create(const P& place)
+std::expected<listener, error> listener::create(const P& place)
 {
     return connect(place.connector());
 }

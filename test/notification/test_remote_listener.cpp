@@ -1,3 +1,4 @@
+#include "../thread/test_support.h"
 #include "dross/ipc/unix_socket.h"
 #include "dross/notification/broadcaster.h"
 #include "dross/notification/delivery.h"
@@ -115,7 +116,7 @@ private:
 // receiving thread may still be running when the subscription goes.
 struct listening final {
     explicit listening(const dross::ipc::unix_socket& place)
-        : ears{ dross::listener::create(place) }
+        : ears{ dross::listener::create(place).value() }
     {
         auto watched = ears.subscribe(dross::listener::link, [kept = got](const dross::link_event& what) {
             kept->link(what);
@@ -347,9 +348,17 @@ TEST_F(remote_listener_test, a_value_the_type_cannot_be_made_from_is_reported_an
     }
 }
 
+TEST_F(remote_listener_test, making_one_fails_when_its_thread_does_not_start)
+{
+    const dross_test::failing_thread_starts failing{ 1 };
+    const auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } });
+    ASSERT_FALSE(ears.has_value());
+    EXPECT_EQ(ears.error(), dross::error(std::errc::resource_unavailable_try_again));
+}
+
 TEST_F(remote_listener_test, subscribing_with_a_type_without_value_traits_fails)
 {
-    auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } });
+    auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } }).value();
     const auto subscribed = ears.subscribe(kNoTraits, [](const no_traits&) {
     }, dross::delivery::direct());
     ASSERT_FALSE(subscribed.has_value());
@@ -367,7 +376,7 @@ TEST_F(remote_listener_test, a_listener_in_this_process_takes_a_type_without_val
 TEST_F(remote_listener_test, the_broadcaster_is_told_each_name_once_and_when_it_is_let_go)
 {
     fake_broadcaster there{ at("s") };
-    auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } });
+    auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } }).value();
     auto first = ears.subscribe(kCount, [](std::int64_t) {
     }, dross::delivery::direct());
     ASSERT_TRUE(first.has_value());
@@ -393,7 +402,7 @@ TEST_F(remote_listener_test, the_broadcaster_is_told_each_name_once_and_when_it_
 
 TEST_F(remote_listener_test, the_names_subscribed_are_asked_for_again_on_each_connection)
 {
-    auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } });
+    auto ears = dross::listener::create(dross::ipc::unix_socket{ dross::path{ at("s") } }).value();
     auto subscribed = ears.subscribe(kCount, [](std::int64_t) {
     }, dross::delivery::direct());
     ASSERT_TRUE(subscribed.has_value());
@@ -438,7 +447,7 @@ TEST_F(remote_listener_test, nothing_is_reported_when_no_one_subscribes_to_link)
     auto news = dross::broadcaster::create(place);
     ASSERT_TRUE(news.has_value());
     auto got = std::make_shared<heard>();
-    auto ears = dross::listener::create(place);
+    auto ears = dross::listener::create(place).value();
     auto subscribed = ears.subscribe(kCount, [got](const std::int64_t n) {
         got->count(n);
     }, dross::delivery::direct());
@@ -460,7 +469,7 @@ TEST_F(remote_listener_test, the_listener_may_be_let_go_from_inside_a_direct_sub
     std::expected<dross::broadcaster, dross::error> news = std::unexpected(dross::error{});
     bool gone = false;
     {
-        auto ears = dross::listener::create(place);
+        auto ears = dross::listener::create(place).value();
         auto subscribed = ears.subscribe(dross::listener::link, [&](const dross::link_event&) {
             std::optional<dross::subscription> ending;
             {

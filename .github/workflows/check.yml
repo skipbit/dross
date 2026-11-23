@@ -742,8 +742,12 @@ jobs:
                   return 1;
               }
               auto ears = dross::listener::create(dross::ipc::grpc_target{ "127.0.0.1:50051", grpc::InsecureChannelCredentials() });
+              if (! ears) {
+                  std::printf("listening failed: %s\n", ears.error().message().c_str());
+                  return 1;
+              }
               std::atomic<std::int64_t> heard{ 0 };
-              auto subscribed = ears.subscribe(kCount, [&heard](const std::int64_t n) { heard = n; }, dross::delivery::direct());
+              auto subscribed = ears->subscribe(kCount, [&heard](const std::int64_t n) { heard = n; }, dross::delivery::direct());
               if (! subscribed) {
                   return 1;
               }

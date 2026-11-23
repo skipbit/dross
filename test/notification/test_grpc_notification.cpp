@@ -84,7 +84,7 @@ private:
 // both direct.
 struct listening final {
     listening(const dross::ipc::grpc_target& place, const dross::topic<std::int64_t>& which)
-        : ears{ dross::listener::create(place) }
+        : ears{ dross::listener::create(place).value() }
     {
         auto watched = ears.subscribe(dross::listener::link, [kept = got](const dross::link_event& what) {
             kept->link(what);

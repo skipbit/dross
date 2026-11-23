@@ -246,7 +246,7 @@ TEST(own_place_test, the_place_is_copied_to_listen_there_again)
 TEST(own_place_test, a_listener_hears_through_a_place_of_its_own)
 {
     const auto part = std::make_shared<own_connector>();
-    auto ears = dross::listener::create(own_connectable_place{ part });
+    auto ears = dross::listener::create(own_connectable_place{ part }).value();
     heard got;
     auto subscribed = ears.subscribe(kCount, [&got](const std::int64_t& value) {
         got.add(value);
