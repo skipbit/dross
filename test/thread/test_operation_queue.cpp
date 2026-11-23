@@ -5,7 +5,6 @@
 #include "observed_time_source.h"
 #include "test_support.h"
 #include "thread/operation_queue_access.h"
-#include "thread/start_thread_access.h"
 
 #include <gtest/gtest.h>
 
@@ -138,7 +137,7 @@ TEST(operation_queue_test, zero_workers_is_rejected)
 TEST(operation_queue_test, a_worker_the_system_will_not_start_is_reported_and_the_started_ones_end)
 {
     const std::size_t before = dross::all_threads().size();
-    dross::start_thread_access::fail_next(1, 2);
+    const dross_test::failing_thread_starts failing{ 1, 2 };
 
     const auto queue = dross::operation_queue::create(3);
     ASSERT_FALSE(queue);

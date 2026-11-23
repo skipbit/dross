@@ -2,7 +2,6 @@
 #include "dross/thread/thread.h"
 #include "observed_time_source.h"
 #include "test_support.h"
-#include "thread/start_thread_access.h"
 #include "thread/thread_access.h"
 
 #include <gtest/gtest.h>
@@ -178,7 +177,7 @@ TEST(thread_test, a_one_shot_thread_runs_its_body_and_ends)
 TEST(thread_test, a_loop_thread_the_system_will_not_start_is_reported)
 {
     const std::size_t before = dross::all_threads().size();
-    dross::start_thread_access::fail_next(1);
+    const dross_test::failing_thread_starts failing{ 1 };
 
     const auto worker = dross::thread::create();
     ASSERT_FALSE(worker);
@@ -189,7 +188,7 @@ TEST(thread_test, a_loop_thread_the_system_will_not_start_is_reported)
 TEST(thread_test, a_one_shot_thread_the_system_will_not_start_does_not_run_its_body)
 {
     std::atomic<bool> ran{ false };
-    dross::start_thread_access::fail_next(1);
+    const dross_test::failing_thread_starts failing{ 1 };
 
     const auto worker = dross::thread::create([&ran]() {
         ran.store(true);

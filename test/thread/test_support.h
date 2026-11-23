@@ -2,6 +2,7 @@
 
 #include "dross/thread/runloop.h"
 #include "dross/thread/timer.h"
+#include "thread/start_thread_access.h"
 
 #include <atomic>
 #include <chrono>
@@ -139,5 +140,24 @@ struct lock_check final {
     }
 };
 static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
+
+// Has thread starts fail as start_thread_access::fail_next() plans, and takes
+// back what is left of the plan when the test leaves the scope, however it
+// leaves, so the tests after it start their threads.
+class failing_thread_starts final {
+public:
+    explicit failing_thread_starts(const int count, const int after = 0)
+    {
+        dross::start_thread_access::fail_next(count, after);
+    }
+
+    failing_thread_starts(const failing_thread_starts& other) = delete;
+    failing_thread_starts& operator=(const failing_thread_starts& other) = delete;
+
+    ~failing_thread_starts()
+    {
+        dross::start_thread_access::fail_next(0);
+    }
+};
 
 }  // namespace dross_test

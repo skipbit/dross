@@ -1,6 +1,6 @@
 #include "dross/type/error.h"
+#include "test_support.h"
 #include "thread/start_thread.h"
-#include "thread/start_thread_access.h"
 
 #include <gtest/gtest.h>
 
@@ -30,7 +30,7 @@ TEST(start_thread_test, a_started_thread_runs_the_body)
 
 TEST(start_thread_test, a_failure_asked_for_is_reported_once)
 {
-    dross::start_thread_access::fail_next(1);
+    const dross_test::failing_thread_starts failing{ 1 };
 
     const auto failed = dross::start_thread([]() {
     });

@@ -8,7 +8,7 @@ class start_thread_access final {
 public:
     // Has count calls to start_thread(), from any thread, fail as when the
     // system will not start a thread, once the next after calls have
-    // started theirs.
+    // started theirs. Both are zero or more.
     static void fail_next(int count, int after = 0);
 };
 
