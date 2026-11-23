@@ -47,6 +47,36 @@ std::uint64_t next_queue_number() noexcept
     return last.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
+// Quits the workers it refers to when it goes, unless release() was called.
+class workers_guard final {
+public:
+    explicit workers_guard(std::vector<thread>& workers) noexcept
+        : _workers{ workers }
+    {
+    }
+
+    workers_guard(const workers_guard& other) = delete;
+    workers_guard& operator=(const workers_guard& other) = delete;
+
+    ~workers_guard()
+    {
+        if (! _released) {
+            for (auto& worker : _workers) {
+                worker.quit();
+            }
+        }
+    }
+
+    void release() noexcept
+    {
+        _released = true;
+    }
+
+private:
+    std::vector<thread>& _workers;
+    bool _released{ false };
+};
+
 // What the workers share with the queue's handles: the tasks waiting to run,
 // the ones running, and which workers already have a sweep on their loop.
 // The workers hold it, not the handles' storage, so the handles going does
@@ -456,7 +486,7 @@ public:
     // Starts thread_count workers for a new queue.
     static std::expected<std::shared_ptr<storage>, error> start(std::size_t thread_count, std::shared_ptr<const time_source> source);
 
-    storage(std::vector<thread> workers, std::shared_ptr<const time_source> source);
+    storage(std::vector<thread> workers, std::shared_ptr<backlog> work, std::shared_ptr<const time_source> source) noexcept;
     ~storage();
 
     bool submit(std::function<void()> task, operation_options options);
@@ -484,32 +514,26 @@ std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue:
     }
 
     std::vector<thread> workers;
+    workers_guard guard{ workers };
     workers.reserve(thread_count);
     for (std::size_t i = 0; i < thread_count; ++i) {
         auto worker = thread_access::start(source);
         if (! worker) {
-            for (auto& started : workers) {
-                started.quit();
-            }
             return std::unexpected(std::move(worker).error());
         }
         workers.push_back(std::move(*worker));
     }
-    return std::make_shared<storage>(std::move(workers), std::move(source));
+    auto work = std::make_shared<backlog>(workers, source);
+    auto store = std::make_shared<storage>(std::move(workers), std::move(work), std::move(source));
+    guard.release();
+    return store;
 }
 
-operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<const time_source> source)
-    : _source{ source }
+operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<backlog> work, std::shared_ptr<const time_source> source) noexcept
+    : _source{ std::move(source) }
+    , _backlog{ std::move(work) }
     , _workers{ std::move(workers) }
 {
-    try {
-        _backlog = std::make_shared<backlog>(_workers, source);
-    } catch (...) {
-        for (auto& worker : _workers) {
-            worker.quit();
-        }
-        throw;
-    }
 }
 
 operation_queue::storage::~storage()
