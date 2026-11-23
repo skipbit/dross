@@ -192,7 +192,7 @@ TEST(observable_test, setting_an_equal_value_changes_nothing_and_calls_nothing)
 
 TEST(observable_test, a_queued_function_runs_on_the_loop_and_never_inside_set)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 50 };
     record calls;
     auto token = volume.when_changed([&calls](const int& now) {
@@ -208,7 +208,7 @@ TEST(observable_test, a_queued_function_runs_on_the_loop_and_never_inside_set)
 
 TEST(observable_test, a_queued_function_is_given_the_latest_change_and_skips_those_in_between)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     record calls;
     auto token = volume.when_changed([&calls](const int& before, const int& now) {
@@ -225,7 +225,7 @@ TEST(observable_test, a_queued_function_is_given_the_latest_change_and_skips_tho
 
 TEST(observable_test, a_change_after_a_queued_call_has_run_is_queued_again)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     record calls;
     auto token = volume.when_changed([&calls](const int& now) {
@@ -261,7 +261,7 @@ TEST(observable_test, a_function_on_a_queue_runs_on_one_of_its_workers)
 
 TEST(observable_test, a_change_made_inside_a_direct_function_reaches_every_function_after_the_one_being_handed_on)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     std::vector<std::string> seen;
     std::vector<int> read_back;
@@ -306,7 +306,7 @@ TEST(observable_test, an_empty_function_gives_a_subscription_never_called_and_no
 
 TEST(observable_test, reset_stops_the_calls)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     record calls;
     auto direct = volume.when_changed([&calls](const int& now) {
@@ -411,7 +411,7 @@ TEST(observable_test, a_function_subscribed_inside_another_is_not_given_a_change
 
 TEST(observable_test, a_set_from_another_thread_takes_effect_when_the_owners_loop_runs_it)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     record calls;
     auto token = volume.when_changed([&calls](const int& now) {
@@ -433,7 +433,7 @@ TEST(observable_test, a_set_from_another_thread_takes_effect_when_the_owners_loo
 
 TEST(observable_test, sets_from_one_thread_take_effect_in_the_order_they_were_posted)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 0 };
     record calls;
     auto token = volume.when_changed([&calls](const int& now) {
@@ -452,7 +452,7 @@ TEST(observable_test, sets_from_one_thread_take_effect_in_the_order_they_were_po
 
 TEST(observable_test, a_function_subscribed_from_another_thread_runs_where_its_delivery_says)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     record calls;
     auto watcher = dross::thread::create().value();
@@ -483,7 +483,7 @@ TEST(observable_test, a_function_subscribed_from_another_thread_runs_where_its_d
 
 TEST(observable_test, a_proxy_sets_the_value_from_another_thread)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     const dross::observable<int> volume{ 1 };
     auto proxy = volume.make_proxy();
 
@@ -522,7 +522,7 @@ TEST(observable_test, once_the_observable_has_gone_a_proxy_sets_nothing_and_its_
 
 TEST(observable_test, a_value_posted_to_an_observable_that_then_goes_is_dropped)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     std::optional<dross::observable<int>> volume{ std::in_place, 1 };
     auto proxy = volume->make_proxy();
     record calls;

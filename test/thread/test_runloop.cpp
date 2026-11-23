@@ -24,7 +24,7 @@ using dross_test::event;
 using dross_test::kTimeout;
 using dross_test::lock_check;
 using dross_test::lock_probe;
-using dross_test::reset_main_runloop;
+using dross_test::reset_main_loop;
 
 // Posts a task to its loop each time it is destroyed. Kept small and copied
 // without throwing, for the same reason as lock_check.
@@ -89,7 +89,7 @@ TEST(runloop_test, a_worker_reaches_the_same_main_loop)
 
 TEST(runloop_test, perform_queues_without_running)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     EXPECT_TRUE(loop.empty());
@@ -104,7 +104,7 @@ TEST(runloop_test, perform_queues_without_running)
 
 TEST(runloop_test, perform_rejects_an_empty_task)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     EXPECT_FALSE(loop.perform(std::function<void()>{}));
@@ -126,7 +126,7 @@ TEST(runloop_test, perform_reports_false_after_the_thread_ended)
 
 TEST(runloop_test, run_pending_runs_what_is_queued_in_order)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     std::vector<int> order;
@@ -144,7 +144,7 @@ TEST(runloop_test, run_pending_runs_what_is_queued_in_order)
 
 TEST(runloop_test, run_pending_leaves_a_task_that_a_task_added)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([loop]() mutable {
@@ -160,7 +160,7 @@ TEST(runloop_test, run_pending_leaves_a_task_that_a_task_added)
 
 TEST(runloop_test, run_pending_does_not_run_a_task_added_by_a_task_that_cleared)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     bool c_ran = false;
@@ -182,7 +182,7 @@ TEST(runloop_test, run_pending_does_not_run_a_task_added_by_a_task_that_cleared)
 
 TEST(runloop_test, clear_discards_the_queue)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     bool ran = false;
@@ -197,7 +197,7 @@ TEST(runloop_test, clear_discards_the_queue)
 
 TEST(runloop_test, quit_ends_run_and_keeps_the_queue)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
@@ -245,7 +245,7 @@ TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
 
 TEST(runloop_test, run_returns_the_number_of_tasks_it_ran)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
@@ -261,7 +261,7 @@ TEST(runloop_test, run_returns_the_number_of_tasks_it_ran)
 
 TEST(runloop_test, run_one_returns_false_when_quit_is_pending)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
@@ -298,7 +298,7 @@ TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
 
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     std::atomic<std::thread::id> ran_on{};
@@ -390,7 +390,7 @@ TEST(runloop_test, run_for_runs_what_is_queued)
 
 TEST(runloop_test, run_for_zero_runs_nothing)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
@@ -419,7 +419,7 @@ TEST(runloop_test, run_for_with_a_huge_timeout_does_not_overflow)
 
 TEST(runloop_test, is_running_is_true_inside_a_task)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     bool seen = false;
@@ -436,7 +436,7 @@ TEST(runloop_test, is_running_is_true_inside_a_task)
 
 TEST(runloop_test, run_pending_from_inside_a_task_restores_the_outer_running_state)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     bool seen_inside_inner_task = false;
@@ -458,7 +458,7 @@ TEST(runloop_test, run_pending_from_inside_a_task_restores_the_outer_running_sta
 
 TEST(runloop_test, an_exception_from_a_task_propagates)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
@@ -476,7 +476,7 @@ TEST(runloop_test, an_exception_from_a_task_propagates)
 
 TEST(runloop_test, an_exception_from_a_task_propagates_out_of_run)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
@@ -496,7 +496,7 @@ TEST(runloop_test, an_exception_from_a_task_propagates_out_of_run)
 
 TEST(runloop_test, a_due_timer_fires_before_a_queued_task)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     std::vector<int> order;
@@ -514,7 +514,7 @@ TEST(runloop_test, a_due_timer_fires_before_a_queued_task)
 
 TEST(runloop_test, run_pending_does_not_run_a_task_a_timer_posts_in_the_same_call)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     int timer_fired = 0;
@@ -540,7 +540,7 @@ TEST(runloop_test, run_pending_does_not_run_a_task_a_timer_posts_in_the_same_cal
 
 TEST(runloop_test, run_for_with_the_most_negative_timeout_does_not_overflow)
 {
-    reset_main_runloop();
+    reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
     // Exercises deadline::after() with the most negative value a caller can
@@ -586,7 +586,7 @@ TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_th
     EXPECT_EQ(released_on_owner->load(), 2);
 }
 
-TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
+TEST(runloop_test, current_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
 {
     struct destructor_probe final {
         std::function<void()> on_destroy;
@@ -603,7 +603,7 @@ TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_tha
         // it is destroyed after that loop's own holder, the same ordering
         // that makes a user's own thread-local destructor run after this
         // library's when the user's was constructed first. See
-        // current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder
+        // current_is_defined_from_a_thread_local_destructor_that_outlives_the_holder
         // in test_thread.cpp for the equivalent covering thread::current().
         thread_local destructor_probe probe{ [&performed]() {
             dross::runloop loop = dross::runloop::current();

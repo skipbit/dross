@@ -117,12 +117,13 @@ Changed
   ``std::invalid_argument``
 
 - The functions that name a thread or a run loop are static members of
-  the type they give, as ``create()`` is: ``thread::main()``,
-  ``thread::current()``, ``thread::all()``, ``runloop::main()`` and
-  ``runloop::current()``. The functions of the old names are removed:
-  ``dross::main_runloop()`` becomes ``dross::runloop::main()``, and
-  ``main_thread()``, ``current_thread()``, ``all_threads()`` and
-  ``current_runloop()`` become the others in the same way
+  the type they give, as ``create()`` is, and the functions of the old
+  names are removed: ``main_thread()`` becomes ``thread::main()``,
+  ``current_thread()`` becomes ``thread::current()``, ``all_threads()``
+  becomes ``thread::all()``, ``main_runloop()`` becomes
+  ``runloop::main()``, and ``current_runloop()`` becomes
+  ``runloop::current()``. ``thread::is_current_thread()`` becomes
+  ``thread::is_current()`` to go with them
 
 - ``toml::serialize`` reads the values it writes without copying them.
   With libstdc++, writing one key holding 1000 numbers takes 30

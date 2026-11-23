@@ -31,7 +31,7 @@ inline constexpr auto kTimeout = std::chrono::seconds{ 5 };
 // known state: no queued tasks, no quit request left behind. There is no bulk
 // equivalent of clear() for timers, so every timer a test installs on it is
 // held by an invalidate_on_exit.
-inline void reset_main_runloop()
+inline void reset_main_loop()
 {
     dross::runloop loop = dross::runloop::main();
     loop.clear();

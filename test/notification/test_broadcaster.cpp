@@ -127,7 +127,7 @@ TEST(broadcaster_test, a_subscriber_is_called_with_the_value_sent)
 
 TEST(broadcaster_test, every_subscriber_is_called_with_the_same_one_value)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<const progress*> seen;
@@ -258,7 +258,7 @@ TEST(broadcaster_test, a_notification_sent_before_subscribing_is_not_received)
 
 TEST(broadcaster_test, notifications_from_one_thread_are_received_in_the_order_sent)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<int> seen;

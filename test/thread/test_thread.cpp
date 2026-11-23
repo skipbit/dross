@@ -79,13 +79,13 @@ TEST(thread_test, a_worker_is_not_the_main_thread)
     EXPECT_FALSE(equal_to_main.load());
 }
 
-TEST(thread_test, is_current_thread_is_true_only_on_the_thread_it_names)
+TEST(thread_test, is_current_is_true_only_on_the_thread_it_names)
 {
     auto worker = dross::thread::create().value();
     std::atomic<bool> true_on_worker{ false };
 
     ASSERT_TRUE(worker.perform([&worker, &true_on_worker]() {
-        true_on_worker.store(worker.is_current_thread());
+        true_on_worker.store(worker.is_current());
     }));
     ASSERT_TRUE(worker.perform([]() {
         dross::thread::current().quit();
@@ -93,7 +93,7 @@ TEST(thread_test, is_current_thread_is_true_only_on_the_thread_it_names)
     ASSERT_TRUE(worker.join_for(kTimeout));
 
     EXPECT_TRUE(true_on_worker.load());
-    EXPECT_FALSE(worker.is_current_thread());
+    EXPECT_FALSE(worker.is_current());
 }
 
 TEST(thread_test, native_id_differs_between_two_live_threads_and_is_always_engaged)
@@ -259,7 +259,7 @@ TEST(thread_test, join_for_zero_does_not_wait_and_reports_the_current_state)
     EXPECT_EQ(source->waits(), waits_before);
 }
 
-TEST(thread_test, all_threads_includes_the_main_thread)
+TEST(thread_test, all_includes_the_main_thread)
 {
     // Registration happens when a thread is first named; ask for the main
     // thread before snapshotting the registry, not after.
@@ -269,7 +269,7 @@ TEST(thread_test, all_threads_includes_the_main_thread)
     EXPECT_NE(std::find(threads.begin(), threads.end(), main_handle), threads.end());
 }
 
-TEST(thread_test, all_threads_gains_and_loses_a_started_thread)
+TEST(thread_test, all_gains_and_loses_a_started_thread)
 {
     auto worker = dross::thread::create().value();
 
@@ -387,7 +387,7 @@ TEST(thread_test, join_on_the_calling_threads_own_handle_returns_at_once)
     EXPECT_TRUE(returned_before_quit.load());
 }
 
-TEST(thread_test, is_current_thread_and_join_work_on_a_record_reached_via_all_threads_without_adoption)
+TEST(thread_test, is_current_and_join_work_on_a_record_reached_via_all_without_adoption)
 {
     // A worker asks about the main thread first, so the main thread's own
     // record gets registered without the main thread itself ever going
@@ -401,11 +401,11 @@ TEST(thread_test, is_current_thread_and_join_work_on_a_record_reached_via_all_th
 
     std::vector<dross::thread> threads = dross::thread::all();
     const auto it = std::find_if(threads.begin(), threads.end(), [](const dross::thread& candidate) {
-        return candidate.is_current_thread();
+        return candidate.is_current();
     });
 
     // Gated behind this assertion rather than calling join() unconditionally
-    // below: before the fix, is_current_thread() returned false here, and
+    // below: before the fix, is_current() returned false here, and
     // join() would then have waited forever instead of returning at once.
     ASSERT_NE(it, threads.end());
 
@@ -456,7 +456,7 @@ TEST(thread_test, an_adopted_thread_that_touched_the_loop_first_reports_perform_
     }));
 }
 
-TEST(thread_test, current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
+TEST(thread_test, current_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
 {
     struct destructor_probe final {
         std::function<void()> on_destroy;
@@ -495,7 +495,7 @@ TEST(thread_test, current_thread_is_defined_from_a_thread_local_destructor_that_
     EXPECT_TRUE(*was_finished);
 }
 
-TEST(thread_test, a_worker_asking_for_main_thread_first_still_reaches_the_real_main_loop)
+TEST(thread_test, a_worker_asking_for_the_main_thread_first_still_reaches_the_real_main_loop)
 {
     // The main thread has not used the module yet in this process; a worker
     // is the first to ask for thread::main(). native::main_thread_id() and

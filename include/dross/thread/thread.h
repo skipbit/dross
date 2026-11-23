@@ -233,7 +233,7 @@ public:
      * @brief Test whether the caller is the thread this handle names.
      * @return true when called from that thread
      */
-    bool is_current_thread() const;
+    bool is_current() const;
 
     /**
      * @brief Get the operating system's identifier for this thread.

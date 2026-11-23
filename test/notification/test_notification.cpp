@@ -46,7 +46,7 @@ dross::subscription subscribe(dross::listener& ears, const dross::topic<T>& whic
 
 TEST(notification_test, a_deferred_direct_subscriber_runs_only_after_notify_returns)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<int> seen;
@@ -63,7 +63,7 @@ TEST(notification_test, a_deferred_direct_subscriber_runs_only_after_notify_retu
 
 TEST(notification_test, deferred_direct_subscribers_run_in_the_order_they_subscribed)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<std::string> seen;
@@ -83,7 +83,7 @@ TEST(notification_test, deferred_direct_subscribers_run_in_the_order_they_subscr
 
 TEST(notification_test, a_deferred_notification_reaches_a_direct_subscriber_after_one_sent_later_without_deferring)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<int> seen;
@@ -100,7 +100,7 @@ TEST(notification_test, a_deferred_notification_reaches_a_direct_subscriber_afte
 
 TEST(notification_test, an_exception_from_a_deferred_direct_subscriber_propagates_out_of_the_running_loop)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     auto token = subscribe(ears, kCount, [](const int&) {
@@ -113,7 +113,7 @@ TEST(notification_test, an_exception_from_a_deferred_direct_subscriber_propagate
 
 TEST(notification_test, deferring_leaves_a_queued_subscriber_called_once)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     int calls = 0;
@@ -151,7 +151,7 @@ TEST(notification_test, a_deferred_delivery_goes_with_a_thread_that_never_runs_i
 
 TEST(notification_test, cancel_stops_a_delivery_queued_on_a_run_loop)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     int calls = 0;
@@ -168,7 +168,7 @@ TEST(notification_test, cancel_stops_a_delivery_queued_on_a_run_loop)
 
 TEST(notification_test, cancel_stops_a_deferred_direct_delivery)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     int calls = 0;
@@ -211,7 +211,7 @@ TEST(notification_test, cancel_stops_a_delivery_queued_on_an_operation_queue)
 
 TEST(notification_test, cancel_stops_only_what_has_not_started)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     int direct_calls = 0;
@@ -233,7 +233,7 @@ TEST(notification_test, cancel_stops_only_what_has_not_started)
 
 TEST(notification_test, cancel_through_a_copy_stops_that_sending_and_no_other)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<int> seen;
@@ -252,7 +252,7 @@ TEST(notification_test, cancel_through_a_copy_stops_that_sending_and_no_other)
 
 TEST(notification_test, a_subscriber_can_cancel_the_rest_of_its_sending_from_inside_its_function)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::optional<dross::notification> sent;
@@ -274,7 +274,7 @@ TEST(notification_test, a_subscriber_can_cancel_the_rest_of_its_sending_from_ins
 
 TEST(notification_test, cancelling_leaves_the_subscription_receiving_later_notifications)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<int> seen;

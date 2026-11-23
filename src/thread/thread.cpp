@@ -517,7 +517,7 @@ bool thread::stop_requested() const
     return _store->stop_requested();
 }
 
-bool thread::is_current_thread() const
+bool thread::is_current() const
 {
     return _store->is_current();
 }

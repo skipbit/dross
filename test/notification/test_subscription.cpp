@@ -156,7 +156,7 @@ TEST(subscription_test, direct_runs_inside_the_sending_call_on_the_sending_threa
 
 TEST(subscription_test, queued_never_runs_inside_the_sending_call_even_on_its_own_thread)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     record calls;
     auto [sender_side, token] = subscribe(dross::delivery::queued(), [&calls](int value) {
         calls.add(value);
@@ -239,7 +239,7 @@ TEST(subscription_test, on_a_queue_runs_on_one_of_its_workers)
 
 TEST(subscription_test, notifications_from_one_thread_start_in_the_order_sent)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     record calls;
     auto [sender_side, token] = subscribe(dross::delivery::queued(), [&calls](int value) {
         calls.add(value);
@@ -279,7 +279,7 @@ TEST(subscription_test, notifications_on_a_queue_with_one_worker_run_one_at_a_ti
 
 TEST(subscription_test, every_subscriber_is_handed_the_same_value)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     std::vector<const void*> seen;
     auto record_address = [&seen](const void* value) {
         seen.push_back(value);
@@ -302,7 +302,7 @@ TEST(subscription_test, every_subscriber_is_handed_the_same_value)
 
 TEST(subscription_test, reset_stops_a_queued_call_from_starting)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     record calls;
     auto [sender_side, token] = subscribe(dross::delivery::queued(), [&calls](int value) {
         calls.add(value);
@@ -341,7 +341,7 @@ TEST(subscription_test, reset_stops_a_call_queued_on_a_queue_from_starting)
 
 TEST(subscription_test, destroying_it_ends_it_as_reset_does)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     record calls;
     auto made = subscribe(dross::delivery::queued(), [&calls](int value) {
         calls.add(value);
@@ -526,7 +526,7 @@ TEST(subscription_test, an_exception_from_a_direct_function_propagates_out_of_th
 
 TEST(subscription_test, an_exception_from_a_queued_function_propagates_out_of_the_running_call)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto [sender_side, token] = subscribe(dross::delivery::queued(), [](int) {
         throw std::runtime_error{ "from the subscriber" };
     });

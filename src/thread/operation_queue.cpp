@@ -602,7 +602,7 @@ bool operation_queue::storage::accepting() const
 bool operation_queue::storage::on_a_worker() const
 {
     return std::any_of(_workers.begin(), _workers.end(), [](const thread& worker) {
-        return worker.is_current_thread();
+        return worker.is_current();
     });
 }
 
