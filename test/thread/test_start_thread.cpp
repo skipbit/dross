@@ -6,10 +6,12 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <string>
 #include <system_error>
 #include <thread>
 
 #if defined(__linux__)
+#include <fstream>
 #include <sys/resource.h>
 #include <unistd.h>
 #endif
@@ -69,6 +71,23 @@ TEST(start_thread_test, a_failure_asked_for_is_reported_once)
 }
 
 #if defined(__linux__)
+// Whether the process holds CAP_SYS_ADMIN or CAP_SYS_RESOURCE, for which
+// the system does not hold it to the limit on threads.
+bool ignores_the_limit_on_threads()
+{
+    std::ifstream status{ "/proc/self/status" };
+    std::string line;
+    while (std::getline(status, line)) {
+        if (line.rfind("CapEff:", 0) == 0) {
+            const unsigned long long effective = std::stoull(line.substr(7), nullptr, 16);
+            constexpr unsigned long long sys_admin = 1ULL << 21;
+            constexpr unsigned long long sys_resource = 1ULL << 24;
+            return (effective & (sys_admin | sys_resource)) != 0;
+        }
+    }
+    return false;
+}
+
 // Exits with 0 when start_thread() reports the failure as asked, 1 when the
 // thread started, and 2 for any other error.
 [[noreturn]] void start_with_no_room_for_a_thread()
@@ -92,6 +111,9 @@ TEST(start_thread_test, a_thread_the_system_will_not_start_is_reported)
 #if defined(__linux__)
     if (getuid() == 0) {
         GTEST_SKIP() << "the limit on threads does not hold for root";
+    }
+    if (ignores_the_limit_on_threads()) {
+        GTEST_SKIP() << "the limit on threads does not hold for a process with CAP_SYS_ADMIN or CAP_SYS_RESOURCE";
     }
     GTEST_FLAG_SET(death_test_style, "threadsafe");
     EXPECT_EXIT(start_with_no_room_for_a_thread(), ::testing::ExitedWithCode(0), "");
