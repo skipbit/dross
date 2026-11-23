@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <system_error>
+#include <thread>
 
 #if defined(__linux__)
 #include <sys/resource.h>
@@ -26,6 +27,30 @@ TEST(start_thread_test, a_started_thread_runs_the_body)
     started->join();
 
     EXPECT_TRUE(ran);
+}
+
+TEST(start_thread_test, a_failure_planned_on_one_thread_leaves_the_others_alone)
+{
+    const dross_test::failing_thread_starts failing{ 1 };
+
+    std::atomic<bool> started_elsewhere{ false };
+    std::thread other{ [&started_elsewhere]() {
+        auto started = dross::start_thread([]() {
+        });
+        if (started) {
+            started->join();
+            started_elsewhere = true;
+        }
+    } };
+    other.join();
+    EXPECT_TRUE(started_elsewhere);
+
+    auto here = dross::start_thread([]() {
+    });
+    if (here) {
+        here->join();
+    }
+    EXPECT_FALSE(here);
 }
 
 TEST(start_thread_test, a_failure_asked_for_is_reported_once)
