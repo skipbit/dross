@@ -403,14 +403,11 @@ unix_transport::unix_transport(std::shared_ptr<state> shared)
 
 std::expected<void, error> unix_transport::start()
 {
-    auto started = start_thread([shared = _state] {
+    return start_thread([shared = _state] {
         shared->run();
+    }).transform([this](std::thread made) {
+        _thread = std::move(made);
     });
-    if (! started) {
-        return std::unexpected(std::move(started).error());
-    }
-    _thread = std::move(*started);
-    return {};
 }
 
 unix_transport::~unix_transport()

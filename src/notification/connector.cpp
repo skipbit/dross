@@ -192,14 +192,11 @@ connector::~connector()
 
 std::expected<void, error> connector::start()
 {
-    auto started = start_thread([shared = _state, part = _part, above = _above] {
+    return start_thread([shared = _state, part = _part, above = _above] {
         run(shared, part, above);
+    }).transform([this](std::thread made) {
+        _thread = std::move(made);
     });
-    if (! started) {
-        return std::unexpected(std::move(started).error());
-    }
-    _thread = std::move(*started);
-    return {};
 }
 
 void connector::send(const std::span<const std::byte> message)
