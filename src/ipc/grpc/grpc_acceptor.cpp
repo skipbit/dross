@@ -1,3 +1,4 @@
+#include "ipc/grpc/cleanup_thread.h"
 #include "ipc/grpc/grpc_place.h"
 #include "ipc/grpc/reaction_scope.h"
 #include "ipc/grpc/stream_state.h"
@@ -10,7 +11,6 @@
 #include <grpcpp/grpcpp.h>
 #include <mutex>
 #include <system_error>
-#include <thread>
 #include <utility>
 
 namespace dross::ipc {
@@ -196,7 +196,7 @@ public:
     }
 
     // gRPC cannot shut a server down from inside one of its reactions, so
-    // when destroyed inside one, a thread of its own finishes the job once
+    // when destroyed inside one, the cleanup thread finishes the job once
     // that reaction returns.
     ~grpc_acceptor() override
     {
@@ -205,9 +205,9 @@ public:
             _core->finish();
             return;
         }
-        std::thread{ [core = _core] {
+        clean_up([core = _core] {
             core->finish();
-        } }.detach();
+        });
     }
 
     grpc_acceptor(const grpc_acceptor& other) = delete;
@@ -221,6 +221,9 @@ private:
 
 std::expected<std::unique_ptr<message_acceptor>, error> grpc_listen_at(const std::string& address, std::shared_ptr<::grpc::ServerCredentials> credentials, std::shared_ptr<message_acceptor_events> events)
 {
+    if (auto cleanup = start_cleanup_thread(); ! cleanup) {
+        return std::unexpected(std::move(cleanup).error());
+    }
     auto core = std::make_shared<acceptor_core>(std::move(events));
     if (auto started = core->start(address, std::move(credentials)); ! started) {
         return std::unexpected(std::move(started).error());

@@ -48,7 +48,11 @@ public:
      * @brief Get what connects to the target.
      *
      * A try waits up to 5 seconds for the peer to answer, and fails with
-     * std::errc::timed_out when it does not.
+     * std::errc::timed_out when it does not. A try also starts the thread
+     * the gRPC part cleans up on, unless it runs already, and fails with
+     * std::errc::resource_unavailable_try_again when the system will not
+     * start it, and with std::errc::not_enough_memory when there is no
+     * memory to start it.
      *
      * @return The connector
      */

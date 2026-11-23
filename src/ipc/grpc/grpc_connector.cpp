@@ -1,3 +1,4 @@
+#include "ipc/grpc/cleanup_thread.h"
 #include "ipc/grpc/grpc_place.h"
 #include "ipc/grpc/reaction_scope.h"
 #include "ipc/grpc/stream_state.h"
@@ -5,8 +6,8 @@
 
 #include <chrono>
 #include <grpcpp/grpcpp.h>
+#include <memory>
 #include <system_error>
-#include <thread>
 #include <utility>
 
 namespace dross::ipc {
@@ -82,18 +83,19 @@ private:
         events.reset();
         // gRPC without its event engine, such as 1.51, shuts its callback
         // queue down with the last channel and joins the queue's threads,
-        // one of which runs this; so the channel goes on a thread of its own.
+        // one of which runs this; so the channel goes on the cleanup thread.
         auto link = std::move(_link);
         auto stub = std::move(_stub);
         delete this;
-        std::thread{ [link = std::move(link), stub = std::move(stub)]() mutable {
+        clean_up([link = std::move(link), stub = std::move(stub)]() mutable {
             stub.reset();
             link.reset();
-        } }.detach();
+        });
     }
 
     std::shared_ptr<::grpc::Channel> _link;
-    std::unique_ptr<grpc_stream::Messages::Stub> _stub;
+    // Shared, as the work handed to the cleanup thread is copyable.
+    std::shared_ptr<grpc_stream::Messages::Stub> _stub;
     ::grpc::ClientContext _context;
     const std::shared_ptr<stream_state> _state;
     std::shared_ptr<message_channel_events> _events;
@@ -111,6 +113,9 @@ public:
 
     std::expected<std::shared_ptr<message_channel>, error> connect(std::shared_ptr<message_channel_events> events) override
     {
+        if (auto cleanup = start_cleanup_thread(); ! cleanup) {
+            return std::unexpected(std::move(cleanup).error());
+        }
         ::grpc::ChannelArguments arguments;
         arguments.SetMaxReceiveMessageSize(max_received_size);
         auto link = ::grpc::CreateCustomChannel(_target, _credentials, arguments);
