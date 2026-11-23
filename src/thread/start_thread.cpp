@@ -3,6 +3,7 @@
 #include "thread/start_thread_access.h"
 
 #include <mutex>
+#include <new>
 #include <system_error>
 #include <utility>
 
@@ -49,6 +50,8 @@ std::expected<std::thread, error> start_thread(std::function<void()> body)
         return std::thread{ std::move(body) };
     } catch (const std::system_error&) {
         return std::unexpected(error{ std::errc::resource_unavailable_try_again });
+    } catch (const std::bad_alloc&) {
+        return std::unexpected(error{ std::errc::not_enough_memory });
     }
 }
 

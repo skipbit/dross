@@ -32,7 +32,8 @@ namespace dross {
  * Both block until the new thread has published its run loop (if any) and
  * its native id, so perform() and native_id() work on the returned handle
  * at once, with no race. When the system will not start the new thread,
- * both return std::errc::resource_unavailable_try_again.
+ * both return std::errc::resource_unavailable_try_again, and when there is
+ * no memory to start it, std::errc::not_enough_memory.
  *
  * Handle semantics:
  * - A thread is a handle to an OS thread, not the thread itself. Copying
@@ -80,6 +81,7 @@ public:
      * @brief Start a thread that runs its own run loop.
      * @return A handle to the new thread, or
      * std::errc::resource_unavailable_try_again when the system will not
+     * start it, or std::errc::not_enough_memory when there is no memory to
      * start it
      *
      * Blocks until the new thread has published its run loop and native id.
@@ -91,6 +93,7 @@ public:
      * @param body The function the new thread runs
      * @return A handle to the new thread, or
      * std::errc::resource_unavailable_try_again when the system will not
+     * start it, or std::errc::not_enough_memory when there is no memory to
      * start it
      *
      * The thread does not run a loop, so perform() on it always returns

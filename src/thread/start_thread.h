@@ -9,7 +9,8 @@
 namespace dross {
 
 // Starts a std::thread that runs body. When the system will not start it,
-// returns std::errc::resource_unavailable_try_again, as every part of the
+// returns std::errc::resource_unavailable_try_again, and when there is no
+// memory to start it, std::errc::not_enough_memory, as every part of the
 // library that starts a thread reports it.
 std::expected<std::thread, error> start_thread(std::function<void()> body);
 

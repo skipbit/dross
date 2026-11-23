@@ -109,7 +109,8 @@ Changed
 - ``thread`` and ``operation_queue`` are started with ``create()``, which
   returns ``std::errc::resource_unavailable_try_again`` when the system
   will not start a thread, instead of letting ``std::system_error``
-  through. Their constructors that started threads are removed:
+  through, and ``std::errc::not_enough_memory`` when there is no memory to
+  start one. Their constructors that started threads are removed:
   ``dross::thread worker;`` becomes
   ``auto worker = dross::thread::create();``. ``operation_queue::create(0)``
   returns ``std::errc::invalid_argument`` instead of throwing

@@ -143,8 +143,9 @@ public:
      * @return A handle to the new queue, or the error that kept it from
      * starting: std::errc::invalid_argument when thread_count is zero, or
      * std::errc::resource_unavailable_try_again when the system will not
-     * start a worker, in which case the workers already started end without
-     * running anything
+     * start a worker, or std::errc::not_enough_memory when there is no
+     * memory to start one, in which case the workers already started end
+     * without running anything
      *
      * Blocks until every worker has started.
      */
