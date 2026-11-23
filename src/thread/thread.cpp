@@ -442,6 +442,35 @@ std::expected<thread, error> thread::create(std::function<void()> body)
     return thread_access::start(std::move(body), time_source::steady());
 }
 
+thread thread::main()
+{
+    // Asked on the main thread, this goes the long way round so the
+    // thread's holder is put in place, the same reason runloop::main() does.
+    if (native::on_main_thread()) {
+        return current();
+    }
+
+    return thread{ storage::main_thread_storage() };
+}
+
+thread thread::current()
+{
+    return thread{ storage::current_thread_storage() };
+}
+
+std::vector<thread> thread::all()
+{
+    auto stores = storage::all();
+
+    std::vector<thread> result;
+    result.reserve(stores.size());
+    for (auto& store : stores) {
+        result.emplace_back(thread{ std::move(store) });
+    }
+
+    return result;
+}
+
 thread::thread(const thread& other) = default;
 
 thread::~thread() = default;
@@ -503,22 +532,6 @@ bool thread::operator==(const thread& other) const noexcept
     return _store == other._store;
 }
 
-thread thread::main()
-{
-    // Asked on the main thread, this goes the long way round so the
-    // thread's holder is put in place, the same reason runloop::main() does.
-    if (native::on_main_thread()) {
-        return thread::current();
-    }
-
-    return thread{ thread::storage::main_thread_storage() };
-}
-
-thread thread::current()
-{
-    return thread{ thread::storage::current_thread_storage() };
-}
-
 std::expected<thread, error> thread_access::start(std::shared_ptr<const time_source> source)
 {
     return thread::storage::start_loop_thread(std::move(source)).transform([](std::shared_ptr<thread::storage> store) {
@@ -531,19 +544,6 @@ std::expected<thread, error> thread_access::start(std::function<void()> body, st
     return thread::storage::start_one_shot_thread(std::move(body), std::move(source)).transform([](std::shared_ptr<thread::storage> store) {
         return thread{ std::move(store) };
     });
-}
-
-std::vector<thread> thread::all()
-{
-    auto stores = thread::storage::all();
-
-    std::vector<thread> result;
-    result.reserve(stores.size());
-    for (auto& store : stores) {
-        result.emplace_back(thread{ std::move(store) });
-    }
-
-    return result;
 }
 
 }  // namespace dross

@@ -419,6 +419,24 @@ bool runloop::storage::finished() const
     return _finished;
 }
 
+runloop runloop::main()
+{
+    // Asked on the main thread, this goes the long way round so the thread's
+    // holder is put in place: that holder is what marks the loop finished
+    // when the main thread ends, and a program that only ever says
+    // runloop::main() would otherwise never install one.
+    if (native::on_main_thread()) {
+        return current();
+    }
+
+    return runloop{ storage::main_loop() };
+}
+
+runloop runloop::current()
+{
+    return runloop{ storage::for_current_thread() };
+}
+
 runloop::runloop(std::shared_ptr<storage> store) noexcept
     : _store{ std::move(store) }
 {
@@ -488,24 +506,6 @@ bool runloop::is_running() const
 bool runloop::operator==(const runloop& other) const noexcept
 {
     return _store == other._store;
-}
-
-runloop runloop::main()
-{
-    // Asked on the main thread, this goes the long way round so the thread's
-    // holder is put in place: that holder is what marks the loop finished
-    // when the main thread ends, and a program that only ever says
-    // runloop::main() would otherwise never install one.
-    if (native::on_main_thread()) {
-        return runloop::current();
-    }
-
-    return runloop{ runloop::storage::main_loop() };
-}
-
-runloop runloop::current()
-{
-    return runloop{ runloop::storage::for_current_thread() };
 }
 
 runloop runloop_access::standalone(std::shared_ptr<const time_source> source)
