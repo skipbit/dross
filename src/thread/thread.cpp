@@ -24,9 +24,9 @@ class thread::storage final {
 public:
     explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
 
-    static std::expected<std::shared_ptr<storage>, error> start_loop_thread(std::shared_ptr<const time_source> source = time_source::steady());
+    static std::expected<std::shared_ptr<storage>, error> start_loop_thread(std::shared_ptr<const time_source> source);
     static std::expected<std::shared_ptr<storage>, error> start_one_shot_thread(std::function<void()> body,
-                                                                                std::shared_ptr<const time_source> source = time_source::steady());
+                                                                                std::shared_ptr<const time_source> source);
     static std::shared_ptr<storage> main_thread_storage();
     static std::shared_ptr<storage> current_thread_storage();
     static std::vector<std::shared_ptr<storage>> all();
@@ -427,16 +427,12 @@ thread::thread(std::shared_ptr<storage> store) noexcept
 
 std::expected<thread, error> thread::create()
 {
-    return storage::start_loop_thread().transform([](std::shared_ptr<storage> store) {
-        return thread{ std::move(store) };
-    });
+    return thread_access::start(time_source::steady());
 }
 
 std::expected<thread, error> thread::create(std::function<void()> body)
 {
-    return storage::start_one_shot_thread(std::move(body)).transform([](std::shared_ptr<storage> store) {
-        return thread{ std::move(store) };
-    });
+    return thread_access::start(std::move(body), time_source::steady());
 }
 
 thread::thread(const thread& other) = default;

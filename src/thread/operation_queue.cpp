@@ -607,9 +607,7 @@ operation_queue::operation_queue(std::shared_ptr<storage> store) noexcept
 
 std::expected<operation_queue, error> operation_queue::create(std::size_t thread_count)
 {
-    return storage::start(thread_count, time_source::steady()).transform([](std::shared_ptr<storage> store) {
-        return operation_queue{ std::move(store) };
-    });
+    return operation_queue_access::make(thread_count, time_source::steady());
 }
 
 operation_queue::operation_queue(const operation_queue& other) = default;

@@ -8,7 +8,7 @@
 #include <memory>
 
 // Ways to start a thread that the public interface does not offer. Used by
-// the library's own tests.
+// the library's create() and its own tests.
 namespace dross {
 
 class thread_access final {

@@ -9,7 +9,8 @@
 #include <optional>
 
 // Ways to make, refer to and inspect a queue that the public interface does
-// not offer. Used by the library's own tests and by the notification layer.
+// not offer. Used by the library's create(), its own tests and the
+// notification layer.
 namespace dross {
 
 class operation_queue_access final {
