@@ -136,7 +136,7 @@ TEST(operation_queue_test, zero_workers_is_rejected)
 
 TEST(operation_queue_test, a_worker_the_system_will_not_start_is_reported_and_the_started_ones_end)
 {
-    const std::size_t before = dross::all_threads().size();
+    const std::vector<dross::thread> before = dross::all_threads();
     const dross_test::failing_thread_starts failing{ 1, 2 };
 
     const auto queue = dross::operation_queue::create(3);
@@ -144,10 +144,10 @@ TEST(operation_queue_test, a_worker_the_system_will_not_start_is_reported_and_th
     EXPECT_EQ(queue.error(), dross::error(std::errc::resource_unavailable_try_again));
 
     const auto deadline = std::chrono::steady_clock::now() + kTimeout;
-    while ((dross::all_threads().size() != before) && (std::chrono::steady_clock::now() < deadline)) {
+    while ((dross_test::threads_not_in(before) != 0) && (std::chrono::steady_clock::now() < deadline)) {
         std::this_thread::yield();
     }
-    EXPECT_EQ(dross::all_threads().size(), before);
+    EXPECT_EQ(dross_test::threads_not_in(before), 0U);
 }
 
 TEST(operation_queue_test, thread_count_is_the_count_it_was_made_with)

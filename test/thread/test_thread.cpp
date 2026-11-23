@@ -176,13 +176,13 @@ TEST(thread_test, a_one_shot_thread_runs_its_body_and_ends)
 
 TEST(thread_test, a_loop_thread_the_system_will_not_start_is_reported)
 {
-    const std::size_t before = dross::all_threads().size();
+    const std::vector<dross::thread> before = dross::all_threads();
     const dross_test::failing_thread_starts failing{ 1 };
 
     const auto worker = dross::thread::create();
     ASSERT_FALSE(worker);
     EXPECT_EQ(worker.error(), dross::error(std::errc::resource_unavailable_try_again));
-    EXPECT_EQ(dross::all_threads().size(), before);
+    EXPECT_EQ(dross_test::threads_not_in(before), 0U);
 }
 
 TEST(thread_test, a_one_shot_thread_the_system_will_not_start_does_not_run_its_body)
