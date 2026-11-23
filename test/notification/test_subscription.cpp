@@ -174,7 +174,7 @@ TEST(subscription_test, queued_without_a_loop_names_the_subscribing_threads_loop
 {
     record calls;
     const auto how = dross::delivery::queued();
-    dross::thread subscriber;
+    auto subscriber = dross::thread::create().value();
     const auto subscriber_id = id_of(subscriber);
 
     std::shared_ptr<receiver> sender_side;
@@ -201,7 +201,7 @@ TEST(subscription_test, queued_without_a_loop_names_the_subscribing_threads_loop
 TEST(subscription_test, queued_with_a_loop_runs_on_that_loop)
 {
     record calls;
-    dross::thread target;
+    auto target = dross::thread::create().value();
     const auto target_id = id_of(target);
 
     auto [sender_side, token] = subscribe(dross::delivery::queued(loop_of(target)), [&calls](int value) {
@@ -222,7 +222,7 @@ TEST(subscription_test, on_a_queue_runs_on_one_of_its_workers)
 {
     record calls;
     auto called = std::make_shared<event>();
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto [sender_side, token] = subscribe(dross::delivery::on(workers), [&calls, called](int value) {
         calls.add(value);
         called->set();
@@ -258,7 +258,7 @@ TEST(subscription_test, notifications_on_a_queue_with_one_worker_run_one_at_a_ti
     record calls;
     std::atomic<int> running{ 0 };
     std::atomic<bool> overlapped{ false };
-    dross::operation_queue worker{ 1 };
+    auto worker = dross::operation_queue::create(1).value();
     auto [sender_side, token] = subscribe(dross::delivery::on(worker), [&calls, &running, &overlapped](int value) {
         if (running.fetch_add(1) > 0) {
             overlapped = true;
@@ -319,7 +319,7 @@ TEST(subscription_test, reset_stops_a_queued_call_from_starting)
 TEST(subscription_test, reset_stops_a_call_queued_on_a_queue_from_starting)
 {
     record calls;
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
     workers.submit([release, blocking]() {
@@ -443,7 +443,7 @@ TEST(subscription_test, move_assignment_ends_the_subscription_held_first)
 TEST(subscription_test, one_on_a_thread_that_has_ended_is_not_active)
 {
     record calls;
-    dross::thread target;
+    auto target = dross::thread::create().value();
     auto [sender_side, token] = subscribe(dross::delivery::queued(loop_of(target)), [&calls](int value) {
         calls.add(value);
     });
@@ -459,7 +459,7 @@ TEST(subscription_test, one_on_a_thread_that_has_ended_is_not_active)
 
 TEST(subscription_test, one_on_a_queue_that_has_shut_down_is_not_active)
 {
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto [sender_side, token] = subscribe(dross::delivery::on(workers), [](int) {
     });
     EXPECT_TRUE(token.active());
@@ -472,7 +472,7 @@ TEST(subscription_test, one_on_a_queue_that_has_shut_down_is_not_active)
 TEST(subscription_test, notifications_queued_before_a_queue_stops_still_run)
 {
     record calls;
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
     workers.submit([release, blocking]() {
@@ -497,7 +497,7 @@ TEST(subscription_test, notifications_queued_before_a_queue_stops_still_run)
 
 TEST(subscription_test, it_does_not_keep_its_queue_going)
 {
-    std::optional<dross::operation_queue> workers{ std::in_place, 1 };
+    std::optional<dross::operation_queue> workers{ dross::operation_queue::create(1).value() };
     auto [sender_side, token] = subscribe(dross::delivery::on(*workers), [](int) {
     });
     EXPECT_TRUE(token.active());
@@ -509,7 +509,7 @@ TEST(subscription_test, it_does_not_keep_its_queue_going)
 
 TEST(subscription_test, a_queue_made_only_to_be_passed_leaves_it_inactive_from_the_start)
 {
-    auto [sender_side, token] = subscribe(dross::delivery::on(dross::operation_queue{ 1 }), [](int) {
+    auto [sender_side, token] = subscribe(dross::delivery::on(dross::operation_queue::create(1).value()), [](int) {
     });
 
     EXPECT_FALSE(token.active());

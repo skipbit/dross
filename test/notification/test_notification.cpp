@@ -140,9 +140,9 @@ TEST(notification_test, a_deferred_delivery_goes_with_a_thread_that_never_runs_i
     auto held = std::make_shared<int>(0);
     const std::weak_ptr<int> watch = held;
 
-    dross::thread once{ [news, held = std::move(held)]() mutable {
+    auto once = dross::thread::create([news, held = std::move(held)]() mutable {
         news.notify(kHeld, std::move(held), kDeferred);
-    } };
+    }).value();
     ASSERT_TRUE(once.join_for(kTimeoutMs));
 
     EXPECT_EQ(calls->load(), 0);
@@ -185,7 +185,7 @@ TEST(notification_test, cancel_stops_a_deferred_direct_delivery)
 
 TEST(notification_test, cancel_stops_a_delivery_queued_on_an_operation_queue)
 {
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
     workers.submit([release, blocking]() {
@@ -309,7 +309,7 @@ TEST(notification_test, cancelling_a_sending_no_one_subscribed_to_does_nothing)
 
 TEST(notification_test, cancel_does_not_wait_for_a_call_running_on_another_thread)
 {
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     auto entered = std::make_shared<event>();

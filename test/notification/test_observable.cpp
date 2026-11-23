@@ -245,7 +245,7 @@ TEST(observable_test, a_function_on_a_queue_runs_on_one_of_its_workers)
     const dross::observable<int> volume{ 1 };
     record calls;
     auto called = std::make_shared<event>();
-    dross::operation_queue workers{ 1 };
+    auto workers = dross::operation_queue::create(1).value();
     auto token = volume.when_changed([&calls, called](const int& now) {
         calls.add(now);
         called->set();
@@ -455,7 +455,7 @@ TEST(observable_test, a_function_subscribed_from_another_thread_runs_where_its_d
     dross_test::reset_main_runloop();
     const dross::observable<int> volume{ 1 };
     record calls;
-    dross::thread watcher;
+    auto watcher = dross::thread::create().value();
     std::thread::id watcher_id;
     dross::subscription direct;
     dross::subscription queued;
@@ -543,7 +543,7 @@ TEST(observable_test, once_the_owners_thread_has_ended_a_set_from_elsewhere_retu
 {
     std::optional<dross::observable<int>> volume;
     {
-        dross::thread owner;
+        auto owner = dross::thread::create().value();
         ASSERT_TRUE(run_on(owner, [&volume]() {
             volume.emplace(1);
         }));
@@ -635,7 +635,7 @@ TEST(observable_death_test, get_once_the_owners_thread_has_ended_stops_the_progr
     GTEST_FLAG_SET(death_test_style, "threadsafe");
     std::optional<dross::observable<int>> volume;
     {
-        dross::thread owner;
+        auto owner = dross::thread::create().value();
         ASSERT_TRUE(run_on(owner, [&volume]() {
             volume.emplace(1);
         }));

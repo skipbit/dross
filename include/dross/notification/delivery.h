@@ -53,12 +53,14 @@ namespace dross {
  * - A delivery is a small value that is copied freely, and moving copies
  *
  * @code
- * dross::operation_queue workers{ 4 };
- *
  * auto here = dross::delivery::queued();                          // the subscribing thread
  * auto on_main = dross::delivery::queued(dross::main_runloop());  // the main thread
  * auto in_place = dross::delivery::direct();                      // the sending thread
- * auto pooled = dross::delivery::on(workers);                     // one of the workers
+ *
+ * auto workers = dross::operation_queue::create(4);
+ * if (workers) {
+ *     auto pooled = dross::delivery::on(*workers);  // one of the workers
+ * }
  * @endcode
  */
 class delivery final {

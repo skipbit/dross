@@ -1,7 +1,10 @@
 #pragma once
 
+#include "dross/type/error.h"
+
 #include <chrono>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -15,10 +18,10 @@ namespace dross {
  *
  * dross::thread starts a detached OS thread and gives back a handle to it.
  * Two kinds of thread can be started:
- * - thread() starts a thread that runs its own run loop (see runloop), which
+ * - create() starts a thread that runs its own run loop (see runloop), which
  *   this library drives by calling run() on it, and so accepts tasks
  *   through perform() for as long as it runs
- * - thread(body) starts a thread that runs body once and then ends; nothing
+ * - create(body) starts a thread that runs body once and then ends; nothing
  *   drives a loop for it, so perform() on it always returns false
  *
  * A thread the library did not start can still be named: main_thread() names
@@ -26,9 +29,10 @@ namespace dross {
  * calls it. Both get a loop too, and so accept tasks, because their owner
  * may choose to drive it themselves.
  *
- * Both constructors block until the new thread has published its run loop
- * (if any) and its native id, so perform() and native_id() work on the
- * returned handle at once, with no race.
+ * Both block until the new thread has published its run loop (if any) and
+ * its native id, so perform() and native_id() work on the returned handle
+ * at once, with no race. When the system will not start the new thread,
+ * both return std::errc::resource_unavailable_try_again.
  *
  * Handle semantics:
  * - A thread is a handle to an OS thread, not the thread itself. Copying
@@ -55,40 +59,44 @@ namespace dross {
  * Thread safety:
  * - Every operation is free of data races when called from any thread
  *
- * Exceptions:
- * - Both constructors propagate std::system_error when the system will not
- *   start the new thread. It is not caught, stored or translated
- *
  * @code
- * dross::thread worker;
- * worker.perform([]() {
- *     if (dross::current_thread().stop_requested()) {
- *         return;
- *     }
- *     // ...
- * });
- * worker.cancel();
- * worker.quit();
- * worker.join_for(std::chrono::seconds{1});
+ * auto worker = dross::thread::create();
+ * if (worker) {
+ *     worker->perform([]() {
+ *         if (dross::current_thread().stop_requested()) {
+ *             return;
+ *         }
+ *         // ...
+ *     });
+ *     worker->cancel();
+ *     worker->quit();
+ *     worker->join_for(std::chrono::seconds{1});
+ * }
  * @endcode
  */
 class thread final {
 public:
     /**
      * @brief Start a thread that runs its own run loop.
+     * @return A handle to the new thread, or
+     * std::errc::resource_unavailable_try_again when the system will not
+     * start it
      *
      * Blocks until the new thread has published its run loop and native id.
      */
-    thread();
+    [[nodiscard]] static std::expected<thread, error> create();
 
     /**
      * @brief Start a thread that runs body once and then ends.
      * @param body The function the new thread runs
+     * @return A handle to the new thread, or
+     * std::errc::resource_unavailable_try_again when the system will not
+     * start it
      *
      * The thread does not run a loop, so perform() on it always returns
      * false. Blocks until the new thread has published its native id.
      */
-    explicit thread(std::function<void()> body);
+    [[nodiscard]] static std::expected<thread, error> create(std::function<void()> body);
 
     /**
      * @brief Copy constructor, giving another handle to the same thread.

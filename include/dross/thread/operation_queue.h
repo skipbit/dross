@@ -35,12 +35,14 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
  * void render();
  * void save();
  *
- * dross::operation_queue queue{ 4 };
- * auto loaded = queue.enqueue(load);
- * auto checked = queue.enqueue(check);
+ * auto queue = dross::operation_queue::create(4);
+ * if (queue) {
+ *     auto loaded = queue->enqueue(load);
+ *     auto checked = queue->enqueue(check);
  *
- * queue.enqueue(render, { .priority = dross::operation_priority::high });
- * queue.enqueue(save, { .after = { *loaded, *checked } });
+ *     queue->enqueue(render, { .priority = dross::operation_priority::high });
+ *     queue->enqueue(save, { .after = { *loaded, *checked } });
+ * }
  * @endcode
  */
 struct operation_options final {
@@ -123,12 +125,14 @@ struct operation_options final {
  * int expensive_work();
  * void show(int answer);
  *
- * dross::operation_queue queue{ 4 };
- * dross::runloop main_loop = dross::main_runloop();
- * queue.submit([main_loop]() mutable {
- *     auto answer = expensive_work();
- *     main_loop.perform([answer]() { show(answer); });
- * });
+ * auto queue = dross::operation_queue::create(4);
+ * if (queue) {
+ *     dross::runloop main_loop = dross::main_runloop();
+ *     queue->submit([main_loop]() mutable {
+ *         auto answer = expensive_work();
+ *         main_loop.perform([answer]() { show(answer); });
+ *     });
+ * }
  * @endcode
  */
 class operation_queue final {
@@ -136,14 +140,15 @@ public:
     /**
      * @brief Start a queue with thread_count workers.
      * @param thread_count The number of workers, at least one
+     * @return A handle to the new queue, or the error that kept it from
+     * starting: std::errc::invalid_argument when thread_count is zero, or
+     * std::errc::resource_unavailable_try_again when the system will not
+     * start a worker, in which case the workers already started end without
+     * running anything
      *
      * Blocks until every worker has started.
-     *
-     * Throws std::invalid_argument when thread_count is zero, and propagates
-     * std::system_error when the system will not start a worker; the workers
-     * already started then end without running anything.
      */
-    explicit operation_queue(std::size_t thread_count);
+    [[nodiscard]] static std::expected<operation_queue, error> create(std::size_t thread_count);
 
     /**
      * @brief Copy constructor, giving another handle to the same queue.

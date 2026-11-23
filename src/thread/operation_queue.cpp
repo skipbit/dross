@@ -24,7 +24,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
-#include <stdexcept>
+#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -453,7 +453,10 @@ private:
 
 class operation_queue::storage final {
 public:
-    storage(std::size_t thread_count, std::shared_ptr<const time_source> source);
+    // Starts thread_count workers for a new queue.
+    static std::expected<std::shared_ptr<storage>, error> start(std::size_t thread_count, std::shared_ptr<const time_source> source);
+
+    storage(std::vector<thread> workers, std::shared_ptr<const time_source> source);
     ~storage();
 
     bool submit(std::function<void()> task, operation_options options);
@@ -473,18 +476,33 @@ private:
     std::vector<thread> _workers;
 };
 
-operation_queue::storage::storage(std::size_t thread_count, std::shared_ptr<const time_source> source)
-    : _source{ source }
+std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue::storage::start(std::size_t thread_count,
+                                                                                                std::shared_ptr<const time_source> source)
 {
     if (thread_count == 0) {
-        throw std::invalid_argument("operation_queue needs at least one worker");
+        return std::unexpected(error{ std::errc::invalid_argument });
     }
 
-    _workers.reserve(thread_count);
-    try {
-        for (std::size_t i = 0; i < thread_count; ++i) {
-            _workers.push_back(thread_access::start(source));
+    std::vector<thread> workers;
+    workers.reserve(thread_count);
+    for (std::size_t i = 0; i < thread_count; ++i) {
+        auto worker = thread_access::start(source);
+        if (! worker) {
+            for (auto& started : workers) {
+                started.quit();
+            }
+            return std::unexpected(std::move(worker).error());
         }
+        workers.push_back(std::move(*worker));
+    }
+    return std::make_shared<storage>(std::move(workers), std::move(source));
+}
+
+operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<const time_source> source)
+    : _source{ source }
+    , _workers{ std::move(workers) }
+{
+    try {
         _backlog = std::make_shared<backlog>(_workers, source);
     } catch (...) {
         for (auto& worker : _workers) {
@@ -563,9 +581,11 @@ operation_queue::operation_queue(std::shared_ptr<storage> store) noexcept
 {
 }
 
-operation_queue::operation_queue(std::size_t thread_count)
-    : operation_queue{ std::make_shared<storage>(thread_count, time_source::steady()) }
+std::expected<operation_queue, error> operation_queue::create(std::size_t thread_count)
 {
+    return storage::start(thread_count, time_source::steady()).transform([](std::shared_ptr<storage> store) {
+        return operation_queue{ std::move(store) };
+    });
 }
 
 operation_queue::operation_queue(const operation_queue& other) = default;
@@ -610,9 +630,11 @@ bool operation_queue::operator==(const operation_queue& other) const noexcept
     return _store == other._store;
 }
 
-operation_queue operation_queue_access::make(std::size_t thread_count, std::shared_ptr<const time_source> source)
+std::expected<operation_queue, error> operation_queue_access::make(std::size_t thread_count, std::shared_ptr<const time_source> source)
 {
-    return operation_queue{ std::make_shared<operation_queue::storage>(thread_count, std::move(source)) };
+    return operation_queue::storage::start(thread_count, std::move(source)).transform([](std::shared_ptr<operation_queue::storage> store) {
+        return operation_queue{ std::move(store) };
+    });
 }
 
 operation_queue_access::weak_queue operation_queue_access::weaken(const operation_queue& queue)
