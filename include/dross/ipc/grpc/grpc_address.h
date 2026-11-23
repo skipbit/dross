@@ -72,7 +72,11 @@ public:
      * @return What listens, for as long as it is held, or why listening
      *         failed: std::errc::address_not_available when gRPC does not
      *         start a server there, as when another listens at the port.
-     *         gRPC does not say why
+     *         gRPC does not say why. Listening also starts the thread the
+     *         gRPC part cleans up on, unless it runs already, and fails with
+     *         std::errc::resource_unavailable_try_again when the system will
+     *         not start it, or std::errc::not_enough_memory when there is
+     *         no memory to start it
      */
     std::expected<std::unique_ptr<message_acceptor>, error> listen(std::shared_ptr<message_acceptor_events> events) const;
 

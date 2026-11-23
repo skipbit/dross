@@ -23,6 +23,7 @@ message(STATUS "gRPC part: gRPC ${gRPC_VERSION}, protobuf ${Protobuf_VERSION}")
 add_library(dross_grpc)
 
 target_sources(dross_grpc PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cleanup_thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/grpc_acceptor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/grpc_address.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/grpc_connector.cpp

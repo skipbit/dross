@@ -1,3 +1,4 @@
+#include "ipc/grpc/cleanup_thread.h"
 #include "ipc/grpc/grpc_place.h"
 #include "ipc/grpc/reaction_scope.h"
 #include "ipc/grpc/stream_state.h"
@@ -5,8 +6,8 @@
 
 #include <chrono>
 #include <grpcpp/grpcpp.h>
+#include <memory>
 #include <system_error>
-#include <thread>
 #include <utility>
 
 namespace dross::ipc {
@@ -20,8 +21,9 @@ using reactor = ::grpc::ClientBidiReactor<grpc_stream::Message, grpc_stream::Mes
 // stream open until its side has ended.
 class client_stream final : public reactor, private stream_operations {
 public:
-    client_stream(std::shared_ptr<::grpc::Channel> link, std::shared_ptr<message_channel_events> events)
-        : _link{ std::move(link) }
+    client_stream(cleanup_thread cleanup, std::shared_ptr<::grpc::Channel> link, std::shared_ptr<message_channel_events> events)
+        : _cleanup{ std::move(cleanup) }
+        , _link{ std::move(link) }
         , _stub{ grpc_stream::Messages::NewStub(_link) }
         , _state{ std::make_shared<stream_state>(static_cast<stream_operations&>(*this), nullptr) }
         , _events{ std::move(events) }
@@ -82,16 +84,19 @@ private:
         events.reset();
         // gRPC without its event engine, such as 1.51, shuts its callback
         // queue down with the last channel and joins the queue's threads,
-        // one of which runs this; so the channel goes on a thread of its own.
+        // one of which runs this; so the channel goes on the cleanup thread.
         auto link = std::move(_link);
-        auto stub = std::move(_stub);
+        // std::function takes only what can be copied, so the stub is shared.
+        std::shared_ptr<grpc_stream::Messages::Stub> stub = std::move(_stub);
+        auto cleanup = _cleanup;
         delete this;
-        std::thread{ [link = std::move(link), stub = std::move(stub)]() mutable {
+        cleanup.clean_up([link = std::move(link), stub = std::move(stub)]() mutable {
             stub.reset();
             link.reset();
-        } }.detach();
+        });
     }
 
+    cleanup_thread _cleanup;
     std::shared_ptr<::grpc::Channel> _link;
     std::unique_ptr<grpc_stream::Messages::Stub> _stub;
     ::grpc::ClientContext _context;
@@ -111,13 +116,17 @@ public:
 
     std::expected<std::shared_ptr<message_channel>, error> connect(std::shared_ptr<message_channel_events> events) override
     {
+        auto cleanup = cleanup_thread::start();
+        if (! cleanup) {
+            return std::unexpected(std::move(cleanup).error());
+        }
         ::grpc::ChannelArguments arguments;
         arguments.SetMaxReceiveMessageSize(max_received_size);
         auto link = ::grpc::CreateCustomChannel(_target, _credentials, arguments);
         if (! link->WaitForConnected(std::chrono::system_clock::now() + _try_limit)) {
             return std::unexpected(error{ std::errc::timed_out });
         }
-        return (new client_stream{ std::move(link), std::move(events) })->start();
+        return (new client_stream{ *cleanup, std::move(link), std::move(events) })->start();
     }
 
 private:

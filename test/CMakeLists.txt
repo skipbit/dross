@@ -115,6 +115,7 @@ if(DROSS_WITH_GRPC)
         # Hidden in the shared libraries, and used by the internal headers
         # the tests include.
         ${PROJECT_SOURCE_DIR}/src/ipc/part_calls.cpp
+        ${PROJECT_SOURCE_DIR}/src/ipc/grpc/cleanup_thread.cpp
         ${PROJECT_SOURCE_DIR}/src/ipc/grpc/grpc_acceptor.cpp
         ${PROJECT_SOURCE_DIR}/src/ipc/grpc/grpc_connector.cpp
         ${PROJECT_SOURCE_DIR}/src/ipc/grpc/reaction_scope.cpp

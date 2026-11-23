@@ -1,3 +1,4 @@
+#include "ipc/grpc/cleanup_thread.h"
 #include "ipc/grpc/grpc_place.h"
 #include "ipc/grpc/reaction_scope.h"
 #include "ipc/grpc/stream_state.h"
@@ -10,7 +11,6 @@
 #include <grpcpp/grpcpp.h>
 #include <mutex>
 #include <system_error>
-#include <thread>
 #include <utility>
 
 namespace dross::ipc {
@@ -190,13 +190,14 @@ reactor* acceptor_core::Exchange(::grpc::CallbackServerContext* context)
 
 class grpc_acceptor final : public message_acceptor {
 public:
-    explicit grpc_acceptor(std::shared_ptr<acceptor_core> core)
-        : _core{ std::move(core) }
+    grpc_acceptor(cleanup_thread cleanup, std::shared_ptr<acceptor_core> core)
+        : _cleanup{ std::move(cleanup) }
+        , _core{ std::move(core) }
     {
     }
 
     // gRPC cannot shut a server down from inside one of its reactions, so
-    // when destroyed inside one, a thread of its own finishes the job once
+    // when destroyed inside one, the cleanup thread finishes the job once
     // that reaction returns.
     ~grpc_acceptor() override
     {
@@ -205,15 +206,16 @@ public:
             _core->finish();
             return;
         }
-        std::thread{ [core = _core] {
+        _cleanup.clean_up([core = _core] {
             core->finish();
-        } }.detach();
+        });
     }
 
     grpc_acceptor(const grpc_acceptor& other) = delete;
     grpc_acceptor& operator=(const grpc_acceptor& other) = delete;
 
 private:
+    cleanup_thread _cleanup;
     const std::shared_ptr<acceptor_core> _core;
 };
 
@@ -221,11 +223,15 @@ private:
 
 std::expected<std::unique_ptr<message_acceptor>, error> grpc_listen_at(const std::string& address, std::shared_ptr<::grpc::ServerCredentials> credentials, std::shared_ptr<message_acceptor_events> events)
 {
+    auto cleanup = cleanup_thread::start();
+    if (! cleanup) {
+        return std::unexpected(std::move(cleanup).error());
+    }
     auto core = std::make_shared<acceptor_core>(std::move(events));
     if (auto started = core->start(address, std::move(credentials)); ! started) {
         return std::unexpected(std::move(started).error());
     }
-    return std::make_unique<grpc_acceptor>(std::move(core));
+    return std::make_unique<grpc_acceptor>(*cleanup, std::move(core));
 }
 
 }  // namespace dross::ipc

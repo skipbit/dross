@@ -1,7 +1,9 @@
+#include "../../thread/test_support.h"
 #include "dross/ipc/error.h"
 #include "dross/ipc/message_acceptor.h"
 #include "dross/ipc/message_channel.h"
 #include "dross/ipc/message_connector.h"
+#include "ipc/grpc/cleanup_thread.h"
 #include "ipc/grpc/grpc_place.h"
 #include "ipc/part_calls.h"
 #include "ipc/part_recorder.h"
@@ -228,6 +230,44 @@ TEST_F(grpc_place_test, listening_where_grpc_cannot_fails)
     const auto acceptor = dross::ipc::grpc_listen_at("unix:" + at("missing/place.sock"), ::grpc::InsecureServerCredentials(), std::make_shared<acceptance>());
     ASSERT_FALSE(acceptor.has_value());
     EXPECT_EQ(acceptor.error(), std::errc::address_not_available);
+}
+
+TEST_F(grpc_place_test, listening_fails_when_the_cleanup_thread_does_not_start)
+{
+    dross::ipc::cleanup_thread_access::forget();
+    {
+        const dross_test::failing_thread_starts failing{ 1 };
+        const auto acceptor = listen(std::make_shared<acceptance>());
+        ASSERT_FALSE(acceptor.has_value());
+        EXPECT_EQ(acceptor.error(), dross::error(std::errc::resource_unavailable_try_again));
+    }
+    EXPECT_TRUE(listen(std::make_shared<acceptance>()).has_value());
+}
+
+TEST_F(grpc_place_test, connecting_fails_when_the_cleanup_thread_does_not_start)
+{
+    auto acceptor = listen(std::make_shared<acceptance>());
+    ASSERT_TRUE(acceptor.has_value());
+    dross::ipc::cleanup_thread_access::forget();
+
+    auto mine = std::make_shared<recorder>();
+    {
+        const dross_test::failing_thread_starts failing{ 1 };
+        const auto channel = connector()->connect(mine);
+        ASSERT_FALSE(channel.has_value());
+        EXPECT_EQ(channel.error(), dross::error(std::errc::resource_unavailable_try_again));
+    }
+    EXPECT_EQ(mine->closes(), 0);
+    EXPECT_TRUE(connector()->connect(std::make_shared<recorder>()).has_value());
+}
+
+TEST_F(grpc_place_test, the_cleanup_thread_is_not_among_the_threads_dross_lists)
+{
+    dross::ipc::cleanup_thread_access::forget();
+    const std::vector<dross::thread> before = dross::all_threads();
+    auto acceptor = listen(std::make_shared<acceptance>());
+    ASSERT_TRUE(acceptor.has_value());
+    EXPECT_EQ(dross_test::threads_not_in(before), 0U);
 }
 
 TEST_F(grpc_place_test, closing_from_the_connecting_side_ends_both_once_in_order)
