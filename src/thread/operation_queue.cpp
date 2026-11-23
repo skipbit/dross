@@ -22,6 +22,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <set>
 #include <system_error>
@@ -513,20 +514,25 @@ std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue:
         return std::unexpected(error{ std::errc::invalid_argument });
     }
 
-    std::vector<thread> workers;
-    workers_guard guard{ workers };
-    workers.reserve(thread_count);
-    for (std::size_t i = 0; i < thread_count; ++i) {
-        auto worker = thread_access::start(source);
-        if (! worker) {
-            return std::unexpected(std::move(worker).error());
+    // Running out of memory is reported as start_thread() reports it.
+    try {
+        std::vector<thread> workers;
+        workers_guard guard{ workers };
+        workers.reserve(thread_count);
+        for (std::size_t i = 0; i < thread_count; ++i) {
+            auto worker = thread_access::start(source);
+            if (! worker) {
+                return std::unexpected(std::move(worker).error());
+            }
+            workers.push_back(std::move(*worker));
         }
-        workers.push_back(std::move(*worker));
+        auto work = std::make_shared<backlog>(workers, source);
+        auto store = std::make_shared<storage>(std::move(workers), std::move(work), std::move(source));
+        guard.release();
+        return store;
+    } catch (const std::bad_alloc&) {
+        return std::unexpected(error{ std::errc::not_enough_memory });
     }
-    auto work = std::make_shared<backlog>(workers, source);
-    auto store = std::make_shared<storage>(std::move(workers), std::move(work), std::move(source));
-    guard.release();
-    return store;
 }
 
 operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<backlog> work, std::shared_ptr<const time_source> source) noexcept

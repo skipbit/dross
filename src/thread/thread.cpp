@@ -13,7 +13,9 @@
 #include <cstdint>
 #include <expected>
 #include <mutex>
+#include <new>
 #include <optional>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -177,22 +179,27 @@ void thread::storage::finish()
 
 std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source)
 {
-    auto self = std::make_shared<storage>(std::move(source));
+    // Running out of memory is reported as start_thread() reports it.
+    try {
+        auto self = std::make_shared<storage>(std::move(source));
 
-    auto runner = start_thread([self, body = std::move(body), run_loop]() mutable {
-        run_on_new_thread(std::move(self), std::move(body), run_loop);
-    });
-    if (! runner) {
-        return std::unexpected(std::move(runner).error());
+        auto runner = start_thread([self, body = std::move(body), run_loop]() mutable {
+            run_on_new_thread(std::move(self), std::move(body), run_loop);
+        });
+        if (! runner) {
+            return std::unexpected(std::move(runner).error());
+        }
+        runner->detach();
+
+        std::unique_lock<std::mutex> lock{ self->_mutex };
+        self->_ready_cv.wait(lock, [&self]() {
+            return self->_published;
+        });
+
+        return self;
+    } catch (const std::bad_alloc&) {
+        return std::unexpected(error{ std::errc::not_enough_memory });
     }
-    runner->detach();
-
-    std::unique_lock<std::mutex> lock{ self->_mutex };
-    self->_ready_cv.wait(lock, [&self]() {
-        return self->_published;
-    });
-
-    return self;
 }
 
 void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop)
