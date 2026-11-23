@@ -1,3 +1,4 @@
+#include "../thread/test_support.h"
 #include "dross/ipc/error.h"
 #include "dross/ipc/message_place.h"
 #include "dross/ipc/unix_socket.h"
@@ -9,6 +10,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <filesystem>
 #include <functional>
 #include <initializer_list>
 #include <memory>
@@ -68,6 +70,31 @@ TEST_F(unix_place_test, connecting_where_nothing_listens_fails)
     const auto channel = place().connector()->connect(mine);
     ASSERT_FALSE(channel.has_value());
     EXPECT_EQ(channel.error(), dross::error(std::errc::no_such_file_or_directory));
+    EXPECT_EQ(mine->closes(), 0);
+}
+
+TEST_F(unix_place_test, listening_fails_and_leaves_no_socket_file_when_its_thread_does_not_start)
+{
+    {
+        const dross_test::failing_thread_starts failing{ 1 };
+        const auto acceptor = place().listen(std::make_shared<acceptance>());
+        ASSERT_FALSE(acceptor.has_value());
+        EXPECT_EQ(acceptor.error(), dross::error(std::errc::resource_unavailable_try_again));
+    }
+    EXPECT_FALSE(std::filesystem::exists(at("place.sock")));
+    EXPECT_TRUE(place().listen(std::make_shared<acceptance>()).has_value());
+}
+
+TEST_F(unix_place_test, connecting_fails_when_its_thread_does_not_start)
+{
+    auto acceptor = place().listen(std::make_shared<acceptance>());
+    ASSERT_TRUE(acceptor.has_value());
+
+    auto mine = std::make_shared<recorder>();
+    const dross_test::failing_thread_starts failing{ 1 };
+    const auto channel = place().connector()->connect(mine);
+    ASSERT_FALSE(channel.has_value());
+    EXPECT_EQ(channel.error(), dross::error(std::errc::resource_unavailable_try_again));
     EXPECT_EQ(mine->closes(), 0);
 }
 

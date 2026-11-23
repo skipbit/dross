@@ -6,6 +6,7 @@
 #include "ipc/outbox.h"
 #include "ipc/poller.h"
 #include "ipc/unix_socket.h"
+#include "thread/start_thread.h"
 
 #include <atomic>
 #include <chrono>
@@ -400,11 +401,13 @@ unix_transport::unix_transport(std::shared_ptr<state> shared)
 {
 }
 
-void unix_transport::start()
+std::expected<void, error> unix_transport::start()
 {
-    _thread = std::thread{ [shared = _state] {
+    return start_thread([shared = _state] {
         shared->run();
-    } };
+    }).transform([this](std::thread made) {
+        _thread = std::move(made);
+    });
 }
 
 unix_transport::~unix_transport()

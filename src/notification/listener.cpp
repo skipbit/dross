@@ -64,13 +64,15 @@ listener listener::create(const broadcaster& source)
     return listener{ std::make_shared<storage>(broadcaster_access::weaken(source)) };
 }
 
-listener listener::connect(std::shared_ptr<ipc::message_connector> part)
+std::expected<listener, error> listener::connect(std::shared_ptr<ipc::message_connector> part)
 {
     if (! part) {
         std::fputs("dross: listener::create: the place gave no connector\n", stderr);
         std::abort();
     }
-    return listener{ std::make_shared<storage>(remote_broadcaster::connect(std::move(part))) };
+    return remote_broadcaster::connect(std::move(part)).transform([](std::shared_ptr<remote_broadcaster> remote) {
+        return listener{ std::make_shared<storage>(std::move(remote)) };
+    });
 }
 
 bool listener::operator==(const listener& other) const noexcept

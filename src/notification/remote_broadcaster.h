@@ -40,8 +40,9 @@ public:
     // Makes the value a dross::value holds, or says why it could not.
     using value_reader = std::expected<std::shared_ptr<const void>, error> (*)(const value& held);
 
-    // Starts connecting to the broadcaster through part.
-    static std::shared_ptr<remote_broadcaster> connect(std::shared_ptr<ipc::message_connector> part);
+    // Starts connecting to the broadcaster through part, or says why the
+    // connector's thread did not start.
+    static std::expected<std::shared_ptr<remote_broadcaster>, error> connect(std::shared_ptr<ipc::message_connector> part);
 
     ~remote_broadcaster() override;
 

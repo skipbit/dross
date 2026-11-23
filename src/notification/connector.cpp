@@ -3,6 +3,7 @@
 #include "dross/ipc/message_channel.h"
 #include "ipc/backoff.h"
 #include "ipc/part_calls.h"
+#include "thread/start_thread.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -189,11 +190,13 @@ connector::~connector()
     }
 }
 
-void connector::start()
+std::expected<void, error> connector::start()
 {
-    _thread = std::thread{ [shared = _state, part = _part, above = _above] {
+    return start_thread([shared = _state, part = _part, above = _above] {
         run(shared, part, above);
-    } };
+    }).transform([this](std::thread made) {
+        _thread = std::move(made);
+    });
 }
 
 void connector::send(const std::span<const std::byte> message)

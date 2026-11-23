@@ -54,8 +54,9 @@ public:
     // Like the above, but connects only to a peer running as allowed.
     static std::expected<std::unique_ptr<unix_transport>, error> connect(const path& location, transport_events& events, uid_t allowed);
 
-    // Starts the thread, once.
-    void start();
+    // Starts the thread, once, or says why the system would not, as
+    // start_thread() does.
+    std::expected<void, error> start();
 
     ~unix_transport() override;
 

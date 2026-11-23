@@ -74,8 +74,7 @@ public:
             const std::lock_guard guard{ _lock };
             _transport = std::move(*made);
         }
-        started->start();
-        return {};
+        return started->start();
     }
 
     // Destroys the transport, then lets the events go after the lock.
@@ -229,15 +228,20 @@ public:
             _transport = std::move(*made);
             _keep = shared_from_this();
         }
-        started->start();
+        if (auto running = started->start(); ! running) {
+            std::unique_lock guard{ _lock };
+            auto ending = let_go();
+            guard.unlock();
+            ending.reset();
+            return std::unexpected(std::move(running).error());
+        }
 
         std::unique_lock guard{ _lock };
         _settled.wait(guard, [this] {
             return _id.has_value() || _refused.has_value();
         });
         if (! _id) {
-            auto ending = std::move(_transport);
-            _keep.reset();
+            auto ending = let_go();
             guard.unlock();
             ending.reset();
             return std::unexpected(*_refused);
@@ -263,6 +267,14 @@ public:
     }
 
 private:
+    // Called with _lock held. Lets go of the transport and of the core
+    // itself; the caller destroys the transport after unlocking.
+    std::unique_ptr<unix_transport> let_go()
+    {
+        _keep.reset();
+        return std::move(_transport);
+    }
+
     void connected(const connection_id id) override
     {
         {

@@ -4,6 +4,7 @@
 #include "dross/type/error.h"
 
 #include <cstddef>
+#include <expected>
 #include <memory>
 #include <span>
 #include <thread>
@@ -57,8 +58,9 @@ public:
     connector(connector&& other) = delete;
     connector& operator=(connector&& other) = delete;
 
-    // Starts the thread, once.
-    void start();
+    // Starts the thread, once, or says why the system would not, as
+    // start_thread() does.
+    std::expected<void, error> start();
 
     // Queues message for the peer; dropped while not connected.
     void send(std::span<const std::byte> message);
