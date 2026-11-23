@@ -5,7 +5,7 @@
 
 // What runloop and thread both hand out once the calling thread's own
 // bookkeeping for them has been torn down, so a user's thread-local
-// destructor that asks for current_runloop() or current_thread() late stays
+// destructor that asks for runloop::current() or thread::current() late stays
 // defined instead of reaching into a destroyed record.
 namespace dross::teardown {
 

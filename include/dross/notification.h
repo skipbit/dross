@@ -29,7 +29,7 @@
  *     dross::subscription keep = std::move(*subscribed);
  *
  *     news.notify(kProgress, progress{ 3, 10 });
- *     dross::current_runloop().run_pending();  // show() runs here
+ *     dross::runloop::current().run_pending();  // show() runs here
  * }
  * @endcode
  *

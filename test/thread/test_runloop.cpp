@@ -43,17 +43,17 @@ static_assert(std::is_nothrow_copy_constructible_v<post_on_destroy>);
 
 TEST(runloop_test, two_handles_from_one_thread_name_the_same_loop)
 {
-    EXPECT_TRUE(dross::current_runloop() == dross::current_runloop());
+    EXPECT_TRUE(dross::runloop::current() == dross::runloop::current());
 }
 
 TEST(runloop_test, the_main_threads_current_loop_is_the_main_loop)
 {
-    EXPECT_TRUE(dross::current_runloop() == dross::main_runloop());
+    EXPECT_TRUE(dross::runloop::current() == dross::runloop::main());
 }
 
 TEST(runloop_test, a_copied_handle_names_the_same_loop)
 {
-    const dross::runloop original = dross::current_runloop();
+    const dross::runloop original = dross::runloop::current();
     const dross::runloop copy = original;
 
     EXPECT_TRUE(copy == original);
@@ -61,11 +61,11 @@ TEST(runloop_test, a_copied_handle_names_the_same_loop)
 
 TEST(runloop_test, another_thread_has_its_own_loop)
 {
-    const dross::runloop mine = dross::current_runloop();
+    const dross::runloop mine = dross::runloop::current();
 
     std::optional<dross::runloop> theirs;
     std::thread worker{ [&theirs]() {
-        theirs = dross::current_runloop();
+        theirs = dross::runloop::current();
     } };
     worker.join();
 
@@ -75,11 +75,11 @@ TEST(runloop_test, another_thread_has_its_own_loop)
 
 TEST(runloop_test, a_worker_reaches_the_same_main_loop)
 {
-    const dross::runloop here = dross::main_runloop();
+    const dross::runloop here = dross::runloop::main();
 
     std::optional<dross::runloop> there;
     std::thread worker{ [&there]() {
-        there = dross::main_runloop();
+        there = dross::runloop::main();
     } };
     worker.join();
 
@@ -90,7 +90,7 @@ TEST(runloop_test, a_worker_reaches_the_same_main_loop)
 TEST(runloop_test, perform_queues_without_running)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     EXPECT_TRUE(loop.empty());
     EXPECT_TRUE(loop.perform([]() {
@@ -105,7 +105,7 @@ TEST(runloop_test, perform_queues_without_running)
 TEST(runloop_test, perform_rejects_an_empty_task)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     EXPECT_FALSE(loop.perform(std::function<void()>{}));
     EXPECT_TRUE(loop.empty());
@@ -115,7 +115,7 @@ TEST(runloop_test, perform_reports_false_after_the_thread_ended)
 {
     std::optional<dross::runloop> theirs;
     std::thread worker{ [&theirs]() {
-        theirs = dross::current_runloop();
+        theirs = dross::runloop::current();
     } };
     worker.join();
 
@@ -127,7 +127,7 @@ TEST(runloop_test, perform_reports_false_after_the_thread_ended)
 TEST(runloop_test, run_pending_runs_what_is_queued_in_order)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     std::vector<int> order;
     loop.perform([&order]() {
@@ -145,7 +145,7 @@ TEST(runloop_test, run_pending_runs_what_is_queued_in_order)
 TEST(runloop_test, run_pending_leaves_a_task_that_a_task_added)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([loop]() mutable {
         loop.perform([]() {
@@ -161,7 +161,7 @@ TEST(runloop_test, run_pending_leaves_a_task_that_a_task_added)
 TEST(runloop_test, run_pending_does_not_run_a_task_added_by_a_task_that_cleared)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     bool c_ran = false;
     loop.perform([loop, &c_ran]() mutable {
@@ -183,7 +183,7 @@ TEST(runloop_test, run_pending_does_not_run_a_task_added_by_a_task_that_cleared)
 TEST(runloop_test, clear_discards_the_queue)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     bool ran = false;
     loop.perform([&ran]() {
@@ -198,7 +198,7 @@ TEST(runloop_test, clear_discards_the_queue)
 TEST(runloop_test, quit_ends_run_and_keeps_the_queue)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
     });
@@ -246,7 +246,7 @@ TEST(runloop_test, a_quit_from_another_thread_ends_a_waiting_run)
 TEST(runloop_test, run_returns_the_number_of_tasks_it_ran)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
     });
@@ -262,7 +262,7 @@ TEST(runloop_test, run_returns_the_number_of_tasks_it_ran)
 TEST(runloop_test, run_one_returns_false_when_quit_is_pending)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
     });
@@ -299,7 +299,7 @@ TEST(runloop_test, a_nested_run_one_does_not_consume_the_outer_quit)
 TEST(runloop_test, a_worker_hands_work_back_to_the_main_thread)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     std::atomic<std::thread::id> ran_on{};
     std::atomic<bool> queued{ false };
@@ -391,7 +391,7 @@ TEST(runloop_test, run_for_runs_what_is_queued)
 TEST(runloop_test, run_for_zero_runs_nothing)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
     });
@@ -420,7 +420,7 @@ TEST(runloop_test, run_for_with_a_huge_timeout_does_not_overflow)
 TEST(runloop_test, is_running_is_true_inside_a_task)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     bool seen = false;
     loop.perform([loop, &seen]() mutable {
@@ -437,7 +437,7 @@ TEST(runloop_test, is_running_is_true_inside_a_task)
 TEST(runloop_test, run_pending_from_inside_a_task_restores_the_outer_running_state)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     bool seen_inside_inner_task = false;
     bool seen_after_inner_run = false;
@@ -459,7 +459,7 @@ TEST(runloop_test, run_pending_from_inside_a_task_restores_the_outer_running_sta
 TEST(runloop_test, an_exception_from_a_task_propagates)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
         throw std::runtime_error{ "from a task" };
@@ -477,7 +477,7 @@ TEST(runloop_test, an_exception_from_a_task_propagates)
 TEST(runloop_test, an_exception_from_a_task_propagates_out_of_run)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     loop.perform([]() {
         throw std::runtime_error{ "from a task" };
@@ -497,7 +497,7 @@ TEST(runloop_test, an_exception_from_a_task_propagates_out_of_run)
 TEST(runloop_test, a_due_timer_fires_before_a_queued_task)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     std::vector<int> order;
     loop.perform([&order]() {
@@ -515,7 +515,7 @@ TEST(runloop_test, a_due_timer_fires_before_a_queued_task)
 TEST(runloop_test, run_pending_does_not_run_a_task_a_timer_posts_in_the_same_call)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     int timer_fired = 0;
     int task_ran = 0;
@@ -541,7 +541,7 @@ TEST(runloop_test, run_pending_does_not_run_a_task_a_timer_posts_in_the_same_cal
 TEST(runloop_test, run_for_with_the_most_negative_timeout_does_not_overflow)
 {
     reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
 
     // Exercises deadline::after() with the most negative value a caller can
     // give; this is what the address-and-undefined sanitizer job installs
@@ -560,7 +560,7 @@ TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_th
 
     std::thread worker{ [released, released_on_owner]() {
         const auto owner = std::this_thread::get_id();
-        dross::runloop loop = dross::current_runloop();
+        dross::runloop loop = dross::runloop::current();
 
         const auto make_resource = [released, released_on_owner, owner]() {
             return std::shared_ptr<int>(new int{ 0 }, [released, released_on_owner, owner](int* p) {
@@ -604,15 +604,15 @@ TEST(runloop_test, current_runloop_is_defined_from_a_thread_local_destructor_tha
         // that makes a user's own thread-local destructor run after this
         // library's when the user's was constructed first. See
         // current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder
-        // in test_thread.cpp for the equivalent covering current_thread().
+        // in test_thread.cpp for the equivalent covering thread::current().
         thread_local destructor_probe probe{ [&performed]() {
-            dross::runloop loop = dross::current_runloop();
+            dross::runloop loop = dross::runloop::current();
             performed = loop.perform([]() {
             });
         } };
         static_cast<void>(probe);
 
-        static_cast<void>(dross::current_runloop());
+        static_cast<void>(dross::runloop::current());
     } };
     worker.join();
 

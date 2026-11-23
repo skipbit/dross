@@ -70,7 +70,7 @@ public:
     using watchers = std::vector<watcher>;
 
     storage(value_pointer initial, equal_type equal)
-        : _owner{ current_runloop() }
+        : _owner{ runloop::current() }
         , _value{ std::move(initial) }
         , _equal{ equal }
     {
@@ -78,7 +78,7 @@ public:
 
     bool owned_here() const
     {
-        return (current_runloop() == _owner);
+        return (runloop::current() == _owner);
     }
 
     // Owner's thread only.

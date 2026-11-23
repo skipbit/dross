@@ -49,7 +49,7 @@ public:
     std::optional<std::uint64_t> native_id() const;
 
 private:
-    // Installed in the calling thread's slot below, so current_thread()
+    // Installed in the calling thread's slot below, so thread::current()
     // returns the same storage on every call from that thread. Its
     // destructor is the one place a thread's end is noticed, whether dross
     // started the thread or only adopted it.
@@ -91,7 +91,7 @@ private:
 
     // Set only on the record main_thread_storage() builds. is_current()
     // branches on it instead of on whether the calling thread has been
-    // adopted, since a thread can reach this record through all_threads()
+    // adopted, since a thread can reach this record through thread::all()
     // without ever going through current_thread_storage() itself.
     bool _is_main{ false };
 
@@ -167,7 +167,7 @@ void thread::storage::finish()
 {
     // Out of the registry before anyone can see the thread as finished. The
     // other order lets a caller return from join_for() and still find the
-    // thread in all_threads(), which is the opposite of what both promise.
+    // thread in thread::all(), which is the opposite of what both promise.
     deregister();
 
     {
@@ -204,13 +204,13 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
 
 void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop)
 {
-    // Installed before anything else, so a call to current_thread() from
+    // Installed before anything else, so a call to thread::current() from
     // inside body or the loop returns this exact storage rather than
     // adopting a fresh one.
     this_thread_holder().install(self);
     self->set_native_id(native::thread_id());
     if (run_loop) {
-        self->_loop = current_runloop();
+        self->_loop = runloop::current();
     }
     register_self(self);
 
@@ -246,7 +246,7 @@ std::shared_ptr<thread::storage> thread::storage::make_adopted()
 {
     auto self = std::make_shared<storage>();
     self->set_native_id(native::thread_id());
-    self->_loop = current_runloop();
+    self->_loop = runloop::current();
     register_self(self);
     return self;
 }
@@ -257,9 +257,9 @@ std::shared_ptr<thread::storage> thread::storage::main_thread_storage()
     // a thread still running at process exit must not reach a destroyed
     // record.
     //
-    // Built lazily, on whichever thread asks main_thread() or
-    // current_thread() first. Which thread that is no longer decides whose
-    // id or loop this holds: native::main_thread_id() and main_runloop() are
+    // Built lazily, on whichever thread asks thread::main() or
+    // thread::current() first. Which thread that is no longer decides whose
+    // id or loop this holds: native::main_thread_id() and runloop::main() are
     // both defined to answer correctly regardless of the calling thread, the
     // former possibly empty (see native_id()'s doc comment), the latter
     // never.
@@ -269,7 +269,7 @@ std::shared_ptr<thread::storage> thread::storage::main_thread_storage()
         if (const auto id = native::main_thread_id()) {
             self->set_native_id(*id);
         }
-        self->_loop = main_runloop();
+        self->_loop = runloop::main();
         register_self(self);
         return self;
     }() };
@@ -361,7 +361,7 @@ bool thread::storage::is_current() const
     // Does not go through current_thread_storage(): asking whether the
     // caller is this thread must not register the caller or build it a run
     // loop as a side effect, and a thread can reach its own record here
-    // through all_threads() without ever having been adopted.
+    // through thread::all() without ever having been adopted.
     if (_is_main) {
         return native::is_main_thread();
     }
@@ -503,18 +503,18 @@ bool thread::operator==(const thread& other) const noexcept
     return _store == other._store;
 }
 
-thread main_thread()
+thread thread::main()
 {
     // Asked on the main thread, this goes the long way round so the
-    // thread's holder is put in place, the same reason main_runloop() does.
+    // thread's holder is put in place, the same reason runloop::main() does.
     if (native::on_main_thread()) {
-        return current_thread();
+        return thread::current();
     }
 
     return thread{ thread::storage::main_thread_storage() };
 }
 
-thread current_thread()
+thread thread::current()
 {
     return thread{ thread::storage::current_thread_storage() };
 }
@@ -533,7 +533,7 @@ std::expected<thread, error> thread_access::start(std::function<void()> body, st
     });
 }
 
-std::vector<thread> all_threads()
+std::vector<thread> thread::all()
 {
     auto stores = thread::storage::all();
 

@@ -135,7 +135,7 @@ timer timer::make(std::chrono::milliseconds interval, bool repeats, std::functio
 
 timer timer::repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback)
 {
-    return repeating(interval, std::move(callback), current_runloop());
+    return repeating(interval, std::move(callback), runloop::current());
 }
 
 timer timer::repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback, runloop loop)
@@ -145,7 +145,7 @@ timer timer::repeating(std::chrono::milliseconds interval, std::function<void(ti
 
 timer timer::once(std::chrono::milliseconds delay, std::function<void(timer)> callback)
 {
-    return once(delay, std::move(callback), current_runloop());
+    return once(delay, std::move(callback), runloop::current());
 }
 
 timer timer::once(std::chrono::milliseconds delay, std::function<void(timer)> callback, runloop loop)

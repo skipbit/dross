@@ -24,8 +24,8 @@ namespace dross {
  * - create(body) starts a thread that runs body once and then ends; nothing
  *   drives a loop for it, so perform() on it always returns false
  *
- * A thread the library did not start can still be named: main_thread() names
- * the process's initial thread, and current_thread() adopts whichever thread
+ * A thread the library did not start can still be named: thread::main() names
+ * the process's initial thread, and thread::current() adopts whichever thread
  * calls it. Both get a loop too, and so accept tasks, because their owner
  * may choose to drive it themselves.
  *
@@ -47,7 +47,7 @@ namespace dross {
  * Cancellation:
  * - cancel() only raises a stop request that a body polls; it does not
  *   touch the thread's run loop. A body observes it by polling
- *   current_thread().stop_requested() and returning on its own
+ *   thread::current().stop_requested() and returning on its own
  * - quit() stops the thread's run loop, if it has one, keeping its queued
  *   tasks; the loop's own clear() is what drops them
  *
@@ -64,7 +64,7 @@ namespace dross {
  * auto worker = dross::thread::create();
  * if (worker) {
  *     worker->perform([]() {
- *         if (dross::current_thread().stop_requested()) {
+ *         if (dross::thread::current().stop_requested()) {
  *             return;
  *         }
  *         // ...
@@ -100,6 +100,49 @@ public:
      * false. Blocks until the new thread has published its native id.
      */
     [[nodiscard]] static std::expected<thread, error> create(std::function<void()> body);
+
+    /**
+     * @brief Get a handle to the process's initial thread.
+     * @return A handle to the main thread
+     *
+     * Callable from any thread. The main thread is the one the process
+     * started on, as the system reports it, so which thread loaded the
+     * library does not come into it.
+     *
+     * Marking this record finished, and dropping it from thread::all(),
+     * happens through the main thread's own bookkeeping, which only the main
+     * thread can install for itself. A process whose main thread never calls
+     * thread::current() or thread::main() leaves this record never marked
+     * finished, even after the process has exited.
+     */
+    static thread main();
+
+    /**
+     * @brief Get a handle to the calling thread.
+     * @return A handle to this thread
+     *
+     * Adopts the calling thread on first use, whether or not dross started
+     * it. The handle belongs to the thread for as long as it runs; once the
+     * thread ends, perform() on a handle to it reports false.
+     *
+     * Defined even when called from a thread-local destructor that runs
+     * after this thread's own bookkeeping has already been torn down, such
+     * as a user's own thread-local destructor running after this library's
+     * when the user's was constructed first: it then returns a handle to a
+     * shared, already-finished record, the same one every such call gets,
+     * rather than reaching into the destroyed one.
+     */
+    static thread current();
+
+    /**
+     * @brief Get handles to every thread that is alive right now.
+     * @return Handles to the live threads, in no particular order
+     *
+     * Includes the main thread and any thread that has called
+     * thread::current(), as well as every thread dross started. A thread
+     * appears once it has been registered and disappears once it has ended.
+     */
+    static std::vector<thread> all();
 
     /**
      * @brief Copy constructor, giving another handle to the same thread.
@@ -196,7 +239,7 @@ public:
      * @brief Get the operating system's identifier for this thread.
      * @return The id dross::native::thread_id() reported on this thread
      *
-     * Always engaged, with one exception: main_thread() on a platform that
+     * Always engaged, with one exception: thread::main() on a platform that
      * cannot ask about another thread's id (macOS) reports empty until the
      * main thread has used this module itself, directly or by starting a
      * thread.
@@ -217,53 +260,7 @@ private:
 
     std::shared_ptr<storage> _store;
 
-    friend thread main_thread();
-    friend thread current_thread();
-    friend std::vector<thread> all_threads();
     friend class thread_access;
 };
-
-/**
- * @brief Get a handle to the process's initial thread.
- * @return A handle to the main thread
- *
- * Callable from any thread. The main thread is the one the process started
- * on, as the system reports it, so which thread loaded the library does not
- * come into it.
- *
- * Marking this record finished, and dropping it from all_threads(), happens
- * through the main thread's own bookkeeping, which only the main thread can
- * install for itself. A process whose main thread never calls
- * current_thread() or main_thread() leaves this record never marked
- * finished, even after the process has exited.
- */
-thread main_thread();
-
-/**
- * @brief Get a handle to the calling thread.
- * @return A handle to this thread
- *
- * Adopts the calling thread on first use, whether or not dross started it.
- * The handle belongs to the thread for as long as it runs; once the thread
- * ends, perform() on a handle to it reports false.
- *
- * Defined even when called from a thread-local destructor that runs after
- * this thread's own bookkeeping has already been torn down, such as a
- * user's own thread-local destructor running after this library's when the
- * user's was constructed first: it then returns a handle to a shared,
- * already-finished record, the same one every such call gets, rather than
- * reaching into the destroyed one.
- */
-thread current_thread();
-
-/**
- * @brief Get handles to every thread that is alive right now.
- * @return Handles to the live threads, in no particular order
- *
- * Includes the main thread and any thread that has called current_thread(),
- * as well as every thread dross started. A thread appears once it has been
- * registered and disappears once it has ended.
- */
-std::vector<thread> all_threads();
 
 }  // namespace dross

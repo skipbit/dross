@@ -49,7 +49,7 @@ enum class notify_timing {
  * {
  *     auto news = dross::broadcaster::create();
  *     news.notify(kProgress, progress{ 3, 10 }, { .timing = dross::notify_timing::deferred });
- *     dross::current_runloop().run_pending();  // direct subscribers run here
+ *     dross::runloop::current().run_pending();  // direct subscribers run here
  * }
  * @endcode
  *

@@ -345,8 +345,8 @@ private:
             self->run_until_empty(worker);
 
             // A task may have queued more on this worker's loop, say with
-            // current_thread().perform(); they run before the worker ends.
-            runloop loop = current_runloop();
+            // thread::current().perform(); they run before the worker ends.
+            runloop loop = runloop::current();
             if (loop.pending_count() > 0) {
                 loop.perform(self->finish(worker));
             } else {

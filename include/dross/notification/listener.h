@@ -123,7 +123,7 @@ concept subscriber_type = std::copy_constructible<std::decay_t<F>> && std::invoc
  *     if (! watched || ! subscribed) {
  *         return 1;
  *     }
- *     dross::current_runloop().run();
+ *     dross::runloop::current().run();
  * }
  * @endcode
  */

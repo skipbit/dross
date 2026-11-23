@@ -27,7 +27,7 @@ void subscription::storage::deliver(const std::shared_ptr<const void>& value, co
     }
     const auto on_direct = [this, &value, &sent, deferred](const direct_target&) {
         if (deferred) {
-            current_runloop().perform(make_task(value, sent));
+            runloop::current().perform(make_task(value, sent));
         } else {
             call(value.get(), *sent);
         }

@@ -110,9 +110,9 @@ std::thread::id id_of(dross::thread& which)
 // The run loop of a dross::thread.
 dross::runloop loop_of(dross::thread& which)
 {
-    dross::runloop loop = dross::current_runloop();
+    dross::runloop loop = dross::runloop::current();
     EXPECT_TRUE(run_on(which, [&loop]() {
-        loop = dross::current_runloop();
+        loop = dross::runloop::current();
     }));
     return loop;
 }
@@ -165,7 +165,7 @@ TEST(subscription_test, queued_never_runs_inside_the_sending_call_even_on_its_ow
     send(*sender_side, 1);
     EXPECT_TRUE(calls.values().empty());
 
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
     EXPECT_EQ(calls.values(), std::vector<int>{ 1 });
     EXPECT_EQ(calls.threads(), std::vector<std::thread::id>{ std::this_thread::get_id() });
 }
@@ -248,7 +248,7 @@ TEST(subscription_test, notifications_from_one_thread_start_in_the_order_sent)
     for (int value = 0; value < 5; ++value) {
         send(*sender_side, value);
     }
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
 
     EXPECT_EQ(calls.values(), (std::vector<int>{ 0, 1, 2, 3, 4 }));
 }
@@ -295,7 +295,7 @@ TEST(subscription_test, every_subscriber_is_handed_the_same_value)
     first->deliver(value, sent, false);
     second->deliver(value, sent, false);
     value.reset();
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
 
     EXPECT_EQ(seen, (std::vector<const void*>{ address, address }));
 }
@@ -310,7 +310,7 @@ TEST(subscription_test, reset_stops_a_queued_call_from_starting)
 
     send(*sender_side, 1);
     token.reset();
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
 
     EXPECT_TRUE(calls.values().empty());
     EXPECT_FALSE(token.active());
@@ -352,7 +352,7 @@ TEST(subscription_test, destroying_it_ends_it_as_reset_does)
     {
         auto token = std::move(made.token);
     }
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
 
     EXPECT_TRUE(calls.values().empty());
     EXPECT_FALSE(sender_side->active());
@@ -533,5 +533,5 @@ TEST(subscription_test, an_exception_from_a_queued_function_propagates_out_of_th
 
     send(*sender_side, 1);
 
-    EXPECT_THROW(dross::current_runloop().run_pending(), std::runtime_error);
+    EXPECT_THROW(dross::runloop::current().run_pending(), std::runtime_error);
 }

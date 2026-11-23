@@ -33,7 +33,7 @@ inline constexpr auto kTimeout = std::chrono::seconds{ 5 };
 // held by an invalidate_on_exit.
 inline void reset_main_runloop()
 {
-    dross::runloop loop = dross::main_runloop();
+    dross::runloop loop = dross::runloop::main();
     loop.clear();
     loop.run_for(std::chrono::milliseconds{ 1 });
 }
@@ -146,11 +146,11 @@ struct lock_check final {
 static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
 
 // How many live threads are not among before, taken earlier with
-// all_threads(). A thread of an earlier test that ends meanwhile does not
+// thread::all(). A thread of an earlier test that ends meanwhile does not
 // change it.
 inline std::size_t threads_not_in(const std::vector<dross::thread>& before)
 {
-    const std::vector<dross::thread> now = dross::all_threads();
+    const std::vector<dross::thread> now = dross::thread::all();
     return static_cast<std::size_t>(std::count_if(now.begin(), now.end(), [&before](const dross::thread& live) {
         return std::find(before.begin(), before.end(), live) == before.end();
     }));

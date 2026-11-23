@@ -39,7 +39,7 @@ namespace dross {
  *   invalidated; once() fires a single time and then invalidates itself
  * - The callback receives the timer itself, so it can invalidate() from
  *   inside to stop a repeating timer, or just read its own state
- * - The two-argument overloads install on current_runloop(); the
+ * - The two-argument overloads install on runloop::current(); the
  *   three-argument overloads install on the loop given
  * - An interval of zero is allowed and means "due immediately"; a repeating
  *   timer with a zero interval then fires once per pass the loop makes over
@@ -71,7 +71,7 @@ namespace dross {
 class timer final {
 public:
     /**
-     * @brief Install a timer that fires every interval on current_runloop().
+     * @brief Install a timer that fires every interval on runloop::current().
      * @param interval How long to wait between fires; zero means "every
      * iteration"
      * @param callback Called with the timer itself each time it fires
@@ -92,7 +92,7 @@ public:
     static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback, runloop loop);
 
     /**
-     * @brief Install a timer that fires once on current_runloop().
+     * @brief Install a timer that fires once on runloop::current().
      * @param delay How long to wait before firing; zero means "immediately"
      * @param callback Called with the timer itself when it fires
      * @return A handle to the installed timer, or a handle that is already

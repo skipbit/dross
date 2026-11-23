@@ -75,9 +75,9 @@ std::shared_ptr<runloop::storage> runloop::storage::main_loop()
 
 std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
 {
-    // A user's own thread-local destructor may call current_runloop() after
+    // A user's own thread-local destructor may call runloop::current() after
     // the holder below has already run its own destructor; see
-    // current_runloop()'s doc comment.
+    // runloop::current()'s doc comment.
     if (teardown::torn_down<storage>()) {
         return teardown::finished_placeholder(&storage::finish);
     }
@@ -93,7 +93,7 @@ std::shared_ptr<runloop::storage> runloop::storage::for_current_thread()
             // Set before finish(), not after: finish() now runs the
             // destructors of whatever this loop's queued tasks and
             // installed timers captured, and one of those could call back
-            // into current_runloop(). That call must see torn_down already
+            // into runloop::current(). That call must see torn_down already
             // true, or it would reach into this very holder while it is
             // mid-destruction.
             teardown::torn_down<storage>() = true;
@@ -490,20 +490,20 @@ bool runloop::operator==(const runloop& other) const noexcept
     return _store == other._store;
 }
 
-runloop main_runloop()
+runloop runloop::main()
 {
     // Asked on the main thread, this goes the long way round so the thread's
     // holder is put in place: that holder is what marks the loop finished
     // when the main thread ends, and a program that only ever says
-    // main_runloop() would otherwise never install one.
+    // runloop::main() would otherwise never install one.
     if (native::on_main_thread()) {
-        return current_runloop();
+        return runloop::current();
     }
 
     return runloop{ runloop::storage::main_loop() };
 }
 
-runloop current_runloop()
+runloop runloop::current()
 {
     return runloop{ runloop::storage::for_current_thread() };
 }
