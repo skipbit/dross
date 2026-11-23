@@ -68,7 +68,11 @@ public:
      * @param events What to tell about the connections
      * @return What listens, for as long as it is held, or why listening
      *         failed, such as std::errc::address_in_use when another
-     *         process listens there
+     *         process listens there, or
+     *         std::errc::resource_unavailable_try_again when the system
+     *         will not start the thread that waits on the socket, or
+     *         std::errc::not_enough_memory when there is no memory to
+     *         start it
      */
     std::expected<std::unique_ptr<message_acceptor>, error> listen(std::shared_ptr<message_acceptor_events> events) const;
 
@@ -79,7 +83,10 @@ public:
      * system's error, such as std::errc::no_such_file_or_directory when
      * there is no socket file and std::errc::connection_refused when
      * nothing listens at it, and with ipc_errc::peer_not_same_user when
-     * another user does.
+     * another user does. Each connection has a thread that waits on its
+     * socket; the try fails with std::errc::resource_unavailable_try_again
+     * when the system will not start it, and with
+     * std::errc::not_enough_memory when there is no memory to start it.
      *
      * @return The connector
      */

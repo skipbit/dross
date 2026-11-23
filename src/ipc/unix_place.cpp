@@ -74,8 +74,7 @@ public:
             const std::lock_guard guard{ _lock };
             _transport = std::move(*made);
         }
-        started->start();
-        return {};
+        return started->start();
     }
 
     // Destroys the transport, then lets the events go after the lock.
@@ -229,7 +228,16 @@ public:
             _transport = std::move(*made);
             _keep = shared_from_this();
         }
-        started->start();
+        if (auto running = started->start(); ! running) {
+            std::unique_ptr<unix_transport> ending;
+            {
+                const std::lock_guard guard{ _lock };
+                ending = std::move(_transport);
+                _keep.reset();
+            }
+            ending.reset();
+            return std::unexpected(std::move(running).error());
+        }
 
         std::unique_lock guard{ _lock };
         _settled.wait(guard, [this] {
