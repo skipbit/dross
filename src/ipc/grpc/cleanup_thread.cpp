@@ -1,20 +1,54 @@
 #include "ipc/grpc/cleanup_thread.h"
 
-#include "dross/thread/thread.h"
+#include "thread/start_thread.h"
 
-#include <cstdio>
-#include <cstdlib>
+#include <condition_variable>
+#include <deque>
 #include <mutex>
-#include <optional>
 #include <utility>
 
 namespace dross::ipc {
+
+// The work handed to the cleanup thread, which it runs in the order given.
+class cleanup_queue final {
+public:
+    void add(std::function<void()> work)
+    {
+        {
+            const std::lock_guard guard{ _lock };
+            _work.push_back(std::move(work));
+        }
+        _added.notify_one();
+    }
+
+    // Runs the work as it comes, for ever.
+    void run()
+    {
+        while (true) {
+            std::function<void()> next;
+            {
+                std::unique_lock guard{ _lock };
+                _added.wait(guard, [this] {
+                    return ! _work.empty();
+                });
+                next = std::move(_work.front());
+                _work.pop_front();
+            }
+            next();
+        }
+    }
+
+private:
+    std::mutex _lock;
+    std::condition_variable _added;
+    std::deque<std::function<void()>> _work;
+};
 
 namespace {
 
 struct held_thread final {
     std::mutex lock;
-    std::optional<thread> running;
+    std::shared_ptr<cleanup_queue> work;
 };
 
 held_thread& held()
@@ -27,8 +61,8 @@ held_thread& held()
 
 }  // namespace
 
-cleanup_thread::cleanup_thread(thread running)
-    : _running{ std::move(running) }
+cleanup_thread::cleanup_thread(std::shared_ptr<cleanup_queue> work)
+    : _work{ std::move(work) }
 {
 }
 
@@ -36,29 +70,30 @@ std::expected<cleanup_thread, error> cleanup_thread::start()
 {
     auto& cleanup = held();
     const std::lock_guard guard{ cleanup.lock };
-    if (! cleanup.running) {
-        auto made = thread::create();
-        if (! made) {
-            return std::unexpected(std::move(made).error());
+    if (! cleanup.work) {
+        auto work = std::make_shared<cleanup_queue>();
+        auto started = start_thread([work] {
+            work->run();
+        });
+        if (! started) {
+            return std::unexpected(std::move(started).error());
         }
-        cleanup.running.emplace(*made);
+        started->detach();
+        cleanup.work = std::move(work);
     }
-    return cleanup_thread{ *cleanup.running };
+    return cleanup_thread{ cleanup.work };
 }
 
 void cleanup_thread::clean_up(std::function<void()> work)
 {
-    if (! _running.perform(std::move(work))) {
-        std::fputs("dross: the gRPC part's cleanup thread has ended\n", stderr);
-        std::abort();
-    }
+    _work->add(std::move(work));
 }
 
 void cleanup_thread_access::forget()
 {
     auto& cleanup = held();
     const std::lock_guard guard{ cleanup.lock };
-    cleanup.running.reset();
+    cleanup.work.reset();
 }
 
 }  // namespace dross::ipc

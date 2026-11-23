@@ -26,8 +26,8 @@ namespace dross::ipc {
 // unix_socket. Its calls come from gRPC's threads. It never calls
 // message_acceptor_events::stopped(), as a started gRPC server does not
 // stop on its own. Listening and connecting start the part's cleanup thread
-// unless it runs already, and fail as dross::thread::create() does when it
-// does not start.
+// unless it runs already, and fail as start_thread() does when it does not
+// start.
 
 // Starts a gRPC server at address, which gRPC names as it does for
 // grpc::ServerBuilder::AddListeningPort(). A server gRPC does not start
