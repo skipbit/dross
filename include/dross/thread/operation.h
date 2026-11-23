@@ -156,12 +156,14 @@ concept operation_value_type = std::is_void_v<T> || (std::is_object_v<T> && std:
  * @code
  * int expensive_work();
  *
- * dross::operation_queue queue{ 4 };
- * std::expected<dross::operation_result, dross::error> result = queue.enqueue([]() {
- *     return expensive_work();
- * });
- * if (result && result->wait_for(std::chrono::seconds{ 1 })) {
- *     std::expected<int, dross::error> answer = result->get_as<int>();
+ * auto queue = dross::operation_queue::create(4);
+ * if (queue) {
+ *     std::expected<dross::operation_result, dross::error> result = queue->enqueue([]() {
+ *         return expensive_work();
+ *     });
+ *     if (result && result->wait_for(std::chrono::seconds{ 1 })) {
+ *         std::expected<int, dross::error> answer = result->get_as<int>();
+ *     }
  * }
  * @endcode
  */

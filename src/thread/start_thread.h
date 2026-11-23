@@ -1,0 +1,17 @@
+#pragma once
+
+#include "dross/type/error.h"
+
+#include <expected>
+#include <functional>
+#include <thread>
+
+namespace dross {
+
+// Starts a std::thread that runs body. When the system will not start it,
+// returns std::errc::resource_unavailable_try_again, and when there is no
+// memory to start it, std::errc::not_enough_memory, so the threads started
+// through it report a failure the same way.
+std::expected<std::thread, error> start_thread(std::function<void()> body);
+
+}  // namespace dross

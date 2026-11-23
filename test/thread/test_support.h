@@ -1,11 +1,15 @@
 #pragma once
 
 #include "dross/thread/runloop.h"
+#include "dross/thread/thread.h"
 #include "dross/thread/timer.h"
+#include "thread/start_thread_access.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -13,6 +17,7 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace dross_test {
 
@@ -139,5 +144,35 @@ struct lock_check final {
     }
 };
 static_assert(std::is_nothrow_copy_constructible_v<lock_check>);
+
+// How many live threads are not among before, taken earlier with
+// all_threads(). A thread of an earlier test that ends meanwhile does not
+// change it.
+inline std::size_t threads_not_in(const std::vector<dross::thread>& before)
+{
+    const std::vector<dross::thread> now = dross::all_threads();
+    return static_cast<std::size_t>(std::count_if(now.begin(), now.end(), [&before](const dross::thread& live) {
+        return std::find(before.begin(), before.end(), live) == before.end();
+    }));
+}
+
+// Has thread starts fail as start_thread_access::fail_next() plans, and takes
+// back what is left of the plan when the test leaves the scope, however it
+// leaves, so the tests after it start their threads.
+class failing_thread_starts final {
+public:
+    explicit failing_thread_starts(const int count, const int after = 0)
+    {
+        dross::start_thread_access::fail_next(count, after);
+    }
+
+    failing_thread_starts(const failing_thread_starts& other) = delete;
+    failing_thread_starts& operator=(const failing_thread_starts& other) = delete;
+
+    ~failing_thread_starts()
+    {
+        dross::start_thread_access::fail_next(0);
+    }
+};
 
 }  // namespace dross_test

@@ -3,6 +3,7 @@
 #include "dross/thread/runloop.h"
 #include "thread/deadline.h"
 #include "thread/native.h"
+#include "thread/start_thread.h"
 #include "thread/teardown.h"
 #include "thread/thread_access.h"
 #include "thread/time_source.h"
@@ -10,8 +11,11 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <expected>
 #include <mutex>
+#include <new>
 #include <optional>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -22,9 +26,9 @@ class thread::storage final {
 public:
     explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
 
-    static std::shared_ptr<storage> start_loop_thread(std::shared_ptr<const time_source> source = time_source::steady());
-    static std::shared_ptr<storage> start_one_shot_thread(std::function<void()> body,
-                                                          std::shared_ptr<const time_source> source = time_source::steady());
+    static std::expected<std::shared_ptr<storage>, error> start_loop_thread(std::shared_ptr<const time_source> source);
+    static std::expected<std::shared_ptr<storage>, error> start_one_shot_thread(std::function<void()> body,
+                                                                                std::shared_ptr<const time_source> source);
     static std::shared_ptr<storage> main_thread_storage();
     static std::shared_ptr<storage> current_thread_storage();
     static std::vector<std::shared_ptr<storage>> all();
@@ -60,7 +64,7 @@ private:
         std::shared_ptr<storage> _store;
     };
 
-    static std::shared_ptr<storage> start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source);
+    static std::expected<std::shared_ptr<storage>, error> start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source);
     static std::shared_ptr<storage> make_adopted();
     static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop);
 
@@ -173,21 +177,29 @@ void thread::storage::finish()
     _done_cv.notify_all();
 }
 
-std::shared_ptr<thread::storage> thread::storage::start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source)
+std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source)
 {
-    auto self = std::make_shared<storage>(std::move(source));
+    // Running out of memory is reported as start_thread() reports it.
+    try {
+        auto self = std::make_shared<storage>(std::move(source));
 
-    std::thread runner{ [self, body = std::move(body), run_loop]() mutable {
-        run_on_new_thread(std::move(self), std::move(body), run_loop);
-    } };
-    runner.detach();
+        auto runner = start_thread([self, body = std::move(body), run_loop]() mutable {
+            run_on_new_thread(std::move(self), std::move(body), run_loop);
+        });
+        if (! runner) {
+            return std::unexpected(std::move(runner).error());
+        }
+        runner->detach();
 
-    std::unique_lock<std::mutex> lock{ self->_mutex };
-    self->_ready_cv.wait(lock, [&self]() {
-        return self->_published;
-    });
+        std::unique_lock<std::mutex> lock{ self->_mutex };
+        self->_ready_cv.wait(lock, [&self]() {
+            return self->_published;
+        });
 
-    return self;
+        return self;
+    } catch (const std::bad_alloc&) {
+        return std::unexpected(error{ std::errc::not_enough_memory });
+    }
 }
 
 void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop)
@@ -219,12 +231,13 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     // and removes it from the registry.
 }
 
-std::shared_ptr<thread::storage> thread::storage::start_loop_thread(std::shared_ptr<const time_source> source)
+std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start_loop_thread(std::shared_ptr<const time_source> source)
 {
     return start(nullptr, true, std::move(source));
 }
 
-std::shared_ptr<thread::storage> thread::storage::start_one_shot_thread(std::function<void()> body, std::shared_ptr<const time_source> source)
+std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start_one_shot_thread(std::function<void()> body,
+                                                                                              std::shared_ptr<const time_source> source)
 {
     return start(std::move(body), false, std::move(source));
 }
@@ -419,14 +432,14 @@ thread::thread(std::shared_ptr<storage> store) noexcept
 {
 }
 
-thread::thread()
-    : thread{ storage::start_loop_thread() }
+std::expected<thread, error> thread::create()
 {
+    return thread_access::start(time_source::steady());
 }
 
-thread::thread(std::function<void()> body)
-    : thread{ storage::start_one_shot_thread(std::move(body)) }
+std::expected<thread, error> thread::create(std::function<void()> body)
 {
+    return thread_access::start(std::move(body), time_source::steady());
 }
 
 thread::thread(const thread& other) = default;
@@ -506,14 +519,18 @@ thread current_thread()
     return thread{ thread::storage::current_thread_storage() };
 }
 
-thread thread_access::start(std::shared_ptr<const time_source> source)
+std::expected<thread, error> thread_access::start(std::shared_ptr<const time_source> source)
 {
-    return thread{ thread::storage::start_loop_thread(std::move(source)) };
+    return thread::storage::start_loop_thread(std::move(source)).transform([](std::shared_ptr<thread::storage> store) {
+        return thread{ std::move(store) };
+    });
 }
 
-thread thread_access::start(std::function<void()> body, std::shared_ptr<const time_source> source)
+std::expected<thread, error> thread_access::start(std::function<void()> body, std::shared_ptr<const time_source> source)
 {
-    return thread{ thread::storage::start_one_shot_thread(std::move(body), std::move(source)) };
+    return thread::storage::start_one_shot_thread(std::move(body), std::move(source)).transform([](std::shared_ptr<thread::storage> store) {
+        return thread{ std::move(store) };
+    });
 }
 
 std::vector<thread> all_threads()

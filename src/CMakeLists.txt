@@ -79,6 +79,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/operation_queue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/runloop.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread/start_thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/thread.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/time_source.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/thread/timer.cpp

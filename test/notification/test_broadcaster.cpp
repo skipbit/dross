@@ -470,7 +470,7 @@ TEST(broadcaster_test, a_subscriber_on_another_thread_is_called_there)
 {
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
-    dross::thread worker;
+    auto worker = dross::thread::create().value();
     auto known = std::make_shared<event>();
     dross::runloop worker_loop = dross::current_runloop();
     std::thread::id worker_id;

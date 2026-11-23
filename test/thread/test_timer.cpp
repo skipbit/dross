@@ -188,7 +188,7 @@ TEST(timer_test, a_copied_handle_names_the_same_timer)
 
 TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
 {
-    dross::thread worker;
+    auto worker = dross::thread::create().value();
     std::optional<dross::runloop> worker_loop;
     dross_test::event captured;
 
