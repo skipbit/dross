@@ -21,8 +21,9 @@ using reactor = ::grpc::ClientBidiReactor<grpc_stream::Message, grpc_stream::Mes
 // stream open until its side has ended.
 class client_stream final : public reactor, private stream_operations {
 public:
-    client_stream(std::shared_ptr<::grpc::Channel> link, std::shared_ptr<message_channel_events> events)
-        : _link{ std::move(link) }
+    client_stream(cleanup_thread cleanup, std::shared_ptr<::grpc::Channel> link, std::shared_ptr<message_channel_events> events)
+        : _cleanup{ std::move(cleanup) }
+        , _link{ std::move(link) }
         , _stub{ grpc_stream::Messages::NewStub(_link) }
         , _state{ std::make_shared<stream_state>(static_cast<stream_operations&>(*this), nullptr) }
         , _events{ std::move(events) }
@@ -85,17 +86,19 @@ private:
         // queue down with the last channel and joins the queue's threads,
         // one of which runs this; so the channel goes on the cleanup thread.
         auto link = std::move(_link);
-        auto stub = std::move(_stub);
+        // std::function takes only what can be copied, so the stub is shared.
+        std::shared_ptr<grpc_stream::Messages::Stub> stub = std::move(_stub);
+        auto cleanup = _cleanup;
         delete this;
-        clean_up([link = std::move(link), stub = std::move(stub)]() mutable {
+        cleanup.clean_up([link = std::move(link), stub = std::move(stub)]() mutable {
             stub.reset();
             link.reset();
         });
     }
 
+    cleanup_thread _cleanup;
     std::shared_ptr<::grpc::Channel> _link;
-    // Shared, as the work handed to the cleanup thread is copyable.
-    std::shared_ptr<grpc_stream::Messages::Stub> _stub;
+    std::unique_ptr<grpc_stream::Messages::Stub> _stub;
     ::grpc::ClientContext _context;
     const std::shared_ptr<stream_state> _state;
     std::shared_ptr<message_channel_events> _events;
@@ -113,7 +116,8 @@ public:
 
     std::expected<std::shared_ptr<message_channel>, error> connect(std::shared_ptr<message_channel_events> events) override
     {
-        if (auto cleanup = start_cleanup_thread(); ! cleanup) {
+        auto cleanup = cleanup_thread::start();
+        if (! cleanup) {
             return std::unexpected(std::move(cleanup).error());
         }
         ::grpc::ChannelArguments arguments;
@@ -122,7 +126,7 @@ public:
         if (! link->WaitForConnected(std::chrono::system_clock::now() + _try_limit)) {
             return std::unexpected(error{ std::errc::timed_out });
         }
-        return (new client_stream{ std::move(link), std::move(events) })->start();
+        return (new client_stream{ *cleanup, std::move(link), std::move(events) })->start();
     }
 
 private:

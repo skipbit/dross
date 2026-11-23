@@ -27,27 +27,29 @@ held_thread& held()
 
 }  // namespace
 
-std::expected<void, error> start_cleanup_thread()
+cleanup_thread::cleanup_thread(thread running)
+    : _running{ std::move(running) }
 {
-    auto& cleanup = held();
-    const std::lock_guard guard{ cleanup.lock };
-    if (cleanup.running) {
-        return {};
-    }
-    auto made = thread::create();
-    if (! made) {
-        return std::unexpected(std::move(made).error());
-    }
-    cleanup.running.emplace(*made);
-    return {};
 }
 
-void clean_up(std::function<void()> work)
+std::expected<cleanup_thread, error> cleanup_thread::start()
 {
     auto& cleanup = held();
     const std::lock_guard guard{ cleanup.lock };
-    if (! cleanup.running || ! cleanup.running->perform(std::move(work))) {
-        std::fputs("dross: the gRPC part has no thread to clean up on\n", stderr);
+    if (! cleanup.running) {
+        auto made = thread::create();
+        if (! made) {
+            return std::unexpected(std::move(made).error());
+        }
+        cleanup.running.emplace(*made);
+    }
+    return cleanup_thread{ *cleanup.running };
+}
+
+void cleanup_thread::clean_up(std::function<void()> work)
+{
+    if (! _running.perform(std::move(work))) {
+        std::fputs("dross: the gRPC part's cleanup thread has ended\n", stderr);
         std::abort();
     }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dross/thread/thread.h"
 #include "dross/type/error.h"
 
 #include <expected>
@@ -17,20 +18,28 @@ namespace dross::ipc {
 
 // The one thread of the gRPC part that does the work gRPC does not allow
 // where it arises, such as inside one of gRPC's reactions. It is started by
-// the first listen or connection that needs it, and is never stopped.
+// the first listen or connection that needs it, and is never stopped. What
+// is made with a successful start() holds the thread.
+class DROSS_CLEANUP_THREAD_HIDDEN cleanup_thread final {
+public:
+    // Starts the thread unless it already runs, and gives it. Fails as
+    // dross::thread::create() does.
+    static std::expected<cleanup_thread, error> start();
 
-// Starts the thread unless it already runs. Fails as dross::thread::create()
-// does.
-DROSS_CLEANUP_THREAD_HIDDEN std::expected<void, error> start_cleanup_thread();
+    // Has the thread do work.
+    void clean_up(std::function<void()> work);
 
-// Has the thread do work, once start_cleanup_thread() has succeeded.
-DROSS_CLEANUP_THREAD_HIDDEN void clean_up(std::function<void()> work);
+private:
+    explicit cleanup_thread(thread running);
+
+    thread _running;
+};
 
 // A way for the library's own tests to start from no thread.
 class DROSS_CLEANUP_THREAD_HIDDEN cleanup_thread_access final {
 public:
-    // Lets go of the thread, so the next start_cleanup_thread() starts
-    // another. The thread let go keeps running the work it was given.
+    // Lets go of the thread, so the next start() starts another. What was
+    // made with the one let go keeps handing its work to that one.
     static void forget();
 };
 

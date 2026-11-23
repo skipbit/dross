@@ -190,8 +190,9 @@ reactor* acceptor_core::Exchange(::grpc::CallbackServerContext* context)
 
 class grpc_acceptor final : public message_acceptor {
 public:
-    explicit grpc_acceptor(std::shared_ptr<acceptor_core> core)
-        : _core{ std::move(core) }
+    grpc_acceptor(cleanup_thread cleanup, std::shared_ptr<acceptor_core> core)
+        : _cleanup{ std::move(cleanup) }
+        , _core{ std::move(core) }
     {
     }
 
@@ -205,7 +206,7 @@ public:
             _core->finish();
             return;
         }
-        clean_up([core = _core] {
+        _cleanup.clean_up([core = _core] {
             core->finish();
         });
     }
@@ -214,6 +215,7 @@ public:
     grpc_acceptor& operator=(const grpc_acceptor& other) = delete;
 
 private:
+    cleanup_thread _cleanup;
     const std::shared_ptr<acceptor_core> _core;
 };
 
@@ -221,14 +223,15 @@ private:
 
 std::expected<std::unique_ptr<message_acceptor>, error> grpc_listen_at(const std::string& address, std::shared_ptr<::grpc::ServerCredentials> credentials, std::shared_ptr<message_acceptor_events> events)
 {
-    if (auto cleanup = start_cleanup_thread(); ! cleanup) {
+    auto cleanup = cleanup_thread::start();
+    if (! cleanup) {
         return std::unexpected(std::move(cleanup).error());
     }
     auto core = std::make_shared<acceptor_core>(std::move(events));
     if (auto started = core->start(address, std::move(credentials)); ! started) {
         return std::unexpected(std::move(started).error());
     }
-    return std::make_unique<grpc_acceptor>(std::move(core));
+    return std::make_unique<grpc_acceptor>(*cleanup, std::move(core));
 }
 
 }  // namespace dross::ipc
