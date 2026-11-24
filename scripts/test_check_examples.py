@@ -64,7 +64,7 @@ class source_of_test(unittest.TestCase):
         self.assertEqual(function_body(source), 'work();')
 
     def test_calls_and_definitions_are_not_taken_as_declarations(self):
-        for line in ['worker.join();', 'dross::main_runloop().run();', 'dross::operation_queue queue{ 4 };',
+        for line in ['worker.join();', 'dross::runloop::main().run();', 'dross::operation_queue queue{ 4 };',
                      'auto loaded = queue.enqueue(load);', 'std::thread worker(run);', 'dross::number n(42);',
                      'dross::path home(std::string{"/home"});', 'return compute(x);', 'return make();',
                      'throw failure();']:

@@ -17,8 +17,8 @@ class timer;
  * work be aimed at a particular thread, and what lets a result be handed
  * back to the thread it came from.
  *
- * Every thread has one run loop, reached through current_runloop(). The main
- * thread's is also reachable from anywhere through main_runloop(), so a
+ * Every thread has one run loop, reached through runloop::current(). The main
+ * thread's is also reachable from anywhere through runloop::main(), so a
  * worker can post to it without being handed a copy first.
  *
  * Timers (see dross::timer) install onto a loop the same way tasks are
@@ -48,8 +48,8 @@ class timer;
  *   queued tasks and installed timers are dropped, so captures held by
  *   either are released on that same thread. This happens only for a thread
  *   that installed its own bookkeeping, which for the main thread means one
- *   that has called current_runloop() or main_runloop() itself; see
- *   main_runloop()'s own doc comment for what that leaves unhandled
+ *   that has called runloop::current() or runloop::main() itself; see
+ *   runloop::main()'s own doc comment for what that leaves unhandled
  *
  * Exceptions:
  * - An exception thrown by a task or a timer's callback propagates out of
@@ -64,19 +64,58 @@ class timer;
  * void show(int answer);
  *
  * // On a worker, handing a result back to the main thread.
- * dross::runloop main_loop = dross::main_runloop();
+ * dross::runloop main_loop = dross::runloop::main();
  *
  * std::thread worker{[main_loop]() mutable {
  *     auto answer = expensive_work();
  *     main_loop.perform([answer]() { show(answer); });
  * }};
  *
- * dross::main_runloop().run();  // runs show(answer) here, until quit()
+ * dross::runloop::main().run();  // runs show(answer) here, until quit()
  * worker.join();
  * @endcode
  */
 class runloop final {
 public:
+    /**
+     * @brief Get a handle to the main thread's run loop.
+     * @return A handle to the loop belonging to the main thread
+     *
+     * Callable from any thread, which is what makes it the way back: a
+     * worker posts to this loop and the main thread runs the task.
+     *
+     * The main thread is the one the process started on, as the system
+     * reports it, so which thread loaded the library does not come into it.
+     *
+     * Marking this loop finished, and releasing its queued tasks and
+     * installed timers, happens through the main thread's own bookkeeping,
+     * which only the main thread can install for itself. A process whose
+     * main thread never calls runloop::current() or runloop::main() leaves
+     * this loop never marked finished, its queued tasks never released, and
+     * any timer installed on it from elsewhere sitting uncleaned, even after
+     * the process has exited; see runloop's own "Cleanup" doc note. Nothing
+     * here fires such a timer either, since that still requires something to
+     * run the loop.
+     */
+    static runloop main();
+
+    /**
+     * @brief Get a handle to the calling thread's run loop.
+     * @return A handle to the loop belonging to this thread
+     *
+     * The loop is created on first use and belongs to the thread for as long
+     * as the thread runs, whether or not dross started that thread. When the
+     * thread ends, perform() on a handle to its loop reports false.
+     *
+     * Defined even when called from a thread-local destructor that runs
+     * after this thread's own bookkeeping has already been torn down, such
+     * as a user's own thread-local destructor running after this library's
+     * when the user's was constructed first: it then returns a handle to a
+     * shared, already-finished loop, the same one every such call gets,
+     * rather than reaching into the destroyed one.
+     */
+    static runloop current();
+
     /**
      * @brief Copy constructor, giving another handle to the same loop.
      * @param other The handle to copy
@@ -239,48 +278,8 @@ private:
 
     std::shared_ptr<storage> _store;
 
-    friend runloop main_runloop();
-    friend runloop current_runloop();
     friend class timer;
     friend class runloop_access;
 };
-
-/**
- * @brief Get a handle to the main thread's run loop.
- * @return A handle to the loop belonging to the main thread
- *
- * Callable from any thread, which is what makes it the way back: a worker
- * posts to this loop and the main thread runs the task.
- *
- * The main thread is the one the process started on, as the system reports
- * it, so which thread loaded the library does not come into it.
- *
- * Marking this loop finished, and releasing its queued tasks and installed
- * timers, happens through the main thread's own bookkeeping, which only the
- * main thread can install for itself. A process whose main thread never
- * calls current_runloop() or main_runloop() leaves this loop never marked
- * finished, its queued tasks never released, and any timer installed on it
- * from elsewhere sitting uncleaned, even after the process has exited; see
- * runloop's own "Cleanup" doc note. Nothing here fires such a timer either,
- * since that still requires something to run the loop.
- */
-runloop main_runloop();
-
-/**
- * @brief Get a handle to the calling thread's run loop.
- * @return A handle to the loop belonging to this thread
- *
- * The loop is created on first use and belongs to the thread for as long as
- * the thread runs, whether or not dross started that thread. When the thread
- * ends, perform() on a handle to its loop reports false.
- *
- * Defined even when called from a thread-local destructor that runs after
- * this thread's own bookkeeping has already been torn down, such as a
- * user's own thread-local destructor running after this library's when the
- * user's was constructed first: it then returns a handle to a shared,
- * already-finished loop, the same one every such call gets, rather than
- * reaching into the destroyed one.
- */
-runloop current_runloop();
 
 }  // namespace dross

@@ -127,7 +127,7 @@ TEST(broadcaster_test, a_subscriber_is_called_with_the_value_sent)
 
 TEST(broadcaster_test, every_subscriber_is_called_with_the_same_one_value)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<const progress*> seen;
@@ -138,7 +138,7 @@ TEST(broadcaster_test, every_subscriber_is_called_with_the_same_one_value)
     auto queued = subscribe(ears, kProgress, record, dross::delivery::queued());
 
     news.notify(kProgress, progress{ 1, 2 });
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
 
     ASSERT_EQ(seen.size(), 2U);
     EXPECT_EQ(seen[0], seen[1]);
@@ -258,7 +258,7 @@ TEST(broadcaster_test, a_notification_sent_before_subscribing_is_not_received)
 
 TEST(broadcaster_test, notifications_from_one_thread_are_received_in_the_order_sent)
 {
-    dross_test::reset_main_runloop();
+    dross_test::reset_main_loop();
     auto news = dross::broadcaster::create();
     auto ears = dross::listener::create(news);
     std::vector<int> seen;
@@ -269,7 +269,7 @@ TEST(broadcaster_test, notifications_from_one_thread_are_received_in_the_order_s
     for (int value = 0; value < 5; ++value) {
         news.notify(kCount, value);
     }
-    dross::current_runloop().run_pending();
+    dross::runloop::current().run_pending();
 
     EXPECT_EQ(seen, (std::vector<int>{ 0, 1, 2, 3, 4 }));
 }
@@ -472,10 +472,10 @@ TEST(broadcaster_test, a_subscriber_on_another_thread_is_called_there)
     auto ears = dross::listener::create(news);
     auto worker = dross::thread::create().value();
     auto known = std::make_shared<event>();
-    dross::runloop worker_loop = dross::current_runloop();
+    dross::runloop worker_loop = dross::runloop::current();
     std::thread::id worker_id;
     worker.perform([&, known]() {
-        worker_loop = dross::current_runloop();
+        worker_loop = dross::runloop::current();
         worker_id = std::this_thread::get_id();
         known->set();
     });

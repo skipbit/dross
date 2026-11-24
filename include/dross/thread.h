@@ -26,7 +26,7 @@
  * void show(int answer);
  *
  * // The main thread's loop, taken on the main thread and handed to a worker.
- * dross::runloop main_loop = dross::main_runloop();
+ * dross::runloop main_loop = dross::runloop::main();
  *
  * std::thread worker{[main_loop]() mutable {
  *     auto answer = expensive_work();
@@ -34,19 +34,19 @@
  *     main_loop.perform([answer]() { show(answer); });
  * }};
  *
- * dross::main_runloop().run();  // until something calls quit()
+ * dross::runloop::main().run();  // until something calls quit()
  * worker.join();
  * @endcode
  *
  * Identity and lifetime:
  * - A runloop is a handle. Copying one gives another handle to the same
  *   loop, and operator== asks whether two handles name the same loop
- * - One thread has one loop. It is reached through current_runloop(), or
- *   through main_runloop() for the main thread's, and is never constructed
+ * - One thread has one loop. It is reached through runloop::current(), or
+ *   through runloop::main() for the main thread's, and is never constructed
  *   directly
  * - dross::thread starts and names a thread, with the same handle
  *   semantics; a thread dross did not start, such as the process's own, is
- *   named through main_thread() and current_thread()
+ *   named through thread::main() and thread::current()
  * - dross::timer installs a callback on a loop, firing it once or on an
  *   interval; it is the same kind of handle again, but the loop is what
  *   keeps it alive once installed, not the handle

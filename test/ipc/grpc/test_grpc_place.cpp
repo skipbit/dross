@@ -264,7 +264,7 @@ TEST_F(grpc_place_test, connecting_fails_when_the_cleanup_thread_does_not_start)
 TEST_F(grpc_place_test, the_cleanup_thread_is_not_among_the_threads_dross_lists)
 {
     dross::ipc::cleanup_thread_access::forget();
-    const std::vector<dross::thread> before = dross::all_threads();
+    const std::vector<dross::thread> before = dross::thread::all();
     auto acceptor = listen(std::make_shared<acceptance>());
     ASSERT_TRUE(acceptor.has_value());
     EXPECT_EQ(dross_test::threads_not_in(before), 0U);

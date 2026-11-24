@@ -58,7 +58,7 @@ delivery delivery::on(const operation_queue& queue)
 delivery_target delivery_access::resolve(const delivery& which)
 {
     const auto on_subscribing_thread = [](const delivery::storage::subscribing_thread&) -> delivery_target {
-        return current_runloop();
+        return runloop::current();
     };
     const auto on_resolved = [](const delivery_target& target) {
         return target;

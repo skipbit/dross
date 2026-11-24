@@ -21,7 +21,7 @@ class cleanup_queue;
 // The one thread of the gRPC part that does the work gRPC does not allow
 // where it arises, such as inside one of gRPC's reactions. It is started by
 // the first listen or connection that needs it, and runs for as long as the
-// process does. It is not a dross::thread, so all_threads() neither lists
+// process does. It is not a dross::thread, so thread::all() neither lists
 // it nor lets it be stopped. What is made with a successful start() holds
 // the thread.
 class DROSS_CLEANUP_THREAD_HIDDEN cleanup_thread final {

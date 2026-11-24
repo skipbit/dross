@@ -45,7 +45,7 @@ public:
     void arrive()
     {
         std::unique_lock<std::mutex> lock{ _mutex };
-        _threads.push_back(dross::current_thread());
+        _threads.push_back(dross::thread::current());
         _wake.notify_all();
         _wake.wait_for(lock, kTimeout, [this]() {
             return (_threads.size() >= _count);
@@ -136,7 +136,7 @@ TEST(operation_queue_test, zero_workers_is_rejected)
 
 TEST(operation_queue_test, a_worker_the_system_will_not_start_is_reported_and_the_started_ones_end)
 {
-    const std::vector<dross::thread> before = dross::all_threads();
+    const std::vector<dross::thread> before = dross::thread::all();
     const dross_test::failing_thread_starts failing{ 1, 2 };
 
     const auto queue = dross::operation_queue::create(3);
@@ -191,7 +191,7 @@ TEST(operation_queue_test, every_worker_runs_a_task_at_once)
     EXPECT_FALSE(workers[0] == workers[2]);
     EXPECT_FALSE(workers[1] == workers[2]);
     for (const auto& worker : workers) {
-        EXPECT_FALSE(worker == dross::current_thread());
+        EXPECT_FALSE(worker == dross::thread::current());
     }
 }
 
@@ -214,8 +214,8 @@ TEST(operation_queue_test, a_worker_busy_with_its_own_loop_does_not_hold_up_a_ta
         for (int n = 0; n < 2; ++n) {
             ASSERT_TRUE(queue.submit([busy, gather, shared]() {
                 gather->arrive();
-                if (busy == dross::current_thread()) {
-                    dross::current_thread().perform([shared]() {
+                if (busy == dross::thread::current()) {
+                    dross::thread::current().perform([shared]() {
                         shared->release.wait();
                     });
                     shared->queued.set();
@@ -411,7 +411,7 @@ TEST(operation_queue_test, wait_for_waits_for_a_waiting_task_of_every_priority)
         // task from the queue, so the one task waiting is all there is to
         // wait for.
         ASSERT_TRUE(queue.submit([release, blocked]() {
-            dross::current_thread().perform([release, blocked]() {
+            dross::thread::current().perform([release, blocked]() {
                 blocked->set();
                 release->wait();
             });
@@ -435,7 +435,7 @@ TEST(operation_queue_test, cancel_takes_a_waiting_task_of_any_priority_off_the_q
     auto release = std::make_shared<event>();
     auto blocked = std::make_shared<event>();
     ASSERT_TRUE(queue.submit([release, blocked]() {
-        dross::current_thread().perform([release, blocked]() {
+        dross::thread::current().perform([release, blocked]() {
             blocked->set();
             release->wait();
         });
@@ -481,13 +481,13 @@ TEST(operation_queue_test, a_task_can_perform_on_its_worker_and_install_a_timer_
     auto queue = dross::operation_queue::create(2).value();
 
     ASSERT_TRUE(queue.submit([shared]() {
-        const dross::thread worker = dross::current_thread();
-        dross::current_thread().perform([shared, worker]() {
-            shared->performed_on_the_worker.store(worker == dross::current_thread());
+        const dross::thread worker = dross::thread::current();
+        dross::thread::current().perform([shared, worker]() {
+            shared->performed_on_the_worker.store(worker == dross::thread::current());
             shared->performed.set();
         });
         dross::timer::once(std::chrono::milliseconds{ 1 }, [shared, worker](dross::timer) {
-            shared->fired_on_the_worker.store(worker == dross::current_thread());
+            shared->fired_on_the_worker.store(worker == dross::thread::current());
             shared->fired.set();
         });
     }));
@@ -570,7 +570,7 @@ TEST(operation_queue_test, a_worker_runs_what_it_queued_on_its_own_loop_before_i
 
         ASSERT_TRUE(queue.submit([shared]() {
             shared->release.wait();
-            dross::current_thread().perform([shared]() {
+            dross::thread::current().perform([shared]() {
                 shared->ran.store(true);
             });
         }));
@@ -1226,7 +1226,7 @@ TEST(operation_queue_test, wait_for_stops_waiting_for_a_task_once_it_is_cancelle
     // from the queue, so the next task waits with nothing else for the
     // waiter to wait for.
     const auto holder = queue.enqueue([release, blocked]() {
-        dross::current_thread().perform([release, blocked]() {
+        dross::thread::current().perform([release, blocked]() {
             blocked->set();
             release->wait();
         });
@@ -1269,7 +1269,7 @@ TEST(operation_queue_test, wait_for_settles_when_the_last_earlier_task_is_cancel
     // waiter to wait for. It is held for longer than the test waits for the
     // waiter, so the worker coming free cannot end the wait in its place.
     const auto holder = queue.enqueue([release, blocked]() {
-        dross::current_thread().perform([release, blocked]() {
+        dross::thread::current().perform([release, blocked]() {
             blocked->set();
             release->wait(kTimeout * 3);
         });
@@ -1573,7 +1573,7 @@ TEST(operation_queue_test, tasks_made_ready_together_run_at_once_on_workers_of_t
     auto gather = std::make_shared<gathering>(2);
 
     const auto first = queue.enqueue([release, started, runner]() {
-        *runner = dross::current_thread();
+        *runner = dross::thread::current();
         started->set();
         release->wait();
     });
@@ -1701,7 +1701,7 @@ TEST(operation_queue_test, a_task_to_run_after_a_cancelled_result_is_cancelled_a
     auto release = std::make_shared<event>();
     auto blocked = std::make_shared<event>();
     ASSERT_TRUE(queue.submit([release, blocked]() {
-        dross::current_thread().perform([release, blocked]() {
+        dross::thread::current().perform([release, blocked]() {
             blocked->set();
             release->wait();
         });
@@ -1739,7 +1739,7 @@ TEST(operation_queue_test, cancel_takes_off_every_task_that_runs_after_the_one_c
     auto release = std::make_shared<event>();
     auto blocked = std::make_shared<event>();
     ASSERT_TRUE(queue.submit([release, blocked]() {
-        dross::current_thread().perform([release, blocked]() {
+        dross::thread::current().perform([release, blocked]() {
             blocked->set();
             release->wait();
         });

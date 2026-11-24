@@ -345,8 +345,8 @@ private:
             self->run_until_empty(worker);
 
             // A task may have queued more on this worker's loop, say with
-            // current_thread().perform(); they run before the worker ends.
-            runloop loop = current_runloop();
+            // thread::current().perform(); they run before the worker ends.
+            runloop loop = runloop::current();
             if (loop.pending_count() > 0) {
                 loop.perform(self->finish(worker));
             } else {
@@ -602,7 +602,7 @@ bool operation_queue::storage::accepting() const
 bool operation_queue::storage::on_a_worker() const
 {
     return std::any_of(_workers.begin(), _workers.end(), [](const thread& worker) {
-        return worker.is_current_thread();
+        return worker.is_current();
     });
 }
 

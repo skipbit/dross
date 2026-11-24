@@ -18,7 +18,7 @@
 namespace {
 
 using dross_test::kTimeout;
-using dross_test::reset_main_runloop;
+using dross_test::reset_main_loop;
 
 // Runs loop in short slices until predicate() is true or bound passes.
 // Short slices, rather than one run_for(bound), keep a test fast once its
@@ -76,8 +76,8 @@ TEST(timer_test, a_repeating_timer_fires_more_than_once_and_stays_valid)
 
 TEST(timer_test, the_callback_receives_the_timer_and_can_invalidate_itself_from_inside)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     int fire_count = 0;
     dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer self) {
@@ -117,8 +117,8 @@ TEST(timer_test, invalidate_before_the_first_fire_means_it_never_fires)
 
 TEST(timer_test, invalidate_is_idempotent_and_safe_after_the_timer_has_ended)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     int fire_count = 0;
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer) {
@@ -148,8 +148,8 @@ TEST(timer_test, invalidate_is_idempotent_and_safe_after_the_timer_has_ended)
 
 TEST(timer_test, a_dropped_handle_does_not_stop_the_timer)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     int fire_count = 0;
     {
@@ -170,8 +170,8 @@ TEST(timer_test, a_dropped_handle_does_not_stop_the_timer)
 
 TEST(timer_test, a_copied_handle_names_the_same_timer)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 1000 }, [](dross::timer) {
     }, loop);
@@ -193,7 +193,7 @@ TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
     dross_test::event captured;
 
     ASSERT_TRUE(worker.perform([&worker_loop, &captured]() {
-        worker_loop = dross::current_runloop();
+        worker_loop = dross::runloop::current();
         captured.set();
     }));
 
@@ -203,7 +203,7 @@ TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
     std::atomic<std::uint64_t> ran_on{ 0 };
     dross_test::event fired;
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&ran_on, &fired](dross::timer) {
-        ran_on.store(dross::current_thread().native_id().value());
+        ran_on.store(dross::thread::current().native_id().value());
         fired.set();
     }, *worker_loop);
     static_cast<void>(t);
@@ -212,18 +212,18 @@ TEST(timer_test, installing_on_an_explicit_loop_runs_on_that_loops_thread)
 
     ASSERT_TRUE(worker.native_id().has_value());
     EXPECT_EQ(ran_on.load(), *worker.native_id());
-    EXPECT_NE(ran_on.load(), dross::current_thread().native_id().value_or(0));
+    EXPECT_NE(ran_on.load(), dross::thread::current().native_id().value_or(0));
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 }
 
 TEST(timer_test, timer_count_rises_on_install_and_falls_on_invalidate_and_after_a_one_shot_fires)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     EXPECT_EQ(loop.timer_count(), 0U);
 
@@ -335,8 +335,8 @@ TEST(timer_test, a_slow_fire_does_not_shorten_another_timers_next_interval)
 
 TEST(timer_test, an_exception_from_the_callback_propagates_and_the_timer_stays_installed)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     int fire_count = 0;
     dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer) {
@@ -357,8 +357,8 @@ TEST(timer_test, an_exception_from_the_callback_propagates_and_the_timer_stays_i
 
 TEST(timer_test, an_exception_from_a_one_shot_callback_propagates_and_the_timer_is_gone)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     // Unlike a repeating timer, a one-shot is removed before it fires
     // regardless of whether the callback throws, so it does not stay
@@ -375,8 +375,8 @@ TEST(timer_test, an_exception_from_a_one_shot_callback_propagates_and_the_timer_
 
 TEST(timer_test, an_empty_callback_is_not_installed)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, std::function<void(dross::timer)>{}, loop);
 
@@ -388,7 +388,7 @@ TEST(timer_test, installing_on_a_finished_loop_returns_an_invalid_handle)
 {
     std::optional<dross::runloop> ended_loop;
     std::thread worker{ [&ended_loop]() {
-        ended_loop = dross::current_runloop();
+        ended_loop = dross::runloop::current();
     } };
     worker.join();
     // The worker thread has ended; its loop is finished.
@@ -403,8 +403,8 @@ TEST(timer_test, installing_on_a_finished_loop_returns_an_invalid_handle)
 
 TEST(timer_test, a_huge_delay_does_not_overflow)
 {
-    reset_main_runloop();
-    dross::runloop loop = dross::main_runloop();
+    reset_main_loop();
+    dross::runloop loop = dross::runloop::main();
 
     // Exercises deadline::after() with the largest value a caller can give;
     // this is what the address-and-undefined sanitizer job installs to

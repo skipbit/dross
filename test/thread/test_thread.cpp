@@ -26,12 +26,12 @@ using dross_test::kTimeout;
 
 TEST(thread_test, two_handles_from_the_main_thread_name_the_same_thread)
 {
-    EXPECT_TRUE(dross::current_thread() == dross::current_thread());
+    EXPECT_TRUE(dross::thread::current() == dross::thread::current());
 }
 
 TEST(thread_test, a_copied_handle_names_the_same_thread)
 {
-    const dross::thread original = dross::current_thread();
+    const dross::thread original = dross::thread::current();
     const dross::thread copy = original;
 
     EXPECT_TRUE(copy == original);
@@ -39,7 +39,7 @@ TEST(thread_test, a_copied_handle_names_the_same_thread)
 
 TEST(thread_test, the_main_threads_current_thread_is_the_main_thread)
 {
-    EXPECT_TRUE(dross::current_thread() == dross::main_thread());
+    EXPECT_TRUE(dross::thread::current() == dross::thread::main());
 }
 
 TEST(thread_test, two_different_threads_are_not_equal)
@@ -50,10 +50,10 @@ TEST(thread_test, two_different_threads_are_not_equal)
     EXPECT_FALSE(first == second);
 
     ASSERT_TRUE(first.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(second.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(first.join_for(kTimeout));
     ASSERT_TRUE(second.join_for(kTimeout));
@@ -62,38 +62,38 @@ TEST(thread_test, two_different_threads_are_not_equal)
 TEST(thread_test, a_worker_is_not_the_main_thread)
 {
     // A handle to the main thread, captured here and compared against below.
-    const dross::thread main_handle = dross::main_thread();
+    const dross::thread main_handle = dross::thread::main();
 
     auto worker = dross::thread::create().value();
     std::atomic<bool> equal_to_main{ true };
 
     ASSERT_TRUE(worker.perform([main_handle, &equal_to_main]() {
-        equal_to_main.store(dross::current_thread() == main_handle);
+        equal_to_main.store(dross::thread::current() == main_handle);
     }));
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 
     EXPECT_FALSE(equal_to_main.load());
 }
 
-TEST(thread_test, is_current_thread_is_true_only_on_the_thread_it_names)
+TEST(thread_test, is_current_is_true_only_on_the_thread_it_names)
 {
     auto worker = dross::thread::create().value();
     std::atomic<bool> true_on_worker{ false };
 
     ASSERT_TRUE(worker.perform([&worker, &true_on_worker]() {
-        true_on_worker.store(worker.is_current_thread());
+        true_on_worker.store(worker.is_current());
     }));
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 
     EXPECT_TRUE(true_on_worker.load());
-    EXPECT_FALSE(worker.is_current_thread());
+    EXPECT_FALSE(worker.is_current());
 }
 
 TEST(thread_test, native_id_differs_between_two_live_threads_and_is_always_engaged)
@@ -108,10 +108,10 @@ TEST(thread_test, native_id_differs_between_two_live_threads_and_is_always_engag
     EXPECT_NE(*first.native_id(), *second.native_id());
 
     ASSERT_TRUE(first.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(second.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(first.join_for(kTimeout));
     ASSERT_TRUE(second.join_for(kTimeout));
@@ -122,12 +122,12 @@ TEST(thread_test, main_threads_native_id_is_known_once_the_main_thread_has_used_
 #if defined(__linux__)
     // native::main_thread_id() reads this from any thread on Linux, so it is
     // known even before the main thread has touched the module itself.
-    EXPECT_TRUE(dross::main_thread().native_id().has_value());
+    EXPECT_TRUE(dross::thread::main().native_id().has_value());
 #else
     // Elsewhere it can only be read on the main thread itself; adopting it
     // is what fills the id in.
-    static_cast<void>(dross::current_thread());
-    EXPECT_TRUE(dross::main_thread().native_id().has_value());
+    static_cast<void>(dross::thread::current());
+    EXPECT_TRUE(dross::thread::main().native_id().has_value());
 #endif
 }
 
@@ -138,7 +138,7 @@ TEST(thread_test, a_handle_to_an_ended_thread_still_reports_its_id)
     const std::uint64_t id_while_running = *worker.native_id();
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 
@@ -152,8 +152,8 @@ TEST(thread_test, a_loop_thread_runs_a_task_on_its_own_thread)
     std::atomic<std::uint64_t> ran_on{ 0 };
 
     ASSERT_TRUE(worker.perform([&ran_on]() {
-        ran_on.store(dross::current_thread().native_id().value());
-        dross::current_thread().quit();
+        ran_on.store(dross::thread::current().native_id().value());
+        dross::thread::current().quit();
     }));
 
     ASSERT_TRUE(worker.join_for(kTimeout));
@@ -176,7 +176,7 @@ TEST(thread_test, a_one_shot_thread_runs_its_body_and_ends)
 
 TEST(thread_test, a_loop_thread_the_system_will_not_start_is_reported)
 {
-    const std::vector<dross::thread> before = dross::all_threads();
+    const std::vector<dross::thread> before = dross::thread::all();
     const dross_test::failing_thread_starts failing{ 1 };
 
     const auto worker = dross::thread::create();
@@ -204,11 +204,11 @@ TEST(thread_test, cancel_sets_stop_requested_and_a_polling_body_sees_it)
     std::atomic<bool> saw_stop{ false };
 
     ASSERT_TRUE(worker.perform([&saw_stop]() {
-        while (! dross::current_thread().stop_requested()) {
+        while (! dross::thread::current().stop_requested()) {
             std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
         }
         saw_stop.store(true);
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
 
     EXPECT_FALSE(worker.stop_requested());
@@ -227,7 +227,7 @@ TEST(thread_test, finished_and_running_reflect_the_threads_lifetime)
     EXPECT_FALSE(worker.finished());
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 
@@ -259,31 +259,31 @@ TEST(thread_test, join_for_zero_does_not_wait_and_reports_the_current_state)
     EXPECT_EQ(source->waits(), waits_before);
 }
 
-TEST(thread_test, all_threads_includes_the_main_thread)
+TEST(thread_test, all_includes_the_main_thread)
 {
     // Registration happens when a thread is first named; ask for the main
     // thread before snapshotting the registry, not after.
-    const dross::thread main_handle = dross::main_thread();
-    const std::vector<dross::thread> threads = dross::all_threads();
+    const dross::thread main_handle = dross::thread::main();
+    const std::vector<dross::thread> threads = dross::thread::all();
 
     EXPECT_NE(std::find(threads.begin(), threads.end(), main_handle), threads.end());
 }
 
-TEST(thread_test, all_threads_gains_and_loses_a_started_thread)
+TEST(thread_test, all_gains_and_loses_a_started_thread)
 {
     auto worker = dross::thread::create().value();
 
     {
-        const std::vector<dross::thread> threads = dross::all_threads();
+        const std::vector<dross::thread> threads = dross::thread::all();
         EXPECT_NE(std::find(threads.begin(), threads.end(), worker), threads.end());
     }
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 
-    const std::vector<dross::thread> threads = dross::all_threads();
+    const std::vector<dross::thread> threads = dross::thread::all();
     EXPECT_EQ(std::find(threads.begin(), threads.end(), worker), threads.end());
 }
 
@@ -292,7 +292,7 @@ TEST(thread_test, a_handle_outliving_the_thread_is_still_usable)
     auto worker = dross::thread::create().value();
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(worker.join_for(kTimeout));
 
@@ -324,8 +324,8 @@ TEST(thread_test, many_threads_drive_the_registry_and_the_loop_concurrently)
             // Exercised concurrently with the perform() calls above, on a
             // thread of its own: adopts this poster and reads the registry
             // while other posters and worker loops are doing the same.
-            static_cast<void>(dross::all_threads());
-            static_cast<void>(dross::current_thread());
+            static_cast<void>(dross::thread::all());
+            static_cast<void>(dross::thread::current());
         });
     }
     for (auto& poster : posters) {
@@ -334,7 +334,7 @@ TEST(thread_test, many_threads_drive_the_registry_and_the_loop_concurrently)
 
     for (auto& worker : workers) {
         ASSERT_TRUE(worker.perform([]() {
-            dross::current_thread().quit();
+            dross::thread::current().quit();
         }));
     }
     for (auto& worker : workers) {
@@ -365,7 +365,7 @@ TEST(thread_test, join_blocks_until_another_thread_ends)
     EXPECT_FALSE(join_returned.load());
 
     ASSERT_TRUE(worker.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
 
     ASSERT_TRUE(watcher.join_for(kTimeout));
@@ -378,34 +378,34 @@ TEST(thread_test, join_on_the_calling_threads_own_handle_returns_at_once)
     std::atomic<bool> returned_before_quit{ false };
 
     ASSERT_TRUE(worker.perform([&returned_before_quit]() {
-        dross::current_thread().join();
+        dross::thread::current().join();
         returned_before_quit.store(true);
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
 
     ASSERT_TRUE(worker.join_for(kTimeout));
     EXPECT_TRUE(returned_before_quit.load());
 }
 
-TEST(thread_test, is_current_thread_and_join_work_on_a_record_reached_via_all_threads_without_adoption)
+TEST(thread_test, is_current_and_join_work_on_a_record_reached_via_all_without_adoption)
 {
     // A worker asks about the main thread first, so the main thread's own
     // record gets registered without the main thread itself ever going
     // through current_thread_storage(). This is exactly how defect 1 arose:
-    // a thread reaching its own record through all_threads() without ever
+    // a thread reaching its own record through thread::all() without ever
     // having been adopted.
     auto finder = dross::thread::create([]() {
-        static_cast<void>(dross::main_thread());
+        static_cast<void>(dross::thread::main());
     }).value();
     ASSERT_TRUE(finder.join_for(kTimeout));
 
-    std::vector<dross::thread> threads = dross::all_threads();
+    std::vector<dross::thread> threads = dross::thread::all();
     const auto it = std::find_if(threads.begin(), threads.end(), [](const dross::thread& candidate) {
-        return candidate.is_current_thread();
+        return candidate.is_current();
     });
 
     // Gated behind this assertion rather than calling join() unconditionally
-    // below: before the fix, is_current_thread() returned false here, and
+    // below: before the fix, is_current() returned false here, and
     // join() would then have waited forever instead of returning at once.
     ASSERT_NE(it, threads.end());
 
@@ -431,7 +431,7 @@ TEST(thread_test, copy_assignment_names_the_same_thread)
     EXPECT_TRUE(second == first);
 
     ASSERT_TRUE(first.perform([]() {
-        dross::current_thread().quit();
+        dross::thread::current().quit();
     }));
     ASSERT_TRUE(first.join_for(kTimeout));
 }
@@ -444,8 +444,8 @@ TEST(thread_test, an_adopted_thread_that_touched_the_loop_first_reports_perform_
         // Touches the run loop module before this one, so the run loop's
         // own thread-local holder is constructed first and destroyed last
         // on this thread. This is exactly how defect 2 arose.
-        static_cast<void>(dross::current_runloop());
-        adopted = dross::current_thread();
+        static_cast<void>(dross::runloop::current());
+        adopted = dross::thread::current();
     }).value();
 
     ASSERT_TRUE(worker.join_for(kTimeout));
@@ -456,7 +456,7 @@ TEST(thread_test, an_adopted_thread_that_touched_the_loop_first_reports_perform_
     }));
 }
 
-TEST(thread_test, current_thread_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
+TEST(thread_test, current_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)
 {
     struct destructor_probe final {
         std::function<void()> on_destroy;
@@ -473,19 +473,19 @@ TEST(thread_test, current_thread_is_defined_from_a_thread_local_destructor_that_
     // this module's own thread-local holder before the body ever runs,
     // which would construct it before probe below rather than after.
     std::thread worker{ [&performed, &was_finished]() {
-        // Constructed before this thread ever calls current_thread(), so it
+        // Constructed before this thread ever calls thread::current(), so it
         // is destroyed after that thread's own holder: the same ordering
         // that makes a user's own thread-local destructor run after this
         // library's when the user's was constructed first.
         thread_local destructor_probe probe{ [&performed, &was_finished]() {
-            dross::thread self = dross::current_thread();
+            dross::thread self = dross::thread::current();
             performed = self.perform([]() {
             });
             was_finished = self.finished();
         } };
         static_cast<void>(probe);
 
-        static_cast<void>(dross::current_thread());
+        static_cast<void>(dross::thread::current());
     } };
     worker.join();
 
@@ -495,18 +495,18 @@ TEST(thread_test, current_thread_is_defined_from_a_thread_local_destructor_that_
     EXPECT_TRUE(*was_finished);
 }
 
-TEST(thread_test, a_worker_asking_for_main_thread_first_still_reaches_the_real_main_loop)
+TEST(thread_test, a_worker_asking_for_the_main_thread_first_still_reaches_the_real_main_loop)
 {
     // The main thread has not used the module yet in this process; a worker
-    // is the first to ask for main_thread(). native::main_thread_id() and
-    // main_runloop() are both defined to answer correctly regardless of
+    // is the first to ask for thread::main(). native::main_thread_id() and
+    // runloop::main() are both defined to answer correctly regardless of
     // which thread asks, so the task below must still land on the real main
     // thread's loop, not on whichever thread happens to build the record.
     std::atomic<bool> queued{ false };
     auto finder = dross::thread::create([&queued]() {
-        dross::thread main_handle = dross::main_thread();
+        dross::thread main_handle = dross::thread::main();
         queued.store(main_handle.perform([]() {
-            dross::main_runloop().quit();
+            dross::runloop::main().quit();
         }));
     }).value();
     ASSERT_TRUE(finder.join_for(kTimeout));
@@ -515,7 +515,7 @@ TEST(thread_test, a_worker_asking_for_main_thread_first_still_reaches_the_real_m
     // Run on the real main thread. If the task above had landed on the
     // wrong loop, nothing would ever call quit() here, and this would run
     // out its whole timeout instead of returning early with one task run.
-    EXPECT_EQ(dross::main_runloop().run_for(kTimeout), 1U);
+    EXPECT_EQ(dross::runloop::main().run_for(kTimeout), 1U);
 }
 
 TEST(thread_test, join_for_with_a_huge_timeout_does_not_overflow)
