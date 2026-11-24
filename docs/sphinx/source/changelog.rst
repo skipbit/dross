@@ -117,8 +117,8 @@ Changed
   ``std::invalid_argument``
 
 - The functions that name a thread or a run loop are static members of
-  the type they give, as ``create()`` is, and the functions of the old
-  names are removed: ``main_thread()`` becomes ``thread::main()``,
+  the type they give, as ``thread::create()`` is, and the functions of the
+  old names are removed: ``main_thread()`` becomes ``thread::main()``,
   ``current_thread()`` becomes ``thread::current()``, ``all_threads()``
   becomes ``thread::all()``, ``main_runloop()`` becomes
   ``runloop::main()``, and ``current_runloop()`` becomes
