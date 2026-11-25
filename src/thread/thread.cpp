@@ -210,6 +210,11 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
     try {
         auto self = std::make_shared<storage>(std::move(source));
 
+        // Held from before the thread starts, so the new thread waits at its
+        // first use of _mutex until _os_thread is set. join() through a
+        // handle from thread::all() then never finds it unset.
+        std::unique_lock<std::mutex> lock{ self->_mutex };
+
         auto runner = start_thread([self, body = std::move(body), one_shot]() mutable {
             run_on_new_thread(std::move(self), std::move(body), one_shot);
         });
@@ -217,7 +222,6 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
             return std::unexpected(std::move(runner).error());
         }
 
-        std::unique_lock<std::mutex> lock{ self->_mutex };
         self->_os_thread = std::move(*runner);
         self->_ready_cv.wait(lock, [&self]() {
             return self->_published;
