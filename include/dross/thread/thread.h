@@ -19,14 +19,15 @@ namespace dross {
  * Every thread it starts runs its own run loop (see runloop), and so accepts
  * tasks through perform(). Two kinds of thread can be started:
  * - create() starts a thread that runs its loop until quit()
- * - create(body) starts a thread whose loop runs body first and ends once
- *   there is nothing left to do: body has returned, no task is queued and
- *   no timer is installed. A task performed while body runs therefore runs
- *   after it, and a timer that keeps repeating keeps the thread until
- *   quit()
+ * - create(body) starts a thread that runs body and then its loop, which
+ *   ends once there is nothing left to do: no task is queued and no timer
+ *   is installed. A task performed while body runs therefore runs after
+ *   it, and a timer that keeps repeating keeps the thread until quit()
  *
- * Either kind refuses tasks from the moment its loop stops, so a task
- * perform() accepts always runs unless quit() drops it.
+ * body always runs to its end, even when quit() comes first; quit() then
+ * stops the loop once body has returned. Either kind refuses tasks from the
+ * moment its loop stops, so a task perform() accepts always runs unless
+ * quit() drops it.
  *
  * A thread the library did not start can still be named: thread::main() names
  * the process's initial thread, and thread::current() adopts whichever thread
@@ -105,10 +106,9 @@ public:
      * start it, or std::errc::not_enough_memory when there is no memory to
      * start it
      *
-     * body runs as the first task on the new thread's run loop. The thread
-     * ends once body has returned, no task is queued and no timer is
-     * installed. Blocks until the new thread has published its run loop and
-     * native id.
+     * body runs on the new thread before its run loop, and the thread ends
+     * once body has returned, no task is queued and no timer is installed.
+     * Blocks until the new thread has published its run loop and native id.
      */
     [[nodiscard]] static std::expected<thread, error> create(std::function<void()> body);
 

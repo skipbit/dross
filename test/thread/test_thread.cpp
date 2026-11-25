@@ -278,6 +278,50 @@ TEST(thread_test, a_one_shot_thread_stays_until_its_timer_fires)
     EXPECT_TRUE(fired.load());
 }
 
+TEST(thread_test, a_one_shot_threads_body_runs_to_its_end_after_quit)
+{
+    dross_test::event quit_sent;
+    std::atomic<bool> body_done{ false };
+    std::atomic<bool> task_ran{ false };
+    auto worker = dross::thread::create([&quit_sent, &body_done]() {
+        ASSERT_TRUE(quit_sent.wait());
+        body_done.store(true);
+    }).value();
+
+    ASSERT_TRUE(worker.perform([&task_ran]() {
+        task_ran.store(true);
+    }));
+    worker.quit();
+    quit_sent.set();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(body_done.load());
+    EXPECT_FALSE(task_ran.load());
+}
+
+TEST(thread_test, a_run_inside_a_one_shot_threads_body_takes_its_quit)
+{
+    std::atomic<bool> second_run_ran{ false };
+    auto worker = dross::thread::create([&second_run_ran]() {
+        auto loop = dross::runloop::current();
+        loop.perform([loop]() mutable {
+            loop.quit();
+        });
+        loop.run();
+
+        loop.perform([&second_run_ran]() {
+            second_run_ran.store(true);
+        });
+        loop.perform([loop]() mutable {
+            loop.quit();
+        });
+        loop.run();
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(second_run_ran.load());
+}
+
 TEST(thread_test, a_one_shot_thread_with_an_empty_body_ends)
 {
     auto worker = dross::thread::create(std::function<void()>{}).value();

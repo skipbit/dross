@@ -129,7 +129,8 @@ Changed
   accepts tasks through ``perform()``. ``body`` runs first, and the thread
   ends once ``body`` has returned, no task is queued and no timer is
   installed, so a task performed while ``body`` runs runs after it.
-  ``perform()`` on such a thread used to return false
+  ``perform()`` on such a thread used to return false. A ``body`` that
+  leaves a repeating timer installed now keeps the thread until ``quit()``
 
 - A thread that ``thread::create()`` or ``thread::create(body)`` started
   refuses tasks as soon as its run loop stops, and drops the tasks

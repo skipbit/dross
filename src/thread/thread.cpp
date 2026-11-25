@@ -246,12 +246,6 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     this_thread_holder().install(self);
     self->set_native_id(native::thread_id());
     self->_loop = runloop::current();
-    // Queued before the handle is published, so body runs ahead of any task
-    // performed through it. An empty body is refused here and the thread
-    // ends once idle, the same as one whose body returns at once.
-    if (one_shot) {
-        self->_loop->perform(std::move(body));
-    }
     register_self(self);
 
     {
@@ -260,7 +254,14 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     }
     self->_ready_cv.notify_all();
 
-    // The loop refuses tasks from here on, so none is accepted that would
+    // Called directly rather than queued, so quit() never drops body and a
+    // run() inside body is the outermost one. Tasks performed while body
+    // runs wait on the loop until it returns.
+    if (one_shot && body) {
+        body();
+    }
+
+    // Once the loop stops it refuses tasks, so none is accepted that would
     // never run, and it drops what quit() left queued.
     if (one_shot) {
         runloop_access::run_to_end_when_idle(*self->_loop);
