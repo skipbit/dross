@@ -193,6 +193,7 @@ runloop::storage::held_task runloop::storage::take_due_timer(std::chrono::steady
 runloop::storage::held_task runloop::storage::next(std::unique_lock<std::mutex>& lock,
                                                    std::chrono::steady_clock::time_point deadline,
                                                    bool consume_quit,
+                                                   when_idle idle,
                                                    pass& current_pass)
 {
     // Set once nothing is due or queued in current_pass and it has already
@@ -239,6 +240,11 @@ runloop::storage::held_task runloop::storage::next(std::unique_lock<std::mutex>&
             continue;
         }
 
+        if ((idle == when_idle::finish) && _timers.empty()) {
+            _finished = true;
+            return nullptr;
+        }
+
         const auto current = now();
 
         // The earlier of the caller's own deadline and the next timer due,
@@ -273,7 +279,7 @@ void runloop::storage::run_released(std::unique_lock<std::mutex>& lock, held_tas
     lock.lock();
 }
 
-std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point deadline)
+std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point deadline, when_idle idle)
 {
     const running_mark mark{ *this };
 
@@ -282,7 +288,7 @@ std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point de
     pass current_pass = fresh_pass();
 
     while (deadline == kNoDeadline || now() < deadline) {
-        auto work = next(lock, deadline, mark.outermost(), current_pass);
+        auto work = next(lock, deadline, mark.outermost(), idle, current_pass);
         if (! work) {
             break;
         }
@@ -296,12 +302,21 @@ std::size_t runloop::storage::run_until(std::chrono::steady_clock::time_point de
 
 std::size_t runloop::storage::run()
 {
-    return run_until(kNoDeadline);
+    return run_until(kNoDeadline, when_idle::wait);
 }
 
 std::size_t runloop::storage::run_for(std::chrono::milliseconds timeout)
 {
-    return run_until(deadline::after(now(), timeout));
+    return run_until(deadline::after(now(), timeout), when_idle::wait);
+}
+
+std::size_t runloop::storage::run_to_end(when_idle idle)
+{
+    // Finished only after run_until() returns, so the destructors of the
+    // tasks it drops see is_running() as false.
+    const auto ran = run_until(kNoDeadline, idle);
+    finish();
+    return ran;
 }
 
 bool runloop::storage::run_one()
@@ -310,7 +325,7 @@ bool runloop::storage::run_one()
 
     std::unique_lock<std::mutex> lock{ _mutex };
     pass current_pass = fresh_pass();
-    auto work = next(lock, kNoDeadline, mark.outermost(), current_pass);
+    auto work = next(lock, kNoDeadline, mark.outermost(), when_idle::wait, current_pass);
     if (! work) {
         return false;
     }
@@ -516,6 +531,16 @@ runloop runloop_access::standalone(std::shared_ptr<const time_source> source)
 bool runloop_access::finished(const runloop& loop)
 {
     return loop._store->finished();
+}
+
+std::size_t runloop_access::run_to_end(runloop& loop)
+{
+    return loop._store->run_to_end(runloop::storage::when_idle::wait);
+}
+
+std::size_t runloop_access::run_to_end_when_idle(runloop& loop)
+{
+    return loop._store->run_to_end(runloop::storage::when_idle::finish);
 }
 
 }  // namespace dross

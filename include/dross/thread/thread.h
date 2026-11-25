@@ -13,16 +13,21 @@
 namespace dross {
 
 /**
- * @brief A handle to an OS thread, running either a run loop or a one-shot
- * body.
+ * @brief A handle to an OS thread running its own run loop.
  *
- * dross::thread starts a detached OS thread and gives back a handle to it.
- * Two kinds of thread can be started:
- * - create() starts a thread that runs its own run loop (see runloop), which
- *   this library drives by calling run() on it, and so accepts tasks
- *   through perform() for as long as it runs
- * - create(body) starts a thread that runs body once and then ends; nothing
- *   drives a loop for it, so perform() on it always returns false
+ * dross::thread starts an OS thread and gives back a handle to it.
+ * Every thread it starts runs its own run loop (see runloop), and so accepts
+ * tasks through perform(). Two kinds of thread can be started:
+ * - create() starts a thread that runs its loop until quit()
+ * - create(body) starts a thread that runs body and then its loop, which
+ *   ends once there is nothing left to do: no task is queued and no timer
+ *   is installed. A task performed while body runs therefore runs after
+ *   it, and a timer that keeps repeating keeps the thread until quit()
+ *
+ * body always runs to its end, even when quit() comes first; quit() then
+ * stops the loop once body has returned. Either kind refuses tasks from the
+ * moment its loop stops, so a task perform() accepts always runs unless
+ * quit() drops it.
  *
  * A thread the library did not start can still be named: thread::main() names
  * the process's initial thread, and thread::current() adopts whichever thread
@@ -48,12 +53,17 @@ namespace dross {
  * - cancel() only raises a stop request that a body polls; it does not
  *   touch the thread's run loop. A body observes it by polling
  *   thread::current().stop_requested() and returning on its own
- * - quit() stops the thread's run loop, if it has one, keeping its queued
- *   tasks; the loop's own clear() is what drops them
+ * - quit() stops the thread's run loop once the task it is running
+ *   returns; the thread then ends, dropping the tasks still queued
  *
  * Waiting:
- * - join() and join_for() wait on a flag, not on the OS thread, so several
- *   handles may wait at once and the wait can be bounded
+ * - For a thread dross started, join() and join_for() wait until the OS
+ *   thread itself has ended. For a thread dross only adopted, they wait
+ *   until its bookkeeping in this library has been torn down
+ * - Several handles may wait at once
+ * - join_for() bounds the wait for that bookkeeping. What the OS thread
+ *   still has to tear down after it is waited for without a bound, which
+ *   is normally a brief moment
  * - Calling join() from the thread it names would deadlock forever, so it
  *   returns at once instead; join_for() does the same, for the same reason
  *
@@ -89,15 +99,16 @@ public:
     [[nodiscard]] static std::expected<thread, error> create();
 
     /**
-     * @brief Start a thread that runs body once and then ends.
-     * @param body The function the new thread runs
+     * @brief Start a thread that runs body and ends once nothing is left.
+     * @param body The function the new thread runs first
      * @return A handle to the new thread, or
      * std::errc::resource_unavailable_try_again when the system will not
      * start it, or std::errc::not_enough_memory when there is no memory to
      * start it
      *
-     * The thread does not run a loop, so perform() on it always returns
-     * false. Blocks until the new thread has published its native id.
+     * body runs on the new thread before its run loop, and the thread ends
+     * once body has returned, no task is queued and no timer is installed.
+     * Blocks until the new thread has published its run loop and native id.
      */
     [[nodiscard]] static std::expected<thread, error> create(std::function<void()> body);
 
@@ -169,16 +180,16 @@ public:
      * @param task The task, which must be callable
      * @return true when the task was queued
      *
-     * Delegates to the thread's run loop. Returns false when the thread has
-     * no run loop (a one-shot thread), the task is empty, or the thread has
-     * ended.
+     * Delegates to the thread's run loop. Returns false when the task is
+     * empty, or once the thread's loop has stopped.
      */
     bool perform(std::function<void()> task);
 
     /**
-     * @brief Stop this thread's run loop, keeping its queued tasks.
+     * @brief Stop this thread's run loop.
      *
-     * Has no effect on a one-shot thread, which has no run loop to stop.
+     * Takes effect once the task the loop is running returns. A thread
+     * dross started then ends and drops the tasks still queued.
      */
     void quit();
 
@@ -194,9 +205,9 @@ public:
     /**
      * @brief Wait for this thread to end.
      *
-     * Waits on a flag rather than the OS thread, so several handles may
-     * join at once. Calling this from the thread it names would deadlock
-     * forever, so it returns at once instead.
+     * For a thread dross started, waits until the OS thread itself has
+     * ended. Several handles may join at once. Calling this from the thread
+     * it names would deadlock forever, so it returns at once instead.
      */
     void join();
 
@@ -205,9 +216,13 @@ public:
      * @param timeout How long to wait
      * @return true when the thread has ended
      *
-     * A timeout of zero does not wait; it reports whether the thread has
-     * already ended. Calling this from the thread it names returns at once,
-     * for the same reason as join().
+     * When it returns true, a thread dross started has ended as join()
+     * waits for it to. The timeout bounds the wait for the thread's
+     * bookkeeping in this library; what the OS thread still has to tear
+     * down after that is waited for without a bound, which is normally a
+     * brief moment. A timeout of zero waits only for that. Calling this
+     * from the thread it names returns at once, for the same reason as
+     * join().
      */
     bool join_for(std::chrono::milliseconds timeout);
 

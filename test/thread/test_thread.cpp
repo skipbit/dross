@@ -1,5 +1,6 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
+#include "dross/thread/timer.h"
 #include "observed_time_source.h"
 #include "test_support.h"
 #include "thread/thread_access.h"
@@ -14,6 +15,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <pthread.h>
 #include <system_error>
 #include <thread>
 #include <vector>
@@ -21,6 +23,54 @@
 namespace {
 
 using dross_test::kTimeout;
+
+// A value the system destroys as the OS thread ends, after the C++
+// thread-local destructors on that thread have run, slowly enough that a
+// join that does not wait for the thread itself returns first.
+class os_thread_end_probe final {
+public:
+    os_thread_end_probe()
+    {
+        _created = (pthread_key_create(&_key, &os_thread_end_probe::on_destroy) == 0);
+    }
+
+    ~os_thread_end_probe()
+    {
+        if (_created) {
+            pthread_key_delete(_key);
+        }
+    }
+
+    os_thread_end_probe(const os_thread_end_probe& other) = delete;
+    os_thread_end_probe& operator=(const os_thread_end_probe& other) = delete;
+
+    bool created() const
+    {
+        return _created;
+    }
+
+    // Called on the thread to watch.
+    void arm()
+    {
+        pthread_setspecific(_key, &_destroyed);
+    }
+
+    bool destroyed() const
+    {
+        return _destroyed.load();
+    }
+
+private:
+    static void on_destroy(void* value)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });
+        static_cast<std::atomic<bool>*>(value)->store(true);
+    }
+
+    pthread_key_t _key{};
+    bool _created{ false };
+    std::atomic<bool> _destroyed{ false };
+};
 
 }  // namespace
 
@@ -172,6 +222,111 @@ TEST(thread_test, a_one_shot_thread_runs_its_body_and_ends)
     EXPECT_TRUE(ran.load());
     EXPECT_FALSE(worker.perform([]() {
     }));
+}
+
+TEST(thread_test, a_one_shot_thread_runs_a_task_performed_while_its_body_runs)
+{
+    dross_test::event performed;
+    std::atomic<bool> body_done{ false };
+    std::atomic<bool> ran_after_body{ false };
+    std::atomic<std::uint64_t> ran_on{ 0 };
+    auto worker = dross::thread::create([&performed, &body_done]() {
+        ASSERT_TRUE(performed.wait());
+        body_done.store(true);
+    }).value();
+
+    ASSERT_TRUE(worker.perform([&body_done, &ran_after_body, &ran_on]() {
+        ran_after_body.store(body_done.load());
+        ran_on.store(dross::thread::current().native_id().value());
+    }));
+    performed.set();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(ran_after_body.load());
+    ASSERT_TRUE(worker.native_id().has_value());
+    EXPECT_EQ(ran_on.load(), *worker.native_id());
+}
+
+TEST(thread_test, a_one_shot_threads_body_runs_before_a_task_performed_at_once)
+{
+    std::atomic<bool> body_ran{ false };
+    std::atomic<bool> task_saw_body{ false };
+    auto worker = dross::thread::create([&body_ran]() {
+        body_ran.store(true);
+    }).value();
+
+    // Accepted or refused depending on whether the thread has already ended;
+    // either way the body has run first.
+    const bool accepted = worker.perform([&body_ran, &task_saw_body]() {
+        task_saw_body.store(body_ran.load());
+    });
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_EQ(task_saw_body.load(), accepted);
+}
+
+TEST(thread_test, a_one_shot_thread_stays_until_its_timer_fires)
+{
+    std::atomic<bool> fired{ false };
+    auto worker = dross::thread::create([&fired]() {
+        dross::timer::once(std::chrono::milliseconds{ 50 }, [&fired](dross::timer) {
+            fired.store(true);
+        });
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(fired.load());
+}
+
+TEST(thread_test, a_one_shot_threads_body_runs_to_its_end_after_quit)
+{
+    dross_test::event quit_sent;
+    std::atomic<bool> body_done{ false };
+    std::atomic<bool> task_ran{ false };
+    auto worker = dross::thread::create([&quit_sent, &body_done]() {
+        ASSERT_TRUE(quit_sent.wait());
+        body_done.store(true);
+    }).value();
+
+    ASSERT_TRUE(worker.perform([&task_ran]() {
+        task_ran.store(true);
+    }));
+    worker.quit();
+    quit_sent.set();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(body_done.load());
+    EXPECT_FALSE(task_ran.load());
+}
+
+TEST(thread_test, a_run_inside_a_one_shot_threads_body_takes_its_quit)
+{
+    std::atomic<bool> second_run_ran{ false };
+    auto worker = dross::thread::create([&second_run_ran]() {
+        auto loop = dross::runloop::current();
+        loop.perform([loop]() mutable {
+            loop.quit();
+        });
+        loop.run();
+
+        loop.perform([&second_run_ran]() {
+            second_run_ran.store(true);
+        });
+        loop.perform([loop]() mutable {
+            loop.quit();
+        });
+        loop.run();
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(second_run_ran.load());
+}
+
+TEST(thread_test, a_one_shot_thread_with_an_empty_body_ends)
+{
+    auto worker = dross::thread::create(std::function<void()>{}).value();
+
+    EXPECT_TRUE(worker.join_for(kTimeout));
 }
 
 TEST(thread_test, a_loop_thread_the_system_will_not_start_is_reported)
@@ -370,6 +525,58 @@ TEST(thread_test, join_blocks_until_another_thread_ends)
 
     ASSERT_TRUE(watcher.join_for(kTimeout));
     EXPECT_TRUE(join_returned.load());
+}
+
+TEST(thread_test, join_waits_for_the_os_thread_to_end)
+{
+    os_thread_end_probe probe;
+    ASSERT_TRUE(probe.created());
+    auto worker = dross::thread::create([&probe]() {
+        probe.arm();
+    }).value();
+
+    worker.join();
+    EXPECT_TRUE(probe.destroyed());
+}
+
+TEST(thread_test, join_for_waits_for_the_os_thread_to_end)
+{
+    os_thread_end_probe probe;
+    ASSERT_TRUE(probe.created());
+    auto worker = dross::thread::create([&probe]() {
+        probe.arm();
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(probe.destroyed());
+}
+
+TEST(thread_test, two_handles_joining_at_once_both_wait_for_the_os_thread_to_end)
+{
+    os_thread_end_probe probe;
+    ASSERT_TRUE(probe.created());
+    dross_test::event go;
+    auto worker = dross::thread::create([&probe, &go]() {
+        probe.arm();
+        ASSERT_TRUE(go.wait());
+    }).value();
+
+    std::atomic<bool> first_saw{ false };
+    std::atomic<bool> second_saw{ false };
+    std::thread first{ [worker, &probe, &first_saw]() mutable {
+        worker.join();
+        first_saw.store(probe.destroyed());
+    } };
+    std::thread second{ [worker, &probe, &second_saw]() mutable {
+        worker.join();
+        second_saw.store(probe.destroyed());
+    } };
+    go.set();
+    first.join();
+    second.join();
+
+    EXPECT_TRUE(first_saw.load());
+    EXPECT_TRUE(second_saw.load());
 }
 
 TEST(thread_test, join_on_the_calling_threads_own_handle_returns_at_once)

@@ -3,6 +3,7 @@
 #include "dross/thread/runloop.h"
 #include "thread/deadline.h"
 #include "thread/native.h"
+#include "thread/runloop_access.h"
 #include "thread/start_thread.h"
 #include "thread/teardown.h"
 #include "thread/thread_access.h"
@@ -25,6 +26,10 @@ namespace dross {
 class thread::storage final {
 public:
     explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
+    ~storage();
+
+    storage(const storage& other) = delete;
+    storage& operator=(const storage& other) = delete;
 
     static std::expected<std::shared_ptr<storage>, error> start_loop_thread(std::shared_ptr<const time_source> source);
     static std::expected<std::shared_ptr<storage>, error> start_one_shot_thread(std::function<void()> body,
@@ -64,9 +69,9 @@ private:
         std::shared_ptr<storage> _store;
     };
 
-    static std::expected<std::shared_ptr<storage>, error> start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source);
+    static std::expected<std::shared_ptr<storage>, error> start(std::function<void()> body, bool one_shot, std::shared_ptr<const time_source> source);
     static std::shared_ptr<storage> make_adopted();
-    static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop);
+    static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool one_shot);
 
     static current_holder& this_thread_holder();
     static std::mutex& registry_mutex();
@@ -78,6 +83,12 @@ private:
 
     void finish();
     void deregister();
+
+    // Waits for the OS thread itself to end, once _finished is set. Only
+    // the first caller joins it; the others wait for that join to finish.
+    // A thread dross did not start has nothing to join. Called with
+    // lock held on _mutex, which is held again on return.
+    void join_os_thread(std::unique_lock<std::mutex>& lock);
 
     // How join() and join_for() read the time and wait. Set once, at
     // construction, and never reassigned, so it is read without _mutex.
@@ -98,6 +109,17 @@ private:
     std::optional<std::uint64_t> _native_id;
     std::optional<runloop> _loop;
 
+    // The OS thread, for a thread dross started. Joined by the first
+    // join() or join_for() to see the thread finished, and otherwise
+    // detached when the last handle goes.
+    std::thread _os_thread;
+    std::once_flag _join_once;
+
+    // Set with _os_thread and never cleared. join_os_thread() reads this
+    // rather than _os_thread.joinable(), which the join itself changes
+    // outside _mutex.
+    bool _os_thread_kept{ false };
+
     // A plain flag rather than std::stop_source: <stop_token> is not in the
     // standard library Apple Clang ships, and nothing here needs more than
     // setting a flag and reading it.
@@ -107,6 +129,15 @@ private:
 thread::storage::storage(std::shared_ptr<const time_source> source)
     : _source{ std::move(source) }
 {
+}
+
+thread::storage::~storage()
+{
+    // May run on the thread itself, as its own bookkeeping is torn down,
+    // where joining would wait on itself.
+    if (_os_thread.joinable()) {
+        _os_thread.detach();
+    }
 }
 
 thread::storage::current_holder::~current_holder()
@@ -177,21 +208,26 @@ void thread::storage::finish()
     _done_cv.notify_all();
 }
 
-std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source)
+std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(std::function<void()> body, bool one_shot, std::shared_ptr<const time_source> source)
 {
     // Running out of memory is reported as start_thread() reports it.
     try {
         auto self = std::make_shared<storage>(std::move(source));
 
-        auto runner = start_thread([self, body = std::move(body), run_loop]() mutable {
-            run_on_new_thread(std::move(self), std::move(body), run_loop);
+        // Held from before the thread starts, so the new thread waits at its
+        // first use of _mutex until _os_thread is set. join() through a
+        // handle from thread::all() then never finds it unset.
+        std::unique_lock<std::mutex> lock{ self->_mutex };
+
+        auto runner = start_thread([self, body = std::move(body), one_shot]() mutable {
+            run_on_new_thread(std::move(self), std::move(body), one_shot);
         });
         if (! runner) {
             return std::unexpected(std::move(runner).error());
         }
-        runner->detach();
 
-        std::unique_lock<std::mutex> lock{ self->_mutex };
+        self->_os_thread = std::move(*runner);
+        self->_os_thread_kept = true;
         self->_ready_cv.wait(lock, [&self]() {
             return self->_published;
         });
@@ -202,16 +238,14 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
     }
 }
 
-void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop)
+void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool one_shot)
 {
     // Installed before anything else, so a call to thread::current() from
     // inside body or the loop returns this exact storage rather than
     // adopting a fresh one.
     this_thread_holder().install(self);
     self->set_native_id(native::thread_id());
-    if (run_loop) {
-        self->_loop = runloop::current();
-    }
+    self->_loop = runloop::current();
     register_self(self);
 
     {
@@ -220,10 +254,19 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     }
     self->_ready_cv.notify_all();
 
-    if (run_loop) {
-        self->_loop->run();
-    } else if (body) {
+    // Called directly rather than queued, so quit() never drops body and a
+    // run() inside body is the outermost one. Tasks performed while body
+    // runs wait on the loop until it returns.
+    if (one_shot && body) {
         body();
+    }
+
+    // Once the loop stops it refuses tasks, so none is accepted that would
+    // never run, and it drops what quit() left queued.
+    if (one_shot) {
+        runloop_access::run_to_end_when_idle(*self->_loop);
+    } else {
+        runloop_access::run_to_end(*self->_loop);
     }
 
     // The thread ends here. this_thread_holder()'s destructor, running as
@@ -233,13 +276,13 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
 
 std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start_loop_thread(std::shared_ptr<const time_source> source)
 {
-    return start(nullptr, true, std::move(source));
+    return start(nullptr, false, std::move(source));
 }
 
 std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start_one_shot_thread(std::function<void()> body,
                                                                                               std::shared_ptr<const time_source> source)
 {
-    return start(std::move(body), false, std::move(source));
+    return start(std::move(body), true, std::move(source));
 }
 
 std::shared_ptr<thread::storage> thread::storage::make_adopted()
@@ -321,6 +364,7 @@ bool thread::storage::perform(std::function<void()> task)
         }
     }
 
+    // Only the finished placeholder has no loop, and it returned above.
     if (! _loop) {
         return false;
     }
@@ -402,17 +446,13 @@ void thread::storage::join()
     while (! _finished) {
         _source->wait(lock, _done_cv);
     }
+    join_os_thread(lock);
 }
 
 bool thread::storage::join_for(std::chrono::milliseconds timeout)
 {
     if (is_current()) {
         return finished();
-    }
-
-    if (timeout <= std::chrono::milliseconds::zero()) {
-        const std::lock_guard<std::mutex> guard{ _mutex };
-        return _finished;
     }
 
     // wait_for() would hand steady_clock::now() + timeout to the clock
@@ -424,7 +464,26 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     while ((! _finished) && (_source->now() < deadline)) {
         _source->wait_until(lock, _done_cv, deadline);
     }
-    return _finished;
+    if (! _finished) {
+        return false;
+    }
+    // Not bounded by timeout: once _finished is set, the OS thread is
+    // only tearing down what is left of it.
+    join_os_thread(lock);
+    return true;
+}
+
+void thread::storage::join_os_thread(std::unique_lock<std::mutex>& lock)
+{
+    if (! _os_thread_kept) {
+        return;
+    }
+
+    lock.unlock();
+    std::call_once(_join_once, [this]() {
+        _os_thread.join();
+    });
+    lock.lock();
 }
 
 thread::thread(std::shared_ptr<storage> store) noexcept

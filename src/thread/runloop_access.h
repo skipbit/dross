@@ -3,6 +3,7 @@
 #include "dross/thread/runloop.h"
 #include "thread/time_source.h"
 
+#include <cstddef>
 #include <memory>
 
 // Ways to make and inspect a run loop that the public interface does not
@@ -18,6 +19,14 @@ public:
 
     // Whether loop's thread has ended, so a task given to it never runs.
     static bool finished(const runloop& loop);
+
+    // Runs loop until quit(), then ends it as its thread's end does: it
+    // refuses tasks from then on and drops what it still holds.
+    static std::size_t run_to_end(runloop& loop);
+
+    // The same, but runs until nothing is left: no task queued and no
+    // timer installed. See runloop::storage::run_to_end().
+    static std::size_t run_to_end_when_idle(runloop& loop);
 };
 
 }  // namespace dross
