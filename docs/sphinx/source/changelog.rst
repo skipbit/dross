@@ -125,6 +125,17 @@ Changed
   ``runloop::current()``. ``thread::is_current_thread()`` becomes
   ``thread::is_current()`` to go with them
 
+- A thread from ``thread::create(body)`` runs its own run loop and
+  accepts tasks through ``perform()``. ``body`` runs first, and the thread
+  ends once ``body`` has returned, no task is queued and no timer is
+  installed, so a task performed while ``body`` runs runs after it.
+  ``perform()`` on such a thread used to return false
+
+- A thread that ``thread::create()`` or ``thread::create(body)`` started
+  refuses tasks as soon as its run loop stops, and drops the tasks
+  ``quit()`` left queued then, rather than accepting tasks it would never
+  run until the thread had ended
+
 - ``toml::serialize`` reads the values it writes without copying them.
   With libstdc++, writing one key holding 1000 numbers takes 30
   allocations instead of 7,036

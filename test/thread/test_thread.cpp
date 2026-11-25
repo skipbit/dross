@@ -1,5 +1,6 @@
 #include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
+#include "dross/thread/timer.h"
 #include "observed_time_source.h"
 #include "test_support.h"
 #include "thread/thread_access.h"
@@ -172,6 +173,67 @@ TEST(thread_test, a_one_shot_thread_runs_its_body_and_ends)
     EXPECT_TRUE(ran.load());
     EXPECT_FALSE(worker.perform([]() {
     }));
+}
+
+TEST(thread_test, a_one_shot_thread_runs_a_task_performed_while_its_body_runs)
+{
+    dross_test::event performed;
+    std::atomic<bool> body_done{ false };
+    std::atomic<bool> ran_after_body{ false };
+    std::atomic<std::uint64_t> ran_on{ 0 };
+    auto worker = dross::thread::create([&performed, &body_done]() {
+        ASSERT_TRUE(performed.wait());
+        body_done.store(true);
+    }).value();
+
+    ASSERT_TRUE(worker.perform([&body_done, &ran_after_body, &ran_on]() {
+        ran_after_body.store(body_done.load());
+        ran_on.store(dross::thread::current().native_id().value());
+    }));
+    performed.set();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(ran_after_body.load());
+    ASSERT_TRUE(worker.native_id().has_value());
+    EXPECT_EQ(ran_on.load(), *worker.native_id());
+}
+
+TEST(thread_test, a_one_shot_threads_body_runs_before_a_task_performed_at_once)
+{
+    std::atomic<bool> body_ran{ false };
+    std::atomic<bool> task_saw_body{ false };
+    auto worker = dross::thread::create([&body_ran]() {
+        body_ran.store(true);
+    }).value();
+
+    // Accepted or refused depending on whether the thread has already ended;
+    // either way the body has run first.
+    const bool accepted = worker.perform([&body_ran, &task_saw_body]() {
+        task_saw_body.store(body_ran.load());
+    });
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_EQ(task_saw_body.load(), accepted);
+}
+
+TEST(thread_test, a_one_shot_thread_stays_until_its_timer_fires)
+{
+    std::atomic<bool> fired{ false };
+    auto worker = dross::thread::create([&fired]() {
+        dross::timer::once(std::chrono::milliseconds{ 50 }, [&fired](dross::timer) {
+            fired.store(true);
+        });
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(fired.load());
+}
+
+TEST(thread_test, a_one_shot_thread_with_an_empty_body_ends)
+{
+    auto worker = dross::thread::create(std::function<void()>{}).value();
+
+    EXPECT_TRUE(worker.join_for(kTimeout));
 }
 
 TEST(thread_test, a_loop_thread_the_system_will_not_start_is_reported)

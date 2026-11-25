@@ -140,12 +140,33 @@ TEST(notification_test, a_deferred_delivery_goes_with_a_thread_that_never_runs_i
     auto held = std::make_shared<int>(0);
     const std::weak_ptr<int> watch = held;
 
+    // A thread dross did not start: nothing drives its loop.
+    std::thread once{ [news, held = std::move(held)]() mutable {
+        news.notify(kHeld, std::move(held), kDeferred);
+    } };
+    once.join();
+
+    EXPECT_EQ(calls->load(), 0);
+    EXPECT_TRUE(watch.expired());
+}
+
+TEST(notification_test, a_deferred_delivery_from_a_one_shot_thread_runs_after_its_body)
+{
+    auto news = dross::broadcaster::create();
+    auto ears = dross::listener::create(news);
+    auto calls = std::make_shared<std::atomic<int>>(0);
+    auto token = subscribe(ears, kHeld, [calls](const std::shared_ptr<int>&) {
+        ++*calls;
+    }, dross::delivery::direct());
+    auto held = std::make_shared<int>(0);
+    const std::weak_ptr<int> watch = held;
+
     auto once = dross::thread::create([news, held = std::move(held)]() mutable {
         news.notify(kHeld, std::move(held), kDeferred);
     }).value();
     ASSERT_TRUE(once.join_for(kTimeoutMs));
 
-    EXPECT_EQ(calls->load(), 0);
+    EXPECT_EQ(calls->load(), 1);
     EXPECT_TRUE(watch.expired());
 }
 

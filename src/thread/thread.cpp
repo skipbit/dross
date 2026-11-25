@@ -3,6 +3,7 @@
 #include "dross/thread/runloop.h"
 #include "thread/deadline.h"
 #include "thread/native.h"
+#include "thread/runloop_access.h"
 #include "thread/start_thread.h"
 #include "thread/teardown.h"
 #include "thread/thread_access.h"
@@ -64,9 +65,9 @@ private:
         std::shared_ptr<storage> _store;
     };
 
-    static std::expected<std::shared_ptr<storage>, error> start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source);
+    static std::expected<std::shared_ptr<storage>, error> start(std::function<void()> body, bool one_shot, std::shared_ptr<const time_source> source);
     static std::shared_ptr<storage> make_adopted();
-    static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop);
+    static void run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool one_shot);
 
     static current_holder& this_thread_holder();
     static std::mutex& registry_mutex();
@@ -177,14 +178,14 @@ void thread::storage::finish()
     _done_cv.notify_all();
 }
 
-std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(std::function<void()> body, bool run_loop, std::shared_ptr<const time_source> source)
+std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(std::function<void()> body, bool one_shot, std::shared_ptr<const time_source> source)
 {
     // Running out of memory is reported as start_thread() reports it.
     try {
         auto self = std::make_shared<storage>(std::move(source));
 
-        auto runner = start_thread([self, body = std::move(body), run_loop]() mutable {
-            run_on_new_thread(std::move(self), std::move(body), run_loop);
+        auto runner = start_thread([self, body = std::move(body), one_shot]() mutable {
+            run_on_new_thread(std::move(self), std::move(body), one_shot);
         });
         if (! runner) {
             return std::unexpected(std::move(runner).error());
@@ -202,15 +203,19 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
     }
 }
 
-void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool run_loop)
+void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::function<void()> body, bool one_shot)
 {
     // Installed before anything else, so a call to thread::current() from
     // inside body or the loop returns this exact storage rather than
     // adopting a fresh one.
     this_thread_holder().install(self);
     self->set_native_id(native::thread_id());
-    if (run_loop) {
-        self->_loop = runloop::current();
+    self->_loop = runloop::current();
+    // Queued before the handle is published, so body runs ahead of any task
+    // performed through it. An empty body is refused here and the thread
+    // ends once idle, the same as one whose body returns at once.
+    if (one_shot) {
+        self->_loop->perform(std::move(body));
     }
     register_self(self);
 
@@ -220,11 +225,14 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     }
     self->_ready_cv.notify_all();
 
-    if (run_loop) {
+    if (one_shot) {
+        runloop_access::run_until_idle(*self->_loop);
+    } else {
         self->_loop->run();
-    } else if (body) {
-        body();
     }
+    // Refuses tasks from here on, so none is accepted that would never run,
+    // and drops what quit() left queued.
+    runloop_access::finish(*self->_loop);
 
     // The thread ends here. this_thread_holder()'s destructor, running as
     // this OS thread's storage is torn down, is what marks self finished
@@ -233,13 +241,13 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
 
 std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start_loop_thread(std::shared_ptr<const time_source> source)
 {
-    return start(nullptr, true, std::move(source));
+    return start(nullptr, false, std::move(source));
 }
 
 std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start_one_shot_thread(std::function<void()> body,
                                                                                               std::shared_ptr<const time_source> source)
 {
-    return start(std::move(body), false, std::move(source));
+    return start(std::move(body), true, std::move(source));
 }
 
 std::shared_ptr<thread::storage> thread::storage::make_adopted()
