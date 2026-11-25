@@ -20,13 +20,13 @@ public:
     // Whether loop's thread has ended, so a task given to it never runs.
     static bool finished(const runloop& loop);
 
-    // Runs loop until it has nothing left to do, then stops it taking
-    // tasks; see runloop::storage::run_until_idle().
-    static std::size_t run_until_idle(runloop& loop);
+    // Runs loop until quit(), then ends it as its thread's end does: it
+    // refuses tasks from then on and drops what it still holds.
+    static std::size_t run_to_end(runloop& loop);
 
-    // Stops loop taking tasks and drops what it still holds, as its
-    // thread's end does.
-    static void finish(runloop& loop);
+    // The same, but runs until nothing is left: no task queued and no
+    // timer installed. See runloop::storage::run_to_end().
+    static std::size_t run_to_end_when_idle(runloop& loop);
 };
 
 }  // namespace dross

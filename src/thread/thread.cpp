@@ -87,7 +87,7 @@ private:
     // Waits for the OS thread itself to end, once _finished is set. Only
     // the first caller joins it; the others wait for that join to finish.
     // A thread dross did not start has nothing to join. Called with
-    // lock held on _mutex.
+    // lock held on _mutex, which is held again on return.
     void join_os_thread(std::unique_lock<std::mutex>& lock);
 
     // How join() and join_for() read the time and wait. Set once, at
@@ -113,8 +113,12 @@ private:
     // join() or join_for() to see the thread finished, and otherwise
     // detached when the last handle goes.
     std::thread _os_thread;
-    bool _joining{ false };
-    bool _joined{ false };
+    std::once_flag _join_once;
+
+    // Set with _os_thread and never cleared. join_os_thread() reads this
+    // rather than _os_thread.joinable(), which the join itself changes
+    // outside _mutex.
+    bool _os_thread_kept{ false };
 
     // A plain flag rather than std::stop_source: <stop_token> is not in the
     // standard library Apple Clang ships, and nothing here needs more than
@@ -223,6 +227,7 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
         }
 
         self->_os_thread = std::move(*runner);
+        self->_os_thread_kept = true;
         self->_ready_cv.wait(lock, [&self]() {
             return self->_published;
         });
@@ -255,14 +260,13 @@ void thread::storage::run_on_new_thread(std::shared_ptr<storage> self, std::func
     }
     self->_ready_cv.notify_all();
 
+    // The loop refuses tasks from here on, so none is accepted that would
+    // never run, and it drops what quit() left queued.
     if (one_shot) {
-        runloop_access::run_until_idle(*self->_loop);
+        runloop_access::run_to_end_when_idle(*self->_loop);
     } else {
-        self->_loop->run();
+        runloop_access::run_to_end(*self->_loop);
     }
-    // Refuses tasks from here on, so none is accepted that would never run,
-    // and drops what quit() left queued.
-    runloop_access::finish(*self->_loop);
 
     // The thread ends here. this_thread_holder()'s destructor, running as
     // this OS thread's storage is torn down, is what marks self finished
@@ -359,6 +363,7 @@ bool thread::storage::perform(std::function<void()> task)
         }
     }
 
+    // Only the finished placeholder has no loop, and it returned above.
     if (! _loop) {
         return false;
     }
@@ -449,15 +454,6 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
         return finished();
     }
 
-    if (timeout <= std::chrono::milliseconds::zero()) {
-        std::unique_lock<std::mutex> lock{ _mutex };
-        if (! _finished) {
-            return false;
-        }
-        join_os_thread(lock);
-        return true;
-    }
-
     // wait_for() would hand steady_clock::now() + timeout to the clock
     // unclamped; for a timeout as large as milliseconds::max() that
     // overflows.
@@ -478,22 +474,15 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
 
 void thread::storage::join_os_thread(std::unique_lock<std::mutex>& lock)
 {
-    if (_joining) {
-        while (! _joined) {
-            _source->wait(lock, _done_cv);
-        }
-        return;
-    }
-    if (! _os_thread.joinable()) {
+    if (! _os_thread_kept) {
         return;
     }
 
-    _joining = true;
     lock.unlock();
-    _os_thread.join();
+    std::call_once(_join_once, [this]() {
+        _os_thread.join();
+    });
     lock.lock();
-    _joined = true;
-    _done_cv.notify_all();
 }
 
 thread::thread(std::shared_ptr<storage> store) noexcept

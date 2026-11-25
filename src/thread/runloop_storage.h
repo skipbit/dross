@@ -22,6 +22,13 @@ namespace dross {
 
 class runloop::storage final {
 public:
+    // What a running call does on finding no task queued and no timer
+    // installed: wait for more work, or finish the loop. See next().
+    enum class when_idle {
+        wait,
+        finish
+    };
+
     explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
 
     static std::shared_ptr<storage> main_loop();
@@ -34,11 +41,10 @@ public:
     std::size_t run_pending();
     std::size_t run_for(std::chrono::milliseconds timeout);
 
-    // Runs as run() does until there is nothing left to do: no task queued
-    // and no timer installed. Then it stops taking tasks, under the same
-    // lock as that check, so every task it accepted has run. Also returns
-    // on quit(), which leaves the loop as run() leaves it.
-    std::size_t run_until_idle();
+    // Runs the loop as run() does, or, given when_idle::finish, until
+    // nothing is left (see next()), and then finishes it as its thread's
+    // end does: it refuses tasks from then on and drops what quit() left.
+    std::size_t run_to_end(when_idle idle);
 
     void quit();
     void clear();
@@ -114,13 +120,13 @@ private:
     // next call starts a fresh one. Finding nothing due or queued also ends
     // it, since a fresh boundary may find what a stale one would miss.
     //
-    // With end_when_idle, finding no task queued and no timer installed
-    // marks the loop finished and returns an empty pointer instead of
-    // waiting.
+    // With when_idle::finish, finding no task queued and no timer installed
+    // marks the loop finished and returns an empty pointer. With
+    // when_idle::wait, it waits for more work instead.
     held_task next(std::unique_lock<std::mutex>& lock,
                    std::chrono::steady_clock::time_point deadline,
                    bool consume_quit,
-                   bool end_when_idle,
+                   when_idle idle,
                    pass& current_pass);
 
     // Runs one task or timer fire with the lock released, and takes the
@@ -128,7 +134,7 @@ private:
     // the lock as well. If the work throws, the lock stays released.
     void run_released(std::unique_lock<std::mutex>& lock, held_task& work);
 
-    std::size_t run_until(std::chrono::steady_clock::time_point deadline, bool end_when_idle);
+    std::size_t run_until(std::chrono::steady_clock::time_point deadline, when_idle idle);
 
     // Claims the next timer due at or before boundary and not yet in
     // handled, as timer_schedule::take_due() does, and returns a work item
