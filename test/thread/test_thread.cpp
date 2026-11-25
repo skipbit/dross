@@ -15,6 +15,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <pthread.h>
 #include <system_error>
 #include <thread>
 #include <vector>
@@ -22,6 +23,54 @@
 namespace {
 
 using dross_test::kTimeout;
+
+// A value the system destroys as the OS thread ends, after the C++
+// thread-local destructors on that thread have run, slowly enough that a
+// join that does not wait for the thread itself returns first.
+class os_thread_end_probe final {
+public:
+    os_thread_end_probe()
+    {
+        _created = (pthread_key_create(&_key, &os_thread_end_probe::on_destroy) == 0);
+    }
+
+    ~os_thread_end_probe()
+    {
+        if (_created) {
+            pthread_key_delete(_key);
+        }
+    }
+
+    os_thread_end_probe(const os_thread_end_probe& other) = delete;
+    os_thread_end_probe& operator=(const os_thread_end_probe& other) = delete;
+
+    bool created() const
+    {
+        return _created;
+    }
+
+    // Called on the thread to watch.
+    void arm()
+    {
+        pthread_setspecific(_key, &_destroyed);
+    }
+
+    bool destroyed() const
+    {
+        return _destroyed.load();
+    }
+
+private:
+    static void on_destroy(void* value)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });
+        static_cast<std::atomic<bool>*>(value)->store(true);
+    }
+
+    pthread_key_t _key{};
+    bool _created{ false };
+    std::atomic<bool> _destroyed{ false };
+};
 
 }  // namespace
 
@@ -432,6 +481,58 @@ TEST(thread_test, join_blocks_until_another_thread_ends)
 
     ASSERT_TRUE(watcher.join_for(kTimeout));
     EXPECT_TRUE(join_returned.load());
+}
+
+TEST(thread_test, join_waits_for_the_os_thread_to_end)
+{
+    os_thread_end_probe probe;
+    ASSERT_TRUE(probe.created());
+    auto worker = dross::thread::create([&probe]() {
+        probe.arm();
+    }).value();
+
+    worker.join();
+    EXPECT_TRUE(probe.destroyed());
+}
+
+TEST(thread_test, join_for_waits_for_the_os_thread_to_end)
+{
+    os_thread_end_probe probe;
+    ASSERT_TRUE(probe.created());
+    auto worker = dross::thread::create([&probe]() {
+        probe.arm();
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_TRUE(probe.destroyed());
+}
+
+TEST(thread_test, two_handles_joining_at_once_both_wait_for_the_os_thread_to_end)
+{
+    os_thread_end_probe probe;
+    ASSERT_TRUE(probe.created());
+    dross_test::event go;
+    auto worker = dross::thread::create([&probe, &go]() {
+        probe.arm();
+        ASSERT_TRUE(go.wait());
+    }).value();
+
+    std::atomic<bool> first_saw{ false };
+    std::atomic<bool> second_saw{ false };
+    std::thread first{ [worker, &probe, &first_saw]() mutable {
+        worker.join();
+        first_saw.store(probe.destroyed());
+    } };
+    std::thread second{ [worker, &probe, &second_saw]() mutable {
+        worker.join();
+        second_saw.store(probe.destroyed());
+    } };
+    go.set();
+    first.join();
+    second.join();
+
+    EXPECT_TRUE(first_saw.load());
+    EXPECT_TRUE(second_saw.load());
 }
 
 TEST(thread_test, join_on_the_calling_threads_own_handle_returns_at_once)

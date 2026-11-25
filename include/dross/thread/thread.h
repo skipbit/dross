@@ -15,7 +15,7 @@ namespace dross {
 /**
  * @brief A handle to an OS thread running its own run loop.
  *
- * dross::thread starts a detached OS thread and gives back a handle to it.
+ * dross::thread starts an OS thread and gives back a handle to it.
  * Every thread it starts runs its own run loop (see runloop), and so accepts
  * tasks through perform(). Two kinds of thread can be started:
  * - create() starts a thread that runs its loop until quit()
@@ -56,8 +56,13 @@ namespace dross {
  *   returns; the thread then ends, dropping the tasks still queued
  *
  * Waiting:
- * - join() and join_for() wait on a flag, not on the OS thread, so several
- *   handles may wait at once and the wait can be bounded
+ * - For a thread dross started, join() and join_for() wait until the OS
+ *   thread itself has ended. For a thread dross only adopted, they wait
+ *   until its bookkeeping in this library has been torn down
+ * - Several handles may wait at once
+ * - join_for() bounds the wait for that bookkeeping. What the OS thread
+ *   still has to tear down after it is waited for without a bound, which
+ *   is normally a brief moment
  * - Calling join() from the thread it names would deadlock forever, so it
  *   returns at once instead; join_for() does the same, for the same reason
  *
@@ -200,9 +205,9 @@ public:
     /**
      * @brief Wait for this thread to end.
      *
-     * Waits on a flag rather than the OS thread, so several handles may
-     * join at once. Calling this from the thread it names would deadlock
-     * forever, so it returns at once instead.
+     * For a thread dross started, waits until the OS thread itself has
+     * ended. Several handles may join at once. Calling this from the thread
+     * it names would deadlock forever, so it returns at once instead.
      */
     void join();
 
@@ -211,9 +216,13 @@ public:
      * @param timeout How long to wait
      * @return true when the thread has ended
      *
-     * A timeout of zero does not wait; it reports whether the thread has
-     * already ended. Calling this from the thread it names returns at once,
-     * for the same reason as join().
+     * When it returns true, a thread dross started has ended as join()
+     * waits for it to. The timeout bounds the wait for the thread's
+     * bookkeeping in this library; what the OS thread still has to tear
+     * down after that is waited for without a bound, which is normally a
+     * brief moment. A timeout of zero waits only for that. Calling this
+     * from the thread it names returns at once, for the same reason as
+     * join().
      */
     bool join_for(std::chrono::milliseconds timeout);
 

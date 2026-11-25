@@ -26,6 +26,10 @@ namespace dross {
 class thread::storage final {
 public:
     explicit storage(std::shared_ptr<const time_source> source = time_source::steady());
+    ~storage();
+
+    storage(const storage& other) = delete;
+    storage& operator=(const storage& other) = delete;
 
     static std::expected<std::shared_ptr<storage>, error> start_loop_thread(std::shared_ptr<const time_source> source);
     static std::expected<std::shared_ptr<storage>, error> start_one_shot_thread(std::function<void()> body,
@@ -80,6 +84,12 @@ private:
     void finish();
     void deregister();
 
+    // Waits for the OS thread itself to end, once _finished is set. Only
+    // the first caller joins it; the others wait for that join to finish.
+    // A thread dross did not start has nothing to join. Called with
+    // lock held on _mutex.
+    void join_os_thread(std::unique_lock<std::mutex>& lock);
+
     // How join() and join_for() read the time and wait. Set once, at
     // construction, and never reassigned, so it is read without _mutex.
     const std::shared_ptr<const time_source> _source;
@@ -99,6 +109,13 @@ private:
     std::optional<std::uint64_t> _native_id;
     std::optional<runloop> _loop;
 
+    // The OS thread, for a thread dross started. Joined by the first
+    // join() or join_for() to see the thread finished, and otherwise
+    // detached when the last handle goes.
+    std::thread _os_thread;
+    bool _joining{ false };
+    bool _joined{ false };
+
     // A plain flag rather than std::stop_source: <stop_token> is not in the
     // standard library Apple Clang ships, and nothing here needs more than
     // setting a flag and reading it.
@@ -108,6 +125,15 @@ private:
 thread::storage::storage(std::shared_ptr<const time_source> source)
     : _source{ std::move(source) }
 {
+}
+
+thread::storage::~storage()
+{
+    // May run on the thread itself, as its own bookkeeping is torn down,
+    // where joining would wait on itself.
+    if (_os_thread.joinable()) {
+        _os_thread.detach();
+    }
 }
 
 thread::storage::current_holder::~current_holder()
@@ -190,9 +216,9 @@ std::expected<std::shared_ptr<thread::storage>, error> thread::storage::start(st
         if (! runner) {
             return std::unexpected(std::move(runner).error());
         }
-        runner->detach();
 
         std::unique_lock<std::mutex> lock{ self->_mutex };
+        self->_os_thread = std::move(*runner);
         self->_ready_cv.wait(lock, [&self]() {
             return self->_published;
         });
@@ -410,6 +436,7 @@ void thread::storage::join()
     while (! _finished) {
         _source->wait(lock, _done_cv);
     }
+    join_os_thread(lock);
 }
 
 bool thread::storage::join_for(std::chrono::milliseconds timeout)
@@ -419,8 +446,12 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     }
 
     if (timeout <= std::chrono::milliseconds::zero()) {
-        const std::lock_guard<std::mutex> guard{ _mutex };
-        return _finished;
+        std::unique_lock<std::mutex> lock{ _mutex };
+        if (! _finished) {
+            return false;
+        }
+        join_os_thread(lock);
+        return true;
     }
 
     // wait_for() would hand steady_clock::now() + timeout to the clock
@@ -432,7 +463,33 @@ bool thread::storage::join_for(std::chrono::milliseconds timeout)
     while ((! _finished) && (_source->now() < deadline)) {
         _source->wait_until(lock, _done_cv, deadline);
     }
-    return _finished;
+    if (! _finished) {
+        return false;
+    }
+    // Not bounded by timeout: once _finished is set, the OS thread is
+    // only tearing down what is left of it.
+    join_os_thread(lock);
+    return true;
+}
+
+void thread::storage::join_os_thread(std::unique_lock<std::mutex>& lock)
+{
+    if (_joining) {
+        while (! _joined) {
+            _source->wait(lock, _done_cv);
+        }
+        return;
+    }
+    if (! _os_thread.joinable()) {
+        return;
+    }
+
+    _joining = true;
+    lock.unlock();
+    _os_thread.join();
+    lock.lock();
+    _joined = true;
+    _done_cv.notify_all();
 }
 
 thread::thread(std::shared_ptr<storage> store) noexcept
