@@ -30,6 +30,10 @@ namespace dross {
  * - The handle the callback receives is one of them while the callback
  *   runs. A copy of it kept from there keeps the timer going, and one held
  *   in the callback's own captures keeps it going until invalidate()
+ * - A timer releases its callback, and with it the callback's captures,
+ *   once it has stopped: at once if it is not firing, or else when that
+ *   fire returns. A handle the callback captures therefore does not keep
+ *   anything alive past the timer's end
  * - invalidate() is callable from any thread, is idempotent, and makes
  *   valid() false at once. The loop drops its own reference to an
  *   invalidated timer
@@ -41,6 +45,8 @@ namespace dross {
  * Firing:
  * - repeating() installs a timer that fires every interval until it is
  *   stopped; once() fires a single time and then invalidates itself
+ * - A fire the loop has already taken when the last handle goes on another
+ *   thread is skipped, but the loop still counts it among the work it ran
  * - The callback receives the timer itself, so it can invalidate() from
  *   inside to stop a repeating timer, or just read its own state
  * - The two-argument overloads install on runloop::current(); the

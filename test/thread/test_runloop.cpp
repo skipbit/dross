@@ -557,8 +557,10 @@ TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_th
     // themselves count as a release: only the very last reference does.
     auto released = std::make_shared<std::atomic<int>>(0);
     auto released_on_owner = std::make_shared<std::atomic<int>>(0);
+    // Outlives the thread, so the timer is still running when the loop ends.
+    std::optional<dross::timer> kept;
 
-    std::thread worker{ [released, released_on_owner]() {
+    std::thread worker{ [released, released_on_owner, &kept]() {
         const auto owner = std::this_thread::get_id();
         dross::runloop loop = dross::runloop::current();
 
@@ -574,8 +576,8 @@ TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_th
 
         loop.perform([resource = make_resource()]() {
         });
-        static_cast<void>(dross::timer::once(std::chrono::hours{ 1 }, [resource = make_resource()](dross::timer) {
-        }, loop));
+        kept = dross::timer::once(std::chrono::hours{ 1 }, [resource = make_resource()](dross::timer) {
+        }, loop);
 
         // The thread ends here without ever calling run(): neither the task
         // nor the timer above ever fires.
@@ -584,6 +586,7 @@ TEST(runloop_test, ending_a_loop_releases_its_queued_tasks_and_timers_on_that_th
 
     EXPECT_EQ(released->load(), 2);
     EXPECT_EQ(released_on_owner->load(), 2);
+    EXPECT_FALSE(kept->valid());
 }
 
 TEST(runloop_test, current_is_defined_from_a_thread_local_destructor_that_outlives_the_holder)

@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <thread>
@@ -210,6 +211,80 @@ TEST(timer_test, a_copy_the_callback_keeps_keeps_the_timer_going)
 
     kept.reset();
     EXPECT_EQ(loop.timer_count(), 0U);
+}
+
+TEST(timer_test, invalidate_releases_the_callback_while_a_handle_remains)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [held = std::move(resource)](dross::timer) {
+    }, loop);
+    EXPECT_FALSE(observed.expired());
+
+    t.invalidate();
+    EXPECT_TRUE(observed.expired());
+}
+
+TEST(timer_test, a_callback_holding_its_own_handle_is_released_once_the_timer_stops)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    auto slot = std::make_shared<std::optional<dross::timer>>();
+    *slot = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [slot, held = std::move(resource)](dross::timer) {
+    }, loop);
+    const std::weak_ptr<std::optional<dross::timer>> observed_slot = slot;
+    dross::timer t = slot->value();
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_FALSE(observed.expired());
+
+    t.invalidate();
+    slot.reset();
+    EXPECT_TRUE(observed.expired());
+    EXPECT_TRUE(observed_slot.expired());
+}
+
+TEST(timer_test, invalidate_from_inside_the_callback_releases_it_once_the_callback_returns)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    bool held_after_invalidate = false;
+    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [held = std::move(resource), &observed, &held_after_invalidate](dross::timer self) {
+        self.invalidate();
+        held_after_invalidate = ! observed.expired();
+    }, loop);
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_TRUE(held_after_invalidate);
+    EXPECT_TRUE(observed.expired());
+    EXPECT_FALSE(t.valid());
+}
+
+TEST(timer_test, a_one_shot_releases_its_callback_once_it_has_fired)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    dross::timer t = dross::timer::once(std::chrono::milliseconds{ 10 }, [held = std::move(resource)](dross::timer) {
+    }, loop);
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_TRUE(observed.expired());
+    EXPECT_FALSE(t.valid());
 }
 
 TEST(timer_test, dropping_the_last_handle_from_another_thread_while_the_loop_is_running)

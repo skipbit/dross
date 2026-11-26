@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 
 // The state behind a timer handle. Given its own header, rather than living
 // only in timer.cpp, because runloop.cpp needs the complete type too: a
@@ -24,8 +25,9 @@ public:
     // installed on its loop.
     static std::shared_ptr<storage> first_handle(const std::shared_ptr<storage>& store);
 
-    // Marks this timer invalid and, if it is still installed, asks its loop
-    // to drop it. Callable from any thread; idempotent.
+    // Stops this timer, the same as mark_invalid(), and, if it is still
+    // installed, asks its loop to drop it. Callable from any thread;
+    // idempotent.
     void invalidate();
 
     bool valid() const;
@@ -40,13 +42,14 @@ public:
 
     // Runs the callback with a handle to this timer, unless the last handle
     // has already gone. Called by the loop with its own lock released, the
-    // same as a task.
+    // same as a task. Releases the callback afterward if the timer is a
+    // one-shot or has stopped meanwhile.
     void fire();
 
-    // Marks this timer invalid without touching its loop. Used by the loop
-    // itself when it already knows the timer is gone: right after a
-    // one-shot fires, and when the loop drops every installed timer as it
-    // ends.
+    // Marks this timer invalid and releases its callback, unless a fire is
+    // running it, without touching its loop. Used by the loop itself when
+    // it already knows the timer is gone: right after a one-shot fires, and
+    // when the loop drops every installed timer as it ends.
     void mark_invalid();
 
 private:
@@ -54,7 +57,10 @@ private:
 
     const std::chrono::milliseconds _interval;
     const bool _repeats;
-    const std::function<void(timer)> _callback;
+    // Empty while a fire is running it and once the timer has stopped, so
+    // a callback holding a handle to its own timer does not keep it alive.
+    std::mutex _callback_mutex;
+    std::function<void(timer)> _callback;
 
     // Set once, at construction, and never reassigned, so concurrent calls
     // to invalidate() from any thread can read it without their own lock.
@@ -67,6 +73,7 @@ private:
     // after, by the loop that fires it.
     std::weak_ptr<storage> _handle;
 
+    // Written only under _callback_mutex; read without it.
     std::atomic<bool> _valid{ true };
 };
 

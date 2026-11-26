@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 namespace dross {
@@ -96,14 +97,45 @@ void timer::storage::fire()
     // Expired when the last handle went after the loop took this fire; the
     // handle's own invalidate() is then on its way.
     auto handle = _handle.lock();
-    if (handle && _callback) {
-        _callback(timer{ std::move(handle) });
+    if (! handle) {
+        return;
     }
+
+    std::function<void(timer)> running;
+    {
+        const std::lock_guard<std::mutex> guard{ _callback_mutex };
+        running.swap(_callback);
+    }
+    if (! running) {
+        return;
+    }
+
+    // Puts the callback back once it returns or throws, if the timer is
+    // still to fire again; otherwise running releases it, outside the lock.
+    const struct put_back final {
+        storage& self;
+        std::function<void(timer)>& running;
+        ~put_back()
+        {
+            const std::lock_guard<std::mutex> guard{ self._callback_mutex };
+            if (self._repeats && self._valid.load()) {
+                self._callback.swap(running);
+            }
+        }
+    } restore{ *this, running };
+    running(timer{ std::move(handle) });
 }
 
 void timer::storage::mark_invalid()
 {
-    _valid.store(false);
+    std::function<void(timer)> released;
+    {
+        const std::lock_guard<std::mutex> guard{ _callback_mutex };
+        _valid.store(false);
+        released.swap(_callback);
+    }
+    // released is destroyed here, outside the lock: its captures may hold
+    // a handle to this timer, and the last one going calls invalidate().
 }
 
 timer::timer(std::shared_ptr<storage> store) noexcept

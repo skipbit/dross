@@ -176,6 +176,11 @@ Fixed
   ``CMAKE_INSTALL_INCLUDEDIR`` as it is, instead of appending it to the
   prefix
 
+- A timer releases its callback once it has stopped, or when a fire that
+  is running it returns. It used to keep the callback while any handle
+  remained, so a callback that captured a handle to its own timer was
+  never released
+
 0.2.0 - 2026-11-03
 ------------------
 
