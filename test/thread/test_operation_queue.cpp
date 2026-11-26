@@ -478,15 +478,17 @@ TEST(operation_queue_test, a_task_can_perform_on_its_worker_and_install_a_timer_
         std::atomic<bool> fired_on_the_worker{ false };
     };
     auto shared = std::make_shared<state>();
+    // Apart from state, which the timer's own callback holds.
+    auto kept = std::make_shared<std::optional<dross::timer>>();
     auto queue = dross::operation_queue::create(2).value();
 
-    ASSERT_TRUE(queue.submit([shared]() {
+    ASSERT_TRUE(queue.submit([shared, kept]() {
         const dross::thread worker = dross::thread::current();
         dross::thread::current().perform([shared, worker]() {
             shared->performed_on_the_worker.store(worker == dross::thread::current());
             shared->performed.set();
         });
-        dross::timer::once(std::chrono::milliseconds{ 1 }, [shared, worker](dross::timer) {
+        *kept = dross::timer::once(std::chrono::milliseconds{ 1 }, [shared, worker](dross::timer) {
             shared->fired_on_the_worker.store(worker == dross::thread::current());
             shared->fired.set();
         });

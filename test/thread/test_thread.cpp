@@ -268,14 +268,28 @@ TEST(thread_test, a_one_shot_threads_body_runs_before_a_task_performed_at_once)
 TEST(thread_test, a_one_shot_thread_stays_until_its_timer_fires)
 {
     std::atomic<bool> fired{ false };
-    auto worker = dross::thread::create([&fired]() {
-        dross::timer::once(std::chrono::milliseconds{ 50 }, [&fired](dross::timer) {
+    std::optional<dross::timer> kept;
+    auto worker = dross::thread::create([&fired, &kept]() {
+        kept = dross::timer::once(std::chrono::milliseconds{ 50 }, [&fired](dross::timer) {
             fired.store(true);
         });
     }).value();
 
     ASSERT_TRUE(worker.join_for(kTimeout));
     EXPECT_TRUE(fired.load());
+}
+
+TEST(thread_test, a_one_shot_thread_ends_without_a_timer_whose_handles_are_gone)
+{
+    std::atomic<bool> fired{ false };
+    auto worker = dross::thread::create([&fired]() {
+        const dross::timer dropped = dross::timer::repeating(std::chrono::milliseconds{ 0 }, [&fired](dross::timer) {
+            fired.store(true);
+        });
+    }).value();
+
+    ASSERT_TRUE(worker.join_for(kTimeout));
+    EXPECT_FALSE(fired.load());
 }
 
 TEST(thread_test, a_one_shot_threads_body_runs_to_its_end_after_quit)
