@@ -138,10 +138,10 @@ struct operation_options final {
 class operation_queue final {
 public:
     /**
-     * @brief Start a queue with thread_count workers.
-     * @param thread_count The number of workers, at least one
+     * @brief Start a queue with max_concurrency workers.
+     * @param max_concurrency The number of workers, at least one
      * @return A handle to the new queue, or the error that kept it from
-     * starting: std::errc::invalid_argument when thread_count is zero, or
+     * starting: std::errc::invalid_argument when max_concurrency is zero, or
      * std::errc::resource_unavailable_try_again when the system will not
      * start a worker, or std::errc::not_enough_memory when there is no
      * memory to start one, in which case the workers already started end
@@ -149,7 +149,7 @@ public:
      *
      * Blocks until every worker has started.
      */
-    [[nodiscard]] static std::expected<operation_queue, error> create(std::size_t thread_count);
+    [[nodiscard]] static std::expected<operation_queue, error> create(std::size_t max_concurrency);
 
     /**
      * @brief Copy constructor, giving another handle to the same queue.
@@ -254,7 +254,7 @@ public:
      * @brief Get the number of workers.
      * @return The count the queue was made with
      */
-    std::size_t thread_count() const noexcept;
+    std::size_t max_concurrency() const noexcept;
 
     /**
      * @brief Test whether two handles name the same queue.

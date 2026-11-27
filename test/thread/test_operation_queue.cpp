@@ -74,8 +74,8 @@ private:
 // they did not all start.
 std::vector<dross::thread> workers_of(dross::operation_queue& queue)
 {
-    auto gather = std::make_shared<gathering>(queue.thread_count());
-    for (std::size_t n = 0; n < queue.thread_count(); ++n) {
+    auto gather = std::make_shared<gathering>(queue.max_concurrency());
+    for (std::size_t n = 0; n < queue.max_concurrency(); ++n) {
         queue.submit([gather]() {
             gather->arrive();
         });
@@ -150,11 +150,11 @@ TEST(operation_queue_test, a_worker_the_system_will_not_start_is_reported_and_th
     EXPECT_EQ(dross_test::threads_not_in(before), 0U);
 }
 
-TEST(operation_queue_test, thread_count_is_the_count_it_was_made_with)
+TEST(operation_queue_test, max_concurrency_is_the_count_it_was_made_with)
 {
     const auto queue = dross::operation_queue::create(3).value();
 
-    EXPECT_EQ(queue.thread_count(), 3U);
+    EXPECT_EQ(queue.max_concurrency(), 3U);
 }
 
 TEST(operation_queue_test, a_copied_handle_names_the_same_queue)
@@ -1471,7 +1471,7 @@ TEST(operation_queue_test, cancel_from_many_threads_while_the_workers_take_tasks
 
     auto queue = dross::operation_queue::create(2).value();
     auto release = std::make_shared<event>();
-    for (std::size_t n = 0; n < queue.thread_count(); ++n) {
+    for (std::size_t n = 0; n < queue.max_concurrency(); ++n) {
         ASSERT_TRUE(queue.submit([release]() {
             release->wait();
         }));

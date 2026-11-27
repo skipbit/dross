@@ -484,8 +484,8 @@ private:
 
 class operation_queue::storage final {
 public:
-    // Starts thread_count workers for a new queue.
-    static std::expected<std::shared_ptr<storage>, error> start(std::size_t thread_count, std::shared_ptr<const time_source> source);
+    // Starts max_concurrency workers for a new queue.
+    static std::expected<std::shared_ptr<storage>, error> start(std::size_t max_concurrency, std::shared_ptr<const time_source> source);
 
     storage(std::vector<thread> workers, std::shared_ptr<backlog> work, std::shared_ptr<const time_source> source) noexcept;
     ~storage();
@@ -496,7 +496,7 @@ public:
     bool wait_for(std::chrono::milliseconds timeout);
     bool shutdown(std::chrono::milliseconds timeout);
 
-    std::size_t thread_count() const noexcept;
+    std::size_t max_concurrency() const noexcept;
     bool accepting() const;
 
 private:
@@ -507,10 +507,10 @@ private:
     std::vector<thread> _workers;
 };
 
-std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue::storage::start(std::size_t thread_count,
+std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue::storage::start(std::size_t max_concurrency,
                                                                                                 std::shared_ptr<const time_source> source)
 {
-    if (thread_count == 0) {
+    if (max_concurrency == 0) {
         return std::unexpected(error{ std::errc::invalid_argument });
     }
 
@@ -518,8 +518,8 @@ std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue:
     try {
         std::vector<thread> workers;
         workers_guard guard{ workers };
-        workers.reserve(thread_count);
-        for (std::size_t i = 0; i < thread_count; ++i) {
+        workers.reserve(max_concurrency);
+        for (std::size_t i = 0; i < max_concurrency; ++i) {
             auto worker = thread_access::start(source);
             if (! worker) {
                 return std::unexpected(std::move(worker).error());
@@ -589,7 +589,7 @@ bool operation_queue::storage::shutdown(std::chrono::milliseconds timeout)
     return true;
 }
 
-std::size_t operation_queue::storage::thread_count() const noexcept
+std::size_t operation_queue::storage::max_concurrency() const noexcept
 {
     return _workers.size();
 }
@@ -611,9 +611,9 @@ operation_queue::operation_queue(std::shared_ptr<storage> store) noexcept
 {
 }
 
-std::expected<operation_queue, error> operation_queue::create(std::size_t thread_count)
+std::expected<operation_queue, error> operation_queue::create(std::size_t max_concurrency)
 {
-    return operation_queue_access::make(thread_count, time_source::steady());
+    return operation_queue_access::make(max_concurrency, time_source::steady());
 }
 
 operation_queue::operation_queue(const operation_queue& other) = default;
@@ -648,9 +648,9 @@ bool operation_queue::shutdown(std::chrono::milliseconds timeout)
     return _store->shutdown(timeout);
 }
 
-std::size_t operation_queue::thread_count() const noexcept
+std::size_t operation_queue::max_concurrency() const noexcept
 {
-    return _store->thread_count();
+    return _store->max_concurrency();
 }
 
 bool operation_queue::operator==(const operation_queue& other) const noexcept
@@ -658,9 +658,9 @@ bool operation_queue::operator==(const operation_queue& other) const noexcept
     return _store == other._store;
 }
 
-std::expected<operation_queue, error> operation_queue_access::make(std::size_t thread_count, std::shared_ptr<const time_source> source)
+std::expected<operation_queue, error> operation_queue_access::make(std::size_t max_concurrency, std::shared_ptr<const time_source> source)
 {
-    return operation_queue::storage::start(thread_count, std::move(source)).transform([](std::shared_ptr<operation_queue::storage> store) {
+    return operation_queue::storage::start(max_concurrency, std::move(source)).transform([](std::shared_ptr<operation_queue::storage> store) {
         return operation_queue{ std::move(store) };
     });
 }

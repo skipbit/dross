@@ -15,9 +15,9 @@ namespace dross {
 
 class operation_queue_access final {
 public:
-    // A queue like create(thread_count) makes, except that its own waits
+    // A queue like create(max_concurrency) makes, except that its own waits
     // read the time and wait through source.
-    static std::expected<operation_queue, error> make(std::size_t thread_count, std::shared_ptr<const time_source> source);
+    static std::expected<operation_queue, error> make(std::size_t max_concurrency, std::shared_ptr<const time_source> source);
 
     // A reference to a queue that does not keep it alive. lock() makes a
     // handle for as long as it is held, so a queue whose last other handle

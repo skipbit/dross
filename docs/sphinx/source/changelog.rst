@@ -148,6 +148,10 @@ Changed
   bookkeeping; what the OS thread still has to tear down after it is
   waited for without a bound
 
+- ``operation_queue::thread_count()`` becomes
+  ``operation_queue::max_concurrency()``, and the parameter of
+  ``operation_queue::create()`` is named ``max_concurrency`` to go with it
+
 - ``toml::serialize`` reads the values it writes without copying them.
   With libstdc++, writing one key holding 1000 numbers takes 30
   allocations instead of 7,036
