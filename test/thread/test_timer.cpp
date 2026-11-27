@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <thread>
@@ -146,26 +147,171 @@ TEST(timer_test, invalidate_is_idempotent_and_safe_after_the_timer_has_ended)
     EXPECT_FALSE(t2.valid());
 }
 
-TEST(timer_test, a_dropped_handle_does_not_stop_the_timer)
+TEST(timer_test, dropping_the_last_handle_stops_the_timer)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    int fire_count = 0;
+    {
+        dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [&fire_count](dross::timer) {
+            ++fire_count;
+        }, loop);
+        EXPECT_EQ(loop.timer_count(), 1U);
+    }
+    EXPECT_EQ(loop.timer_count(), 0U);
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 0U);
+    EXPECT_EQ(fire_count, 0);
+}
+
+TEST(timer_test, a_copy_keeps_the_timer_going_after_the_original_goes)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    int fire_count = 0;
+    std::optional<dross::timer> kept;
+    {
+        dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [&fire_count](dross::timer) {
+            ++fire_count;
+        }, loop);
+        kept = t;
+    }
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_EQ(fire_count, 1);
+    EXPECT_TRUE(kept->valid());
+
+    kept.reset();
+    EXPECT_EQ(loop.timer_count(), 0U);
+}
+
+TEST(timer_test, a_copy_the_callback_keeps_keeps_the_timer_going)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    int fire_count = 0;
+    std::optional<dross::timer> kept;
+    {
+        dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [&fire_count, &kept](dross::timer self) {
+            ++fire_count;
+            kept = self;
+        }, loop);
+        manual.clock->advance(std::chrono::milliseconds{ 10 });
+        EXPECT_EQ(loop.run_pending(), 1U);
+    }
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_EQ(fire_count, 2);
+
+    kept.reset();
+    EXPECT_EQ(loop.timer_count(), 0U);
+}
+
+TEST(timer_test, invalidate_releases_the_callback_while_a_handle_remains)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [held = std::move(resource)](dross::timer) {
+    }, loop);
+    EXPECT_FALSE(observed.expired());
+
+    t.invalidate();
+    EXPECT_TRUE(observed.expired());
+}
+
+TEST(timer_test, a_callback_holding_its_own_handle_is_released_once_the_timer_stops)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    auto slot = std::make_shared<std::optional<dross::timer>>();
+    *slot = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [slot, held = std::move(resource)](dross::timer) {
+    }, loop);
+    const std::weak_ptr<std::optional<dross::timer>> observed_slot = slot;
+    dross::timer t = slot->value();
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_FALSE(observed.expired());
+
+    t.invalidate();
+    slot.reset();
+    EXPECT_TRUE(observed.expired());
+    EXPECT_TRUE(observed_slot.expired());
+}
+
+TEST(timer_test, invalidate_from_inside_the_callback_releases_it_once_the_callback_returns)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    bool held_after_invalidate = false;
+    dross::timer t = dross::timer::repeating(std::chrono::milliseconds{ 10 }, [held = std::move(resource), &observed, &held_after_invalidate](dross::timer self) {
+        self.invalidate();
+        held_after_invalidate = ! observed.expired();
+    }, loop);
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_TRUE(held_after_invalidate);
+    EXPECT_TRUE(observed.expired());
+    EXPECT_FALSE(t.valid());
+}
+
+TEST(timer_test, a_one_shot_releases_its_callback_once_it_has_fired)
+{
+    dross_test::manual_loop manual;
+    dross::runloop& loop = manual.loop;
+
+    auto resource = std::make_shared<int>(0);
+    const std::weak_ptr<int> observed = resource;
+    dross::timer t = dross::timer::once(std::chrono::milliseconds{ 10 }, [held = std::move(resource)](dross::timer) {
+    }, loop);
+
+    manual.clock->advance(std::chrono::milliseconds{ 10 });
+    EXPECT_EQ(loop.run_pending(), 1U);
+    EXPECT_TRUE(observed.expired());
+    EXPECT_FALSE(t.valid());
+}
+
+TEST(timer_test, dropping_the_last_handle_from_another_thread_while_the_loop_is_running)
 {
     reset_main_loop();
     dross::runloop loop = dross::runloop::main();
 
-    int fire_count = 0;
-    {
-        dross::timer t = dross::timer::once(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer) {
-            ++fire_count;
-        }, loop);
-        static_cast<void>(t);
-    }
-    // t is gone; the loop still holds the timer it named.
-    EXPECT_EQ(loop.timer_count(), 1U);
+    std::atomic<int> fire_count{ 0 };
+    std::optional<dross::timer> t{ dross::timer::repeating(std::chrono::milliseconds{ 0 }, [&fire_count](dross::timer) {
+        fire_count.fetch_add(1);
+    }, loop) };
 
-    spin_until(loop, [&fire_count]() {
-        return (fire_count > 0);
+    std::thread dropper{ [&t, &fire_count]() {
+        while (fire_count.load() < 3) {
+            std::this_thread::yield();
+        }
+        t.reset();
+    } };
+    spin_until(loop, [&loop]() {
+        return (loop.timer_count() == 0U);
     });
-    EXPECT_EQ(fire_count, 1);
+    dropper.join();
+
     EXPECT_EQ(loop.timer_count(), 0U);
+    const int after_drop = fire_count.load();
+    loop.run_pending();
+    EXPECT_EQ(fire_count.load(), after_drop);
 }
 
 TEST(timer_test, a_copied_handle_names_the_same_timer)

@@ -22,7 +22,8 @@ namespace dross {
  * - create(body) starts a thread that runs body and then its loop, which
  *   ends once there is nothing left to do: no task is queued and no timer
  *   is installed. A task performed while body runs therefore runs after
- *   it, and a timer that keeps repeating keeps the thread until quit()
+ *   it, and a repeating timer keeps the thread until the timer stops or
+ *   quit() is called
  *
  * body always runs to its end, even when quit() comes first; quit() then
  * stops the loop once body has returned. Either kind refuses tasks from the

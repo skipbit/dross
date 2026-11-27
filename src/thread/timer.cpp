@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 namespace dross {
@@ -22,6 +23,34 @@ std::uint64_t next_timer_id()
 }
 
 }  // namespace
+
+// Owned by every handle to one timer, and only by them; stops the timer
+// when the last handle goes.
+class timer::storage::handles final {
+public:
+    explicit handles(std::shared_ptr<storage> store) noexcept
+        : _store{ std::move(store) }
+    {
+    }
+
+    handles(const handles& other) = delete;
+    handles& operator=(const handles& other) = delete;
+
+    ~handles()
+    {
+        _store->invalidate();
+    }
+
+private:
+    const std::shared_ptr<storage> _store;
+};
+
+std::shared_ptr<timer::storage> timer::storage::first_handle(const std::shared_ptr<storage>& store)
+{
+    std::shared_ptr<storage> handle{ std::make_shared<handles>(store), store.get() };
+    store->_handle = handle;
+    return handle;
+}
 
 timer::storage::storage(std::chrono::milliseconds interval,
                         bool repeats,
@@ -65,14 +94,48 @@ std::uint64_t timer::storage::id() const noexcept
 
 void timer::storage::fire()
 {
-    if (_callback) {
-        _callback(timer{ shared_from_this() });
+    // Expired when the last handle went after the loop took this fire; the
+    // handle's own invalidate() is then on its way.
+    auto handle = _handle.lock();
+    if (! handle) {
+        return;
     }
+
+    std::function<void(timer)> running;
+    {
+        const std::lock_guard<std::mutex> guard{ _callback_mutex };
+        running.swap(_callback);
+    }
+    if (! running) {
+        return;
+    }
+
+    // Puts the callback back once it returns or throws, if the timer is
+    // still to fire again; otherwise running releases it, outside the lock.
+    const struct put_back final {
+        storage& self;
+        std::function<void(timer)>& running;
+        ~put_back()
+        {
+            const std::lock_guard<std::mutex> guard{ self._callback_mutex };
+            if (self._repeats && self._valid.load()) {
+                self._callback.swap(running);
+            }
+        }
+    } restore{ *this, running };
+    running(timer{ std::move(handle) });
 }
 
 void timer::storage::mark_invalid()
 {
-    _valid.store(false);
+    std::function<void(timer)> released;
+    {
+        const std::lock_guard<std::mutex> guard{ _callback_mutex };
+        _valid.store(false);
+        released.swap(_callback);
+    }
+    // released is destroyed here, outside the lock: its captures may hold
+    // a handle to this timer, and the last one going calls invalidate().
 }
 
 timer::timer(std::shared_ptr<storage> store) noexcept
@@ -119,6 +182,7 @@ timer timer::make(std::chrono::milliseconds interval, bool repeats, std::functio
     const bool has_callback = static_cast<bool>(callback);
 
     auto store = std::make_shared<storage>(interval, repeats, std::move(callback), loop._store);
+    auto handle = storage::first_handle(store);
 
     if (! has_callback) {
         store->mark_invalid();
@@ -130,7 +194,7 @@ timer timer::make(std::chrono::milliseconds interval, bool repeats, std::functio
         }
     }
 
-    return timer{ std::move(store) };
+    return timer{ std::move(handle) };
 }
 
 timer timer::repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback)

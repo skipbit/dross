@@ -129,13 +129,18 @@ Changed
   accepts tasks through ``perform()``. ``body`` runs first, and the thread
   ends once ``body`` has returned, no task is queued and no timer is
   installed, so a task performed while ``body`` runs runs after it.
-  ``perform()`` on such a thread used to return false. A ``body`` that
-  leaves a repeating timer installed now keeps the thread until ``quit()``
+  ``perform()`` on such a thread used to return false. A repeating timer
+  installed on it now keeps the thread until the timer stops or ``quit()``
 
 - A thread that ``thread::create()`` or ``thread::create(body)`` started
   refuses tasks as soon as its run loop stops, and drops the tasks
   ``quit()`` left queued then, rather than accepting tasks it would never
   run until the thread had ended
+
+- A timer stops once the last handle to it is gone, the same as after
+  ``invalidate()``; its loop used to keep it firing until ``invalidate()``.
+  ``timer::once()`` and ``timer::repeating()`` are ``[[nodiscard]]``, so a
+  handle dropped as soon as it is made draws a warning
 
 - ``thread::join()`` and ``thread::join_for()`` on a thread dross started
   wait until the OS thread itself has ended, not only until its
@@ -170,6 +175,11 @@ Fixed
 - ``dross.pc`` writes an absolute ``CMAKE_INSTALL_LIBDIR`` or
   ``CMAKE_INSTALL_INCLUDEDIR`` as it is, instead of appending it to the
   prefix
+
+- A timer releases its callback once it has stopped, or when a fire that
+  is running it returns. It used to keep the callback while any handle
+  remained, so a callback that captured a handle to its own timer was
+  never released
 
 0.2.0 - 2026-11-03
 ------------------

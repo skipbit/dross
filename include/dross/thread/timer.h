@@ -24,8 +24,16 @@ namespace dross {
  *   moved-from handle is still a usable handle
  *
  * Lifetime:
- * - The loop holds the timer once it is installed. Dropping every handle to
- *   a timer does not stop it; only invalidate() does
+ * - A timer runs only while a handle to it remains. Dropping the last
+ *   handle stops it the same as invalidate(), so keep one for as long as
+ *   it is to fire
+ * - The handle the callback receives is one of them while the callback
+ *   runs. A copy of it kept from there keeps the timer going, and one held
+ *   in the callback's own captures keeps it going until invalidate()
+ * - A timer releases its callback, and with it the callback's captures,
+ *   once it has stopped: at once if it is not firing, or else when that
+ *   fire returns. A handle the callback captures therefore does not keep
+ *   anything alive past the timer's end
  * - invalidate() is callable from any thread, is idempotent, and makes
  *   valid() false at once. The loop drops its own reference to an
  *   invalidated timer
@@ -35,8 +43,10 @@ namespace dross {
  *   already invalid, the same as one invalidate() has already been called on
  *
  * Firing:
- * - repeating() installs a timer that fires every interval until
- *   invalidated; once() fires a single time and then invalidates itself
+ * - repeating() installs a timer that fires every interval until it is
+ *   stopped; once() fires a single time and then invalidates itself
+ * - A fire the loop has already taken when the last handle goes on another
+ *   thread is skipped, but the loop still counts it among the work it ran
  * - The callback receives the timer itself, so it can invalidate() from
  *   inside to stop a repeating timer, or just read its own state
  * - The two-argument overloads install on runloop::current(); the
@@ -78,7 +88,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty
      */
-    static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback);
+    [[nodiscard]] static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback);
 
     /**
      * @brief Install a timer that fires every interval on the given loop.
@@ -89,7 +99,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty or loop has already finished
      */
-    static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback, runloop loop);
+    [[nodiscard]] static timer repeating(std::chrono::milliseconds interval, std::function<void(timer)> callback, runloop loop);
 
     /**
      * @brief Install a timer that fires once on runloop::current().
@@ -98,7 +108,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty
      */
-    static timer once(std::chrono::milliseconds delay, std::function<void(timer)> callback);
+    [[nodiscard]] static timer once(std::chrono::milliseconds delay, std::function<void(timer)> callback);
 
     /**
      * @brief Install a timer that fires once on the given loop.
@@ -108,7 +118,7 @@ public:
      * @return A handle to the installed timer, or a handle that is already
      * invalid when callback is empty or loop has already finished
      */
-    static timer once(std::chrono::milliseconds delay, std::function<void(timer)> callback, runloop loop);
+    [[nodiscard]] static timer once(std::chrono::milliseconds delay, std::function<void(timer)> callback, runloop loop);
 
     /**
      * @brief Copy constructor, giving another handle to the same timer.
@@ -119,7 +129,8 @@ public:
     /**
      * @brief Destructor.
      *
-     * Destroying a handle does not stop the timer; see invalidate().
+     * Destroying the last handle stops the timer, the same as
+     * invalidate().
      */
     ~timer();
 
