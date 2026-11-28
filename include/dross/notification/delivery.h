@@ -48,6 +48,9 @@ namespace dross {
  *   subscription before stopping the queue
  * - So a queue made only to be passed to on() stops at the end of that
  *   statement, and the subscription is inactive from the start
+ * - A notification the queue refuses, as it does when it has no worker
+ *   and the system will not start one, is not handed on, while the
+ *   subscription stays active
  *
  * Handle semantics:
  * - A delivery is a small value that is copied freely, and moving copies

@@ -95,13 +95,14 @@ struct operation_options final {
  * - When the last handle goes, the queue stops accepting tasks. Its
  *   workers run what is left, both the queue's tasks and what those tasks
  *   queued on their own worker's loop, and then end on their own; a worker
- *   with a timer installed on its loop ends once the timer has stopped
+ *   with a timer installed on its loop ends after the timer has stopped
  * - A task another thread queues on a worker's loop once the queue has
  *   stopped may not run, the same as one queued on any dross::thread whose
  *   loop is quitting
  * - The destructor never waits for that, even the last one
- * - quit() on a worker's thread, such as thread::current().quit() from a
- *   task, does not end the worker; the queue alone decides when it ends
+ * - thread::current().quit() from a task does not end its worker. A
+ *   quit() from another thread may end an idle worker early, the same as
+ *   one that has had nothing to do for long enough
  *
  * Waiting:
  * - wait_for() waits for the tasks already submitted to finish, while the
