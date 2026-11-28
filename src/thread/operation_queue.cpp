@@ -5,6 +5,7 @@
 #include "thread/deadline.h"
 #include "thread/operation_access.h"
 #include "thread/operation_queue_access.h"
+#include "thread/runloop_access.h"
 #include "thread/thread_access.h"
 #include "thread/time_source.h"
 
@@ -250,15 +251,23 @@ private:
         }
     }
 
-    // A worker, and whether it has a sweep on its loop.
+    // A worker, its loop, and whether it has a sweep on that loop.
     struct worker final {
         thread handle;
+        runloop loop;
         bool sweeping;
+
+        // Free to take a task at once: no sweep, and nothing else running
+        // on its loop.
+        bool free() const
+        {
+            return ((! sweeping) && (! runloop_access::running_work(loop)));
+        }
     };
 
     // Adds a task to the list of its priority and hands a sweep to every
-    // worker that has none, starting one first when every worker has one
-    // and the queue is still below max_concurrency. A sweep keeps taking
+    // worker that has none, starting one first when no worker is free and
+    // the queue is still below max_concurrency. A sweep keeps taking
     // until every list is empty, so an existing one reaches the task too.
     // Every idle worker gets one, not just the first, since a worker with
     // no sweep may still be busy running something else on its loop.
@@ -270,10 +279,10 @@ private:
     {
         _tasks[static_cast<std::size_t>(priority)].push_back(std::move(task));
 
-        const bool all_busy = std::all_of(_workers.begin(), _workers.end(), [](const auto& each) {
-            return each.second.sweeping;
+        const bool none_free = std::none_of(_workers.begin(), _workers.end(), [](const auto& each) {
+            return each.second.free();
         });
-        if (all_busy && _accepting && (_workers.size() < _max_concurrency)) {
+        if (none_free && _accepting && (_workers.size() < _max_concurrency)) {
             // A worker that does not start leaves the task to the others.
             start_worker();
         }
@@ -297,7 +306,8 @@ private:
         if (! started) {
             return false;
         }
-        _workers.emplace(id, worker{ std::move(*started), false });
+        runloop loop = thread_access::loop(*started);
+        _workers.emplace(id, worker{ std::move(*started), std::move(loop), false });
         return true;
     }
 

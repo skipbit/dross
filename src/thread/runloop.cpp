@@ -273,6 +273,25 @@ runloop::storage::held_task runloop::storage::next(std::unique_lock<std::mutex>&
 
 void runloop::storage::run_released(std::unique_lock<std::mutex>& lock, held_task& work)
 {
+    // Counts the work down even when it throws, so running_work() does not
+    // stay true once the throw has left the loop.
+    struct counted final {
+        storage& owner;
+        std::unique_lock<std::mutex>& held;
+
+        ~counted()
+        {
+            if (held.owns_lock()) {
+                --owner._running_work;
+            } else {
+                const std::lock_guard<std::mutex> guard{ owner._mutex };
+                --owner._running_work;
+            }
+        }
+    };
+
+    ++_running_work;
+    const counted mark{ *this, lock };
     lock.unlock();
     (*work)();
     work = nullptr;  // release the captures outside the lock
@@ -434,6 +453,12 @@ bool runloop::storage::finished() const
     return _finished;
 }
 
+bool runloop::storage::running_work() const
+{
+    const std::lock_guard<std::mutex> guard{ _mutex };
+    return (_running_work > 0);
+}
+
 runloop runloop::main()
 {
     // Asked on the main thread, this goes the long way round so the thread's
@@ -531,6 +556,11 @@ runloop runloop_access::standalone(std::shared_ptr<const time_source> source)
 bool runloop_access::finished(const runloop& loop)
 {
     return loop._store->finished();
+}
+
+bool runloop_access::running_work(const runloop& loop)
+{
+    return loop._store->running_work();
 }
 
 std::size_t runloop_access::run_to_end(runloop& loop)

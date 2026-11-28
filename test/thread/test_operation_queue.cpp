@@ -444,6 +444,34 @@ TEST(operation_queue_test, a_worker_busy_with_its_own_loop_does_not_hold_up_a_ta
     }
 }
 
+TEST(operation_queue_test, a_worker_busy_with_its_own_loop_starts_another_for_a_task)
+{
+    struct state {
+        event busy;
+        event release;
+        event ran;
+    };
+    auto shared = std::make_shared<state>();
+    auto queue = dross::operation_queue_access::make(2, dross::time_source::steady(), kLongIdle).value();
+
+    ASSERT_TRUE(queue.enqueue([shared]() {
+        dross::thread::current().perform([shared]() {
+            shared->busy.set();
+            shared->release.wait();
+        });
+    }));
+    ASSERT_TRUE(shared->busy.wait());
+
+    ASSERT_TRUE(queue.enqueue([shared]() {
+        shared->ran.set();
+    }));
+    const bool ran = shared->ran.wait();
+    shared->release.set();
+
+    EXPECT_TRUE(ran);
+    EXPECT_TRUE(queue.wait_for(kTimeout));
+}
+
 TEST(operation_queue_test, tasks_start_in_the_order_they_were_submitted)
 {
     struct state {
