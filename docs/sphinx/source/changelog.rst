@@ -152,6 +152,10 @@ Changed
   ``operation_queue::max_concurrency()``, and the parameter of
   ``operation_queue::create()`` is named ``max_concurrency`` to go with it
 
+- ``operation_queue::submit()`` is removed; ``operation_queue::enqueue()``
+  queues a task the same way, and gives back a result where ``submit()``
+  gave back ``true``
+
 - ``toml::serialize`` reads the values it writes without copying them.
   With libstdc++, writing one key holding 1000 numbers takes 30
   allocations instead of 7,036

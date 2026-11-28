@@ -24,8 +24,7 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
                               && operation_value_type<std::decay_t<std::invoke_result_t<std::decay_t<F>&>>>;
 
 /**
- * @brief How a queue runs a task given to operation_queue::submit() or
- * operation_queue::enqueue().
+ * @brief How a queue runs a task given to operation_queue::enqueue().
  *
  * Every member has a default, so a task given no options gets them all, and
  * one given some can name just those:
@@ -77,8 +76,7 @@ struct operation_options final {
  *   has been accepted, so tasks cannot run after one another in a circle
  * - When one of them is cancelled, whether before the task is submitted or
  *   after, the task is cancelled too and never runs, and so is every task
- *   that runs after it in turn. A task given to submit() that is cancelled
- *   this way is dropped without a word, as it has no result to report it
+ *   that runs after it in turn
  *
  * Handle semantics:
  * - An operation_queue is a handle to a queue, not the queue itself.
@@ -128,7 +126,7 @@ struct operation_options final {
  * auto queue = dross::operation_queue::create(4);
  * if (queue) {
  *     dross::runloop main_loop = dross::runloop::main();
- *     queue->submit([main_loop]() mutable {
+ *     queue->enqueue([main_loop]() mutable {
  *         auto answer = expensive_work();
  *         main_loop.perform([answer]() { show(answer); });
  *     });
@@ -173,35 +171,19 @@ public:
     operation_queue& operator=(const operation_queue& other);
 
     /**
-     * @brief Add a task for one of the workers to run.
-     * @param task The task, which must be callable
-     * @param options How to run it
-     * @return true when the task was queued
-     *
-     * The task is queued and this returns at once; it does not wait for the
-     * task to run. Returns false when the task is empty, when its priority is
-     * not one operation_priority names, when options.after names a result
-     * from another queue, or once the queue has been shut down.
-     */
-    bool submit(std::function<void()> task, operation_options options = {});
-
-    /**
      * @brief Add a task for one of the workers to run, and get a handle to
      * what it returns.
      * @param task The task
      * @param options How to run it
      * @return The result, not yet filled in, or the reason the task was not
      * queued: operation_errc::empty_task for a null function pointer or an
-     * empty std::function, the tasks submit() refuses as empty,
-     * operation_errc::invalid_priority for a priority
+     * empty std::function, operation_errc::invalid_priority for a priority
      * operation_priority does not name, operation_errc::foreign_dependency
      * when options.after names a result from another queue, or
      * operation_errc::queue_stopped once the queue has stopped
      *
-     * Queued in the same list as submit(), so the two keep one order. Returns
-     * at once, as submit() does; the result is filled in when the task
-     * returns. A task that throws propagates the same as one given to
-     * submit().
+     * The task is queued and this returns at once; it does not wait for the
+     * task to run. The result is filled in when the task returns.
      */
     template <operation_task_type F>
     std::expected<operation_result, error> enqueue(F&& task, operation_options options = {});
@@ -276,8 +258,8 @@ private:
     template <typename R, typename... Args>
     struct is_std_function<std::function<R(Args...)>> : std::true_type { };
 
-    // Empty the way std::function takes a task as empty, so enqueue() refuses
-    // what submit() does; a task of any other type is never empty.
+    // Empty the way std::function takes a task as empty; a task of any other
+    // type is never empty.
     template <typename F>
     static bool is_empty(const F& task) noexcept
     {

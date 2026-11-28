@@ -209,7 +209,7 @@ TEST(notification_test, cancel_stops_a_delivery_queued_on_an_operation_queue)
     auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
-    workers.submit([release, blocking]() {
+    workers.enqueue([release, blocking]() {
         blocking->set();
         release->wait();
     });

@@ -322,7 +322,7 @@ TEST(subscription_test, reset_stops_a_call_queued_on_a_queue_from_starting)
     auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
-    workers.submit([release, blocking]() {
+    workers.enqueue([release, blocking]() {
         blocking->set();
         release->wait();
     });
@@ -475,7 +475,7 @@ TEST(subscription_test, notifications_queued_before_a_queue_stops_still_run)
     auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
-    workers.submit([release, blocking]() {
+    workers.enqueue([release, blocking]() {
         blocking->set();
         release->wait();
     });

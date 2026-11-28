@@ -38,7 +38,7 @@ void subscription::storage::deliver(const std::shared_ptr<const void>& value, co
     };
     const auto on_queue = [this, &value, &sent](const operation_queue_access::weak_queue& weak) {
         if (auto queue = operation_queue_access::lock(weak)) {
-            queue->submit(make_task(value, sent));
+            queue->enqueue(make_task(value, sent));
         }
     };
     std::visit(overloaded{ on_direct, on_loop, on_queue }, _target);
