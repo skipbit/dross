@@ -54,6 +54,9 @@ public:
     bool is_running() const;
     bool finished() const;
 
+    // Whether a task or a timer's callback is running on this loop.
+    bool running_work() const;
+
     // Adds which to this loop's installed timers, due at first_deadline.
     // Returns false, without installing it, once this loop is finished.
     bool install_timer(std::shared_ptr<timer::storage> which, std::chrono::steady_clock::time_point first_deadline);
@@ -159,6 +162,7 @@ private:
     timer_schedule<std::shared_ptr<timer::storage>> _timers;
     std::uint64_t _next_sequence{ 0 };
     std::size_t _depth{ 0 };
+    std::size_t _running_work{ 0 };
     bool _quit{ false };
     bool _finished{ false };
 };

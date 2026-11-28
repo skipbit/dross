@@ -24,8 +24,7 @@ concept operation_task_type = std::copy_constructible<std::decay_t<F>> && std::i
                               && operation_value_type<std::decay_t<std::invoke_result_t<std::decay_t<F>&>>>;
 
 /**
- * @brief How a queue runs a task given to operation_queue::submit() or
- * operation_queue::enqueue().
+ * @brief How a queue runs a task given to operation_queue::enqueue().
  *
  * Every member has a default, so a task given no options gets them all, and
  * one given some can name just those:
@@ -51,8 +50,8 @@ struct operation_options final {
 };
 
 /**
- * @brief A fixed set of worker threads that run submitted tasks, the higher
- * priority first and otherwise in the order they were submitted.
+ * @brief Worker threads, up to a set number, that run submitted tasks, the
+ * higher priority first and otherwise in the order they were submitted.
  *
  * Where runloop and thread aim work at one particular thread, a queue hands
  * it to whichever of its workers is free. Each worker is a dross::thread
@@ -61,7 +60,13 @@ struct operation_options final {
  * it, the same as on any other thread dross started.
  *
  * Workers:
- * - The number of workers is given when the queue is made and never changes
+ * - A queue starts with no worker. It starts one when a task is ready to
+ *   run and every worker it has is busy, until it has max_concurrency()
+ *   of them, so no more tasks than that run at once
+ * - A worker that has had nothing to do for about half a second ends. One
+ *   with a task queued on its loop or a timer installed there stays
+ * - When the system will not start a worker, the tasks wait for the
+ *   workers the queue has; when it has none, enqueue() refuses the task
  * - The tasks wait in one list that every worker takes from. A worker takes
  *   the task of the highest operation_priority waiting, and of those, the
  *   one submitted first, so tasks of one priority start in the order they
@@ -77,8 +82,7 @@ struct operation_options final {
  *   has been accepted, so tasks cannot run after one another in a circle
  * - When one of them is cancelled, whether before the task is submitted or
  *   after, the task is cancelled too and never runs, and so is every task
- *   that runs after it in turn. A task given to submit() that is cancelled
- *   this way is dropped without a word, as it has no result to report it
+ *   that runs after it in turn
  *
  * Handle semantics:
  * - An operation_queue is a handle to a queue, not the queue itself.
@@ -88,29 +92,23 @@ struct operation_options final {
  *   moved-from handle is still a usable handle naming the same queue
  *
  * Lifetime:
- * - When the last handle goes, or on shutdown(), the queue stops accepting
- *   tasks. Its workers run what is left, both the queue's tasks and what
- *   those tasks queued on their own worker's loop, and then end on their
- *   own
+ * - When the last handle goes, the queue stops accepting tasks. Its
+ *   workers run what is left, both the queue's tasks and what those tasks
+ *   queued on their own worker's loop, and then end on their own; a worker
+ *   with a timer installed on its loop ends after the timer has stopped
  * - A task another thread queues on a worker's loop once the queue has
  *   stopped may not run, the same as one queued on any dross::thread whose
  *   loop is quitting
- * - The destructor never waits for that, even the last one; shutdown() is
- *   the way to wait for it
- * - A timer installed on a worker's loop does not keep the worker alive; it
- *   goes when the worker ends
- * - quit() on a worker's thread, such as thread::current().quit() from a
- *   task, ends that worker early. A queue whose workers have all ended that
- *   way still accepts tasks but never runs them
+ * - The destructor never waits for that, even the last one
+ * - thread::current().quit() from a task does not end its worker. A
+ *   quit() from another thread may end an idle worker early, the same as
+ *   one that has had nothing to do for long enough
  *
  * Waiting:
  * - wait_for() waits for the tasks already submitted to finish, while the
  *   queue goes on accepting more
- * - shutdown() stops the queue accepting tasks and waits for its workers to
- *   end
- * - Called from one of the queue's own workers, either returns at once
- *   instead, since the task it is called from can never finish while it
- *   waits
+ * - Called from one of the queue's own workers, it returns at once instead,
+ *   since the task it is called from can never finish while it waits
  *
  * Thread safety:
  * - Every operation is free of data races when called from any thread,
@@ -128,7 +126,7 @@ struct operation_options final {
  * auto queue = dross::operation_queue::create(4);
  * if (queue) {
  *     dross::runloop main_loop = dross::runloop::main();
- *     queue->submit([main_loop]() mutable {
+ *     queue->enqueue([main_loop]() mutable {
  *         auto answer = expensive_work();
  *         main_loop.perform([answer]() { show(answer); });
  *     });
@@ -138,18 +136,16 @@ struct operation_options final {
 class operation_queue final {
 public:
     /**
-     * @brief Start a queue with thread_count workers.
-     * @param thread_count The number of workers, at least one
-     * @return A handle to the new queue, or the error that kept it from
-     * starting: std::errc::invalid_argument when thread_count is zero, or
-     * std::errc::resource_unavailable_try_again when the system will not
-     * start a worker, or std::errc::not_enough_memory when there is no
-     * memory to start one, in which case the workers already started end
-     * without running anything
+     * @brief Make a queue that runs at most max_concurrency tasks at once.
+     * @param max_concurrency The most workers the queue has at once, at least
+     * one
+     * @return A handle to the new queue, or std::errc::invalid_argument when
+     * max_concurrency is zero, or std::errc::not_enough_memory when there is
+     * no memory to make it
      *
-     * Blocks until every worker has started.
+     * Starts no worker; the first task does.
      */
-    [[nodiscard]] static std::expected<operation_queue, error> create(std::size_t thread_count);
+    [[nodiscard]] static std::expected<operation_queue, error> create(std::size_t max_concurrency);
 
     /**
      * @brief Copy constructor, giving another handle to the same queue.
@@ -173,35 +169,20 @@ public:
     operation_queue& operator=(const operation_queue& other);
 
     /**
-     * @brief Add a task for one of the workers to run.
-     * @param task The task, which must be callable
-     * @param options How to run it
-     * @return true when the task was queued
-     *
-     * The task is queued and this returns at once; it does not wait for the
-     * task to run. Returns false when the task is empty, when its priority is
-     * not one operation_priority names, when options.after names a result
-     * from another queue, or once the queue has been shut down.
-     */
-    bool submit(std::function<void()> task, operation_options options = {});
-
-    /**
      * @brief Add a task for one of the workers to run, and get a handle to
      * what it returns.
      * @param task The task
      * @param options How to run it
      * @return The result, not yet filled in, or the reason the task was not
      * queued: operation_errc::empty_task for a null function pointer or an
-     * empty std::function, the tasks submit() refuses as empty,
-     * operation_errc::invalid_priority for a priority
+     * empty std::function, operation_errc::invalid_priority for a priority
      * operation_priority does not name, operation_errc::foreign_dependency
      * when options.after names a result from another queue, or
-     * operation_errc::queue_stopped once the queue has stopped
+     * operation_errc::queue_stopped when the queue has no worker and the
+     * system will not start one
      *
-     * Queued in the same list as submit(), so the two keep one order. Returns
-     * at once, as submit() does; the result is filled in when the task
-     * returns. A task that throws propagates the same as one given to
-     * submit().
+     * The task is queued and this returns at once; it does not wait for the
+     * task to run. The result is filled in when the task returns.
      */
     template <operation_task_type F>
     std::expected<operation_result, error> enqueue(F&& task, operation_options options = {});
@@ -236,25 +217,11 @@ public:
     bool wait_for(std::chrono::milliseconds timeout);
 
     /**
-     * @brief Stop accepting tasks and wait for the workers to end, for at
-     * most timeout.
-     * @param timeout How long to wait
-     * @return true when every worker has ended
-     *
-     * The workers run what was already submitted before they end. The queue
-     * stops accepting tasks even when this returns false, and its workers
-     * still end once they are done. A timeout of zero does not wait; it
-     * reports whether they have already ended. Called from one of the
-     * queue's own workers, this does not wait either, for the same reason as
-     * thread::join().
+     * @brief Get the most workers the queue has at once.
+     * @return The count the queue was made with, not the number of workers
+     * it has now
      */
-    bool shutdown(std::chrono::milliseconds timeout);
-
-    /**
-     * @brief Get the number of workers.
-     * @return The count the queue was made with
-     */
-    std::size_t thread_count() const noexcept;
+    std::size_t max_concurrency() const noexcept;
 
     /**
      * @brief Test whether two handles name the same queue.
@@ -276,8 +243,8 @@ private:
     template <typename R, typename... Args>
     struct is_std_function<std::function<R(Args...)>> : std::true_type { };
 
-    // Empty the way std::function takes a task as empty, so enqueue() refuses
-    // what submit() does; a task of any other type is never empty.
+    // Empty the way std::function takes a task as empty; a task of any other
+    // type is never empty.
     template <typename F>
     static bool is_empty(const F& task) noexcept
     {

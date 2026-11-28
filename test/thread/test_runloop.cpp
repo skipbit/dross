@@ -417,6 +417,34 @@ TEST(runloop_test, run_for_with_a_huge_timeout_does_not_overflow)
     EXPECT_EQ(manual.clock->now(), started);
 }
 
+TEST(runloop_test, running_work_is_true_only_while_a_task_runs)
+{
+    dross::runloop loop = dross::runloop_access::standalone(dross::time_source::steady());
+
+    bool seen = false;
+    loop.perform([loop, &seen]() {
+        seen = dross::runloop_access::running_work(loop);
+    });
+
+    EXPECT_FALSE(dross::runloop_access::running_work(loop));
+    loop.run_pending();
+
+    EXPECT_TRUE(seen);
+    EXPECT_FALSE(dross::runloop_access::running_work(loop));
+}
+
+TEST(runloop_test, running_work_is_false_after_a_task_throws)
+{
+    dross::runloop loop = dross::runloop_access::standalone(dross::time_source::steady());
+    loop.perform([]() {
+        throw std::runtime_error{ "thrown" };
+    });
+
+    EXPECT_THROW(loop.run_pending(), std::runtime_error);
+
+    EXPECT_FALSE(dross::runloop_access::running_work(loop));
+}
+
 TEST(runloop_test, is_running_is_true_inside_a_task)
 {
     reset_main_loop();

@@ -39,15 +39,18 @@ namespace dross {
  *
  * Lifetime:
  * - A subscription does not keep its loop's thread or its queue going. Once
- *   the thread has ended, or the queue has stopped, whether by shutdown()
- *   or by its last handle going, the subscription is no longer active and
- *   no new notification is handed on
+ *   the thread has ended, or the queue has stopped by its last handle
+ *   going, the subscription is no longer active and no new notification is
+ *   handed on
  * - What was already queued follows the loop or the queue: a loop whose
  *   thread has ended drops it, and a queue that has stopped still runs it,
  *   as it runs every task it accepted. To have none of it run, end the
  *   subscription before stopping the queue
  * - So a queue made only to be passed to on() stops at the end of that
  *   statement, and the subscription is inactive from the start
+ * - A notification the queue refuses, as it does when it has no worker
+ *   and the system will not start one, is not handed on, while the
+ *   subscription stays active
  *
  * Handle semantics:
  * - A delivery is a small value that is copied freely, and moving copies

@@ -20,6 +20,9 @@ public:
     // Whether loop's thread has ended, so a task given to it never runs.
     static bool finished(const runloop& loop);
 
+    // Whether a task or a timer's callback is running on loop right now.
+    static bool running_work(const runloop& loop);
+
     // Runs loop until quit(), then ends it as its thread's end does: it
     // refuses tasks from then on and drops what it still holds.
     static std::size_t run_to_end(runloop& loop);

@@ -53,6 +53,10 @@ public:
 
     std::optional<std::uint64_t> native_id() const;
 
+    // The thread's loop. Set before the thread is published and never
+    // reassigned, so it is read without _mutex.
+    const std::optional<runloop>& loop() const noexcept;
+
 private:
     // Installed in the calling thread's slot below, so thread::current()
     // returns the same storage on every call from that thread. Its
@@ -371,6 +375,11 @@ bool thread::storage::perform(std::function<void()> task)
     return _loop->perform(std::move(task));
 }
 
+const std::optional<runloop>& thread::storage::loop() const noexcept
+{
+    return _loop;
+}
+
 void thread::storage::quit()
 {
     if (_loop) {
@@ -603,6 +612,11 @@ std::expected<thread, error> thread_access::start(std::function<void()> body, st
     return thread::storage::start_one_shot_thread(std::move(body), std::move(source)).transform([](std::shared_ptr<thread::storage> store) {
         return thread{ std::move(store) };
     });
+}
+
+runloop thread_access::loop(const thread& which)
+{
+    return *which._store->loop();
 }
 
 }  // namespace dross

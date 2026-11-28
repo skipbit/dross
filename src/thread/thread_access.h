@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dross/thread/runloop.h"
 #include "dross/thread/thread.h"
 #include "thread/time_source.h"
 
@@ -18,6 +19,9 @@ public:
     // The thread's own run loop still uses steady().
     static std::expected<thread, error> start(std::shared_ptr<const time_source> source);
     static std::expected<thread, error> start(std::function<void()> body, std::shared_ptr<const time_source> source);
+
+    // The run loop of a thread one of the above started.
+    static runloop loop(const thread& which);
 };
 
 }  // namespace dross

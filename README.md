@@ -198,7 +198,7 @@ int main()
 - **`runloop`** - Per-thread task queue, so work can be handed to a specific thread
 - **`thread`** - A handle to an OS thread, running a loop the library drives, either until quit() or until its body is done, or one its owner drives
 - **`timer`** - A callback installed on a run loop, firing once or on an interval
-- **`operation_queue`** - A fixed set of worker threads, each running its own loop, taking submitted tasks from one shared queue by priority, and in the order they were submitted within one priority, each only once the tasks it runs after have returned
+- **`operation_queue`** - Worker threads, up to a set number and started as tasks need them, each running its own loop, taking submitted tasks from one shared queue by priority, and in the order they were submitted within one priority, each only once the tasks it runs after have returned
 - **`operation_result`** - What a task given to `operation_queue::enqueue()` returned, to wait on and read as its own type
 
 ### Notification Layer

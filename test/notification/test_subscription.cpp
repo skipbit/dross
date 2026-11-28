@@ -322,7 +322,7 @@ TEST(subscription_test, reset_stops_a_call_queued_on_a_queue_from_starting)
     auto workers = dross::operation_queue::create(1).value();
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
-    workers.submit([release, blocking]() {
+    workers.enqueue([release, blocking]() {
         blocking->set();
         release->wait();
     });
@@ -457,39 +457,31 @@ TEST(subscription_test, one_on_a_thread_that_has_ended_is_not_active)
     EXPECT_TRUE(calls.values().empty());
 }
 
-TEST(subscription_test, one_on_a_queue_that_has_shut_down_is_not_active)
-{
-    auto workers = dross::operation_queue::create(1).value();
-    auto [sender_side, token] = subscribe(dross::delivery::on(workers), [](int) {
-    });
-    EXPECT_TRUE(token.active());
-
-    ASSERT_TRUE(workers.shutdown(std::chrono::duration_cast<std::chrono::milliseconds>(kTimeout)));
-
-    EXPECT_FALSE(token.active());
-}
-
 TEST(subscription_test, notifications_queued_before_a_queue_stops_still_run)
 {
     record calls;
-    auto workers = dross::operation_queue::create(1).value();
+    std::optional<dross::operation_queue> workers{ dross::operation_queue::create(1).value() };
     auto release = std::make_shared<event>();
     auto blocking = std::make_shared<event>();
-    workers.submit([release, blocking]() {
+    workers->enqueue([release, blocking]() {
         blocking->set();
         release->wait();
     });
     ASSERT_TRUE(blocking->wait());
 
-    auto [sender_side, token] = subscribe(dross::delivery::on(workers), [&calls](int value) {
+    auto [sender_side, token] = subscribe(dross::delivery::on(*workers), [&calls](int value) {
         calls.add(value);
     });
     send(*sender_side, 1);
     send(*sender_side, 2);
-    EXPECT_FALSE(workers.shutdown(std::chrono::milliseconds::zero()));
+    // Queued after both, on the only worker, so it returns once they have.
+    const auto finished = workers->enqueue([]() {
+    });
+    ASSERT_TRUE(finished.has_value());
+    workers.reset();
     send(*sender_side, 3);
     release->set();
-    ASSERT_TRUE(workers.shutdown(std::chrono::duration_cast<std::chrono::milliseconds>(kTimeout)));
+    ASSERT_TRUE(finished->wait_for(std::chrono::duration_cast<std::chrono::milliseconds>(kTimeout)));
 
     EXPECT_EQ(calls.values(), (std::vector<int>{ 1, 2 }));
     EXPECT_FALSE(token.active());
