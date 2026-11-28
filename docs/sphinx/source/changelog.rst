@@ -156,6 +156,10 @@ Changed
   queues a task the same way, and gives back a result where ``submit()``
   gave back ``true``
 
+- ``operation_queue::shutdown()`` is removed. A queue stops accepting
+  tasks once its last handle goes, and ``wait_for()`` waits for the tasks
+  given to it; nothing waits for its workers to end
+
 - ``toml::serialize`` reads the values it writes without copying them.
   With libstdc++, writing one key holding 1000 numbers takes 30
   allocations instead of 7,036

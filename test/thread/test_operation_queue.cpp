@@ -453,7 +453,7 @@ TEST(operation_queue_test, cancel_takes_a_waiting_task_of_any_priority_off_the_q
     release->set();
 
     EXPECT_TRUE(settled);
-    ASSERT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(queue.wait_for(kTimeout));
     EXPECT_EQ(ran->load(), 0);
     for (const auto& result : results) {
         const auto value = result.get_as<void>();
@@ -702,118 +702,6 @@ TEST(operation_queue_test, wait_for_on_one_of_its_own_workers_does_not_wait)
     EXPECT_EQ(source->waits(), 0U);
 }
 
-TEST(operation_queue_test, shutdown_stops_accepting_and_ends_the_workers)
-{
-    auto queue = dross::operation_queue::create(2).value();
-    auto workers = workers_of(queue);
-    ASSERT_EQ(workers.size(), 2U);
-
-    EXPECT_TRUE(queue.shutdown(kTimeout));
-    EXPECT_FALSE(queue.enqueue([]() {
-    }));
-    for (const auto& worker : workers) {
-        EXPECT_TRUE(worker.finished());
-    }
-}
-
-TEST(operation_queue_test, shutdown_waits_for_the_tasks_already_submitted)
-{
-    const auto source = std::make_shared<dross_test::observed_time_source>();
-    auto queue = dross::operation_queue_access::make(1, source).value();
-    struct state {
-        event release;
-        std::atomic<int> ran{ 0 };
-    };
-    auto shared = std::make_shared<state>();
-    ASSERT_TRUE(queue.enqueue([shared]() {
-        shared->release.wait();
-    }));
-    for (int n = 0; n < 3; ++n) {
-        ASSERT_TRUE(queue.enqueue([shared]() {
-            shared->ran.fetch_add(1);
-        }));
-    }
-
-    // The same bounds as in wait_for's test: only the workers ending, not
-    // the shutdown's own deadline, ends the wait in time.
-    std::atomic<bool> ended{ false };
-    event returned;
-    std::thread stopper{ [queue, &ended, &returned]() mutable {
-        ended.store(queue.shutdown(kTimeout * 2));
-        returned.set();
-    } };
-    const bool saw_wait = source->await_timed_waits(1);
-    shared->release.set();
-    const bool woke = returned.wait();
-    stopper.join();
-
-    EXPECT_TRUE(saw_wait);
-    EXPECT_TRUE(woke);
-    EXPECT_TRUE(ended.load());
-    EXPECT_EQ(shared->ran.load(), 3);
-}
-
-TEST(operation_queue_test, shutdown_times_out_while_a_task_is_still_running)
-{
-    auto queue = dross::operation_queue::create(1).value();
-    auto release = std::make_shared<event>();
-    ASSERT_TRUE(queue.enqueue([release]() {
-        release->wait();
-    }));
-
-    EXPECT_FALSE(queue.shutdown(std::chrono::milliseconds{ 1 }));
-    EXPECT_FALSE(queue.enqueue([]() {
-    }));
-
-    release->set();
-    EXPECT_TRUE(queue.shutdown(kTimeout));
-}
-
-TEST(operation_queue_test, shutdown_zero_does_not_wait_and_reports_the_current_state)
-{
-    const auto source = std::make_shared<dross_test::observed_time_source>();
-    auto queue = dross::operation_queue_access::make(1, source).value();
-    auto release = std::make_shared<event>();
-    ASSERT_TRUE(queue.enqueue([release]() {
-        release->wait();
-    }));
-
-    const bool while_running = queue.shutdown(std::chrono::milliseconds::zero());
-    release->set();
-    ASSERT_TRUE(queue.shutdown(kTimeout));
-    const std::size_t waits_before = source->waits();
-    const bool once_ended = queue.shutdown(std::chrono::milliseconds::zero());
-
-    EXPECT_FALSE(while_running);
-    EXPECT_TRUE(once_ended);
-    EXPECT_EQ(source->waits(), waits_before);
-}
-
-TEST(operation_queue_test, shutdown_on_one_of_its_own_workers_does_not_wait)
-{
-    const auto source = std::make_shared<dross_test::observed_time_source>();
-    auto queue = dross::operation_queue_access::make(2, source).value();
-    auto workers = workers_of(queue);
-    ASSERT_EQ(workers.size(), 2U);
-    struct state {
-        std::atomic<bool> ended{ true };
-        event returned;
-    };
-    auto shared = std::make_shared<state>();
-
-    ASSERT_TRUE(queue.enqueue([queue, shared]() mutable {
-        shared->ended.store(queue.shutdown(kTimeout));
-        shared->returned.set();
-    }));
-
-    ASSERT_TRUE(shared->returned.wait());
-    EXPECT_FALSE(shared->ended.load());
-    EXPECT_EQ(source->waits(), 0U);
-    EXPECT_FALSE(queue.enqueue([]() {
-    }));
-    EXPECT_TRUE(all_end(workers));
-}
-
 TEST(operation_queue_test, enqueue_gives_back_what_the_task_returned)
 {
     auto queue = dross::operation_queue::create(2).value();
@@ -933,19 +821,6 @@ TEST(operation_queue_test, a_task_can_wait_for_the_result_of_one_it_enqueued)
     ASSERT_TRUE(outer->wait_for(kTimeout * 2));
 
     EXPECT_EQ(outer->get_as<int>(), 7);
-}
-
-TEST(operation_queue_test, enqueue_after_shutdown_reports_the_queue_stopped)
-{
-    auto queue = dross::operation_queue::create(1).value();
-    ASSERT_TRUE(queue.shutdown(kTimeout));
-
-    const auto result = queue.enqueue([]() {
-        return 1;
-    });
-
-    ASSERT_FALSE(result.has_value());
-    EXPECT_TRUE(result.error() == dross::operation_errc::queue_stopped);
 }
 
 TEST(operation_queue_test, enqueue_reports_an_empty_function_without_queueing_it)
@@ -1075,7 +950,7 @@ TEST(operation_queue_test, a_priority_operation_priority_does_not_name_is_not_qu
     }
     const auto after = queue.enqueue(count);
     ASSERT_TRUE(after.has_value());
-    ASSERT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(queue.wait_for(kTimeout));
 
     EXPECT_EQ(ran->load(), 1);
     EXPECT_TRUE(after->get_as<void>().has_value());
@@ -1682,7 +1557,7 @@ TEST(operation_queue_test, a_task_to_run_after_a_cancelled_result_is_cancelled_a
     ASSERT_FALSE(value.has_value());
     EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
     EXPECT_FALSE(queue.cancel(second->id()));
-    ASSERT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(queue.wait_for(kTimeout));
     EXPECT_EQ(ran->load(), 0);
 }
 
@@ -1716,7 +1591,7 @@ TEST(operation_queue_test, cancel_takes_off_every_task_that_runs_after_the_one_c
     ASSERT_TRUE(queue.cancel(first->id()));
     release->set();
 
-    ASSERT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(queue.wait_for(kTimeout));
     EXPECT_EQ(ran->load(), 1);
     for (const auto& result : { *first, *second, *third }) {
         const auto value = result.get_as<void>();
@@ -1747,7 +1622,7 @@ TEST(operation_queue_test, cancel_takes_off_a_task_still_waiting_for_what_it_run
     ASSERT_TRUE(queue.cancel(second->id()));
     release->set();
 
-    ASSERT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(queue.wait_for(kTimeout));
     EXPECT_EQ(first->get_as<int>(), 1);
     EXPECT_EQ(ran->load(), 0);
     for (const auto& result : { *second, *third }) {
@@ -1774,7 +1649,7 @@ TEST(operation_queue_test, a_result_from_another_queue_is_refused)
 
     ASSERT_FALSE(result.has_value());
     EXPECT_TRUE(result.error() == dross::operation_errc::foreign_dependency);
-    ASSERT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(queue.wait_for(kTimeout));
     EXPECT_EQ(ran->load(), 0);
 }
 
@@ -1809,17 +1684,17 @@ TEST(operation_queue_test, wait_for_waits_for_a_task_still_waiting_for_what_it_r
 
 TEST(operation_queue_test, a_chain_left_when_the_queue_stops_still_runs_to_its_end)
 {
-    auto queue = dross::operation_queue::create(3).value();
+    std::optional<dross::operation_queue> queue{ dross::operation_queue::create(3).value() };
     auto release = std::make_shared<event>();
     auto ran = std::make_shared<std::atomic<int>>(0);
-    const auto first = queue.enqueue([release, ran]() {
+    const auto first = queue->enqueue([release, ran]() {
         release->wait();
         ran->fetch_add(1);
     });
     ASSERT_TRUE(first.has_value());
     std::optional<dross::operation_result> last = *first;
     for (int n = 0; n < 5; ++n) {
-        const auto next = queue.enqueue(
+        const auto next = queue->enqueue(
             [ran]() {
             ran->fetch_add(1);
         },
@@ -1828,11 +1703,10 @@ TEST(operation_queue_test, a_chain_left_when_the_queue_stops_still_runs_to_its_e
         last = *next;
     }
 
-    const bool ended_early = queue.shutdown(std::chrono::milliseconds::zero());
+    queue.reset();
     release->set();
 
-    EXPECT_FALSE(ended_early);
-    EXPECT_TRUE(queue.shutdown(kTimeout));
+    ASSERT_TRUE(last->wait_for(kTimeout));
     EXPECT_EQ(ran->load(), 6);
     EXPECT_TRUE(last->get_as<void>().has_value());
 }

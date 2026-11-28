@@ -28,9 +28,6 @@ public:
 
     // A handle to the queue, or std::nullopt once its last handle has gone.
     static std::optional<operation_queue> lock(const weak_queue& queue);
-
-    // Whether queue still takes tasks, which it stops doing on shutdown().
-    static bool accepting(const operation_queue& queue);
 };
 
 }  // namespace dross

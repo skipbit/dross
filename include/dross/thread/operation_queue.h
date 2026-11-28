@@ -86,15 +86,13 @@ struct operation_options final {
  *   moved-from handle is still a usable handle naming the same queue
  *
  * Lifetime:
- * - When the last handle goes, or on shutdown(), the queue stops accepting
- *   tasks. Its workers run what is left, both the queue's tasks and what
- *   those tasks queued on their own worker's loop, and then end on their
- *   own
+ * - When the last handle goes, the queue stops accepting tasks. Its
+ *   workers run what is left, both the queue's tasks and what those tasks
+ *   queued on their own worker's loop, and then end on their own
  * - A task another thread queues on a worker's loop once the queue has
  *   stopped may not run, the same as one queued on any dross::thread whose
  *   loop is quitting
- * - The destructor never waits for that, even the last one; shutdown() is
- *   the way to wait for it
+ * - The destructor never waits for that, even the last one
  * - A timer installed on a worker's loop does not keep the worker alive; it
  *   goes when the worker ends
  * - quit() on a worker's thread, such as thread::current().quit() from a
@@ -104,11 +102,8 @@ struct operation_options final {
  * Waiting:
  * - wait_for() waits for the tasks already submitted to finish, while the
  *   queue goes on accepting more
- * - shutdown() stops the queue accepting tasks and waits for its workers to
- *   end
- * - Called from one of the queue's own workers, either returns at once
- *   instead, since the task it is called from can never finish while it
- *   waits
+ * - Called from one of the queue's own workers, it returns at once instead,
+ *   since the task it is called from can never finish while it waits
  *
  * Thread safety:
  * - Every operation is free of data races when called from any thread,
@@ -216,21 +211,6 @@ public:
      * for the same reason as thread::join().
      */
     bool wait_for(std::chrono::milliseconds timeout);
-
-    /**
-     * @brief Stop accepting tasks and wait for the workers to end, for at
-     * most timeout.
-     * @param timeout How long to wait
-     * @return true when every worker has ended
-     *
-     * The workers run what was already submitted before they end. The queue
-     * stops accepting tasks even when this returns false, and its workers
-     * still end once they are done. A timeout of zero does not wait; it
-     * reports whether they have already ended. Called from one of the
-     * queue's own workers, this does not wait either, for the same reason as
-     * thread::join().
-     */
-    bool shutdown(std::chrono::milliseconds timeout);
 
     /**
      * @brief Get the number of workers.

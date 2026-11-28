@@ -151,12 +151,6 @@ public:
         return true;
     }
 
-    bool accepting()
-    {
-        const std::lock_guard<std::mutex> guard{ _mutex };
-        return _accepting;
-    }
-
     // Stops accepting and hands every worker a task that runs what is left
     // and then ends the worker. Under the same lock as enqueue(), so every
     // sweep enqueue() handed out is ahead of it on its worker's loop. It lets
@@ -450,21 +444,18 @@ public:
     // Starts max_concurrency workers for a new queue.
     static std::expected<std::shared_ptr<storage>, error> start(std::size_t max_concurrency, std::shared_ptr<const time_source> source);
 
-    storage(std::vector<thread> workers, std::shared_ptr<backlog> work, std::shared_ptr<const time_source> source) noexcept;
+    storage(std::vector<thread> workers, std::shared_ptr<backlog> work) noexcept;
     ~storage();
 
     std::expected<operation_result, error> enqueue_any(std::function<std::any()> task, operation_options options);
     bool cancel(const operation_id& id);
     bool wait_for(std::chrono::milliseconds timeout);
-    bool shutdown(std::chrono::milliseconds timeout);
 
     std::size_t max_concurrency() const noexcept;
-    bool accepting() const;
 
 private:
     bool on_a_worker() const;
 
-    const std::shared_ptr<const time_source> _source;
     std::shared_ptr<backlog> _backlog;
     std::vector<thread> _workers;
 };
@@ -489,7 +480,7 @@ std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue:
             workers.push_back(std::move(*worker));
         }
         auto work = std::make_shared<backlog>(workers, source);
-        auto store = std::make_shared<storage>(std::move(workers), std::move(work), std::move(source));
+        auto store = std::make_shared<storage>(std::move(workers), std::move(work));
         guard.release();
         return store;
     } catch (const std::bad_alloc&) {
@@ -497,9 +488,8 @@ std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue:
     }
 }
 
-operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<backlog> work, std::shared_ptr<const time_source> source) noexcept
-    : _source{ std::move(source) }
-    , _backlog{ std::move(work) }
+operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<backlog> work) noexcept
+    : _backlog{ std::move(work) }
     , _workers{ std::move(workers) }
 {
 }
@@ -525,32 +515,9 @@ bool operation_queue::storage::wait_for(std::chrono::milliseconds timeout)
     return _backlog->wait_for(timeout, (! on_a_worker()));
 }
 
-bool operation_queue::storage::shutdown(std::chrono::milliseconds timeout)
-{
-    _backlog->stop();
-    if (on_a_worker()) {
-        timeout = std::chrono::milliseconds::zero();
-    }
-
-    // One deadline for every worker, rather than timeout for each in turn.
-    const auto deadline = deadline::after(_source->now(), timeout);
-    for (auto& worker : _workers) {
-        const auto left = std::chrono::ceil<std::chrono::milliseconds>(deadline - _source->now());
-        if (! worker.join_for(left)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 std::size_t operation_queue::storage::max_concurrency() const noexcept
 {
     return _workers.size();
-}
-
-bool operation_queue::storage::accepting() const
-{
-    return _backlog->accepting();
 }
 
 bool operation_queue::storage::on_a_worker() const
@@ -592,11 +559,6 @@ bool operation_queue::wait_for(std::chrono::milliseconds timeout)
     return _store->wait_for(timeout);
 }
 
-bool operation_queue::shutdown(std::chrono::milliseconds timeout)
-{
-    return _store->shutdown(timeout);
-}
-
 std::size_t operation_queue::max_concurrency() const noexcept
 {
     return _store->max_concurrency();
@@ -625,11 +587,6 @@ std::optional<operation_queue> operation_queue_access::lock(const weak_queue& qu
         return operation_queue{ std::move(store) };
     }
     return std::nullopt;
-}
-
-bool operation_queue_access::accepting(const operation_queue& queue)
-{
-    return queue._store->accepting();
 }
 
 }  // namespace dross

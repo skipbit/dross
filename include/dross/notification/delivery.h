@@ -39,9 +39,9 @@ namespace dross {
  *
  * Lifetime:
  * - A subscription does not keep its loop's thread or its queue going. Once
- *   the thread has ended, or the queue has stopped, whether by shutdown()
- *   or by its last handle going, the subscription is no longer active and
- *   no new notification is handed on
+ *   the thread has ended, or the queue has stopped by its last handle
+ *   going, the subscription is no longer active and no new notification is
+ *   handed on
  * - What was already queued follows the loop or the queue: a loop whose
  *   thread has ended drops it, and a queue that has stopped still runs it,
  *   as it runs every task it accepted. To have none of it run, end the
