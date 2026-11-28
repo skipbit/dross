@@ -226,6 +226,37 @@ TEST(operation_queue_test, a_queue_that_cannot_start_a_worker_refuses_a_task_as_
     EXPECT_EQ(accepted->get_as<int>(), 2);
 }
 
+TEST(operation_queue_test, a_task_after_a_cancelled_result_is_cancelled_with_no_worker_to_start)
+{
+    const std::vector<dross::thread> before = dross::thread::all();
+    auto queue = dross::operation_queue_access::make(1, dross::time_source::steady(), kShortIdle).value();
+    auto release = std::make_shared<event>();
+    ASSERT_TRUE(queue.enqueue([release]() {
+        release->wait();
+    }));
+    const auto waiting = queue.enqueue([]() {
+    });
+    ASSERT_TRUE(waiting.has_value());
+    ASSERT_TRUE(queue.cancel(waiting->id()));
+    release->set();
+    ASSERT_TRUE(queue.wait_for(kTimeout));
+    ASSERT_TRUE(eventually([&before]() {
+        return (dross_test::threads_not_in(before) == 0);
+    }));
+
+    const auto result = [&queue, &waiting]() {
+        const dross_test::failing_thread_starts failing{ 1 };
+        return queue.enqueue([]() {
+        }, { .after = { *waiting } });
+    }();
+
+    ASSERT_TRUE(result.has_value());
+    const auto value = result->get_as<void>();
+    ASSERT_FALSE(value.has_value());
+    EXPECT_TRUE(value.error() == dross::operation_errc::cancelled);
+    EXPECT_EQ(dross_test::threads_not_in(before), 0U);
+}
+
 TEST(operation_queue_test, a_worker_that_does_not_start_leaves_the_task_to_the_others)
 {
     auto queue = dross::operation_queue::create(2).value();

@@ -84,12 +84,14 @@ public:
         if (! _accepting) {
             return std::unexpected(error(operation_errc::queue_stopped));
         }
-        // With no worker, a task accepted could never run.
-        if (_workers.empty() && (! start_worker())) {
+        // With no worker, a task accepted could never run. One cancelled as
+        // it is accepted never runs, so it needs none.
+        const bool cancelled = any_cancelled(options.after);
+        if ((! cancelled) && _workers.empty() && (! start_worker())) {
             return std::unexpected(error(operation_errc::queue_stopped));
         }
         operation_result result = operation_access::make(_source, _number);
-        if (any_cancelled(options.after)) {
+        if (cancelled) {
             operation_access::cancel(result);
         } else {
             queue(options, result, std::move(held));
