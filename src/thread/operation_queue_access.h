@@ -3,6 +3,7 @@
 #include "dross/thread/operation_queue.h"
 #include "thread/time_source.h"
 
+#include <chrono>
 #include <cstddef>
 #include <expected>
 #include <memory>
@@ -18,6 +19,12 @@ public:
     // A queue like create(max_concurrency) makes, except that its own waits
     // read the time and wait through source.
     static std::expected<operation_queue, error> make(std::size_t max_concurrency, std::shared_ptr<const time_source> source);
+
+    // As make(), with workers that leave after idle with nothing to do
+    // rather than the 500 milliseconds create() gives them.
+    static std::expected<operation_queue, error> make(std::size_t max_concurrency,
+                                                      std::shared_ptr<const time_source> source,
+                                                      std::chrono::milliseconds idle);
 
     // A reference to a queue that does not keep it alive. lock() makes a
     // handle for as long as it is held, so a queue whose last other handle

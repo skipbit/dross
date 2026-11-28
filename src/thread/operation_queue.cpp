@@ -48,48 +48,19 @@ std::uint64_t next_queue_number() noexcept
     return last.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
-// Quits the workers it refers to when it goes, unless release() was called.
-class workers_guard final {
-public:
-    explicit workers_guard(std::vector<thread>& workers) noexcept
-        : _workers{ workers }
-    {
-    }
-
-    workers_guard(const workers_guard& other) = delete;
-    workers_guard& operator=(const workers_guard& other) = delete;
-
-    ~workers_guard()
-    {
-        if (! _released) {
-            for (auto& worker : _workers) {
-                worker.quit();
-            }
-        }
-    }
-
-    void release() noexcept
-    {
-        _released = true;
-    }
-
-private:
-    std::vector<thread>& _workers;
-    bool _released{ false };
-};
-
 // What the workers share with the queue's handles: the tasks waiting to run,
-// the ones running, and which workers already have a sweep on their loop.
-// The workers hold it, not the handles' storage, so the handles going does
-// not take it from a worker still sweeping. It holds handles to the workers
-// in turn until it stops, which is what lets it hand them sweeps.
+// the ones running, and the workers themselves. The workers hold it, not the
+// handles' storage, so the handles going does not take it from a worker
+// still running. It starts a worker when a task is ready and every worker
+// it has is busy, up to max_concurrency, and holds a handle to each until
+// that worker leaves.
 class backlog final : public std::enable_shared_from_this<backlog> {
 public:
-    backlog(std::vector<thread> workers, std::shared_ptr<const time_source> source)
+    backlog(std::size_t max_concurrency, std::shared_ptr<const time_source> source, std::chrono::milliseconds idle)
         : _source{ std::move(source) }
         , _number{ next_queue_number() }
-        , _workers{ std::move(workers) }
-        , _sweeping(_workers.size(), false)
+        , _max_concurrency{ max_concurrency }
+        , _idle{ idle }
     {
     }
 
@@ -110,6 +81,10 @@ public:
         auto held = std::make_unique<std::function<std::any()>>(std::move(task));
         const std::lock_guard<std::mutex> guard{ _mutex };
         if (! _accepting) {
+            return std::unexpected(error(operation_errc::queue_stopped));
+        }
+        // With no worker, a task accepted could never run.
+        if (_workers.empty() && (! start_worker())) {
             return std::unexpected(error(operation_errc::queue_stopped));
         }
         operation_result result = operation_access::make(_source, _number);
@@ -151,27 +126,33 @@ public:
         return true;
     }
 
-    // Stops accepting and hands every worker a task that runs what is left
-    // and then ends the worker. Under the same lock as enqueue(), so every
-    // sweep enqueue() handed out is ahead of it on its worker's loop. It lets
-    // go of its handles to the workers, since their loops hold it and would
-    // otherwise keep it alive, and drops them once _mutex is released.
+    // Stops accepting and wakes every worker, so one with nothing left on
+    // its loop leaves at once rather than at the end of its idle wait. The
+    // wake is queued under _mutex, so a worker still here has it ahead of
+    // the check that lets it leave.
     void stop()
     {
-        std::vector<thread> workers;
-        {
-            const std::lock_guard<std::mutex> guard{ _mutex };
-            if (! _accepting) {
-                return;
-            }
-            _accepting = false;
-
-            for (std::size_t i = 0; i < _workers.size(); ++i) {
-                _workers[i].perform(finish(i));
-            }
-            workers = std::move(_workers);
-            _workers.clear();
+        const std::lock_guard<std::mutex> guard{ _mutex };
+        _accepting = false;
+        for (auto& [id, worker] : _workers) {
+            worker.handle.perform([]() {
+                runloop::current().quit();
+            });
         }
+    }
+
+    // Whether the calling thread is one of the workers.
+    bool on_a_worker()
+    {
+        const std::lock_guard<std::mutex> guard{ _mutex };
+        return std::any_of(_workers.begin(), _workers.end(), [](const auto& worker) {
+            return worker.second.handle.is_current();
+        });
+    }
+
+    std::size_t max_concurrency() const noexcept
+    {
+        return _max_concurrency;
     }
 
     // Waits until every task accepted before the call has finished, or
@@ -269,55 +250,104 @@ private:
         }
     }
 
+    // A worker, and whether it has a sweep on its loop.
+    struct worker final {
+        thread handle;
+        bool sweeping;
+    };
+
     // Adds a task to the list of its priority and hands a sweep to every
-    // worker that has none; a sweep keeps taking until every list is empty,
-    // so an existing one reaches the task too. Every idle worker gets one,
-    // not just the first, since a worker with no sweep may still be busy
-    // running something else on its loop. Whichever gets there first takes
-    // the task, and the rest find the lists empty. Called with _mutex held.
-    // After stop() there is no worker to hand one to, so a task made ready
-    // then is taken by the worker whose done() made it ready, as it sweeps.
+    // worker that has none, starting one first when every worker has one
+    // and the queue is still below max_concurrency. A sweep keeps taking
+    // until every list is empty, so an existing one reaches the task too.
+    // Every idle worker gets one, not just the first, since a worker with
+    // no sweep may still be busy running something else on its loop.
+    // Whichever gets there first takes the task, and the rest find the
+    // lists empty. Called with _mutex held. Once the queue has stopped no
+    // worker is started, as the worker whose done() made the task ready
+    // takes it as it sweeps.
     void make_ready(entry task, operation_priority priority)
     {
         _tasks[static_cast<std::size_t>(priority)].push_back(std::move(task));
 
-        for (std::size_t i = 0; i < _workers.size(); ++i) {
-            if (_sweeping[i]) {
-                continue;
+        const bool all_busy = std::all_of(_workers.begin(), _workers.end(), [](const auto& each) {
+            return each.second.sweeping;
+        });
+        if (all_busy && _accepting && (_workers.size() < _max_concurrency)) {
+            // A worker that does not start leaves the task to the others.
+            start_worker();
+        }
+        for (auto& [id, each] : _workers) {
+            if (! each.sweeping) {
+                each.sweeping = true;
+                each.handle.perform(sweep(id));
             }
-            // Marked even when perform() fails: a worker whose loop has
-            // ended is never offered a sweep again.
-            _sweeping[i] = true;
-            _workers[i].perform(sweep(i));
         }
     }
 
-    std::function<void()> sweep(std::size_t worker)
+    // Starts a worker with no sweep yet; false when the system will not
+    // start one. Called with _mutex held, which the new thread does not
+    // take before it is started.
+    bool start_worker()
     {
-        return [self = shared_from_this(), worker]() {
-            self->run_until_empty(worker);
-        };
+        const std::uint64_t id = _next_worker++;
+        auto started = thread_access::start([self = shared_from_this(), id]() {
+            self->serve(id);
+        }, _source);
+        if (! started) {
+            return false;
+        }
+        _workers.emplace(id, worker{ std::move(*started), false });
+        return true;
     }
 
-    std::function<void()> finish(std::size_t worker)
+    // The body of a worker: runs its loop, which takes its sweeps, until it
+    // leaves.
+    void serve(std::uint64_t id)
     {
-        return [self = shared_from_this(), worker]() {
-            self->run_until_empty(worker);
-
-            // A task may have queued more on this worker's loop, say with
-            // thread::current().perform(); they run before the worker ends.
-            runloop loop = runloop::current();
-            if (loop.pending_count() > 0) {
-                loop.perform(self->finish(worker));
-            } else {
-                loop.quit();
+        runloop loop = runloop::current();
+        for (;;) {
+            const std::size_t ran = loop.run_for(_idle);
+            if (leave(id, ran, loop)) {
+                return;
             }
+        }
+    }
+
+    // Lets the worker go once it has been idle for a whole wait, or at once
+    // after the queue has stopped, as long as nothing is queued on its loop
+    // and no timer is installed there. Its handle is dropped once _mutex is
+    // released. Called between waits, when no sweep is running on it.
+    bool leave(std::uint64_t id, std::size_t ran, const runloop& loop)
+    {
+        std::optional<thread> gone;
+        {
+            const std::lock_guard<std::mutex> guard{ _mutex };
+            if (_accepting && (ran > 0)) {
+                return false;
+            }
+            if ((loop.pending_count() > 0) || (loop.timer_count() > 0)) {
+                return false;
+            }
+            const auto found = _workers.find(id);
+            if (found != _workers.end()) {
+                gone = std::move(found->second.handle);
+                _workers.erase(found);
+            }
+        }
+        return true;
+    }
+
+    std::function<void()> sweep(std::uint64_t id)
+    {
+        return [self = shared_from_this(), id]() {
+            self->run_until_empty(id);
         };
     }
 
-    void run_until_empty(std::size_t worker)
+    void run_until_empty(std::uint64_t id)
     {
-        while (auto next = take(worker)) {
+        while (auto next = take(id)) {
             next->run();
             done(*next);
         }
@@ -326,7 +356,7 @@ private:
     // The first task of the highest priority waiting, or none once every
     // list is empty, which also clears this worker's sweep so the next
     // enqueue() hands it another.
-    std::optional<entry> take(std::size_t worker)
+    std::optional<entry> take(std::uint64_t id)
     {
         const std::lock_guard<std::mutex> guard{ _mutex };
         for (auto tasks = _tasks.rbegin(); tasks != _tasks.rend(); ++tasks) {
@@ -336,7 +366,7 @@ private:
                 return next;
             }
         }
-        _sweeping[worker] = false;
+        _workers.at(id).sweeping = false;
         return std::nullopt;
     }
 
@@ -413,6 +443,9 @@ private:
     // without _mutex.
     const std::shared_ptr<const time_source> _source;
     const std::uint64_t _number;
+    const std::size_t _max_concurrency;
+    // How long a worker waits with nothing to do before it leaves.
+    const std::chrono::milliseconds _idle;
 
     std::mutex _mutex;
     std::condition_variable _settled;
@@ -431,9 +464,9 @@ private:
     std::unordered_map<operation_id, std::vector<std::uint64_t>> _dependents;
     // Every task waiting for results to return before it runs, by order.
     std::map<std::uint64_t, waiting> _waiting;
-    // Empty once the queue has stopped.
-    std::vector<thread> _workers;
-    std::vector<bool> _sweeping;
+    // Every worker that has not left, by a number of its own.
+    std::map<std::uint64_t, worker> _workers;
+    std::uint64_t _next_worker{ 0 };
     bool _accepting{ true };
 };
 
@@ -441,10 +474,12 @@ private:
 
 class operation_queue::storage final {
 public:
-    // Starts max_concurrency workers for a new queue.
-    static std::expected<std::shared_ptr<storage>, error> start(std::size_t max_concurrency, std::shared_ptr<const time_source> source);
+    // A new queue, which starts its workers as tasks need them.
+    static std::expected<std::shared_ptr<storage>, error> make(std::size_t max_concurrency,
+                                                               std::shared_ptr<const time_source> source,
+                                                               std::chrono::milliseconds idle);
 
-    storage(std::vector<thread> workers, std::shared_ptr<backlog> work) noexcept;
+    explicit storage(std::shared_ptr<backlog> work) noexcept;
     ~storage();
 
     std::expected<operation_result, error> enqueue_any(std::function<std::any()> task, operation_options options);
@@ -454,43 +489,25 @@ public:
     std::size_t max_concurrency() const noexcept;
 
 private:
-    bool on_a_worker() const;
-
     std::shared_ptr<backlog> _backlog;
-    std::vector<thread> _workers;
 };
 
-std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue::storage::start(std::size_t max_concurrency,
-                                                                                                std::shared_ptr<const time_source> source)
+std::expected<std::shared_ptr<operation_queue::storage>, error> operation_queue::storage::make(std::size_t max_concurrency,
+                                                                                               std::shared_ptr<const time_source> source,
+                                                                                               std::chrono::milliseconds idle)
 {
     if (max_concurrency == 0) {
         return std::unexpected(error{ std::errc::invalid_argument });
     }
-
-    // Running out of memory is reported as start_thread() reports it.
     try {
-        std::vector<thread> workers;
-        workers_guard guard{ workers };
-        workers.reserve(max_concurrency);
-        for (std::size_t i = 0; i < max_concurrency; ++i) {
-            auto worker = thread_access::start(source);
-            if (! worker) {
-                return std::unexpected(std::move(worker).error());
-            }
-            workers.push_back(std::move(*worker));
-        }
-        auto work = std::make_shared<backlog>(workers, source);
-        auto store = std::make_shared<storage>(std::move(workers), std::move(work));
-        guard.release();
-        return store;
+        return std::make_shared<storage>(std::make_shared<backlog>(max_concurrency, std::move(source), idle));
     } catch (const std::bad_alloc&) {
         return std::unexpected(error{ std::errc::not_enough_memory });
     }
 }
 
-operation_queue::storage::storage(std::vector<thread> workers, std::shared_ptr<backlog> work) noexcept
+operation_queue::storage::storage(std::shared_ptr<backlog> work) noexcept
     : _backlog{ std::move(work) }
-    , _workers{ std::move(workers) }
 {
 }
 
@@ -512,19 +529,12 @@ bool operation_queue::storage::cancel(const operation_id& id)
 
 bool operation_queue::storage::wait_for(std::chrono::milliseconds timeout)
 {
-    return _backlog->wait_for(timeout, (! on_a_worker()));
+    return _backlog->wait_for(timeout, (! _backlog->on_a_worker()));
 }
 
 std::size_t operation_queue::storage::max_concurrency() const noexcept
 {
-    return _workers.size();
-}
-
-bool operation_queue::storage::on_a_worker() const
-{
-    return std::any_of(_workers.begin(), _workers.end(), [](const thread& worker) {
-        return worker.is_current();
-    });
+    return _backlog->max_concurrency();
 }
 
 operation_queue::operation_queue(std::shared_ptr<storage> store) noexcept
@@ -571,7 +581,14 @@ bool operation_queue::operator==(const operation_queue& other) const noexcept
 
 std::expected<operation_queue, error> operation_queue_access::make(std::size_t max_concurrency, std::shared_ptr<const time_source> source)
 {
-    return operation_queue::storage::start(max_concurrency, std::move(source)).transform([](std::shared_ptr<operation_queue::storage> store) {
+    return make(max_concurrency, std::move(source), std::chrono::milliseconds{ 500 });
+}
+
+std::expected<operation_queue, error> operation_queue_access::make(std::size_t max_concurrency,
+                                                                   std::shared_ptr<const time_source> source,
+                                                                   std::chrono::milliseconds idle)
+{
+    return operation_queue::storage::make(max_concurrency, std::move(source), idle).transform([](std::shared_ptr<operation_queue::storage> store) {
         return operation_queue{ std::move(store) };
     });
 }

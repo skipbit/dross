@@ -50,8 +50,8 @@ struct operation_options final {
 };
 
 /**
- * @brief A fixed set of worker threads that run submitted tasks, the higher
- * priority first and otherwise in the order they were submitted.
+ * @brief Worker threads, up to a set number, that run submitted tasks, the
+ * higher priority first and otherwise in the order they were submitted.
  *
  * Where runloop and thread aim work at one particular thread, a queue hands
  * it to whichever of its workers is free. Each worker is a dross::thread
@@ -60,7 +60,13 @@ struct operation_options final {
  * it, the same as on any other thread dross started.
  *
  * Workers:
- * - The number of workers is given when the queue is made and never changes
+ * - A queue starts with no worker. It starts one when a task is ready to
+ *   run and every worker it has is busy, until it has max_concurrency()
+ *   of them, so no more tasks than that run at once
+ * - A worker that has had nothing to do for about half a second ends. One
+ *   with a task queued on its loop or a timer installed there stays
+ * - When the system will not start a worker, the tasks wait for the
+ *   workers the queue has; when it has none, enqueue() refuses the task
  * - The tasks wait in one list that every worker takes from. A worker takes
  *   the task of the highest operation_priority waiting, and of those, the
  *   one submitted first, so tasks of one priority start in the order they
@@ -88,16 +94,14 @@ struct operation_options final {
  * Lifetime:
  * - When the last handle goes, the queue stops accepting tasks. Its
  *   workers run what is left, both the queue's tasks and what those tasks
- *   queued on their own worker's loop, and then end on their own
+ *   queued on their own worker's loop, and then end on their own; a worker
+ *   with a timer installed on its loop ends once the timer has stopped
  * - A task another thread queues on a worker's loop once the queue has
  *   stopped may not run, the same as one queued on any dross::thread whose
  *   loop is quitting
  * - The destructor never waits for that, even the last one
- * - A timer installed on a worker's loop does not keep the worker alive; it
- *   goes when the worker ends
  * - quit() on a worker's thread, such as thread::current().quit() from a
- *   task, ends that worker early. A queue whose workers have all ended that
- *   way still accepts tasks but never runs them
+ *   task, does not end the worker; the queue alone decides when it ends
  *
  * Waiting:
  * - wait_for() waits for the tasks already submitted to finish, while the
@@ -131,16 +135,14 @@ struct operation_options final {
 class operation_queue final {
 public:
     /**
-     * @brief Start a queue with max_concurrency workers.
-     * @param max_concurrency The number of workers, at least one
-     * @return A handle to the new queue, or the error that kept it from
-     * starting: std::errc::invalid_argument when max_concurrency is zero, or
-     * std::errc::resource_unavailable_try_again when the system will not
-     * start a worker, or std::errc::not_enough_memory when there is no
-     * memory to start one, in which case the workers already started end
-     * without running anything
+     * @brief Make a queue that runs at most max_concurrency tasks at once.
+     * @param max_concurrency The most workers the queue has at once, at least
+     * one
+     * @return A handle to the new queue, or std::errc::invalid_argument when
+     * max_concurrency is zero, or std::errc::not_enough_memory when there is
+     * no memory to make it
      *
-     * Blocks until every worker has started.
+     * Starts no worker; the first task does.
      */
     [[nodiscard]] static std::expected<operation_queue, error> create(std::size_t max_concurrency);
 
@@ -175,7 +177,8 @@ public:
      * empty std::function, operation_errc::invalid_priority for a priority
      * operation_priority does not name, operation_errc::foreign_dependency
      * when options.after names a result from another queue, or
-     * operation_errc::queue_stopped once the queue has stopped
+     * operation_errc::queue_stopped when the queue has no worker and the
+     * system will not start one
      *
      * The task is queued and this returns at once; it does not wait for the
      * task to run. The result is filled in when the task returns.
@@ -213,8 +216,9 @@ public:
     bool wait_for(std::chrono::milliseconds timeout);
 
     /**
-     * @brief Get the number of workers.
-     * @return The count the queue was made with
+     * @brief Get the most workers the queue has at once.
+     * @return The count the queue was made with, not the number of workers
+     * it has now
      */
     std::size_t max_concurrency() const noexcept;
 

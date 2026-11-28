@@ -11,11 +11,11 @@
  *   worker happens to be free
  * - a callback can be sent back to the thread the work came from
  *
- * operation_queue covers the other case, work for whichever of a fixed set
- * of workers is free. Its workers keep a loop too, so the way back works
- * from them as well. Where the caller would rather wait for what the work
- * returns than have it sent back, enqueue() hands back an operation_result
- * to wait on and read.
+ * operation_queue covers the other case, work for whichever of its
+ * workers is free, up to a set number of them. Its workers keep a loop too,
+ * so the way back works from them as well. Where the caller would rather
+ * wait for what the work returns than have it sent back, enqueue() hands
+ * back an operation_result to wait on and read.
  *
  * Usage:
  * @code
